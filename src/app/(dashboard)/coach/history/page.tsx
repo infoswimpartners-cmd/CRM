@@ -15,7 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChevronLeft } from 'lucide-react'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
-import { LessonHistoryActions } from '@/components/coach/LessonHistoryActions'
+import { LessonHistoryRow } from '@/components/coach/LessonHistoryRow'
 
 export default async function CoachHistoryPage({
     searchParams,
@@ -128,30 +128,7 @@ export default async function CoachHistoryPage({
                                 </TableHeader>
                                 <TableBody>
                                     {lessons.map((lesson) => (
-                                        <TableRow key={lesson.id}>
-                                            <TableCell className="font-medium">
-                                                <div className="flex flex-col">
-                                                    <span>{format(new Date(lesson.lesson_date), 'M/d(E)', { locale: ja })}</span>
-                                                    <span className="text-xs text-muted-foreground">{format(new Date(lesson.lesson_date), 'HH:mm')}</span>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>{lesson.student_name}</TableCell>
-                                            <TableCell className="hidden md:table-cell text-xs text-muted-foreground max-w-[150px] truncate">
-                                                {lesson.location}
-                                            </TableCell>
-                                            <TableCell className="hidden md:table-cell text-xs text-muted-foreground max-w-[200px] truncate">
-                                                {lesson.menu_description}
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                <div className="flex flex-col items-end gap-1">
-                                                    <span>¥{lesson.price.toLocaleString()}</span>
-                                                    <Badge variant="outline" className="text-[10px] px-1 py-0 h-5 font-normal">完了</Badge>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <LessonHistoryActions lesson={lesson} />
-                                            </TableCell>
-                                        </TableRow>
+                                        <LessonHistoryRow key={lesson.id} lesson={lesson} />
                                     ))}
                                 </TableBody>
                             </Table>

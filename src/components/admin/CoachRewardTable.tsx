@@ -53,7 +53,7 @@ interface CoachRewardTableProps {
     targetDate?: Date
 }
 
-type Rank = 'Platinum' | 'Gold' | 'Silver' | 'Bronze' | 'Standard' | 'Master'
+type Rank = 'Owner' | 'Platinum' | 'Gold' | 'Silver' | 'Bronze' | 'Standard'
 
 export function CoachRewardTable({ coaches, lessons, targetDate }: CoachRewardTableProps) {
     const [selectedCoachId, setSelectedCoachId] = useState<string | null>(null)
@@ -75,7 +75,7 @@ export function CoachRewardTable({ coaches, lessons, targetDate }: CoachRewardTa
         let rate = 0.50
 
         if (coach.role === 'admin') {
-            rank = 'Master'
+            rank = 'Owner'
             rate = 1.0
         } else {
             const pastLessons = lessons.filter(l =>
@@ -172,7 +172,7 @@ export function CoachRewardTable({ coaches, lessons, targetDate }: CoachRewardTa
 
     const getRankColor = (r: Rank) => {
         switch (r) {
-            case 'Master': return 'bg-purple-100 text-purple-700 border-purple-200'
+            case 'Owner': return 'bg-purple-100 text-purple-700 border-purple-200'
             case 'Platinum': return 'bg-slate-800 text-slate-300 border-slate-700'
             case 'Gold': return 'bg-yellow-100 text-yellow-700 border-yellow-200'
             case 'Silver': return 'bg-slate-100 text-slate-700 border-slate-200'

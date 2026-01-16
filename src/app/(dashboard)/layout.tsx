@@ -44,9 +44,28 @@ export default async function DashboardLayout({
         <div className="min-h-screen bg-gray-50 pb-20 md:pb-0">
             <header className="bg-white shadow-sm sticky top-0 z-10">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-                    <Link href="/" className="font-bold text-xl text-blue-600">
+                    <Link href="/" className="font-bold text-xl text-blue-600 mr-8">
                         Swim Partners
                     </Link>
+
+                    {/* Navigation for Admins */}
+                    {safeProfile.role === 'admin' && (
+                        <nav className="flex items-center gap-4 mr-auto">
+                            <Link
+                                href="/admin"
+                                className="text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors"
+                            >
+                                管理者
+                            </Link>
+                            <Link
+                                href="/coach"
+                                className="text-sm font-medium text-gray-700 hover:text-blue-600 transition-colors"
+                            >
+                                コーチ
+                            </Link>
+                        </nav>
+                    )}
+
                     <div className="flex items-center gap-4">
                         <span className="text-sm text-gray-500 hidden sm:inline">{safeProfile.full_name || user.email}</span>
                         <form action={signOut}>

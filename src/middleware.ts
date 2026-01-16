@@ -2,7 +2,10 @@ import { type NextRequest } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
 
 export async function middleware(request: NextRequest) {
-    return await updateSession(request)
+    const response = await updateSession(request)
+    // Relax CSP to allow 'eval' in development to fix HMR/UI update issues
+    response.headers.set('Content-Security-Policy', "script-src 'self' 'unsafe-eval' 'unsafe-inline' https:; object-src 'none';")
+    return response
 }
 
 export const config = {

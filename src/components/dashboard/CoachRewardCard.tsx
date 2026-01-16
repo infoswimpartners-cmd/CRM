@@ -16,7 +16,7 @@ interface Lesson {
     }
 }
 
-type Rank = 'Platinum' | 'Gold' | 'Silver' | 'Bronze' | 'Standard'
+type Rank = 'Owner' | 'Platinum' | 'Gold' | 'Silver' | 'Bronze' | 'Standard'
 
 export function CoachRewardCard() {
     const [loading, setLoading] = useState(true)
@@ -38,6 +38,15 @@ export function CoachRewardCard() {
             const { data: { user } } = await supabase.auth.getUser()
 
             if (!user) return
+
+            // Fetch profile to check role (Admin/Owner)
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('role')
+                .eq('id', user.id)
+                .single()
+
+            const isOwner = profile?.role === 'admin'
 
             // 1. Calculate Rank (Last 3 months average)
             // Range: Start of 3 months ago to End of last month
@@ -65,18 +74,23 @@ export function CoachRewardCard() {
             let currentRank: Rank = 'Standard'
             let rate = 0.50
 
-            if (average >= 30) {
-                currentRank = 'Platinum'
-                rate = 0.70
-            } else if (average >= 25) {
-                currentRank = 'Gold'
-                rate = 0.65
-            } else if (average >= 20) {
-                currentRank = 'Silver'
-                rate = 0.60
-            } else if (average >= 15) {
-                currentRank = 'Bronze'
-                rate = 0.55
+            if (isOwner) {
+                currentRank = 'Owner'
+                rate = 1.0 // 100% Reward for Owners
+            } else {
+                if (average >= 30) {
+                    currentRank = 'Platinum'
+                    rate = 0.70
+                } else if (average >= 25) {
+                    currentRank = 'Gold'
+                    rate = 0.65
+                } else if (average >= 20) {
+                    currentRank = 'Silver'
+                    rate = 0.60
+                } else if (average >= 15) {
+                    currentRank = 'Bronze'
+                    rate = 0.55
+                }
             }
 
             setRank(currentRank)
@@ -143,8 +157,14 @@ export function CoachRewardCard() {
             }
 
             // 3. Calculate Tax (10.21%)
+            // Owners (Admins) are exempt from tax withholding in this system context
             const grossReward = Math.floor(totalReward)
-            const taxAmount = Math.floor(grossReward * 0.1021)
+            let taxAmount = Math.floor(grossReward * 0.1021)
+
+            if (isOwner) {
+                taxAmount = 0
+            }
+
             const netReward = grossReward - taxAmount
 
             setCurrentMonthReward(netReward)
@@ -163,6 +183,7 @@ export function CoachRewardCard() {
 
     const getRankColor = (r: Rank) => {
         switch (r) {
+            case 'Owner': return 'text-purple-600 bg-purple-100 border-purple-200' // Owner (Special)
             case 'Platinum': return 'text-slate-300 bg-slate-800' // Platinum
             case 'Gold': return 'text-yellow-600 bg-yellow-100'
             case 'Silver': return 'text-slate-600 bg-slate-100'

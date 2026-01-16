@@ -5,7 +5,7 @@ import { CoachRewardTable } from '@/components/admin/CoachRewardTable'
 import { startOfMonth, endOfMonth, subMonths } from 'date-fns'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Settings, Users, User } from 'lucide-react'
+import { Settings, Users, User, PlusCircle, Calendar as CalendarIcon, History } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { AdminDashboardTabs } from '@/components/admin/AdminDashboardTabs'
 
@@ -13,6 +13,9 @@ export const dynamic = 'force-dynamic'
 
 import { MonthSelector } from '@/components/admin/MonthSelector'
 import { format } from 'date-fns'
+import { CoachRewardCard } from '@/components/dashboard/CoachRewardCard'
+import { Badge } from '@/components/ui/badge'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
 export default async function AdminDashboard(props: {
     searchParams: Promise<{ [key: string]: string | string[] | undefined }>
@@ -24,6 +27,11 @@ export default async function AdminDashboard(props: {
     const targetDate = new Date(monthParam + '-01')
 
     const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+        return <div>Access Denied</div>
+    }
 
     // 1. Fetch Coaches (Profiles)
     // Note: In a real app we might filter by role, but assuming all profiles are relevant or we filter later
@@ -57,6 +65,33 @@ export default async function AdminDashboard(props: {
             )
         `)
         .order('lesson_date', { ascending: false })
+
+    // 3. Fetch My Coach Data (Recent Lessons) - Similar to coach/page.tsx
+    const { data: myRecentLessons } = await supabase
+        .from('lessons')
+        .select(`
+            *,
+            lesson_masters (
+                is_trial,
+                unit_price
+            ),
+            students (
+                membership_types (
+                    reward_master:lesson_masters!reward_master_id (
+                        unit_price
+                    )
+                )
+            )
+        `)
+        .eq('coach_id', user.id)
+        .order('lesson_date', { ascending: false }) // Use lesson_date for display order
+        .limit(5)
+
+    // Calculate Reward Rate for current user (Admin is always 100% locally, but for display logic)
+    // Actually Admin rate is fixed 1.0 in calculation, but let's reuse logic for display consistency if needed.
+    // For Admin dashboard, we can simplify/assume 1.0 or just calculate it if we want to be precise.
+    // Let's stick to the calculateTotalReward logic used below which handles 'admin' role = 1.0.
+    const myRate = 1.0
 
     if (error) {
         console.error('Error fetching lessons:', error)
@@ -120,6 +155,7 @@ export default async function AdminDashboard(props: {
                 const master = l.lesson_masters
                 // @ts-ignore
                 const membershipRewardMaster = l.students?.membership_types?.reward_master
+                // @ts-ignore (not handling all potential nulls perfectly here for brevity)
 
                 if (master) {
                     if (master.is_trial) {
@@ -146,6 +182,22 @@ export default async function AdminDashboard(props: {
     const diffProfit = totalProfit - lastMonthProfit
     const diffCount = thisMonthLessons.length - lastMonthLessons.length
 
+    // Helper for My Recent Lessons UI
+    const calculateMyLessonReward = (lesson: any) => {
+        const master = lesson.lesson_masters
+        if (!master) return 0
+
+        if (master.is_trial) {
+            return 4500
+        }
+
+        // Membership Reward override
+        const membershipRewardPrice = lesson.students?.membership_types?.reward_master?.unit_price
+        const basePrice = membershipRewardPrice ?? master.unit_price
+
+        return Math.floor(basePrice * myRate)
+    }
+
     return (
         <div className="space-y-8 pb-8">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -156,6 +208,7 @@ export default async function AdminDashboard(props: {
                 <MonthSelector currentMonth={monthParam} />
             </div>
 
+
             <SalesSummary
                 totalSales={totalSales}
                 lessonCount={thisMonthLessons.length}
@@ -165,11 +218,103 @@ export default async function AdminDashboard(props: {
                 diffCount={diffCount}
             />
 
+            <div className="py-6">
+                <h3 className="mb-4 text-lg font-semibold flex items-center gap-2 text-slate-700">
+                    <User className="h-5 w-5" />
+                    マイ・コーチング活動
+                </h3>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    <CoachRewardCard />
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <History className="h-5 w-5" />
+                                最近のレッスン履歴
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {myRecentLessons && myRecentLessons.length > 0 ? (
+                                <div className="space-y-4">
+                                    {myRecentLessons.map((lesson) => (
+                                        <div key={lesson.id} className="flex items-center justify-between border-b pb-2 last:border-0 last:pb-0">
+                                            <div>
+                                                <p className="font-medium text-sm">{lesson.student_name}</p>
+                                                <p className="text-xs text-gray-500">{new Date(lesson.lesson_date).toLocaleDateString()}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="font-medium text-sm text-blue-600">
+                                                    ¥{calculateMyLessonReward(lesson).toLocaleString()}
+                                                </p>
+                                                {lesson.lesson_masters?.is_trial ? (
+                                                    <Badge variant="outline" className="text-[10px] h-5">体験</Badge>
+                                                ) : (
+                                                    <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">完了</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                    <Button variant="ghost" size="sm" className="w-full text-xs" asChild>
+                                        <Link href="/coach/history">すべて見る</Link>
+                                    </Button>
+                                </div>
+                            ) : (
+                                <div className="text-sm text-gray-500 text-center py-4">
+                                    履歴はありません。
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
+
             <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-1">
                 <AdminDashboardTabs
                     performanceContent={<CoachRewardTable coaches={activeCoaches} lessons={lessons as any} targetDate={targetDate} />}
                     historyContent={<LessonTable lessons={lessons as any} />}
                 />
+            </div>
+
+            <div className="border-t pt-8">
+                <h3 className="mb-4 text-lg font-semibold flex items-center gap-2 text-slate-700">
+                    <User className="h-5 w-5" />
+                    コーチ業務メニュー
+                </h3>
+                <div className="grid gap-4 md:grid-cols-3">
+                    <Link href="/coach/report">
+                        <Card className="hover://bg-slate-50 transition-colors cursor-pointer h-full border-slate-200 shadow-none hover:shadow-sm">
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <CardTitle className="text-sm font-medium text-slate-700">新規レポート作成</CardTitle>
+                                <PlusCircle className="h-4 w-4 text-blue-500" />
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-xs text-muted-foreground">レッスンの実施報告を作成します</div>
+                            </CardContent>
+                        </Card>
+                    </Link>
+                    <Link href="/coach/schedule">
+                        <Card className="hover:bg-slate-50 transition-colors cursor-pointer h-full border-slate-200 shadow-none hover:shadow-sm">
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <CardTitle className="text-sm font-medium text-slate-700">スケジュール</CardTitle>
+                                <CalendarIcon className="h-4 w-4 text-green-500" />
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-xs text-muted-foreground">予定の確認・追加</div>
+                            </CardContent>
+                        </Card>
+                    </Link>
+                    <Link href="/coach/history">
+                        <Card className="hover:bg-slate-50 transition-colors cursor-pointer h-full border-slate-200 shadow-none hover:shadow-sm">
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <CardTitle className="text-sm font-medium text-slate-700">レッスン履歴</CardTitle>
+                                <History className="h-4 w-4 text-purple-500" />
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-xs text-muted-foreground">提出済みレポートの確認</div>
+                            </CardContent>
+                        </Card>
+                    </Link>
+                </div>
             </div>
 
             <div className="border-t pt-8">

@@ -40,9 +40,10 @@ interface Lesson {
 
 interface Props {
     lesson: Lesson
+    onDelete?: () => void
 }
 
-export function LessonHistoryActions({ lesson }: Props) {
+export function LessonHistoryActions({ lesson, onDelete }: Props) {
     const router = useRouter()
     const [isEditOpen, setIsEditOpen] = useState(false)
     const [isDeleteOpen, setIsDeleteOpen] = useState(false)
@@ -51,6 +52,9 @@ export function LessonHistoryActions({ lesson }: Props) {
     const handleDelete = async () => {
         setIsDeleting(true)
         const supabase = createClient()
+
+        // Optimistic update
+        onDelete?.()
 
         try {
             const { error } = await supabase

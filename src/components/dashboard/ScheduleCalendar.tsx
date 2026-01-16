@@ -21,6 +21,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { createClient } from '@/lib/supabase/client'
 import { AddScheduleDialog } from './AddScheduleDialog'
+import { EditScheduleDialog } from './EditScheduleDialog'
 
 interface Schedule {
     id: string
@@ -41,6 +42,15 @@ export function ScheduleCalendar() {
     // View Mode State
     const [viewMode, setViewMode] = React.useState<'calendar' | 'list'>('calendar')
     const [listSchedules, setListSchedules] = React.useState<Schedule[]>([])
+
+    // Edit Dialog State
+    const [selectedSchedule, setSelectedSchedule] = React.useState<Schedule | null>(null)
+    const [isEditOpen, setIsEditOpen] = React.useState(false)
+
+    const handleScheduleClick = (schedule: Schedule) => {
+        setSelectedSchedule(schedule)
+        setIsEditOpen(true)
+    }
 
     // Fetch schedules for the displayed month (Calendar Mode)
     React.useEffect(() => {
@@ -136,7 +146,11 @@ export function ScheduleCalendar() {
     }
 
     const ScheduleCard = ({ schedule }: { schedule: Schedule }) => (
-        <Card key={schedule.id}>
+        <Card
+            key={schedule.id}
+            className="cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => handleScheduleClick(schedule)}
+        >
             <CardContent className="p-4 flex gap-4">
                 <div className="flex flex-col items-center justify-center min-w-[60px] border-r pr-4">
                     <span className="text-sm font-bold text-gray-900">
@@ -313,6 +327,13 @@ export function ScheduleCalendar() {
                     </div>
                 </div>
             )}
+
+            <EditScheduleDialog
+                schedule={selectedSchedule}
+                open={isEditOpen}
+                onOpenChange={setIsEditOpen}
+                onSuccess={handleSuccess}
+            />
         </div>
     )
 }
