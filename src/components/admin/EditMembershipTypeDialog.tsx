@@ -14,13 +14,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog"
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from 'sonner'
 
 interface MembershipType {
@@ -51,30 +45,72 @@ export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembe
 
     const [name, setName] = useState(type.name)
     const [fee, setFee] = useState(type.fee.toString())
-    const [defaultLessonId, setDefaultLessonId] = useState<string>(type.default_lesson_master_id || 'none')
-    const [rewardMasterId, setRewardMasterId] = useState<string>(type.reward_master_id || 'none')
+    // Map of lesson_id -> custom reward price (null means use master price)
+    const [selectedLessons, setSelectedLessons] = useState<Map<string, string>>(new Map())
     const [lessonMasters, setLessonMasters] = useState<LessonMaster[]>([])
 
+    // Fetch Masters and Existing Relations
     useEffect(() => {
-        const fetchMasters = async () => {
+        const fetchData = async () => {
             const supabase = createClient()
-            const { data } = await supabase
+
+            // 1. Fetch Masters
+            const { data: masters } = await supabase
                 .from('lesson_masters')
                 .select('id, name, active, unit_price')
                 .eq('active', true)
                 .order('name')
-            if (data) setLessonMasters(data as any)
+            if (masters) setLessonMasters(masters as any)
+
+            // 2. Fetch Existing Relations
+            if (type.id) {
+                const { data: relations } = await supabase
+                    .from('membership_type_lessons')
+                    .select('lesson_master_id, reward_price')
+                    .eq('membership_type_id', type.id)
+
+                if (relations && relations.length > 0) {
+                    const newMap = new Map<string, string>()
+                    relations.forEach((r: any) => {
+                        newMap.set(r.lesson_master_id, r.reward_price !== null ? String(r.reward_price) : '')
+                    })
+                    setSelectedLessons(newMap)
+                } else {
+                    // Fallback to legacy field
+                    if (type.default_lesson_master_id) {
+                        const newMap = new Map<string, string>()
+                        newMap.set(type.default_lesson_master_id, '')
+                        setSelectedLessons(newMap)
+                    } else {
+                        setSelectedLessons(new Map())
+                    }
+                }
+            }
         }
-        if (open) fetchMasters()
-    }, [open])
+        if (open) fetchData()
+    }, [open, type.id, type.default_lesson_master_id])
 
     // Update local state when type prop changes
     useEffect(() => {
         setName(type.name)
         setFee(type.fee.toString())
-        setDefaultLessonId(type.default_lesson_master_id || 'none')
-        setRewardMasterId(type.reward_master_id || 'none')
     }, [type])
+
+    const toggleLesson = (id: string) => {
+        const newMap = new Map(selectedLessons)
+        if (newMap.has(id)) {
+            newMap.delete(id)
+        } else {
+            newMap.set(id, '')
+        }
+        setSelectedLessons(newMap)
+    }
+
+    const handlePriceChange = (id: string, value: string) => {
+        const newMap = new Map(selectedLessons)
+        newMap.set(id, value)
+        setSelectedLessons(newMap)
+    }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -82,29 +118,46 @@ export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembe
         const supabase = createClient()
 
         try {
-            const { error } = await supabase
+            // 1. Update Base Type
+            const { error: baseError } = await supabase
                 .from('membership_types')
                 .update({
                     name,
                     fee: parseInt(fee),
-                    default_lesson_master_id: defaultLessonId === 'none' ? null : defaultLessonId,
-                    reward_master_id: rewardMasterId === 'none' ? null : rewardMasterId,
                 })
                 .eq('id', type.id)
 
-            if (error) throw error
+            if (baseError) throw baseError
+
+            // 2. Update Relations (Delete All + Insert All)
+            const { error: deleteError } = await supabase
+                .from('membership_type_lessons')
+                .delete()
+                .eq('membership_type_id', type.id)
+
+            if (deleteError) throw deleteError
+
+            if (selectedLessons.size > 0) {
+                const relations = Array.from(selectedLessons.entries()).map(([lessonId, priceStr]) => ({
+                    membership_type_id: type.id,
+                    lesson_master_id: lessonId,
+                    reward_price: priceStr && !isNaN(parseInt(priceStr)) ? parseInt(priceStr) : null
+                }))
+
+                const { error: insertError } = await supabase
+                    .from('membership_type_lessons')
+                    .insert(relations)
+
+                if (insertError) throw insertError
+            }
 
             toast.success('会員区分を更新しました')
             onOpenChange(false)
             router.refresh()
         } catch (error) {
-            console.error('Update Log Error Object:', error)
+            console.error('Update Log Error Object:', JSON.stringify(error, null, 2))
             // @ts-ignore
-            console.error('Update Log Error Message:', error?.message)
-            // @ts-ignore
-            console.error('Update Log Error Details:', error?.details)
-            // @ts-ignore
-            toast.error(`更新に失敗しました: ${error?.message} / ${error?.details || ''}`)
+            toast.error(`更新に失敗しました: ${error?.message || '不明なエラー'}`)
         } finally {
             setLoading(false)
         }
@@ -112,7 +165,7 @@ export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembe
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-[500px]">
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>
                         <DialogTitle>会員区分の編集</DialogTitle>
@@ -146,41 +199,58 @@ export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembe
                                 required
                             />
                         </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="edit-defaultLesson" className="text-right">
-                                標準レッスン
+                        <div className="grid grid-cols-4 items-start gap-4">
+                            <Label className="text-right pt-2">
+                                標準レッスン<br />(複数選択可)
                             </Label>
-                            <Select value={defaultLessonId} onValueChange={setDefaultLessonId}>
-                                <SelectTrigger className="col-span-3">
-                                    <SelectValue placeholder="選択なし" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="none">選択なし</SelectItem>
-                                    {lessonMasters.map((master) => (
-                                        <SelectItem key={master.id} value={master.id}>
-                                            {master.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="edit-rewardMaster" className="text-right">
-                                報酬計算用
-                            </Label>
-                            <Select value={rewardMasterId} onValueChange={setRewardMasterId}>
-                                <SelectTrigger className="col-span-3">
-                                    <SelectValue placeholder="選択なし (売上額を使用)" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="none">選択なし (売上額を使用)</SelectItem>
-                                    {lessonMasters.map((master) => (
-                                        <SelectItem key={master.id} value={master.id}>
-                                            {master.name} (単価: ¥{master.unit_price?.toLocaleString()})
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <div className="col-span-3 border rounded-md p-3 h-[300px] overflow-y-auto space-y-4">
+                                {lessonMasters.map((master) => {
+                                    const isChecked = selectedLessons.has(master.id)
+                                    return (
+                                        <div key={master.id} className="flex flex-col space-y-2 border-b pb-2 last:border-0">
+                                            <div className="flex items-center space-x-2">
+                                                <Checkbox
+                                                    id={`edit-lesson-${master.id}`}
+                                                    checked={isChecked}
+                                                    onCheckedChange={() => toggleLesson(master.id)}
+                                                />
+                                                <label
+                                                    htmlFor={`edit-lesson-${master.id}`}
+                                                    className="text-sm font-medium leading-none cursor-pointer flex-1"
+                                                >
+                                                    {master.name} <span className="text-gray-400 text-xs">(通常単価: ¥{master.unit_price.toLocaleString()})</span>
+                                                </label>
+                                            </div>
+
+                                            {isChecked && (
+                                                <div className="flex items-center gap-2 pl-6 animate-in slide-in-from-top-1 duration-200">
+                                                    <Label htmlFor={`edit-price-${master.id}`} className="text-xs text-gray-500 whitespace-nowrap">
+                                                        報酬計算単価:
+                                                    </Label>
+                                                    <div className="relative w-32">
+                                                        <Input
+                                                            id={`edit-price-${master.id}`}
+                                                            type="number"
+                                                            placeholder={master.unit_price.toString()}
+                                                            value={selectedLessons.get(master.id) || ''}
+                                                            onChange={(e) => handlePriceChange(master.id, e.target.value)}
+                                                            className="h-8 text-sm"
+                                                        />
+                                                    </div>
+                                                    <span className="text-xs text-gray-400">
+                                                        (空欄は {master.unit_price}円)
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )
+                                })}
+                                {lessonMasters.length === 0 && (
+                                    <div className="text-sm text-gray-500 text-center py-4">
+                                        有効なレッスンマスタがありません
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
                     <DialogFooter>

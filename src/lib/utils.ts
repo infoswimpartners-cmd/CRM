@@ -48,7 +48,10 @@ export function calculateSchoolGrade(birthDate: Date): string {
 
   const gradeScore = academicYearDiff - 6
 
-  if (gradeScore < 1) return '未就学児'
+  if (gradeScore === 0) return '年長'
+  if (gradeScore === -1) return '年中'
+  if (gradeScore === -2) return '年少'
+  if (gradeScore < -2) return '幼児' // Below Nensho
   if (gradeScore <= 6) return `小学${gradeScore}年生`
   if (gradeScore <= 9) return `中学${gradeScore - 6}年生`
   if (gradeScore <= 12) return `高校${gradeScore - 9}年生`

@@ -1,15 +1,18 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { PlusCircle, History, User, Calendar as CalendarIcon } from 'lucide-react'
+import { PlusCircle, History, User, Calendar as CalendarIcon, DollarSign, Users, Waves } from 'lucide-react'
 
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 
-import { CoachRewardCard } from '@/components/dashboard/CoachRewardCard'
-import { startOfMonth, subMonths, endOfMonth } from 'date-fns'
+import { RevenueChart } from '@/components/dashboard/RevenueChart'
+import { startOfMonth, subMonths, endOfMonth, format } from 'date-fns'
+import { CoachActivityWidget } from '@/components/dashboard/CoachActivityWidget'
+import { calculateCoachRate, calculateMonthlyStats } from '@/lib/reward-system'
+import { MonthlyFinancialsWidget } from '@/components/coach/MonthlyFinancialsWidget'
 
 export default async function CoachDashboard() {
     const supabase = await createClient()
@@ -25,33 +28,13 @@ export default async function CoachDashboard() {
         .eq('id', user.id)
         .single()
 
-    // 1. Calculate Reward Rate (Server-Side)
+    // 1. Fetch Lessons Data (Broad range for 6 months history + 3 months rank)
+    // We need 9 months of data ideally (6 months display + 3 months calc for the oldest displayed month)
+    // But for simplicity/performance in this view, let's fetch last 9 months.
     const today = new Date()
-    const threeMonthsAgo = startOfMonth(subMonths(today, 3))
-    const lastMonthEnd = endOfMonth(subMonths(today, 1))
+    const nineMonthsAgo = startOfMonth(subMonths(today, 9))
 
-    const { count } = await supabase
-        .from('lessons')
-        .select('*', { count: 'exact', head: true })
-        .eq('coach_id', user.id)
-        .gte('lesson_date', threeMonthsAgo.toISOString())
-        .lte('lesson_date', lastMonthEnd.toISOString())
-
-    const average = (count || 0) / 3
-    let rate = 0.50
-    const isAdmin = profile?.role === 'admin'
-
-    if (isAdmin) {
-        rate = 1.0 // Admin always 100%
-    } else {
-        if (average >= 30) rate = 0.70
-        else if (average >= 25) rate = 0.65
-        else if (average >= 20) rate = 0.60
-        else if (average >= 15) rate = 0.55
-    }
-
-    // 2. Fetch Recent Lessons with Data for Reward Calc
-    const { data: recentLessons } = await supabase
+    const { data: allLessons } = await supabase
         .from('lessons')
         .select(`
             *,
@@ -68,139 +51,172 @@ export default async function CoachDashboard() {
             )
         `)
         .eq('coach_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(5)
+        .gte('lesson_date', nineMonthsAgo.toISOString())
+        .order('lesson_date', { ascending: false })
 
-    // Helper to calc reward per lesson
-    const calculateLessonReward = (lesson: any) => {
-        const master = lesson.lesson_masters
-        if (!master) return 0
+    // 2. Calculate Stats for this month and past months
+    const isAdmin = profile?.role === 'admin'
+    const currentRate = isAdmin ? 1.0 : calculateCoachRate(user.id, allLessons as any || [], today)
+    const thisMonthStart = startOfMonth(today)
+    const thisMonthEnd = endOfMonth(today)
 
-        if (master.is_trial) {
-            return 4500
-        }
+    const thisMonthLessons = allLessons?.filter(l => {
+        const d = new Date(l.lesson_date)
+        return d >= thisMonthStart && d <= thisMonthEnd
+    }) || []
 
-        // Membership Reward override
-        // Note: The type definition for join is tricky, relying on runtime structure
-        const membershipRewardPrice = lesson.students?.membership_types?.reward_master?.unit_price
-        const basePrice = membershipRewardPrice ?? master.unit_price
+    const thisMonthStats = calculateMonthlyStats(user.id, thisMonthLessons as any[], currentRate)
 
-        return Math.floor(basePrice * rate)
+    // Generate 6 months reports for widget
+    const monthlyReports = []
+    for (let i = 0; i < 6; i++) {
+        const d = subMonths(today, i)
+        const monthStart = startOfMonth(d)
+        const monthEnd = endOfMonth(d)
+
+        // Rate for THAT specific month (based on 3 months prior to THAT month)
+        const monthRate = isAdmin ? 1.0 : calculateCoachRate(user.id, allLessons as any || [], d)
+
+        const monthLessons = allLessons?.filter(l => {
+            const date = new Date(l.lesson_date)
+            return date >= monthStart && date <= monthEnd
+        }) || []
+
+        const stats = calculateMonthlyStats(user.id, monthLessons as any[], monthRate)
+
+        monthlyReports.push({
+            monthKey: format(d, 'yyyy-MM'),
+            sales: stats.totalSales,
+            reward: stats.totalReward,
+            count: stats.lessonCount,
+            rate: monthRate,
+            details: stats.details
+        })
     }
 
+    // 3. (Kept) Fetch Upcoming Schedules
+    const now = new Date().toISOString()
+    const { data: upcomingSchedulesRaw } = await supabase
+        .from('lesson_schedules')
+        .select(`
+            id,
+            title,
+            start_time,
+            end_time,
+            location,
+            students ( full_name )
+        `)
+        .eq('coach_id', user.id)
+        .gte('start_time', now)
+        .order('start_time', { ascending: true })
+        .limit(5)
+
+    const upcomingSchedules = upcomingSchedulesRaw?.map(s => ({
+        id: s.id,
+        title: s.title || 'レッスン',
+        start_time: s.start_time,
+        end_time: s.end_time,
+        location: s.location,
+        // @ts-ignore
+        student_name: Array.isArray(s.students) ? s.students[0]?.full_name : s.students?.full_name,
+        coach: {
+            full_name: profile?.full_name || '名称未設定',
+            avatar_url: profile?.avatar_url
+        }
+    })) || []
+
+    // 4. (Kept) Recent Lessons for "Report/Memo Tab" (already have allLessons, just slice top 5)
+    // But existing code uses `getStudentMemos` or specific fetch? logic was fetch with students..
+    // allLessons has what we need but simplified. Let's reuse allLessons or fetch proper structure if needed.
+    // The previous code fetched separate recentLessons.
+    // Let's use `allLessons` slice(0,5) but ensure it has `students` and `profiles` if needed.
+    // `allLessons` has `students`.
+    const recentLessons = allLessons?.slice(0, 5) || []
+
+    // Calculate Active & New Students
+    const threeMonthsStart = startOfMonth(subMonths(today, 2))
+    const activeStudents = new Set(
+        allLessons?.filter(l => new Date(l.lesson_date) >= threeMonthsStart)
+            .map(l => l.student_id)
+    ).size
+
+    const previousStudents = new Set(
+        allLessons?.filter(l => new Date(l.lesson_date) < thisMonthStart)
+            .map(l => l.student_id)
+    )
+    const thisMonthStudentIds = new Set(thisMonthLessons.map(l => l.student_id))
+    let newStudentsCount = 0
+    thisMonthStudentIds.forEach(id => {
+        if (!previousStudents.has(id)) newStudentsCount++
+    })
+
+    // Calculate Lesson Diff
+    const lastMonthCount = monthlyReports[1]?.count || 0
+    const lessonDiff = thisMonthStats.lessonCount - lastMonthCount
+
     return (
-        <div className="space-y-8">
-            {/* Header Section */}
-            <div className="flex flex-col md:flex-row items-center gap-6 bg-white p-6 rounded-lg border shadow-sm">
-                <Avatar className="h-20 w-20 border-2 border-primary/10">
-                    <AvatarImage src={profile?.avatar_url || ''} />
-                    <AvatarFallback className="text-xl bg-primary/5 text-primary">
-                        {profile?.full_name?.slice(0, 1) || 'C'}
-                    </AvatarFallback>
-                </Avatar>
-                <div className="flex flex-col text-center md:text-left gap-1">
-                    <h1 className="text-2xl font-bold tracking-tight">
-                        こんにちは、{profile?.full_name || 'コーチ'}さん
-                        {profile?.coach_number && (
-                            <Badge variant="secondary" className="ml-2">
-                                {profile.coach_number}
-                            </Badge>
-                        )}
-                    </h1>
-                    <p className="text-muted-foreground">
-                        今日のレッスン報告やスケジュールの確認を行いましょう
-                    </p>
+        <div className="space-y-6 animate-fade-in-up">
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 h-[800px] xl:h-[600px]">
+                {/* Left Column: Charts & KPIs */}
+                <div className="xl:col-span-2 flex flex-col gap-6 h-full overflow-y-auto pr-2">
+                    {/* KPI Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 shrink-0">
+                        <div className="bg-white rounded-2xl p-6 relative overflow-hidden group shadow-sm border border-slate-200">
+                            <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                                <DollarSign className="w-32 h-32 text-cyan-500" />
+                            </div>
+                            <div>
+                                <div>
+                                    <p className="text-sm font-medium text-slate-500">今月の報酬 (見込)</p>
+                                    <h3 className="text-3xl font-bold text-slate-900 mt-1">¥{thisMonthStats.totalReward.toLocaleString()}</h3>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-2xl p-6 relative overflow-hidden group shadow-sm border border-slate-200">
+                            <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                                <Users className="w-32 h-32 text-blue-500" />
+                            </div>
+                            <div>
+                                <p className="text-sm font-medium text-slate-500">アクティブ生徒数 (直近3ヶ月)</p>
+                                <h3 className="text-3xl font-bold text-slate-900 mt-1">{activeStudents}</h3>
+                                <div className="flex items-center gap-2 mt-4 text-sm text-green-600 bg-green-50 w-fit px-2 py-1 rounded-lg">
+                                    <span>{newStudentsCount > 0 ? '+' : ''}{newStudentsCount}</span>
+                                    <span className="text-slate-500">今月の新規</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-2xl p-6 relative overflow-hidden group shadow-sm border border-slate-200">
+                            <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                                <CalendarIcon className="w-32 h-32 text-purple-500" />
+                            </div>
+                            <div>
+                                <p className="text-sm font-medium text-slate-500">レッスン数 (今月)</p>
+                                <h3 className="text-3xl font-bold text-slate-900 mt-1">{thisMonthStats.lessonCount}</h3>
+                                <div className={`flex items-center gap-2 mt-4 text-sm w-fit px-2 py-1 rounded-lg ${lessonDiff >= 0 ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'}`}>
+                                    <span>{lessonDiff >= 0 ? '+' : ''}{lessonDiff}</span>
+                                    <span className="text-slate-500">前月比</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Monthly Financials Widget */}
+                    <div className="mt-6">
+                        <MonthlyFinancialsWidget reports={monthlyReports} />
+                    </div>
                 </div>
-            </div>
 
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                <CoachRewardCard />
-
-                <Card className="bg-blue-50 border-blue-100">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <PlusCircle className="h-5 w-5 text-blue-600" />
-                            新規レポート作成
-                        </CardTitle>
-                        <CardDescription>レッスンの実施報告を作成します</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <Button asChild className="w-full" size="lg">
-                            <Link href="/coach/report">レポート作成</Link>
-                        </Button>
-                    </CardContent>
-                </Card>
-
-                <Card className="bg-green-50 border-green-100">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <CalendarIcon className="h-5 w-5 text-green-600" />
-                            スケジュール
-                        </CardTitle>
-                        <CardDescription>予定の確認・追加</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <Button asChild className="w-full bg-green-600 hover:bg-green-700" size="lg">
-                            <Link href="/coach/schedule">カレンダーを見る</Link>
-                        </Button>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <History className="h-5 w-5" />
-                            最近の履歴
-                        </CardTitle>
-                        <CardDescription>最近提出したレッスン報告（報酬額）</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        {recentLessons && recentLessons.length > 0 ? (
-                            <div className="space-y-4">
-                                {recentLessons.map((lesson) => (
-                                    <div key={lesson.id} className="flex items-center justify-between border-b pb-2 last:border-0 last:pb-0">
-                                        <div>
-                                            <p className="font-medium text-sm">{lesson.student_name}</p>
-                                            <p className="text-xs text-gray-500">{new Date(lesson.lesson_date).toLocaleDateString()}</p>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="font-medium text-sm text-blue-600">
-                                                ¥{calculateLessonReward(lesson).toLocaleString()}
-                                            </p>
-                                            {/* Show badge if Trial or Special? Optional */}
-                                            {lesson.lesson_masters?.is_trial ? (
-                                                <Badge variant="outline" className="text-[10px] h-5">体験</Badge>
-                                            ) : (
-                                                <span className="text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">完了</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                                <Button variant="ghost" size="sm" className="w-full text-xs" asChild>
-                                    <Link href="/coach/history">すべて見る</Link>
-                                </Button>
-                            </div>
-                        ) : (
-                            <div className="text-sm text-gray-500 text-center py-4">
-                                履歴はありません。
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <User className="h-5 w-5" />
-                            プロフィール
-                        </CardTitle>
-                        <CardDescription>登録情報の確認・変更</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <Button variant="outline" asChild className="w-full">
-                            <Link href="/coach/profile">設定へ移動</Link>
-                        </Button>
-                    </CardContent>
-                </Card>
+                {/* Right Column: Activity Widget */}
+                <div className="xl:col-span-1 h-full min-h-[500px]">
+                    <CoachActivityWidget
+                        // @ts-ignore
+                        schedules={upcomingSchedules || []}
+                        // @ts-ignore
+                        reports={recentLessons || []}
+                    />
+                </div>
             </div>
         </div >
     )

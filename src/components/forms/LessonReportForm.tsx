@@ -60,7 +60,7 @@ export function LessonReportForm() {
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [lessonMasters, setLessonMasters] = useState<LessonMaster[]>([])
     const [coachId, setCoachId] = useState<string>('')
-    const [restrictedLessonId, setRestrictedLessonId] = useState<string | null>(null)
+    const [restrictedLessonIds, setRestrictedLessonIds] = useState<string[] | null>(null)
 
     // Load lesson masters and current user on mount
     useEffect(() => {
@@ -109,39 +109,59 @@ export function LessonReportForm() {
     // Watch student_id to auto-select default lesson based on membership type AND restrict options
     const selectedStudentId = form.watch('student_id')
     useEffect(() => {
-        const fetchDefaultLesson = async () => {
+        const fetchAllowedLessons = async () => {
+            // Reset selection when student changes
+            form.setValue('lesson_master_id', '')
+            form.setValue('price', 0)
+
             if (!selectedStudentId) {
-                setRestrictedLessonId(null)
+                setRestrictedLessonIds(null)
                 return
             }
 
             const supabase = createClient()
-            const { data } = await supabase
+
+            // 1. Get Student's Membership Type ID
+            const { data: student } = await supabase
                 .from('students')
-                .select(`
-                    membership_types (
-                        default_lesson_master_id
-                    )
-                `)
+                .select('membership_type_id')
                 .eq('id', selectedStudentId)
                 .single()
 
-            // Safe navigation to get the default lesson ID
-            // @ts-ignore: Complex generic type inference with Supabase joins
-            const defaultLessonId = data?.membership_types?.default_lesson_master_id
+            if (!student?.membership_type_id) {
+                setRestrictedLessonIds(null)
+                return
+            }
 
-            if (defaultLessonId) {
-                form.setValue('lesson_master_id', defaultLessonId)
-                setRestrictedLessonId(defaultLessonId)
+            // 2. Get Allowed Lessons for that Membership Type
+            const { data: allowed } = await supabase
+                .from('membership_type_lessons')
+                .select('lesson_master_id')
+                .eq('membership_type_id', student.membership_type_id)
+
+            if (allowed && allowed.length > 0) {
+                const ids = allowed.map(a => a.lesson_master_id)
+                setRestrictedLessonIds(ids)
+
+                // Auto-select if only one option
+                if (ids.length === 1) {
+                    form.setValue('lesson_master_id', ids[0])
+                }
             } else {
-                setRestrictedLessonId(null)
+                // If no specific restriction found, maybe fallback to legacy default or allow none (empty list)
+                // For now, let's assume if configured, it restricts. If nothing configured... 
+                // We should probably check if it has legacy default_lesson_master_id as fallback?
+                // But generally, if we upgraded, we should use the new table.
+                // Let's fallback to allowing all if nothing configured? 
+                // "standard lesson ... multiple select" implies restriction.
+                setRestrictedLessonIds([]) // No allowed lessons found -> Empty list (forcing setup)
             }
         }
-        fetchDefaultLesson()
+        fetchAllowedLessons()
     }, [selectedStudentId, form])
 
-    const displayMasters = restrictedLessonId
-        ? lessonMasters.filter(m => m.id === restrictedLessonId)
+    const displayMasters = restrictedLessonIds !== null
+        ? lessonMasters.filter(m => restrictedLessonIds.includes(m.id))
         : lessonMasters
 
     async function onSubmit(values: FormValues) {
@@ -298,10 +318,10 @@ export function LessonReportForm() {
                     name="menu_description"
                     render={({ field }) => (
                         <FormItem>
-                            <FormLabel>メニュー / 内容</FormLabel>
+                            <FormLabel>レッスン記録/メモ</FormLabel>
                             <FormControl>
                                 <Textarea
-                                    placeholder="W-UP, 50m x 10 クロール..."
+                                    placeholder="レッスンの詳細や、特記事項などを入力してください"
                                     className="resize-none"
                                     {...field}
                                 />

@@ -37,6 +37,17 @@ export default function EditStudentPage({ params }: { params: Promise<{ id: stri
     useEffect(() => {
         const fetchMembershipTypes = async () => {
             const supabase = createClient()
+
+            // Check Role
+            const { data: { user } } = await supabase.auth.getUser()
+            if (user) {
+                const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+                if (profile?.role !== 'admin') {
+                    router.push('/customers')
+                    return
+                }
+            }
+
             const { data } = await supabase
                 .from('membership_types')
                 .select('id, name')

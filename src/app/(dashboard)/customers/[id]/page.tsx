@@ -55,6 +55,10 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
         .eq('student_id', student.id)
         .order('lesson_date', { ascending: false })
 
+    // Fetch User Role
+    const { data: { user } } = await supabase.auth.getUser()
+    const isAdmin = user ? (await supabase.from('profiles').select('role').eq('id', user.id).single()).data?.role === 'admin' : false
+
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
@@ -63,11 +67,13 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
                         <ChevronLeft className="h-4 w-4" /> 生徒一覧に戻る
                     </Link>
                 </Button>
-                <Button variant="outline" asChild>
-                    <Link href={`/customers/${student.id}/edit`}>
-                        編集
-                    </Link>
-                </Button>
+                {isAdmin && (
+                    <Button variant="outline" asChild>
+                        <Link href={`/customers/${student.id}/edit`}>
+                            編集
+                        </Link>
+                    </Button>
+                )}
             </div>
 
             <div className="flex items-center gap-4">
@@ -91,18 +97,24 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600 bg-gray-50 p-4 rounded-md">
                 <div>
                     <span className="font-semibold block">連絡先 (メール):</span>
-                    {student.contact_email || '-'}
+                    {isAdmin ? (student.contact_email || '-') : '***'}
                 </div>
                 <div>
                     <span className="font-semibold block">連絡先 (電話):</span>
-                    {student.contact_phone || '-'}
+                    {isAdmin ? (student.contact_phone || '-') : '***'}
                 </div>
                 <div>
                     <span className="font-semibold block mb-1">担当コーチ:</span>
-                    <StudentCoachAssigner
-                        studentId={student.id}
-                        currentCoachId={student.coach_id}
-                    />
+                    {isAdmin ? (
+                        <StudentCoachAssigner
+                            studentId={student.id}
+                            currentCoachId={student.coach_id}
+                        />
+                    ) : (
+                        <span className="text-gray-900 font-medium">
+                            {student.profiles?.full_name || '担当なし'}
+                        </span>
+                    )}
                 </div>
             </div>
 

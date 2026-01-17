@@ -15,13 +15,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog"
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from 'sonner'
 import { Plus } from 'lucide-react'
 
@@ -39,8 +33,8 @@ export function AddMembershipTypeDialog() {
 
     const [name, setName] = useState('')
     const [fee, setFee] = useState('0')
-    const [defaultLessonId, setDefaultLessonId] = useState<string>('none')
-    const [rewardMasterId, setRewardMasterId] = useState<string>('none')
+    // Map of lesson_id -> custom reward price (null means use master price)
+    const [selectedLessons, setSelectedLessons] = useState<Map<string, string>>(new Map())
     const [lessonMasters, setLessonMasters] = useState<LessonMaster[]>([])
 
     useEffect(() => {
@@ -48,7 +42,7 @@ export function AddMembershipTypeDialog() {
             const supabase = createClient()
             const { data } = await supabase
                 .from('lesson_masters')
-                .select('id, name, active, unit_price') // Added unit_price
+                .select('id, name, active, unit_price')
                 .eq('active', true)
                 .order('name')
             if (data) setLessonMasters(data as any)
@@ -56,29 +50,64 @@ export function AddMembershipTypeDialog() {
         if (open) fetchMasters()
     }, [open])
 
+    const toggleLesson = (id: string, masterPrice: number) => {
+        const newMap = new Map(selectedLessons)
+        if (newMap.has(id)) {
+            newMap.delete(id)
+        } else {
+            // Default to empty string (implies master price) or maybe pre-fill?
+            // User requested explicit config. Let's default to empty (placeholder will show master price)
+            newMap.set(id, '')
+        }
+        setSelectedLessons(newMap)
+    }
+
+    const handlePriceChange = (id: string, value: string) => {
+        const newMap = new Map(selectedLessons)
+        newMap.set(id, value)
+        setSelectedLessons(newMap)
+    }
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setLoading(true)
         const supabase = createClient()
 
         try {
-            const { error } = await supabase
+            // 1. Create Membership Type
+            const { data: typeData, error: typeError } = await supabase
                 .from('membership_types')
                 .insert({
                     name,
                     fee: parseInt(fee),
-                    default_lesson_master_id: defaultLessonId === 'none' ? null : defaultLessonId,
-                    reward_master_id: rewardMasterId === 'none' ? null : rewardMasterId,
+                    default_lesson_master_id: null,
+                    reward_master_id: null,
                 })
+                .select()
+                .single()
 
-            if (error) throw error
+            if (typeError) throw typeError
+
+            // 2. Create Relations
+            if (selectedLessons.size > 0) {
+                const relations = Array.from(selectedLessons.entries()).map(([lessonId, priceStr]) => ({
+                    membership_type_id: typeData.id,
+                    lesson_master_id: lessonId,
+                    reward_price: priceStr && !isNaN(parseInt(priceStr)) ? parseInt(priceStr) : null
+                }))
+
+                const { error: relationError } = await supabase
+                    .from('membership_type_lessons')
+                    .insert(relations)
+
+                if (relationError) throw relationError
+            }
 
             toast.success('会員区分を追加しました')
             setOpen(false)
             setName('')
             setFee('0')
-            setDefaultLessonId('none')
-            setRewardMasterId('none')
+            setSelectedLessons(new Map())
             router.refresh()
         } catch (error: any) {
             console.error('Error adding membership type:', error.message, error.details, error.hint)
@@ -95,12 +124,13 @@ export function AddMembershipTypeDialog() {
                     <Plus className="mr-2 h-4 w-4" /> 新規追加
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-[600px]">
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>
                         <DialogTitle>会員区分の追加</DialogTitle>
                         <DialogDescription>
                             新しい会員区分と会費、標準レッスンを登録します。
+                            月会費用の報酬単価を設定する場合は、レッスン選択後に入力してください。
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">
@@ -130,42 +160,58 @@ export function AddMembershipTypeDialog() {
                                 required
                             />
                         </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="defaultLesson" className="text-right">
+                        <div className="grid grid-cols-4 items-start gap-4">
+                            <Label className="text-right pt-2">
                                 標準レッスン
                             </Label>
-                            <Select value={defaultLessonId} onValueChange={setDefaultLessonId}>
-                                <SelectTrigger className="col-span-3">
-                                    <SelectValue placeholder="選択なし" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="none">選択なし</SelectItem>
-                                    {lessonMasters.map((master) => (
-                                        <SelectItem key={master.id} value={master.id}>
-                                            {master.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <div className="col-span-3 border rounded-md p-3 h-[300px] overflow-y-auto space-y-4">
+                                {lessonMasters.map((master) => {
+                                    const isChecked = selectedLessons.has(master.id)
+                                    return (
+                                        <div key={master.id} className="flex flex-col space-y-2 border-b pb-2 last:border-0">
+                                            <div className="flex items-center space-x-2">
+                                                <Checkbox
+                                                    id={`lesson-${master.id}`}
+                                                    checked={isChecked}
+                                                    onCheckedChange={() => toggleLesson(master.id, master.unit_price)}
+                                                />
+                                                <label
+                                                    htmlFor={`lesson-${master.id}`}
+                                                    className="text-sm font-medium leading-none cursor-pointer flex-1"
+                                                >
+                                                    {master.name} <span className="text-gray-400 text-xs">(通常単価: ¥{master.unit_price.toLocaleString()})</span>
+                                                </label>
+                                            </div>
 
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="rewardMaster" className="text-right">
-                                報酬計算用
-                            </Label>
-                            <Select value={rewardMasterId} onValueChange={setRewardMasterId}>
-                                <SelectTrigger className="col-span-3">
-                                    <SelectValue placeholder="選択なし (売上額を使用)" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="none">選択なし (売上額を使用)</SelectItem>
-                                    {lessonMasters.map((master) => (
-                                        <SelectItem key={master.id} value={master.id}>
-                                            {master.name} (単価: ¥{master.unit_price?.toLocaleString()})
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                                            {isChecked && (
+                                                <div className="flex items-center gap-2 pl-6 animate-in slide-in-from-top-1 duration-200">
+                                                    <Label htmlFor={`price-${master.id}`} className="text-xs text-gray-500 whitespace-nowrap">
+                                                        報酬計算単価:
+                                                    </Label>
+                                                    <div className="relative w-32">
+                                                        <Input
+                                                            id={`price-${master.id}`}
+                                                            type="number"
+                                                            placeholder={master.unit_price.toString()}
+                                                            value={selectedLessons.get(master.id) || ''}
+                                                            onChange={(e) => handlePriceChange(master.id, e.target.value)}
+                                                            className="h-8 text-sm"
+                                                        />
+                                                    </div>
+                                                    <span className="text-xs text-gray-400">
+                                                        (空欄は {master.unit_price}円)
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )
+                                })}
+                                {lessonMasters.length === 0 && (
+                                    <div className="text-sm text-gray-500 text-center py-4">
+                                        有効なレッスンマスタがありません
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
                     <DialogFooter>

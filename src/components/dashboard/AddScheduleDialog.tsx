@@ -3,6 +3,11 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
+interface Student {
+    id: string
+    full_name: string
+    default_master_id?: string
+}
 import {
     Dialog,
     DialogContent,
@@ -34,18 +39,20 @@ import {
 import { toast } from 'sonner'
 import Link from 'next/link'
 
-interface AddScheduleDialogProps {
-    onSuccess?: () => void
-}
-
 interface Student {
     id: string
     full_name: string
     default_master_id?: string
 }
 
-export function AddScheduleDialog({ onSuccess }: AddScheduleDialogProps) {
-    const [open, setOpen] = useState(false)
+interface AddScheduleDialogProps {
+    onSuccess?: () => void
+    open: boolean
+    onOpenChange: (open: boolean) => void
+    initialDate?: Date
+}
+
+export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate }: AddScheduleDialogProps) {
     const [loading, setLoading] = useState(false)
     const [students, setStudents] = useState<Student[]>([])
 
@@ -61,6 +68,13 @@ export function AddScheduleDialog({ onSuccess }: AddScheduleDialogProps) {
     // Google Calendar Link State
     const [createdEventUrl, setCreatedEventUrl] = useState<string | null>(null)
 
+    // Update date when initialDate changes or dialog opens
+    useEffect(() => {
+        if (open && initialDate) {
+            setDate(initialDate)
+        }
+    }, [open, initialDate])
+
     // Initial Data Fetch
     useEffect(() => {
         if (!open) return
@@ -69,9 +83,6 @@ export function AddScheduleDialog({ onSuccess }: AddScheduleDialogProps) {
             const { data: { user } } = await supabase.auth.getUser()
             if (!user) return
 
-            // Fetch students for dropdown
-            // Using existing RPC or direct select for simplicity if RLS allows
-            // Using RPC is safer if we have it
             const { data } = await supabase.rpc('get_students_for_coach_public', {
                 p_coach_id: user.id
             })
@@ -99,9 +110,6 @@ export function AddScheduleDialog({ onSuccess }: AddScheduleDialogProps) {
         eTime: string
     ) => {
         // Format dates for Google Calendar API (YYYYMMDDTHHMMSSZ)
-        // Note: Needs to be in UTC or handled correctly with timezones.
-        // Simple simplified approach:
-
         const startDateTime = new Date(eventDate)
         const [sh, sm] = sTime.split(':').map(Number)
         startDateTime.setHours(sh, sm, 0)
@@ -111,10 +119,20 @@ export function AddScheduleDialog({ onSuccess }: AddScheduleDialogProps) {
         endDateTime.setHours(eh, em, 0)
 
         const formatGCalDate = (date: Date) => {
-            return date.toISOString().replace(/-|:|\.\d\d\d/g, "")
+            return date.toISOString().replace(/-|:|\.|Z/g, "")
+        }
+        // Note: ISOString is UTC. GCal API without Z treats as local time? 
+        // Or if we strip Z it might be interpreted as local. 
+        // Standard approach: use YYYYMMDDTHHMMSSZ for UTC.
+        // Our simplified approach here essentially assumes UTC or works well enough for now.
+        // Let's stick to the previous logic but clean up regex.
+
+        // Correct GCal URL format usually: YYYYMMDDTHHMMSS
+        const toGCalString = (d: Date) => {
+            return d.toISOString().replace(/-|:|\./g, '').substring(0, 15) + 'Z'
         }
 
-        const dates = `${formatGCalDate(startDateTime)}/${formatGCalDate(endDateTime)}`
+        const dates = `${toGCalString(startDateTime)}/${toGCalString(endDateTime)}`
         const details = encodeURIComponent(eventNotes || '')
         const text = encodeURIComponent(eventTitle)
         const loc = encodeURIComponent(eventLocation)
@@ -169,16 +187,8 @@ export function AddScheduleDialog({ onSuccess }: AddScheduleDialogProps) {
             toast.success('スケジュールを追加しました')
             if (onSuccess) onSuccess()
 
-            // Don't close immediately if we want to show the GCal link?
-            // Or maybe open it automatically? 
-            // Better to show a "Success" state in the dialog or let user click.
-
         } catch (error: any) {
             console.error('Schedule Save Error:', error)
-            console.error('Error Message:', error.message)
-            console.error('Error Code:', error.code)
-            console.error('Error Details:', error.details)
-            console.error('Error Hint:', error.hint)
             toast.error(`保存に失敗しました: ${error.message || '不明なエラー'}`)
         } finally {
             setLoading(false)
@@ -186,7 +196,7 @@ export function AddScheduleDialog({ onSuccess }: AddScheduleDialogProps) {
     }
 
     const handleClose = () => {
-        setOpen(false)
+        onOpenChange(false)
         setCreatedEventUrl(null)
         // Reset form
         setStudentId('none')
@@ -198,17 +208,14 @@ export function AddScheduleDialog({ onSuccess }: AddScheduleDialogProps) {
         setTitle('')
     }
 
+    // ...
+
     return (
         <Dialog open={open} onOpenChange={(v) => {
             if (!v) handleClose()
-            setOpen(v)
+            else onOpenChange(v)
         }}>
-            <DialogTrigger asChild>
-                <Button>
-                    <Plus className="mr-2 h-4 w-4" />
-                    予定を追加
-                </Button>
-            </DialogTrigger>
+            {/* Trigger Removed - Controlled by Parent */}
             <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
                     <DialogTitle>レッスンスケジュール登録</DialogTitle>

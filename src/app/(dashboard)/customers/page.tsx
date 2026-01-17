@@ -35,10 +35,23 @@ export default function StudentListPage() {
     const [students, setStudents] = useState<Student[]>([])
     const [search, setSearch] = useState('')
     const [loading, setLoading] = useState(true)
+    const [isAdmin, setIsAdmin] = useState(false)
 
     useEffect(() => {
+        checkUserRole()
         fetchStudents()
     }, [])
+
+    const checkUserRole = async () => {
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+            const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+            if (profile?.role === 'admin') {
+                setIsAdmin(true)
+            }
+        }
+    }
 
     const fetchStudents = async () => {
         setLoading(true)
@@ -78,11 +91,13 @@ export default function StudentListPage() {
                     <h1 className="text-3xl font-bold tracking-tight">顧客管理</h1>
                     <p className="text-gray-500">生徒情報の検索・管理</p>
                 </div>
-                <Button asChild className="ml-auto">
-                    <Link href="/customers/new">
-                        <Plus className="mr-2 h-4 w-4" /> 新規生徒登録
-                    </Link>
-                </Button>
+                {isAdmin && (
+                    <Button asChild className="ml-auto">
+                        <Link href="/customers/new">
+                            <Plus className="mr-2 h-4 w-4" /> 新規生徒登録
+                        </Link>
+                    </Button>
+                )}
             </div>
 
             <div className="flex items-center py-4">

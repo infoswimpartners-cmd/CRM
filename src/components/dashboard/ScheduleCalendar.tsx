@@ -14,7 +14,7 @@ import {
     subMonths
 } from 'date-fns'
 import { ja } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, MapPin, Clock } from 'lucide-react'
+import { ChevronLeft, ChevronRight, MapPin, Clock, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
@@ -128,18 +128,21 @@ export function ScheduleCalendar() {
     const selectedDaySchedules = schedules.filter(s => isSameDay(new Date(s.start_time), selectedDate))
         .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
 
+    // Add Dialog State
+    const [isAddOpen, setIsAddOpen] = React.useState(false)
+    const [addDialogDate, setAddDialogDate] = React.useState<Date | undefined>(new Date())
+
+    const handleDateDoubleClick = (date: Date) => {
+        setAddDialogDate(date)
+        setIsAddOpen(true)
+    }
+
     // Success handler for Add Dialog (refresh data)
     const handleSuccess = () => {
+        setIsAddOpen(false)
         if (viewMode === 'calendar') {
             setCurrentMonth(new Date(currentMonth))
         } else {
-            // Re-trigger list fetch by toggling mode or just forcing update
-            // Simple hack: set viewMode to list again (might not trigger effect dep)
-            // Better: separate loading trigger or just a boolean `refresh` state
-            // For now, toggle temporarily to calendar then back? No that flashes.
-            // Just reload page? No.
-            // Let's rely on the user navigating or just accept it might not refresh instantly without a trigger.
-            // Actually, force a re-fetch manually?
             setViewMode('calendar')
             setTimeout(() => setViewMode('list'), 10)
         }
@@ -154,7 +157,6 @@ export function ScheduleCalendar() {
             <CardContent className="p-4 flex gap-4">
                 <div className="flex flex-col items-center justify-center min-w-[60px] border-r pr-4">
                     <span className="text-sm font-bold text-gray-900">
-                        {/* Different display for List View vs Month View? Month view implies date context. List view needs Date AND Time */}
                         {viewMode === 'list' ? (
                             <>
                                 <span className="text-xs text-gray-500">{format(new Date(schedule.start_time), 'M/d')}</span>
@@ -220,7 +222,14 @@ export function ScheduleCalendar() {
                         リスト (今後)
                     </button>
                 </div>
-                <AddScheduleDialog onSuccess={handleSuccess} />
+                {/* Manual Add Button */}
+                <Button onClick={() => {
+                    setAddDialogDate(new Date())
+                    setIsAddOpen(true)
+                }}>
+                    <Clock className="mr-2 h-4 w-4" />
+                    予定を追加
+                </Button>
             </div>
 
             {viewMode === 'calendar' ? (
@@ -260,6 +269,7 @@ export function ScheduleCalendar() {
                                     <button
                                         key={day.toString()}
                                         onClick={() => setSelectedDate(day)}
+                                        onDoubleClick={() => handleDateDoubleClick(day)}
                                         className={cn(
                                             "relative bg-white min-h-[60px] p-1 flex flex-col items-center justify-start hover:bg-gray-50 transition-colors",
                                             !isCurrentMonth && "bg-gray-50/50 text-gray-400",
@@ -291,6 +301,10 @@ export function ScheduleCalendar() {
                         <h3 className="font-bold flex items-center gap-2 border-b pb-2">
                             {format(selectedDate, 'M月d日 (E)', { locale: ja })} の予定
                             <Badge variant="secondary">{selectedDaySchedules.length}件</Badge>
+                            <Button variant="ghost" size="sm" className="ml-auto text-xs" onClick={() => handleDateDoubleClick(selectedDate)}>
+                                <Plus className="w-4 h-4 mr-1" />
+                                追加
+                            </Button>
                         </h3>
 
                         <div className="space-y-3">
@@ -299,8 +313,12 @@ export function ScheduleCalendar() {
                                     <ScheduleCard key={schedule.id} schedule={schedule} />
                                 ))
                             ) : (
-                                <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border border-dashed">
-                                    予定はありません
+                                <div
+                                    className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border border-dashed cursor-pointer hover:bg-gray-100 transition-colors"
+                                    onClick={() => handleDateDoubleClick(selectedDate)}
+                                >
+                                    予定はありません<br />
+                                    <span className="text-xs text-blue-500 block mt-1">ダブルクリックまたはここをクリックして追加</span>
                                 </div>
                             )}
                         </div>
@@ -327,6 +345,13 @@ export function ScheduleCalendar() {
                     </div>
                 </div>
             )}
+
+            <AddScheduleDialog
+                open={isAddOpen}
+                onOpenChange={setIsAddOpen}
+                onSuccess={handleSuccess}
+                initialDate={addDialogDate}
+            />
 
             <EditScheduleDialog
                 schedule={selectedSchedule}

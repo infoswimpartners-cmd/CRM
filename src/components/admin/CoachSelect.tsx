@@ -34,7 +34,8 @@ export function CoachSelect({ value, onValueChange, placeholder = "コーチを�
             const { data } = await supabase
                 .from('profiles')
                 .select('*')
-                .eq('role', 'coach')
+                // .eq('role', 'coach')
+                .or('role.eq.coach,email.eq.shinshin980312kodai@gmail.com')
                 .order('full_name')
 
             if (data) {
