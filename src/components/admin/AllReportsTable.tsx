@@ -12,6 +12,8 @@ import { Badge } from '@/components/ui/badge'
 import { format } from 'date-fns'
 import { ja } from 'date-fns/locale'
 
+import { ReportActions } from '@/components/admin/reports/ReportActions'
+
 export async function AllReportsTable() {
     const supabase = await createClient()
 
@@ -45,6 +47,7 @@ export async function AllReportsTable() {
                         <TableHead>生徒</TableHead>
                         <TableHead>メニュー内容</TableHead>
                         <TableHead>種類</TableHead>
+                        <TableHead className="w-[100px]">操作</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -85,6 +88,9 @@ export async function AllReportsTable() {
                                 ) : (
                                     <Badge variant="outline" className="text-slate-500 bg-slate-50">通常</Badge>
                                 )}
+                            </TableCell>
+                            <TableCell>
+                                <ReportActions report={report} />
                             </TableCell>
                         </TableRow>
                     ))}

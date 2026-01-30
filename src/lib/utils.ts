@@ -58,3 +58,17 @@ export function calculateSchoolGrade(birthDate: Date): string {
   if (gradeScore <= 16) return `大学${gradeScore - 12}年生`
   return '社会人'
 }
+
+export function formatStudentNames(student: { full_name: string, second_student_name?: string | null }): string {
+  if (student.second_student_name) {
+    return `${student.full_name}・${student.second_student_name}`
+  }
+  return student.full_name
+}
+
+export function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('ja-JP', {
+    style: 'currency',
+    currency: 'JPY'
+  }).format(amount)
+}

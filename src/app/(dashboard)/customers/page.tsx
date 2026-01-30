@@ -60,10 +60,11 @@ export default function StudentListPage() {
             .from('students')
             .select(`
                 *,
-                membership_types (
+                membership_types:membership_type_id (
                     name
                 )
             `)
+            .neq('status', 'withdrawn')
             .order('created_at', { ascending: false })
 
         const { data, error } = await query
@@ -92,11 +93,18 @@ export default function StudentListPage() {
                     <p className="text-gray-500">生徒情報の検索・管理</p>
                 </div>
                 {isAdmin && (
-                    <Button asChild className="ml-auto">
-                        <Link href="/customers/new">
-                            <Plus className="mr-2 h-4 w-4" /> 新規生徒登録
-                        </Link>
-                    </Button>
+                    <div className="ml-auto flex gap-2">
+                        <Button variant="outline" asChild>
+                            <Link href="/customers/withdrawn">
+                                退会者リスト
+                            </Link>
+                        </Button>
+                        <Button asChild>
+                            <Link href="/customers/new">
+                                <Plus className="mr-2 h-4 w-4" /> 新規生徒登録
+                            </Link>
+                        </Button>
+                    </div>
                 )}
             </div>
 

@@ -51,6 +51,7 @@ interface LessonMaster {
     name: string
     unit_price: number
     active: boolean
+    is_single_ticket?: boolean
     created_at: string
     display_order: number
 }
@@ -100,6 +101,7 @@ function SortableRow({ master, toggleActive, setEditingMaster, setDeletingId }: 
                     </span>
                 </div>
             </TableCell>
+
             <TableCell className="text-right">
                 <div className="flex justify-end gap-2">
                     <Button variant="ghost" size="icon" onClick={() => setEditingMaster(master)}>
@@ -115,7 +117,7 @@ function SortableRow({ master, toggleActive, setEditingMaster, setDeletingId }: 
                     </Button>
                 </div>
             </TableCell>
-        </TableRow>
+        </TableRow >
     )
 }
 
@@ -184,6 +186,10 @@ export function LessonMasterTable({ masters }: { masters: LessonMaster[] }) {
         const valueA = a[key]
         const valueB = b[key]
 
+        if (valueA === undefined && valueB === undefined) return 0
+        if (valueA === undefined) return 1
+        if (valueB === undefined) return -1
+
         if (valueA < valueB) {
             return direction === 'asc' ? -1 : 1
         }
@@ -244,6 +250,7 @@ export function LessonMasterTable({ masters }: { masters: LessonMaster[] }) {
     return (
         <div className="border rounded-md">
             <DndContext
+                id="lesson-master-dnd-context"
                 sensors={sensors}
                 collisionDetection={closestCenter}
                 onDragEnd={handleDragEnd}

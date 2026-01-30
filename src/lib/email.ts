@@ -1,5 +1,6 @@
 
 import nodemailer from 'nodemailer'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 interface EmailOptions {
     to: string
@@ -53,6 +54,42 @@ export class EmailService {
             return true
         } catch (error) {
             console.error('Error sending email:', error)
+            return false
+        }
+    }
+
+    async sendTemplateEmail(key: string, to: string, variables: Record<string, string>): Promise<boolean> {
+        try {
+            const supabase = createAdminClient()
+            const { data: template, error } = await supabase
+                .from('email_templates')
+                .select('*')
+                .eq('key', key)
+                .single()
+
+            if (error || !template) {
+                console.error(`Email Template '${key}' not found:`, error?.message)
+                return false
+            }
+
+            let subject = template.subject
+            let body = template.body
+
+            // Replace variables
+            for (const [k, v] of Object.entries(variables)) {
+                // Match {{key}}
+                const regex = new RegExp(`{{${k}}}`, 'g')
+                subject = subject.replace(regex, v)
+                body = body.replace(regex, v)
+            }
+
+            return this.sendEmail({
+                to,
+                subject,
+                text: body,
+            })
+        } catch (e) {
+            console.error('Error in sendTemplateEmail:', e)
             return false
         }
     }

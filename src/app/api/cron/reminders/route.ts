@@ -55,15 +55,15 @@ export async function GET(request: NextRequest) {
         // Filter for students with Email
         const targetSchedules = schedules.filter(s => s.students?.contact_email)
 
-        // Fetch email template
-        const { data: config } = await supabase
-            .from('app_configs')
-            .select('key, value')
-            .in('key', ['reminder_email_template', 'reminder_email_subject'])
+        // Fetch email template from new table
+        const { data: templateData } = await supabase
+            .from('email_templates')
+            .select('*')
+            .eq('key', 'lesson_reminder')
+            .single()
 
-        const template = config?.find(c => c.key === 'reminder_email_template')?.value || '{{student_name}}様\n\nいつもSwim Partnersをご利用いただきありがとうございます。\n\n明日 {{date}} {{time}}より、{{coach_name}}とのレッスン予約がございます。\n\n当日はお気をつけてお越しください。\nお待ちしております。\n\nSwim Partners'
-
-        const subjectTemplate = config?.find(c => c.key === 'reminder_email_subject')?.value || '【Swim Partners】明日のレッスン予約のリマインド'
+        const templateBody = templateData?.body || '{{name}}様\n\n明日 {{date}} {{time}}よりレッスンがあります。'
+        const templateSubject = templateData?.subject || '【Swim Partners】レッスン予約のリマインド'
 
         const results = []
 
@@ -76,14 +76,16 @@ export async function GET(request: NextRequest) {
             const timeStr = format(new Date(schedule.start_time), 'HH:mm')
             const dateStr = format(new Date(schedule.start_time), 'M月d日(E)', { locale: ja })
 
-            const subject = subjectTemplate
+            const subject = templateSubject
 
             // Replace variables
-            let messageText = template
-                .replace('{{student_name}}', student.full_name)
-                .replace('{{date}}', dateStr)
-                .replace('{{time}}', timeStr)
-                .replace('{{coach_name}}', coach?.full_name || '担当コーチ')
+            let messageText = templateBody
+                .replace(/{{name}}/g, student.full_name)
+                .replace(/{{date}}/g, dateStr)
+                .replace(/{{time}}/g, timeStr)
+                .replace(/{{coach_name}}/g, coach?.full_name || '担当コーチ')
+                // Legacy support
+                .replace(/{{student_name}}/g, student.full_name)
 
             if (dryRun) {
                 console.log(`[DRY RUN] Would send Email to ${email} (${student.full_name}):\n${messageText}`)

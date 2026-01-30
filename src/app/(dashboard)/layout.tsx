@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
+import { Suspense } from 'react' // Add Suspense
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { User, Bell, Search, LayoutDashboard, Users, Calendar, DollarSign, Settings, LogOut } from 'lucide-react'
@@ -8,6 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Input } from '@/components/ui/input'
 import { MobileSidebar } from '@/components/layout/MobileSidebar'
 import { DesktopSidebar } from '@/components/layout/DesktopSidebar'
+import { GlobalSearchContainer } from '@/components/layout/GlobalSearchContainer' // Import Container
 import Image from 'next/image'
 
 export const dynamic = 'force-dynamic'
@@ -29,7 +31,8 @@ export default async function DashboardLayout({
 
     const { data: profile } = await supabase
         .from('profiles')
-        .select('*')
+        .select('*, coach_number') // Explicitly select coach_number just in case * doesn't get it due to types? No, * gets all. But let's be safe or just rely on *
+        // * is fine.
         .eq('id', user.id)
         .single()
 
@@ -44,7 +47,7 @@ export default async function DashboardLayout({
         redirect('/change-password')
     }
 
-    const safeProfile = profile as { full_name: string | null; role: string; avatar_url: string | null; email: string }
+    const safeProfile = profile as { id: string; full_name: string | null; role: string; avatar_url: string | null; email: string; coach_number: string | null }
 
     const signOut = async () => {
         'use server'
@@ -52,6 +55,8 @@ export default async function DashboardLayout({
         await supabase.auth.signOut()
         redirect('/login')
     }
+
+
 
     const NavItem = ({ href, icon: Icon, label, isActive }: { href: string, icon: any, label: string, isActive?: boolean }) => (
         <Link
@@ -93,31 +98,29 @@ export default async function DashboardLayout({
                 <header className="relative md:sticky md:top-4 z-40 mx-4 md:mx-6 mt-4">
                     <div className="glass rounded-2xl px-6 py-3 flex items-center justify-between shadow-sm border border-white/40">
                         <div className="flex-1 max-w-md relative">
-                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-                            <Input
-                                placeholder="生徒を検索..."
-                                className="pl-10 bg-white/40 border-white/20 text-slate-700 placeholder:text-slate-400 focus:border-primary/50 focus:ring-primary/20 rounded-full h-10 transition-all hover:bg-white/60"
-                            />
+                            <Suspense fallback={
+                                <div className="h-11 w-full max-w-md bg-white/20 backdrop-blur-md rounded-full animate-pulse ring-1 ring-white/10" />
+                            }>
+                                <GlobalSearchContainer isAdmin={safeProfile.role === 'admin'} />
+                            </Suspense>
                         </div>
 
                         <div className="flex items-center gap-4 ml-4">
-                            <Button variant="ghost" size="icon" className="text-slate-400 hover:text-cyan-400 hover:bg-white/5 rounded-full relative">
-                                <Bell className="h-5 w-5" />
-                                <span className="absolute top-2 right-2.5 w-2 h-2 bg-cyan-400 rounded-full shadow-[0_0_10px_rgba(34,211,238,0.8)]"></span>
-                            </Button>
-
-                            <div className="h-8 w-[1px] bg-white/10 mx-2"></div>
-
                             <Link href="/settings" className="flex items-center gap-3 hover:bg-white/5 p-1.5 pr-4 rounded-full transition-all border border-transparent hover:border-white/5">
                                 <Avatar className="h-9 w-9 ring-2 ring-white/10">
-                                    <AvatarImage src={safeProfile.avatar_url || ''} />
+                                    <AvatarImage src={safeProfile.avatar_url || undefined} />
                                     <AvatarFallback className="bg-gradient-to-br from-cyan-900 to-blue-900 text-cyan-100">
                                         {safeProfile.full_name?.slice(0, 1) || 'U'}
                                     </AvatarFallback>
                                 </Avatar>
                                 <div className="hidden md:block text-left">
                                     <p className="text-sm font-medium text-white leading-none">{safeProfile.full_name}</p>
-                                    <p className="text-xs text-slate-400 mt-1 capitalize">{safeProfile.role}</p>
+                                    <div className="flex flex-col mt-1">
+                                        <p className="text-xs text-slate-400 capitalize">{safeProfile.role}</p>
+                                        <p className="text-[10px] text-slate-500 font-mono opacity-70 hover:opacity-100 transition-opacity">
+                                            ID: {safeProfile.coach_number || safeProfile.id.slice(0, 8)}
+                                        </p>
+                                    </div>
                                 </div>
                             </Link>
                         </div>

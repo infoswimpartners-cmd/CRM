@@ -3,11 +3,15 @@
 import { Card, CardContent } from "@/components/ui/card"
 import { Wallet, CreditCard, TrendingUp } from "lucide-react"
 
-export function EarningsSummary() {
-    // Mock data - In production this would come from props or API
-    const currentMonthReward = 156000
-    const totalUnpaid = 156000
-    const lastPayment = 142000
+export function EarningsSummary({
+    currentMonthReward = 0,
+    totalUnpaid = 0,
+    lastPayment = 0
+}: {
+    currentMonthReward?: number
+    totalUnpaid?: number
+    lastPayment?: number
+}) {
 
     return (
         <div className="grid gap-6 md:grid-cols-3">

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { RevenueChart } from '@/components/dashboard/RevenueChart'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { calculateCoachRate, calculateLessonReward } from '@/lib/reward-system'
 
 export const dynamic = 'force-dynamic'
 
@@ -95,6 +96,77 @@ export default async function AnalyticsPage() {
     const topCustomers = Array.from(customerSpendMap.values())
         .sort((a, b) => b.total - a.total)
         .slice(0, 10) // Top 10
+
+    // 4. Fetch Coach Sales Data with details for Reward Calculation
+    const { data: coachLessonsData } = await supabase
+        .from('lessons')
+        .select(`
+            id,
+            price,
+            lesson_date,
+            coach_id,
+            profiles (
+                id,
+                full_name,
+                avatar_url
+            ),
+            lesson_masters (
+                id,
+                unit_price,
+                is_trial
+            ),
+            students (
+                membership_types (
+                    id,
+                    membership_type_lessons (
+                        lesson_master_id,
+                        reward_price
+                    )
+                )
+            )
+        `)
+
+    // Group lessons by coach to calculate rate and rewards
+    const coachLessonsMap = new Map<string, any[]>()
+
+    coachLessonsData?.forEach(lesson => {
+        if (!lesson.coach_id) return
+        const existing = coachLessonsMap.get(lesson.coach_id) || []
+        existing.push(lesson)
+        coachLessonsMap.set(lesson.coach_id, existing)
+    })
+
+    const coachRanking = []
+
+    for (const [coachId, lessons] of coachLessonsMap.entries()) {
+        const profile = Array.isArray(lessons[0].profiles) ? lessons[0].profiles[0] : lessons[0].profiles
+        if (!profile) continue
+
+        // Calculate Current Rate (using today as reference)
+        // @ts-ignore: Type compatibility for helper function
+        const currentRate = calculateCoachRate(coachId, lessons, new Date())
+
+        let totalSales = 0
+        let totalReward = 0
+
+        lessons.forEach(l => {
+            totalSales += (l.price || 0)
+            // @ts-ignore: Type compatibility
+            totalReward += calculateLessonReward(l, currentRate)
+        })
+
+        coachRanking.push({
+            id: coachId,
+            full_name: profile.full_name,
+            avatar_url: profile.avatar_url,
+            count: lessons.length,
+            totalSales,
+            totalReward
+        })
+    }
+
+    // Sort by Total Sales desc
+    coachRanking.sort((a, b) => b.totalSales - a.totalSales)
 
     return (
         <div className="space-y-8 pb-8">
@@ -192,6 +264,55 @@ export default async function AnalyticsPage() {
                                         </td>
                                         <td className="px-6 py-4 text-right font-bold text-cyan-700">
                                             ¥{customer.total.toLocaleString()}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </Card>
+            </div>
+
+            {/* Coach Sales Ranking */}
+            <div className="space-y-4">
+                <h2 className="text-xl font-bold text-slate-800">コーチ別売上・報酬ランキング</h2>
+                <Card className="bg-white border-slate-200 shadow-sm overflow-hidden">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left">
+                            <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-100">
+                                <tr>
+                                    <th className="px-6 py-3 font-medium">順位</th>
+                                    <th className="px-6 py-3 font-medium">コーチ名</th>
+                                    <th className="px-6 py-3 font-medium text-right">レッスン回数</th>
+                                    <th className="px-6 py-3 font-medium text-right">累計売上</th>
+                                    <th className="px-6 py-3 font-medium text-right">累計報酬 (概算)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {coachRanking.map((coach, index) => (
+                                    <tr key={coach.id} className="bg-white border-b border-slate-100 last:border-0 hover:bg-slate-50/50 transition-colors">
+                                        <td className="px-6 py-4 font-medium text-slate-900 w-16">
+                                            {index + 1}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-3">
+                                                <Avatar className="h-8 w-8">
+                                                    <AvatarImage src={coach.avatar_url} />
+                                                    <AvatarFallback>{coach.full_name?.[0]}</AvatarFallback>
+                                                </Avatar>
+                                                <Link href={`/admin/coaches/${coach.id}`} className="font-medium text-slate-700 hover:text-cyan-600 hover:underline">
+                                                    {coach.full_name}
+                                                </Link>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 text-right text-slate-600">
+                                            {coach.count}回
+                                        </td>
+                                        <td className="px-6 py-4 text-right font-bold text-slate-900">
+                                            ¥{coach.totalSales.toLocaleString()}
+                                        </td>
+                                        <td className="px-6 py-4 text-right font-bold text-cyan-700">
+                                            ¥{coach.totalReward.toLocaleString()}
                                         </td>
                                     </tr>
                                 ))}

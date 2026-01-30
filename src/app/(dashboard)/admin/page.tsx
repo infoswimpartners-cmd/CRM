@@ -61,7 +61,7 @@ export default async function AdminDashboard(props: {
                 is_trial
             ),
             students (
-                membership_types (
+                membership_types!students_membership_type_id_fkey (
                     reward_master:lesson_masters!reward_master_id (
                         unit_price
                     )
@@ -80,7 +80,7 @@ export default async function AdminDashboard(props: {
                 unit_price
             ),
             students (
-                membership_types (
+                membership_types!students_membership_type_id_fkey (
                     reward_master:lesson_masters!reward_master_id (
                         unit_price
                     )

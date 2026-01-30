@@ -22,6 +22,16 @@ import { Card, CardContent } from '@/components/ui/card'
 import { createClient } from '@/lib/supabase/client'
 import { AddScheduleDialog } from './AddScheduleDialog'
 import { EditScheduleDialog } from './EditScheduleDialog'
+import { formatStudentNames } from '@/lib/utils'
+
+
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
 
 interface Schedule {
     id: string
@@ -30,14 +40,24 @@ interface Schedule {
     end_time: string
     location?: string
     notes?: string
-    student?: { full_name: string } // Joined data structure
+    student?: { full_name: string, second_student_name?: string | null } // Joined data structure
+    coach_id: string
+    profiles?: { full_name: string, avatar_url: string } // Joined Coach data
 }
 
-export function ScheduleCalendar() {
+interface ScheduleCalendarProps {
+    adminView?: boolean
+}
+
+export function ScheduleCalendar({ adminView = false }: ScheduleCalendarProps) {
     const [currentMonth, setCurrentMonth] = React.useState(new Date())
     const [selectedDate, setSelectedDate] = React.useState<Date>(new Date())
     const [schedules, setSchedules] = React.useState<Schedule[]>([])
     const [loading, setLoading] = React.useState(false)
+
+    // Admin Filter State
+    const [selectedCoachFilter, setSelectedCoachFilter] = React.useState<string>('all')
+    const [coaches, setCoaches] = React.useState<{ id: string, full_name: string }[]>([])
 
     // View Mode State
     const [viewMode, setViewMode] = React.useState<'calendar' | 'list'>('calendar')
@@ -51,6 +71,17 @@ export function ScheduleCalendar() {
         setSelectedSchedule(schedule)
         setIsEditOpen(true)
     }
+
+    // Fetch Coaches (Admin Only)
+    React.useEffect(() => {
+        if (!adminView) return
+        const fetchCoaches = async () => {
+            const supabase = createClient()
+            const { data } = await supabase.from('profiles').select('id, full_name').eq('role', 'coach') // or all?
+            if (data) setCoaches(data)
+        }
+        fetchCoaches()
+    }, [adminView])
 
     // Fetch schedules for the displayed month (Calendar Mode)
     React.useEffect(() => {
@@ -66,15 +97,28 @@ export function ScheduleCalendar() {
             const start = startOfWeek(startOfMonth(currentMonth)).toISOString()
             const end = endOfWeek(endOfMonth(currentMonth)).toISOString()
 
-            const { data } = await supabase
+            let query = supabase
                 .from('lesson_schedules')
                 .select(`
                     *,
-                    students ( full_name )
+                    students ( full_name, second_student_name ),
+                    profiles ( full_name, avatar_url )
                 `)
-                .eq('coach_id', user.id)
                 .gte('start_time', start)
                 .lte('start_time', end)
+
+            // Apply Filters
+            if (adminView) {
+                // Admin Mode
+                if (selectedCoachFilter !== 'all') {
+                    query = query.eq('coach_id', selectedCoachFilter)
+                }
+            } else {
+                // Coach Mode (Restrict to self)
+                query = query.eq('coach_id', user.id)
+            }
+
+            const { data } = await query
 
             if (data) {
                 setSchedules(data as any)
@@ -82,7 +126,7 @@ export function ScheduleCalendar() {
             setLoading(false)
         }
         fetchSchedules()
-    }, [currentMonth, viewMode])
+    }, [currentMonth, viewMode, adminView, selectedCoachFilter])
 
     // Fetch ALL upcoming schedules (List Mode)
     React.useEffect(() => {
@@ -97,16 +141,29 @@ export function ScheduleCalendar() {
 
             const now = new Date().toISOString()
 
-            const { data } = await supabase
+            let query = supabase
                 .from('lesson_schedules')
                 .select(`
                     *,
-                    students ( full_name )
+                    students ( full_name, second_student_name ),
+                    profiles ( full_name, avatar_url )
                 `)
-                .eq('coach_id', user.id)
                 .gte('start_time', now)
                 .order('start_time', { ascending: true })
-                .limit(50) // Reasonable limit
+                .limit(50)
+
+            // Apply Filters
+            if (adminView) {
+                // Admin Mode
+                if (selectedCoachFilter !== 'all') {
+                    query = query.eq('coach_id', selectedCoachFilter)
+                }
+            } else {
+                // Coach Mode (Restrict to self)
+                query = query.eq('coach_id', user.id)
+            }
+
+            const { data } = await query
 
             if (data) {
                 setListSchedules(data as any)
@@ -114,7 +171,7 @@ export function ScheduleCalendar() {
             setLoading(false)
         }
         fetchListSchedules()
-    }, [viewMode])
+    }, [viewMode, adminView, selectedCoachFilter])
 
     const nextMonth = () => setCurrentMonth(addMonths(currentMonth, 1))
     const prevMonth = () => setCurrentMonth(subMonths(currentMonth, 1))
@@ -141,6 +198,8 @@ export function ScheduleCalendar() {
     const handleSuccess = () => {
         setIsAddOpen(false)
         if (viewMode === 'calendar') {
+            // Force refresh by toggling something or just re-running effect?
+            // Simplest is to just re-set current Month date object to trigger effect
             setCurrentMonth(new Date(currentMonth))
         } else {
             setViewMode('calendar')
@@ -189,7 +248,13 @@ export function ScheduleCalendar() {
                         {(schedule as any).students?.full_name && (
                             <div className="flex items-center gap-1.5 text-blue-600">
                                 <div className="w-1.5 h-1.5 rounded-full bg-blue-600" />
-                                {(schedule as any).students.full_name}
+                                {formatStudentNames((schedule as any).students)}
+                            </div>
+                        )}
+                        {/* Admin View: Show Coach Name */}
+                        {adminView && (schedule as any).profiles?.full_name && (
+                            <div className="flex items-center gap-1.5 text-xs text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded w-fit mt-1">
+                                <span className="font-bold">担当:</span> {(schedule as any).profiles.full_name}
                             </div>
                         )}
                     </div>
@@ -203,6 +268,7 @@ export function ScheduleCalendar() {
             <div className="flex items-center justify-between gap-4">
                 {/* View Toggle */}
                 <div className="flex bg-gray-100 p-1 rounded-lg">
+                    {/* ... (existing toggle buttons) ... */}
                     <button
                         onClick={() => setViewMode('calendar')}
                         className={cn(
@@ -222,6 +288,25 @@ export function ScheduleCalendar() {
                         リスト (今後)
                     </button>
                 </div>
+
+                {/* Admin: Coach Filter */}
+                {adminView && (
+                    <div className="w-[200px]">
+                        <Select value={selectedCoachFilter} onValueChange={setSelectedCoachFilter}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="コーチ絞り込み" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">全員を表示</SelectItem>
+                                {coaches.map(c => (
+                                    <SelectItem key={c.id} value={c.id}>{c.full_name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                )}
+
+
                 {/* Manual Add Button */}
                 <Button onClick={() => {
                     setAddDialogDate(new Date())
@@ -240,6 +325,7 @@ export function ScheduleCalendar() {
                             <h2 className="text-xl font-bold">
                                 {format(currentMonth, 'yyyy年 M月', { locale: ja })}
                             </h2>
+                            {/* ... */}
                             <div className="flex items-center gap-1">
                                 <Button variant="outline" size="icon" onClick={prevMonth}>
                                     <ChevronLeft className="h-4 w-4" />
@@ -287,7 +373,11 @@ export function ScheduleCalendar() {
                                         <div className="mt-1 flex flex-wrap gap-0.5 justify-center">
                                             {/* Dots for events */}
                                             {schedules.filter(s => isSameDay(new Date(s.start_time), day)).map((s, i) => (
-                                                <div key={s.id} className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                                                <div key={s.id} className={cn(
+                                                    "w-1.5 h-1.5 rounded-full",
+                                                    // If adminView active, maybe color code? For now just blue default.
+                                                    "bg-blue-400"
+                                                )} />
                                             ))}
                                         </div>
                                     </button>
@@ -295,6 +385,7 @@ export function ScheduleCalendar() {
                             })}
                         </div>
                     </div>
+
 
                     {/* Selected Date Details */}
                     <div className="space-y-4">

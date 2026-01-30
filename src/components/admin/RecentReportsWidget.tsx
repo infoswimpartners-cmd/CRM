@@ -33,7 +33,7 @@ export function RecentReportsWidget({ reports }: { reports: RecentReport[] }) {
                         reports.map((report) => (
                             <div key={report.id} className="flex gap-4 border-b border-slate-50 pb-4 last:border-0 last:pb-0">
                                 <Avatar className="h-9 w-9 border border-white shadow-sm flex-shrink-0">
-                                    <AvatarImage src={report.profiles?.avatar_url || ''} />
+                                    <AvatarImage src={report.profiles?.avatar_url || undefined} />
                                     <AvatarFallback className="bg-orange-100 text-orange-700">
                                         {report.profiles?.full_name?.slice(0, 1) || 'C'}
                                     </AvatarFallback>

@@ -1,4 +1,4 @@
-import { startOfMonth, endOfMonth, subMonths } from 'date-fns'
+import { startOfMonth, endOfMonth, subMonths, format } from 'date-fns'
 
 export type LessonData = {
     id: string
@@ -95,4 +95,47 @@ export function calculateMonthlyStats(coachId: string, monthLessons: LessonData[
     })
 
     return stats
+}
+
+// New: Calculate Historical Monthly Rewards with Correct Historical Rates
+export function calculateHistoricalMonthlyRewards(
+    coachId: string,
+    allLessons: LessonData[],
+    monthsToLookBack: number = 12
+) {
+    const today = new Date()
+    const history = []
+
+    for (let i = 0; i < monthsToLookBack; i++) {
+        const d = subMonths(today, i)
+        const monthStart = startOfMonth(d)
+        const monthEnd = endOfMonth(d)
+        const monthKey = format(d, 'yyyy-MM')
+
+        // 1. Calculate Rate applicable for THIS month (based on 3 months prior to this month)
+        // Note: calculateCoachRate logic uses 1-3 months prior to referenceDate.
+        // So passing 'd' (current month in loop) as referenceDate is correct for "Rate applied to this month".
+        const historicalRate = calculateCoachRate(coachId, allLessons, d)
+
+        // 2. Filter lessons for this month
+        const monthLessons = allLessons.filter(l => {
+            const ld = new Date(l.lesson_date)
+            return ld >= monthStart && ld <= monthEnd
+        })
+
+        // 3. Calculate Reward
+        const stats = calculateMonthlyStats(coachId, monthLessons, historicalRate)
+
+        history.push({
+            month: monthKey,
+            yearMonth: format(d, 'yyyy年M月'), // Display Label
+            totalSales: stats.totalSales,
+            totalReward: stats.totalReward,
+            rate: historicalRate,
+            lessonCount: stats.lessonCount,
+            details: stats.details
+        })
+    }
+
+    return history
 }

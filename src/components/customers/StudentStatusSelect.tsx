@@ -19,7 +19,6 @@ interface Props {
 }
 
 const statusLabels: Record<string, string> = {
-    inquiry: 'お問い合わせ',
     trial_pending: '体験予定',
     trial_done: '体験受講済',
     active: '会員',
@@ -28,8 +27,7 @@ const statusLabels: Record<string, string> = {
 }
 
 const statusColors: Record<string, string> = {
-    inquiry: 'bg-gray-100 text-gray-800 hover:bg-gray-200',
-    trial_pending: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200',
+    trial_pending: 'bg-gray-100 text-gray-800 hover:bg-gray-200',
     trial_done: 'bg-purple-100 text-purple-800 hover:bg-purple-200',
     active: 'bg-green-100 text-green-800 hover:bg-green-200',
     resting: 'bg-gray-200 text-gray-600 hover:bg-gray-300',
@@ -37,7 +35,7 @@ const statusColors: Record<string, string> = {
 }
 
 export function StudentStatusSelect({ studentId, initialStatus, compact = false }: Props) {
-    const [status, setStatus] = useState(initialStatus || 'inquiry')
+    const [status, setStatus] = useState(initialStatus || 'trial_pending')
     const [loading, setLoading] = useState(false)
     const supabase = createClient()
 

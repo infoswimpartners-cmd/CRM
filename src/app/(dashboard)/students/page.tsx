@@ -6,6 +6,10 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { MoreHorizontal, Filter, Plus, Search } from 'lucide-react'
 import { Input } from '@/components/ui/input'
+import { statusLabels, statusColors } from '@/components/admin/StudentStatusSelect'
+import { cn } from '@/lib/utils'
+
+export const dynamic = 'force-dynamic'
 
 export default async function StudentsPage() {
     const supabase = await createClient()
@@ -27,13 +31,15 @@ export default async function StudentsPage() {
             grade,
             sex,
             memo,
+            status,
             membership_types (
                 name
             )
         `)
-        // .eq('coach_id', user.id) // If relation exists, or rely on RLS
-        // Assuming RLS handles visibility or we simply fetch all visible
+        .neq('status', 'withdrawn')
         .order('created_at', { ascending: false })
+
+    const filteredStudents = students?.filter(student => student.status !== 'withdrawn') || []
 
     return (
         <div className="space-y-6 animate-fade-in-up">
@@ -76,7 +82,7 @@ export default async function StudentsPage() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {students?.map((student) => (
+                            {filteredStudents.map((student) => (
                                 <tr key={student.id} className="group hover:bg-slate-50 transition-colors">
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-3">
@@ -97,8 +103,8 @@ export default async function StudentsPage() {
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">
-                                        <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-200">
-                                            Active
+                                        <Badge variant="secondary" className={cn("border-0", statusColors[student.status] || 'bg-gray-100 text-gray-800')}>
+                                            {statusLabels[student.status] || student.status || '不明'}
                                         </Badge>
                                     </td>
                                     <td className="px-6 py-4">
@@ -120,20 +126,21 @@ export default async function StudentsPage() {
                                         </Button>
                                     </td>
                                 </tr>
-                            )) || (
-                                    <tr>
-                                        <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
-                                            生徒が見つかりませんでした。
-                                        </td>
-                                    </tr>
-                                )}
+                            ))}
+                            {filteredStudents.length === 0 && (
+                                <tr>
+                                    <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
+                                        生徒が見つかりませんでした。
+                                    </td>
+                                </tr>
+                            )}
                         </tbody>
                     </table>
                 </div>
 
                 <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between">
                     <span className="text-xs text-slate-500">
-                        {students?.length || 0} 名を表示中
+                        {filteredStudents.length} 名を表示中
                     </span>
                     <div className="flex gap-2">
                         <Button variant="outline" size="sm" className="h-8 bg-white border-slate-200 text-slate-500 hover:text-slate-700 hover:bg-slate-50" disabled>

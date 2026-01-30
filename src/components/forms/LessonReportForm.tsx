@@ -9,9 +9,11 @@ import { format } from 'date-fns'
 import { CalendarIcon, Loader2 } from 'lucide-react'
 
 import { createClient } from '@/lib/supabase/client'
+import { submitLessonReport } from '@/actions/report'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
     Form,
     FormControl,
@@ -61,6 +63,7 @@ export function LessonReportForm() {
     const [lessonMasters, setLessonMasters] = useState<LessonMaster[]>([])
     const [coachId, setCoachId] = useState<string>('')
     const [restrictedLessonIds, setRestrictedLessonIds] = useState<string[] | null>(null)
+    const [keepValues, setKeepValues] = useState(true)
 
     // Load lesson masters and current user on mount
     useEffect(() => {
@@ -148,12 +151,6 @@ export function LessonReportForm() {
                     form.setValue('lesson_master_id', ids[0])
                 }
             } else {
-                // If no specific restriction found, maybe fallback to legacy default or allow none (empty list)
-                // For now, let's assume if configured, it restricts. If nothing configured... 
-                // We should probably check if it has legacy default_lesson_master_id as fallback?
-                // But generally, if we upgraded, we should use the new table.
-                // Let's fallback to allowing all if nothing configured? 
-                // "standard lesson ... multiple select" implies restriction.
                 setRestrictedLessonIds([]) // No allowed lessons found -> Empty list (forcing setup)
             }
         }
@@ -166,33 +163,41 @@ export function LessonReportForm() {
 
     async function onSubmit(values: FormValues) {
         setIsSubmitting(true)
-        const supabase = createClient()
-
-        // Get current user (coach)
-        const { data: { user } } = await supabase.auth.getUser()
-
-        if (!user) {
-            toast.error('レポートを送信するにはログインが必要です')
-            setIsSubmitting(false)
-            return
-        }
 
         try {
-            const { error } = await supabase.from('lessons').insert({
-                coach_id: user.id,
-                student_id: values.student_id || null, // Optional for now
-                student_name: values.student_name,
-                lesson_master_id: values.lesson_master_id,
+            // Convert date to ISO string for server action
+            const payload = {
+                ...values,
                 lesson_date: values.lesson_date.toISOString(),
-                location: values.location,
-                menu_description: values.menu_description || '',
-                price: values.price,
-            })
+            }
 
-            if (error) throw error
+            const result = await submitLessonReport(payload)
+
+            if (!result.success) {
+                throw new Error(typeof result.error === 'string' ? result.error : 'Submission failed')
+            }
 
             toast.success('レッスン報告を送信しました！')
-            router.push('/coach')
+
+            if (keepValues) {
+                // Keep Date, Location. Reset Student-specific fields
+                const currentValues = form.getValues()
+                form.reset({
+                    ...currentValues,
+                    student_id: '',
+                    student_name: '',
+                    menu_description: '',
+                    price: 0,
+                    lesson_master_id: '' // Clear this to force re-selection or auto-select based on new student
+                })
+                // Clear any restricted lessons state
+                setRestrictedLessonIds(null)
+
+                // Scroll to top to encourage next entry
+                window.scrollTo({ top: 0, behavior: 'smooth' })
+            } else {
+                router.push('/coach')
+            }
         } catch (error) {
             console.error('Error submitting report:', error)
             toast.error('送信に失敗しました。もう一度お試しください。')
@@ -347,6 +352,20 @@ export function LessonReportForm() {
                         </FormItem>
                     )}
                 />
+
+                <div className="flex items-center space-x-2 py-2 bg-slate-50 p-4 rounded-lg border border-slate-100">
+                    <Checkbox
+                        id="keepValues"
+                        checked={keepValues}
+                        onCheckedChange={(checked) => setKeepValues(checked as boolean)}
+                    />
+                    <label
+                        htmlFor="keepValues"
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-slate-700 cursor-pointer select-none"
+                    >
+                        続けて次の報告を作成する（日時・場所を保持）
+                    </label>
+                </div>
 
                 <Button type="submit" className="w-full" disabled={isSubmitting}>
                     {isSubmitting ? (

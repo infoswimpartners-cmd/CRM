@@ -198,6 +198,10 @@ export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembe
                                 className="col-span-3"
                                 required
                             />
+                            <p className="col-start-2 col-span-3 text-xs text-muted-foreground">
+                                ※0円より大きい場合: レッスン料は会費に含まれるとみなされ、別途請求されません。<br />
+                                ※0円の場合: 単発利用とみなされ、レッスン毎に都度請求されます。
+                            </p>
                         </div>
                         <div className="grid grid-cols-4 items-start gap-4">
                             <Label className="text-right pt-2">

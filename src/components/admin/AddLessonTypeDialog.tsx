@@ -48,6 +48,7 @@ export function AddLessonTypeDialog() {
             setOpen(false)
             setName('')
             setPrice('0')
+            setPrice('0')
             setIsTrial(false)
             router.refresh()
         } catch (error: any) {
@@ -126,6 +127,6 @@ export function AddLessonTypeDialog() {
                     </DialogFooter>
                 </form>
             </DialogContent>
-        </Dialog>
+        </Dialog >
     )
 }

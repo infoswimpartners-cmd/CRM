@@ -130,6 +130,6 @@ export function EditLessonTypeDialog({ master, open, onOpenChange }: EditLessonT
                     </DialogFooter>
                 </form>
             </DialogContent>
-        </Dialog>
+        </Dialog >
     )
 }

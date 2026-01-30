@@ -13,6 +13,7 @@ import { Loader2 } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { calculateAge, calculateSchoolGrade } from '@/lib/utils'
 import React from 'react'
+import { updateStudent } from '@/actions/student'
 
 export default function EditStudentPage({ params }: { params: Promise<{ id: string }> }) {
     const router = useRouter()
@@ -23,13 +24,16 @@ export default function EditStudentPage({ params }: { params: Promise<{ id: stri
     const [formData, setFormData] = useState({
         full_name: '',
         full_name_kana: '',
+        second_student_name: '',
+        second_student_name_kana: '',
         gender: '',
         birth_date: '',
         contact_email: '',
         contact_phone: '',
         student_notes: '', // notes on students table
-        status: 'inquiry',
-        membership_type_id: ''
+        status: 'trial_pending',
+        membership_type_id: '',
+        start_timing: 'current' // 'current' | 'next'
     })
 
     const [membershipTypes, setMembershipTypes] = useState<{ id: string, name: string }[]>([])
@@ -74,13 +78,16 @@ export default function EditStudentPage({ params }: { params: Promise<{ id: stri
             setFormData({
                 full_name: data.full_name,
                 full_name_kana: data.full_name_kana || '',
+                second_student_name: data.second_student_name || '',
+                second_student_name_kana: data.second_student_name_kana || '',
                 gender: data.gender || '',
                 birth_date: data.birth_date || '',
                 contact_email: data.contact_email || '',
                 contact_phone: data.contact_phone || '',
                 student_notes: data.notes || '',
-                status: data.status || 'inquiry',
-                membership_type_id: data.membership_type_id || ''
+                status: data.status || 'trial_pending',
+                membership_type_id: data.membership_type_id || '',
+                start_timing: 'current'
             })
             setLoading(false)
         }
@@ -103,29 +110,35 @@ export default function EditStudentPage({ params }: { params: Promise<{ id: stri
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setSaving(true)
-        const supabase = createClient()
 
         try {
-            const { error } = await supabase.from('students').update({
-                full_name: formData.full_name,
-                full_name_kana: formData.full_name_kana,
-                gender: formData.gender,
-                birth_date: formData.birth_date || null,
-                contact_email: formData.contact_email,
-                contact_phone: formData.contact_phone,
-                notes: formData.student_notes,
-                status: formData.status,
-                membership_type_id: formData.membership_type_id || null
-            }).eq('id', id)
+            // Import the server action dynamically or ensure it's imported at top
+            // Since we are in client component, we import it from the actions file
+            // Note: We need to add the import statement at the top of the file as well.
+            // For now, let's assume valid import. If not, I will add it in next step.
+            // Actually, I should use replace_file_content to add import too.
+            // But this tool call is for valid TSX replacement.
 
-            if (error) throw error
+            // Wait, I cannot add import in the same chunk if they are far apart.
+            // I will assume I can update the whole file or use multi_replace.
+            // Let's use multi_replace in next step if needed, or just replace the handle submit and let me add import separately.
+            // I will use `updateStudent` here.
+
+            const result = await updateStudent(id, formData)
+
+            if (!result.success) {
+                throw new Error(result.error)
+            }
 
             toast.success('生徒情報を更新しました')
+            if (result.emailSent) {
+                toast.success('本入会完了メールを送信しました')
+            }
             router.push(`/customers/${id}`)
             router.refresh()
-        } catch (error) {
+        } catch (error: any) {
             console.error(error)
-            toast.error('更新に失敗しました')
+            toast.error(error.message || '更新に失敗しました')
         } finally {
             setSaving(false)
         }
@@ -154,6 +167,14 @@ export default function EditStudentPage({ params }: { params: Promise<{ id: stri
                             <div className="space-y-2">
                                 <Label htmlFor="full_name_kana">フリガナ</Label>
                                 <Input id="full_name_kana" value={formData.full_name_kana} onChange={handleChange} placeholder="ヤマダ タロウ" />
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="second_student_name">2人目の生徒名 (同時受講の場合)</Label>
+                            <div className="grid grid-cols-2 gap-4">
+                                <Input id="second_student_name" value={formData.second_student_name} onChange={handleChange} placeholder="同伴する生徒名" />
+                                <Input id="second_student_name_kana" value={formData.second_student_name_kana} onChange={handleChange} placeholder="フリガナ (2人目)" />
                             </div>
                         </div>
 
@@ -213,8 +234,8 @@ export default function EditStudentPage({ params }: { params: Promise<{ id: stri
                                         <SelectValue placeholder="選択してください" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="inquiry">お問い合わせ</SelectItem>
                                         <SelectItem value="trial_pending">体験予定</SelectItem>
+                                        <SelectItem value="trial_confirmed">体験確定</SelectItem>
                                         <SelectItem value="trial_done">体験受講済</SelectItem>
                                         <SelectItem value="active">会員</SelectItem>
                                         <SelectItem value="resting">休会中</SelectItem>
@@ -222,7 +243,65 @@ export default function EditStudentPage({ params }: { params: Promise<{ id: stri
                                     </SelectContent>
                                 </Select>
                             </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="membership_type">会員種別</Label>
+                                <Select value={formData.membership_type_id} onValueChange={(val) => setFormData({ ...formData, membership_type_id: val })}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="選択してください" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="unassigned">未設定</SelectItem>
+                                        {membershipTypes.map((type) => (
+                                            <SelectItem key={type.id} value={type.id}>
+                                                {type.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
                         </div>
+
+                        {/* Membership Start Timing - Only show if membership is selected */}
+                        {formData.membership_type_id && formData.membership_type_id !== 'unassigned' && (
+                            <div className="bg-blue-50 p-4 rounded-md border border-blue-100">
+                                <Label className="block mb-3">課金・サブスクリプション開始時期</Label>
+                                <div className="flex flex-col gap-3">
+                                    <label className="flex items-start gap-2 cursor-pointer p-2 rounded hover:bg-white/50 transition-colors">
+                                        <input
+                                            type="radio"
+                                            name="start_timing"
+                                            value="current"
+                                            checked={formData.start_timing === 'current'}
+                                            onChange={() => setFormData({ ...formData, start_timing: 'current' })}
+                                            className="mt-1"
+                                        />
+                                        <div>
+                                            <span className="font-bold block text-sm">今月から開始 (即時引き落とし)</span>
+                                            <span className="text-xs text-gray-500">
+                                                直ちにStripeでの決済処理が実行され、定期課金が開始されます。
+                                            </span>
+                                        </div>
+                                    </label>
+                                    <label className="flex items-start gap-2 cursor-pointer p-2 rounded hover:bg-white/50 transition-colors">
+                                        <input
+                                            type="radio"
+                                            name="start_timing"
+                                            value="next"
+                                            checked={formData.start_timing === 'next'}
+                                            onChange={() => setFormData({ ...formData, start_timing: 'next' })}
+                                            className="mt-1"
+                                        />
+                                        <div>
+                                            <span className="font-bold block text-sm">来月から開始 (翌月1日引き落とし)</span>
+                                            <span className="text-xs text-gray-500">
+                                                今月末までは「都度払い（単発）」扱いとなります。<br />
+                                                次回請求は来月1日に自動で行われます。
+                                            </span>
+                                        </div>
+                                    </label>
+                                </div>
+                            </div>
+                        )}
 
                         <div className="flex justify-end gap-2 pt-4">
                             <Button variant="outline" type="button" onClick={() => router.back()}>キャンセル</Button>

@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { PlusCircle, History, User, Calendar as CalendarIcon, DollarSign, Users, Waves } from 'lucide-react'
+import { PlusCircle, History, User, Calendar as CalendarIcon, DollarSign, Users, Waves, FileText } from 'lucide-react'
 
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
@@ -12,7 +12,8 @@ import { RevenueChart } from '@/components/dashboard/RevenueChart'
 import { startOfMonth, subMonths, endOfMonth, format } from 'date-fns'
 import { CoachActivityWidget } from '@/components/dashboard/CoachActivityWidget'
 import { calculateCoachRate, calculateMonthlyStats } from '@/lib/reward-system'
-import { MonthlyFinancialsWidget } from '@/components/coach/MonthlyFinancialsWidget'
+
+export const dynamic = 'force-dynamic'
 
 export default async function CoachDashboard() {
     const supabase = await createClient()
@@ -28,30 +29,33 @@ export default async function CoachDashboard() {
         .eq('id', user.id)
         .single()
 
-    // 1. Fetch Lessons Data (Broad range for 6 months history + 3 months rank)
-    // We need 9 months of data ideally (6 months display + 3 months calc for the oldest displayed month)
-    // But for simplicity/performance in this view, let's fetch last 9 months.
+    // 1. Fetch Lessons Data (Broad range for 3 months history)
     const today = new Date()
-    const nineMonthsAgo = startOfMonth(subMonths(today, 9))
+    const threeMonthsAgo = startOfMonth(subMonths(today, 3))
 
     const { data: allLessons } = await supabase
         .from('lessons')
         .select(`
             *,
             lesson_masters (
-                is_trial,
-                unit_price
+                id,
+                name,
+                unit_price,
+                is_trial
             ),
             students (
-                membership_types (
-                    reward_master:lesson_masters!reward_master_id (
-                        unit_price
-                    )
+                id,
+                full_name,
+                membership_types!students_membership_type_id_fkey (
+                    id
                 )
+            ),
+            profiles (
+                full_name,
+                avatar_url
             )
         `)
         .eq('coach_id', user.id)
-        .gte('lesson_date', nineMonthsAgo.toISOString())
         .order('lesson_date', { ascending: false })
 
     // 2. Calculate Stats for this month and past months
@@ -67,32 +71,16 @@ export default async function CoachDashboard() {
 
     const thisMonthStats = calculateMonthlyStats(user.id, thisMonthLessons as any[], currentRate)
 
-    // Generate 6 months reports for widget
-    const monthlyReports = []
-    for (let i = 0; i < 6; i++) {
-        const d = subMonths(today, i)
-        const monthStart = startOfMonth(d)
-        const monthEnd = endOfMonth(d)
-
-        // Rate for THAT specific month (based on 3 months prior to THAT month)
-        const monthRate = isAdmin ? 1.0 : calculateCoachRate(user.id, allLessons as any || [], d)
-
-        const monthLessons = allLessons?.filter(l => {
-            const date = new Date(l.lesson_date)
-            return date >= monthStart && date <= monthEnd
-        }) || []
-
-        const stats = calculateMonthlyStats(user.id, monthLessons as any[], monthRate)
-
-        monthlyReports.push({
-            monthKey: format(d, 'yyyy-MM'),
-            sales: stats.totalSales,
-            reward: stats.totalReward,
-            count: stats.lessonCount,
-            rate: monthRate,
-            details: stats.details
-        })
-    }
+    // Calculate Last Month Stats for KPI Diff
+    const lastMonthDate = subMonths(today, 1)
+    const lastMonthStart = startOfMonth(lastMonthDate)
+    const lastMonthEnd = endOfMonth(lastMonthDate)
+    const lastMonthRate = isAdmin ? 1.0 : calculateCoachRate(user.id, allLessons as any || [], lastMonthDate)
+    const lastMonthLessons = allLessons?.filter(l => {
+        const d = new Date(l.lesson_date)
+        return d >= lastMonthStart && d <= lastMonthEnd
+    }) || []
+    const lastMonthStats = calculateMonthlyStats(user.id, lastMonthLessons as any[], lastMonthRate)
 
     // 3. (Kept) Fetch Upcoming Schedules
     const now = new Date().toISOString()
@@ -125,12 +113,6 @@ export default async function CoachDashboard() {
         }
     })) || []
 
-    // 4. (Kept) Recent Lessons for "Report/Memo Tab" (already have allLessons, just slice top 5)
-    // But existing code uses `getStudentMemos` or specific fetch? logic was fetch with students..
-    // allLessons has what we need but simplified. Let's reuse allLessons or fetch proper structure if needed.
-    // The previous code fetched separate recentLessons.
-    // Let's use `allLessons` slice(0,5) but ensure it has `students` and `profiles` if needed.
-    // `allLessons` has `students`.
     const recentLessons = allLessons?.slice(0, 5) || []
 
     // Calculate Active & New Students
@@ -151,73 +133,113 @@ export default async function CoachDashboard() {
     })
 
     // Calculate Lesson Diff
-    const lastMonthCount = monthlyReports[1]?.count || 0
-    const lessonDiff = thisMonthStats.lessonCount - lastMonthCount
+    const lessonDiff = thisMonthStats.lessonCount - lastMonthStats.lessonCount
+
+    // Calculate Last Month Stats for K
+    // ... (This context is just to locate safely)
+
+    // ...
 
     return (
-        <div className="space-y-6 animate-fade-in-up">
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 h-[800px] xl:h-[600px]">
-                {/* Left Column: Charts & KPIs */}
-                <div className="xl:col-span-2 flex flex-col gap-6 h-full overflow-y-auto pr-2">
-                    {/* KPI Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 shrink-0">
-                        <div className="bg-white rounded-2xl p-6 relative overflow-hidden group shadow-sm border border-slate-200">
-                            <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                                <DollarSign className="w-32 h-32 text-cyan-500" />
-                            </div>
-                            <div>
-                                <div>
-                                    <p className="text-sm font-medium text-slate-500">今月の報酬 (見込)</p>
-                                    <h3 className="text-3xl font-bold text-slate-900 mt-1">¥{thisMonthStats.totalReward.toLocaleString()}</h3>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="bg-white rounded-2xl p-6 relative overflow-hidden group shadow-sm border border-slate-200">
-                            <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                                <Users className="w-32 h-32 text-blue-500" />
-                            </div>
-                            <div>
-                                <p className="text-sm font-medium text-slate-500">アクティブ生徒数 (直近3ヶ月)</p>
-                                <h3 className="text-3xl font-bold text-slate-900 mt-1">{activeStudents}</h3>
-                                <div className="flex items-center gap-2 mt-4 text-sm text-green-600 bg-green-50 w-fit px-2 py-1 rounded-lg">
-                                    <span>{newStudentsCount > 0 ? '+' : ''}{newStudentsCount}</span>
-                                    <span className="text-slate-500">今月の新規</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="bg-white rounded-2xl p-6 relative overflow-hidden group shadow-sm border border-slate-200">
-                            <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                                <CalendarIcon className="w-32 h-32 text-purple-500" />
-                            </div>
-                            <div>
-                                <p className="text-sm font-medium text-slate-500">レッスン数 (今月)</p>
-                                <h3 className="text-3xl font-bold text-slate-900 mt-1">{thisMonthStats.lessonCount}</h3>
-                                <div className={`flex items-center gap-2 mt-4 text-sm w-fit px-2 py-1 rounded-lg ${lessonDiff >= 0 ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'}`}>
-                                    <span>{lessonDiff >= 0 ? '+' : ''}{lessonDiff}</span>
-                                    <span className="text-slate-500">前月比</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Monthly Financials Widget */}
-                    <div className="mt-6">
-                        <MonthlyFinancialsWidget reports={monthlyReports} />
-                    </div>
+        <div className="space-y-8 animate-fade-in-up pb-10">
+            {/* Welcome & Actions */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white/50 backdrop-blur-sm p-6 rounded-2xl border border-white/20 shadow-sm">
+                <div>
+                    <h1 className="text-2xl font-bold text-slate-900">
+                        Welcome back, <span className="text-blue-600">{profile?.full_name || 'Coach'}</span>
+                    </h1>
+                    <p className="text-slate-500 text-sm mt-1">今日の予定を確認して、レッスン業務を開始しましょう。</p>
                 </div>
-
-                {/* Right Column: Activity Widget */}
-                <div className="xl:col-span-1 h-full min-h-[500px]">
-                    <CoachActivityWidget
-                        // @ts-ignore
-                        schedules={upcomingSchedules || []}
-                        // @ts-ignore
-                        reports={recentLessons || []}
-                    />
+                <div className="flex items-center gap-3">
+                    <Button asChild variant="outline" className="bg-white hover:bg-slate-50 text-slate-700 border-slate-200">
+                        <Link href="/coach/schedule">
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            予定を登録
+                        </Link>
+                    </Button>
+                    <Button asChild className="bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-200 border-none">
+                        <Link href="/coach/report">
+                            <FileText className="mr-2 h-4 w-4" />
+                            レッスン報告
+                        </Link>
+                    </Button>
                 </div>
             </div>
-        </div >
+
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                {/* Left Column */}
+                <div className="xl:col-span-2 space-y-6">
+                    {/* KPI Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {/* Reward Card */}
+                        <Card className="border-none shadow-md bg-gradient-to-br from-cyan-500 to-blue-600 text-white relative overflow-hidden group">
+                            <div className="absolute right-0 top-0 h-full w-24 bg-white/10 -skew-x-12 transform translate-x-12 transition-transform group-hover:translate-x-6" />
+                            <CardContent className="p-6 relative z-10">
+                                <p className="text-blue-100 text-sm font-medium">今月の報酬 (見込)</p>
+                                <h3 className="text-3xl font-bold mt-2">¥{thisMonthStats.totalReward.toLocaleString()}</h3>
+                                <p className="text-xs text-blue-100 mt-4 opacity-80">確定までお待ちください</p>
+                            </CardContent>
+                            <DollarSign className="absolute right-4 bottom-4 text-white/20 w-24 h-24 -mb-8 -mr-8" />
+                        </Card>
+
+                        {/* Students Card */}
+                        <Card className="group hover:shadow-lg transition-all duration-300 border-slate-200 bg-white">
+                            <CardContent className="p-6">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <p className="text-sm font-medium text-slate-500">アクティブ生徒</p>
+                                        <h3 className="text-3xl font-bold text-slate-900 mt-2">{activeStudents}</h3>
+                                    </div>
+                                    <div className="p-2 bg-blue-50 rounded-lg text-blue-600 group-hover:bg-blue-100 transition-colors">
+                                        <Users className="w-5 h-5" />
+                                    </div>
+                                </div>
+                                <div className="mt-4 flex items-center gap-2 text-sm">
+                                    {newStudentsCount > 0 && (
+                                        <span className="text-green-600 font-medium badge bg-green-50 px-2 py-0.5 rounded text-xs">
+                                            +{newStudentsCount} 新規
+                                        </span>
+                                    )}
+                                    <span className="text-slate-400 text-xs">直近3ヶ月の受講者</span>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Lessons Card */}
+                        <Card className="group hover:shadow-lg transition-all duration-300 border-slate-200 bg-white">
+                            <CardContent className="p-6">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <p className="text-sm font-medium text-slate-500">実施レッスン</p>
+                                        <h3 className="text-3xl font-bold text-slate-900 mt-2">{thisMonthStats.lessonCount}</h3>
+                                    </div>
+                                    <div className="p-2 bg-purple-50 rounded-lg text-purple-600 group-hover:bg-purple-100 transition-colors">
+                                        <CalendarIcon className="w-5 h-5" />
+                                    </div>
+                                </div>
+                                <div className="mt-4 flex items-center gap-2 text-sm">
+                                    <span className={`${lessonDiff >= 0 ? 'text-green-600' : 'text-red-500'} font-medium`}>
+                                        {lessonDiff >= 0 ? '+' : ''}{lessonDiff}
+                                    </span>
+                                    <span className="text-slate-400">前月比</span>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </div>
+
+                {/* Right Column */}
+                <div className="xl:col-span-1">
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm h-full min-h-[500px] overflow-hidden">
+                        <CoachActivityWidget
+                            // @ts-ignore
+                            schedules={upcomingSchedules || []}
+                            // @ts-ignore
+                            reports={recentLessons || []}
+                        />
+                    </div>
+                </div>
+            </div>
+        </div>
     )
 }

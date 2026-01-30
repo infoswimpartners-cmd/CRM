@@ -79,7 +79,7 @@ export function AllCoachesScheduleWidget({ schedules, title = '全コーチの�
                                         <div className="flex items-center gap-2 mb-1">
                                             <Badge variant="outline" className="text-[10px] h-5 bg-white border-slate-200 text-slate-600 flex items-center gap-1 pl-1 pr-2">
                                                 <Avatar className="h-3 w-3">
-                                                    <AvatarImage src={schedule.coach.avatar_url || ''} />
+                                                    <AvatarImage src={schedule.coach.avatar_url || undefined} />
                                                     <AvatarFallback className="text-[8px]">{schedule.coach.full_name[0]}</AvatarFallback>
                                                 </Avatar>
                                                 <span className="truncate max-w-[80px]">{schedule.coach.full_name}</span>

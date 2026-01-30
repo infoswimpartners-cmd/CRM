@@ -10,6 +10,7 @@ import { ja } from 'date-fns/locale'
 import { AddScheduleDialog } from './AddScheduleDialog'
 import { Badge } from '@/components/ui/badge'
 import { useRouter } from 'next/navigation'
+import { formatStudentNames } from '@/lib/utils'
 
 interface Schedule {
     id: string
@@ -76,7 +77,7 @@ export function UpcomingScheduleCard({ schedules }: UpcomingScheduleCardProps) {
                                         {schedule.students?.full_name && (
                                             <div className="flex items-center gap-1.5 text-xs text-slate-500">
                                                 <div className="w-1.5 h-1.5 rounded-full bg-cyan-500 shadow-sm" />
-                                                {schedule.students.full_name}
+                                                {formatStudentNames(schedule.students)}
                                             </div>
                                         )}
                                     </div>

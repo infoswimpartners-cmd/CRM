@@ -24,7 +24,7 @@ $$;
 
 -- Function to submit a lesson report (Public)
 -- Function to submit a lesson report (Public)
-drop function if exists submit_lesson_report_public(uuid, uuid, timestamp with time zone, text, uuid, integer);
+drop function if exists submit_lesson_report_public(uuid, uuid, text, timestamp with time zone, text, uuid, integer, text);
 
 create or replace function submit_lesson_report_public(
   p_coach_id uuid,
@@ -70,6 +70,6 @@ $$;
 
 -- Grant access to public (anon)
 grant execute on function get_students_for_coach_public(uuid) to anon;
-grant execute on function submit_lesson_report_public(uuid, uuid, timestamp with time zone, text, uuid, integer) to anon;
+grant execute on function submit_lesson_report_public(uuid, uuid, text, timestamp with time zone, text, uuid, integer, text) to anon;
 grant execute on function get_students_for_coach_public(uuid) to authenticated;
-grant execute on function submit_lesson_report_public(uuid, uuid, timestamp with time zone, text, uuid, integer) to authenticated;
+grant execute on function submit_lesson_report_public(uuid, uuid, text, timestamp with time zone, text, uuid, integer, text) to authenticated;

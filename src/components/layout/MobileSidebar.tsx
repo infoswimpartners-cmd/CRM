@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Menu, X, LayoutDashboard, Users, Calendar, DollarSign, Settings, LogOut, History, PlusCircle } from 'lucide-react'
+import { Menu, X, LayoutDashboard, Users, Calendar, DollarSign, Settings, LogOut, History, PlusCircle, Mail, FileCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { usePathname } from 'next/navigation'
 import Image from 'next/image'
@@ -76,9 +76,11 @@ export function MobileSidebar({ userProfile }: { userProfile: any }) {
 
                             <div className="px-4 mt-6 mb-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">分析・集計</div>
                             <NavItem href="/admin/analytics" icon={DollarSign} label="売上詳細" isActive={pathname?.startsWith('/admin/analytics')} />
+                            <NavItem href="/admin/billing" icon={FileCheck} label="請求承認" isActive={pathname?.startsWith('/admin/billing')} />
                             <NavItem href="/admin/reports" icon={Calendar} label="実施メモ一覧" isActive={pathname?.startsWith('/admin/reports')} />
 
                             <div className="px-4 mt-6 mb-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">運営管理</div>
+                            <NavItem href="/admin/schedule" icon={Calendar} label="全体スケジュール" isActive={pathname?.startsWith('/admin/schedule')} />
                             <NavItem href="/customers" icon={Users} label="会員管理" isActive={pathname?.startsWith('/customers')} />
                             <NavItem href="/admin/coaches" icon={Users} label="コーチ管理" isActive={pathname?.startsWith('/admin/coaches')} />
 
@@ -89,6 +91,7 @@ export function MobileSidebar({ userProfile }: { userProfile: any }) {
 
                             <div className="px-4 mt-6 mb-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">システム</div>
                             <NavItem href="/admin/masters" icon={Settings} label="マスタ設定" isActive={pathname?.startsWith('/admin/masters')} />
+                            <NavItem href="/admin/email-templates" icon={Mail} label="メール設定" isActive={pathname?.startsWith('/admin/email-templates')} />
                             <NavItem href="/admin/settings" icon={Settings} label="全体設定" isActive={pathname?.startsWith('/admin/settings')} />
                         </>
                     ) : (

@@ -1,28 +1,6 @@
-import { createClient } from '@/lib/supabase/server'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Label } from "@/components/ui/label"
-import { TemplateEditorForm } from '@/components/admin/TemplateEditorForm'
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 export default async function SettingsPage() {
-    const supabase = await createClient()
-
-    // Fetch Body
-    const { data: bodyConfig } = await supabase
-        .from('app_configs')
-        .select('value')
-        .eq('key', 'reminder_email_template')
-        .single()
-
-    // Fetch Subject
-    const { data: subjectConfig } = await supabase
-        .from('app_configs')
-        .select('value')
-        .eq('key', 'reminder_email_subject')
-        .single()
-
-    const initialBody = bodyConfig?.value || ''
-    const initialSubject = subjectConfig?.value || '【Swim Partners】明日のレッスン予約のリマインド'
-
     return (
         <div className="space-y-6">
             <div>
@@ -32,14 +10,14 @@ export default async function SettingsPage() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle>リマインドメール設定</CardTitle>
-                    <CardDescription>
-                        自動送信されるリマインドメールの件名と本文を編集します。<br />
-                        以下の変数が使用可能です: {'{{student_name}}'}, {'{{date}}'}, {'{{time}}'}, {'{{coach_name}}'}
-                    </CardDescription>
+                    <CardTitle>各種設定</CardTitle>
                 </CardHeader>
-                <CardContent>
-                    <TemplateEditorForm initialSubject={initialSubject} initialBody={initialBody} />
+                <CardContent className="space-y-4">
+                    <div className="bg-blue-50 p-4 rounded-lg text-blue-800">
+                        <p className="font-bold">お知らせ</p>
+                        <p>リマインドメールの設定は「メール設定」メニューに統合されました。</p>
+                        <a href="/admin/email-templates" className="text-blue-600 underline mt-2 inline-block">メール設定へ移動</a>
+                    </div>
                 </CardContent>
             </Card>
         </div>

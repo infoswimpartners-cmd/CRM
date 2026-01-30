@@ -71,6 +71,13 @@ export function EditScheduleDialog({ schedule, open, onOpenChange, onSuccess }: 
     const [showDeleteAlert, setShowDeleteAlert] = useState(false)
     const [students, setStudents] = useState<Student[]>([])
 
+    // Admin & Coach State
+    const [isAdmin, setIsAdmin] = useState(false)
+    const [coaches, setCoaches] = useState<{ id: string, full_name: string | null }[]>([])
+    const [selectedCoachId, setSelectedCoachId] = useState<string>('')
+    const [currentUser, setCurrentUser] = useState<any>(null)
+
+
     // Form State
     const [studentId, setStudentId] = useState<string>('none')
     const [date, setDate] = useState<Date | undefined>(new Date())
@@ -80,20 +87,38 @@ export function EditScheduleDialog({ schedule, open, onOpenChange, onSuccess }: 
     const [notes, setNotes] = useState('')
     const [title, setTitle] = useState('')
 
-    // Initial Data Fetch (Students)
+    // Initial Data Fetch (User Role, Coaches)
     useEffect(() => {
         if (!open) return
-        const fetchData = async () => {
+        const init = async () => {
             const supabase = createClient()
             const { data: { user } } = await supabase.auth.getUser()
             if (!user) return
 
-            const { data } = await supabase.rpc('get_students_for_coach_public', {
-                p_coach_id: user.id
-            })
-            if (data) setStudents(data)
+            setCurrentUser(user)
+
+            // Initial selected coach depends on schedule if exists
+            // But we will handle that in the schedule-loading effect.
+            // Here we just check role.
+
+            // Check Role
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('role')
+                .eq('id', user.id)
+                .single()
+
+            if (profile?.role === 'admin') {
+                setIsAdmin(true)
+                // Fetch All Coaches
+                const { data: allCoaches } = await supabase
+                    .from('profiles')
+                    .select('id, full_name')
+
+                if (allCoaches) setCoaches(allCoaches)
+            }
         }
-        fetchData()
+        init()
     }, [open])
 
     // Load Schedule Data
@@ -109,16 +134,68 @@ export function EditScheduleDialog({ schedule, open, onOpenChange, onSuccess }: 
             setLocation(schedule.location || '')
             setNotes(schedule.notes || '')
             setStudentId(schedule.student_id || 'none')
+
+            // Set initial selected coach from schedule. 
+            // Note: schedule object needs to contain coach_id. The interface defined above doesn't have it explicitly yet?
+            // Actually supabase query usually returns all columns or we need to check how it passed.
+            // Let's assume it might not be in the passed prop.
+            // If not passed, we might default to self, but better safe.
+            // Wait, standard `schedule` prop interface in this file:
+            /*
+            interface Schedule {
+                id: string
+                title: string
+                start_time: string
+                end_time: string
+                location?: string
+                notes?: string
+                student?: { full_name: string }
+                student_id?: string
+            }
+            */
+            // It is missing coach_id. We should update Interface or fetch it? 
+            // Fetching single schedule detail is safer if prop is incomplete.
+            // However, let's update the interface right now as well (I will do this via multiple replacements or just cast it)
+            // For now let's assume `(schedule as any).coach_id`.
+            if ((schedule as any).coach_id) {
+                setSelectedCoachId((schedule as any).coach_id)
+            } else {
+                // Default to current user if not present (unlikely if created correctly)
+                // set via other effect if needed
+            }
+
+            // Reset states
+            setIsDeleting(false)
+            setShowDeleteAlert(false)
         }
     }, [open, schedule])
 
-    // Auto-generate title (Only if it looks like a default title or user wants it)
-    // In Edit mode, maybe we shouldn't auto-update title as aggressively to avoid overwriting user edits?
-    // Let's only update if the title matches the old student name pattern or is empty.
+    // Ensure selectedCoachId is set if schedule didn't have it (e.g. initial load logic overlap)
+    useEffect(() => {
+        if (open && !selectedCoachId && currentUser) {
+            setSelectedCoachId(currentUser.id)
+        }
+    }, [open, currentUser, selectedCoachId])
+
+
+    // Fetch Students (Depends on Selected Coach)
+    useEffect(() => {
+        if (!open || !selectedCoachId) return
+        const fetchStudents = async () => {
+            const supabase = createClient()
+            const { data } = await supabase.rpc('get_students_for_coach_public', {
+                p_coach_id: selectedCoachId
+            })
+            if (data) setStudents(data)
+            else setStudents([])
+        }
+        fetchStudents()
+    }, [open, selectedCoachId])
+
+
+    // Auto-generate title
     useEffect(() => {
         if (!open) return
-        // Simple logic: If existing title was "[OldName]様 レッスン" and we change student, update it.
-        // For now, let's just leave it manual in edit mode unless explicitly empty, to be safe.
         if (title === '') {
             if (studentId && studentId !== 'none') {
                 const student = students.find(s => s.id === studentId)
@@ -150,16 +227,23 @@ export function EditScheduleDialog({ schedule, open, onOpenChange, onSuccess }: 
             const [eh, em] = endTime.split(':').map(Number)
             endDateTime.setHours(eh, em, 0)
 
+            const updatePayload: any = {
+                student_id: studentId === 'none' ? null : studentId,
+                start_time: startDateTime.toISOString(),
+                end_time: endDateTime.toISOString(),
+                title: title,
+                location: location,
+                notes: notes
+            }
+
+            // Only update coach_id if admin and valid
+            if (isAdmin && selectedCoachId) {
+                updatePayload.coach_id = selectedCoachId
+            }
+
             const { error } = await supabase
                 .from('lesson_schedules')
-                .update({
-                    student_id: studentId === 'none' ? null : studentId,
-                    start_time: startDateTime.toISOString(),
-                    end_time: endDateTime.toISOString(),
-                    title: title,
-                    location: location,
-                    notes: notes
-                })
+                .update(updatePayload)
                 .eq('id', schedule.id)
 
             if (error) throw error
@@ -177,17 +261,13 @@ export function EditScheduleDialog({ schedule, open, onOpenChange, onSuccess }: 
     }
 
     const handleDelete = async () => {
+        // ... (unchanged)
         if (!schedule) return
         setIsDeleting(true)
-        const supabase = createClient()
-
         try {
-            const { error } = await supabase
-                .from('lesson_schedules')
-                .delete()
-                .eq('id', schedule.id)
-
-            if (error) throw error
+            const { cancelSchedule } = await import('@/actions/schedule')
+            const result = await cancelSchedule(schedule.id)
+            if (!result.success) throw new Error(result.error)
 
             toast.success('スケジュールを削除しました')
             if (onSuccess) onSuccess()
@@ -195,7 +275,7 @@ export function EditScheduleDialog({ schedule, open, onOpenChange, onSuccess }: 
             onOpenChange(false)
         } catch (error: any) {
             console.error('Delete Error:', error)
-            toast.error('削除に失敗しました')
+            toast.error(error.message || '削除に失敗しました')
             setIsDeleting(false)
         }
     }
@@ -212,6 +292,24 @@ export function EditScheduleDialog({ schedule, open, onOpenChange, onSuccess }: 
                     </DialogHeader>
 
                     <form onSubmit={handleSubmit} className="space-y-4 py-4">
+
+                        {/* Admin: Coach Selector */}
+                        {isAdmin && (
+                            <div className="grid gap-2 p-3 bg-slate-50 border rounded-md">
+                                <Label className="text-slate-700 font-bold">担当コーチ (管理者機能)</Label>
+                                <Select value={selectedCoachId} onValueChange={setSelectedCoachId}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="コーチを選択" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {coaches.map(c => (
+                                            <SelectItem key={c.id} value={c.id}>{c.full_name || '未設定'}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+
                         <div className="grid gap-2">
                             <Label>生徒 (任意)</Label>
                             <Select value={studentId} onValueChange={setStudentId}>
@@ -261,11 +359,43 @@ export function EditScheduleDialog({ schedule, open, onOpenChange, onSuccess }: 
                         <div className="grid grid-cols-2 gap-4">
                             <div className="grid gap-2">
                                 <Label>開始時間</Label>
-                                <Input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} required />
+                                <Select value={startTime} onValueChange={setStartTime}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="開始時間" />
+                                    </SelectTrigger>
+                                    <SelectContent className="h-[200px]">
+                                        {Array.from({ length: 24 * 6 }).map((_, i) => {
+                                            const h = Math.floor(i / 6)
+                                            const m = (i % 6) * 10
+                                            const time = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`
+                                            return (
+                                                <SelectItem key={time} value={time}>
+                                                    {time}
+                                                </SelectItem>
+                                            )
+                                        })}
+                                    </SelectContent>
+                                </Select>
                             </div>
                             <div className="grid gap-2">
                                 <Label>終了時間</Label>
-                                <Input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} required />
+                                <Select value={endTime} onValueChange={setEndTime}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="終了時間" />
+                                    </SelectTrigger>
+                                    <SelectContent className="h-[200px]">
+                                        {Array.from({ length: 24 * 6 }).map((_, i) => {
+                                            const h = Math.floor(i / 6)
+                                            const m = (i % 6) * 10
+                                            const time = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`
+                                            return (
+                                                <SelectItem key={time} value={time}>
+                                                    {time}
+                                                </SelectItem>
+                                            )
+                                        })}
+                                    </SelectContent>
+                                </Select>
                             </div>
                         </div>
 

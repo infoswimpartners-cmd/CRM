@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { LogOut, LayoutDashboard, Users, Calendar, DollarSign, Settings, User, History, PlusCircle } from 'lucide-react'
+import { LogOut, LayoutDashboard, Users, Calendar, DollarSign, Settings, User, History, PlusCircle, CreditCard, BookOpen, Mail, FileCheck } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 
 interface DesktopSidebarProps {
@@ -52,9 +52,14 @@ export function DesktopSidebar({ role }: DesktopSidebarProps) {
 
                         <NavHeading>分析・集計</NavHeading>
                         <NavItem href="/admin/analytics" icon={DollarSign} label="売上詳細" isActive={pathname?.startsWith('/admin/analytics')} />
-                        <NavItem href="/admin/reports" icon={Calendar} label="実施メモ一覧" isActive={pathname?.startsWith('/admin/reports')} />
+                        <NavItem href="/admin/reports" icon={Calendar} label="全レッスン報告" isActive={pathname?.startsWith('/admin/reports')} />
+
+                        <NavHeading>財務管理</NavHeading>
+                        <NavItem href="/admin/billing" icon={FileCheck} label="請求承認" isActive={pathname?.startsWith('/admin/billing')} />
+                        <NavItem href="/admin/finance/payouts" icon={CreditCard} label="報酬支払管理" isActive={pathname?.startsWith('/admin/finance/payouts')} />
 
                         <NavHeading>運営管理</NavHeading>
+                        <NavItem href="/admin/schedule" icon={Calendar} label="全体スケジュール" isActive={pathname?.startsWith('/admin/schedule')} />
                         <NavItem href="/customers" icon={Users} label="会員管理" isActive={pathname?.startsWith('/customers')} />
                         <NavItem href="/admin/coaches" icon={User} label="コーチ管理" isActive={pathname?.startsWith('/admin/coaches')} />
 
@@ -65,7 +70,12 @@ export function DesktopSidebar({ role }: DesktopSidebarProps) {
 
                         <NavHeading>システム</NavHeading>
                         <NavItem href="/admin/masters" icon={Settings} label="マスタ設定" isActive={pathname?.startsWith('/admin/masters')} />
+                        <NavItem href="/admin/email-templates" icon={Mail} label="メール設定" isActive={pathname?.startsWith('/admin/email-templates')} />
                         <NavItem href="/admin/settings" icon={Settings} label="全体設定" isActive={pathname?.startsWith('/admin/settings')} />
+
+                        <NavHeading>ヘルプ</NavHeading>
+                        <NavItem href="/admin/manual" icon={BookOpen} label="管理者マニュアル" isActive={pathname?.startsWith('/admin/manual')} />
+                        <NavItem href="/coach/manual" icon={BookOpen} label="コーチマニュアル" isActive={pathname?.startsWith('/coach/manual')} />
                     </>
                 ) : (
                     <>
@@ -84,6 +94,9 @@ export function DesktopSidebar({ role }: DesktopSidebarProps) {
 
                         <NavHeading>設定</NavHeading>
                         <NavItem href="/settings" icon={Settings} label="アカウント設定" isActive={pathname?.startsWith('/settings')} />
+
+                        <NavHeading>ヘルプ</NavHeading>
+                        <NavItem href="/coach/manual" icon={BookOpen} label="コーチマニュアル" isActive={pathname?.startsWith('/coach/manual')} />
                     </>
                 )}
             </nav>
