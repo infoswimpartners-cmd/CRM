@@ -46,6 +46,38 @@ export async function createStripeCustomer(studentId: string) {
     }
 }
 
+export async function updateStudentStripeId(studentId: string, stripeCustomerId: string) {
+    const supabase = await createClient()
+
+    try {
+        // Auth Check (Admin Only recommended, assuming user is admin/staff)
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { success: false, error: 'Unauthorized' }
+
+        // Fetch Student
+        const { data: student } = await supabase
+            .from('students')
+            .select('id')
+            .eq('id', studentId)
+            .single()
+
+        if (!student) return { success: false, error: 'Student not found' }
+
+        const { error } = await supabase
+            .from('students')
+            .update({ stripe_customer_id: stripeCustomerId })
+            .eq('id', studentId)
+
+        if (error) throw error
+
+        revalidatePath(`/customers/${studentId}`)
+        return { success: true }
+    } catch (error: any) {
+        console.error('Update Stripe ID Error:', error)
+        return { success: false, error: error.message }
+    }
+}
+
 export async function createPaymentSetupLink(studentId: string) {
     const supabase = await createClient()
 
