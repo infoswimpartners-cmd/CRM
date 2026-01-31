@@ -11,6 +11,8 @@ import { ChevronLeft } from 'lucide-react'
 import { StudentCoachAssigner } from '@/components/admin/StudentCoachAssigner'
 import { StudentStatusSelect, statusLabels, statusColors } from '@/components/admin/StudentStatusSelect'
 import { TrialConfirmButton } from '@/components/admin/TrialConfirmButton'
+import { StripeManager } from '@/components/admin/students/StripeManager'
+import { getStripeCustomerStatus } from '@/actions/stripe'
 
 export default async function StudentDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params
@@ -49,6 +51,12 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
         .select('id, full_name')
         .in('role', ['coach', 'admin', 'owner'])
         .order('full_name')
+
+    // Fetch Stripe Status
+    let paymentMethodStatus = null
+    if (student.stripe_customer_id) {
+        paymentMethodStatus = await getStripeCustomerStatus(student.stripe_customer_id)
+    }
 
     return (
         <div className="space-y-6">
@@ -136,33 +144,12 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
                     )}
                 </div>
                 {isAdmin && (
-                    <div>
-                        <span className="font-semibold block mb-1">Stripe連携:</span>
-                        {student.stripe_customer_id ? (
-                            <div className="space-y-1">
-                                <div className="flex items-center gap-2 text-green-700 bg-green-50 px-2 py-1 rounded w-fit">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-check-circle-2"><circle cx="12" cy="12" r="10" /><path d="m9 12 2 2 4-4" /></svg>
-                                    <span className="text-sm font-bold">連携済み</span>
-                                </div>
-                                <div className="text-xs text-gray-500 font-mono">
-                                    ID: {student.stripe_customer_id}
-                                </div>
-                                <a
-                                    href={`https://dashboard.stripe.com/customers/${student.stripe_customer_id}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-sm text-blue-600 hover:text-blue-800 underline flex items-center gap-1"
-                                >
-                                    Stripe管理画面を開く
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-external-link"><path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></svg>
-                                </a>
-                            </div>
-                        ) : (
-                            <div className="flex items-center gap-2 text-gray-500 bg-gray-100 px-2 py-1 rounded w-fit">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-alert-circle"><circle cx="12" cy="12" r="10" /><line x1="12" x2="12" y1="8" y2="12" /><line x1="12" x2="12.01" y1="16" y2="16" /></svg>
-                                <span className="text-sm">未連携</span>
-                            </div>
-                        )}
+                    <div className="md:col-span-2">
+                        <StripeManager
+                            studentId={student.id}
+                            stripeCustomerId={student.stripe_customer_id}
+                            paymentMethodStatus={paymentMethodStatus}
+                        />
                     </div>
                 )}
             </div>

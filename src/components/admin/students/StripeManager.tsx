@@ -104,10 +104,10 @@ export function StripeManager({ studentId, stripeCustomerId, paymentMethodStatus
                             顧客データを作成する
                         </Button>
                         <Button
-                            variant="ghost"
+                            variant="outline"
                             size="sm"
                             onClick={() => setIsManualMode(true)}
-                            className="text-xs text-slate-400 hover:text-indigo-600"
+                            className="text-xs text-slate-500 hover:text-indigo-600"
                         >
                             IDを手動入力する
                         </Button>
@@ -154,10 +154,10 @@ export function StripeManager({ studentId, stripeCustomerId, paymentMethodStatus
                             ID: {stripeCustomerId}
                             <button
                                 onClick={() => setIsManualMode(true)}
-                                className="text-slate-300 hover:text-indigo-600 opacity-0 group-hover:opacity-100 transition-all p-1"
+                                className="text-slate-400 hover:text-indigo-600 transition-all p-1"
                                 title="IDを手動編集"
                             >
-                                <Pencil className="w-3 h-3" />
+                                <Pencil className="w-4 h-4" />
                             </button>
                         </div>
                     </div >
