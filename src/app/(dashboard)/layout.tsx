@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { MobileSidebar } from '@/components/layout/MobileSidebar'
 import { DesktopSidebar } from '@/components/layout/DesktopSidebar'
 import { GlobalSearchContainer } from '@/components/layout/GlobalSearchContainer' // Import Container
+import { NotificationBell } from '@/components/layout/NotificationBell' // [NEW]
 import Image from 'next/image'
 
 export const dynamic = 'force-dynamic'
@@ -106,6 +107,11 @@ export default async function DashboardLayout({
                         </div>
 
                         <div className="flex items-center gap-4 ml-4">
+                            {/* [NEW] Notification Bell */}
+                            <Suspense>
+                                <NotificationBell isAdmin={safeProfile.role === 'admin' || safeProfile.role === 'owner'} />
+                            </Suspense>
+
                             <Link href="/settings" className="flex items-center gap-3 hover:bg-white/5 p-1.5 pr-4 rounded-full transition-all border border-transparent hover:border-white/5">
                                 <Avatar className="h-9 w-9 ring-2 ring-white/10">
                                     <AvatarImage src={safeProfile.avatar_url || undefined} />
@@ -130,7 +136,7 @@ export default async function DashboardLayout({
                 <main className="relative z-10 flex-1 p-6 space-y-6">
                     {children}
                 </main>
-            </div>
-        </div>
+            </div >
+        </div >
     )
 }
