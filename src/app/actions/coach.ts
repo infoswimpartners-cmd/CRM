@@ -199,3 +199,37 @@ export async function deleteCoach(coachId: string): Promise<{ success?: boolean;
         return { error: '予期せぬエラーが発生しました。' }
     }
 }
+
+export async function getInvitationUrl(coachId: string): Promise<{ success?: boolean; url?: string; error?: string }> {
+    try {
+        const supabase = createAdminClient()
+
+        // Fetch current profile
+        const { data: profile, error: fetchError } = await supabase
+            .from('profiles')
+            .select('invitation_token, status, invitation_expires_at')
+            .eq('id', coachId)
+            .single()
+
+        if (fetchError || !profile) {
+            return { error: 'コーチ情報が見つかりません。' }
+        }
+
+        if (profile.status === 'active') {
+            return { error: 'このコーチは既に登録完了しています。' }
+        }
+
+        // Check expiration
+        if (new Date(profile.invitation_expires_at) < new Date()) {
+            return { error: '有効期限が切れています。「再招待」を行ってください。' }
+        }
+
+        const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://manager.swim-partners.com'}/auth/invite?token=${profile.invitation_token}`
+
+        return { success: true, url: inviteUrl }
+
+    } catch (err) {
+        console.error('getInvitationUrl error:', err)
+        return { error: 'URLの取得に失敗しました。' }
+    }
+}

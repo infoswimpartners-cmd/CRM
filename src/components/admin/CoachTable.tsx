@@ -15,6 +15,7 @@ import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { CoachDeleteButton } from '@/components/admin/CoachDeleteButton'
 import { CoachResendButton } from '@/components/admin/CoachResendButton'
+import { CoachInviteLinkButton } from '@/components/admin/CoachInviteLinkButton'
 import { AdminResetPasswordDialog } from '@/components/admin/AdminResetPasswordDialog'
 import { useState } from 'react'
 
@@ -150,7 +151,10 @@ export function CoachTable({ coaches, studentCounts }: CoachTableProps) {
                             <TableCell className="text-right">
                                 <div className="flex justify-end gap-2">
                                     {coach.status === 'pending' && (
-                                        <CoachResendButton coachId={coach.id} coachName={coach.full_name} />
+                                        <>
+                                            <CoachInviteLinkButton coachId={coach.id} coachName={coach.full_name} />
+                                            <CoachResendButton coachId={coach.id} coachName={coach.full_name} />
+                                        </>
                                     )}
                                     <Button variant="ghost" size="icon" asChild>
                                         <Link href={`/admin/coaches/${coach.id}`}>

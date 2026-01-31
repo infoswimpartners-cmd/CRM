@@ -331,7 +331,8 @@ export default function AdminManualPage() {
                                         <strong>再招待の手順:</strong><br />
                                         <span className="text-gray-600">
                                             コーチ一覧の「招待中」ステータス横にある<br />
-                                            <strong>「再招待ボタン（紙飛行機アイコン）」</strong>をクリックしてください。
+                                            <strong>「再招待ボタン（紙飛行機アイコン）」</strong>でメール再送、<br />
+                                            <strong>「リンクコピー（鎖アイコン）」</strong>でURLをコピーできます。
                                         </span>
                                     </div>
                                     <div className="bg-amber-50 p-2 rounded mt-2 text-amber-800 text-xs">
