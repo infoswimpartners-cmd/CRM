@@ -104,9 +104,7 @@ export function CoachSignupForm({ token }: CoachSignupFormProps) {
                         </div>
                         <p className="text-xs text-muted-foreground">8文字以上で設定してください</p>
                     </div>
-                    const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
-                    // ... inside return ...
 
                     <div className="space-y-2">
                         <Label htmlFor="confirmPassword">パスワード（確認）</Label>
