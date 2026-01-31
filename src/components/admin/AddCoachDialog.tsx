@@ -56,7 +56,7 @@ export function AddCoachDialog() {
                         <DialogDescription>
                             追加するコーチの情報を入力してください。
                             <br />
-                            <span className="text-xs text-muted-foreground">※確認メールが送信され、自動的にコーチ権限が付与されます。</span>
+                            <span className="text-xs text-muted-foreground">※招待メールが送信されます。コーチはリンクからパスワードを設定して登録を完了します。</span>
                         </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-4 py-4">

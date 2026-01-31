@@ -14,6 +14,7 @@ import { ChevronRight, User, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-reac
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { CoachDeleteButton } from '@/components/admin/CoachDeleteButton'
+import { CoachResendButton } from '@/components/admin/CoachResendButton'
 import { AdminResetPasswordDialog } from '@/components/admin/AdminResetPasswordDialog'
 import { useState } from 'react'
 
@@ -24,6 +25,7 @@ interface Coach {
     avatar_url: string | null
     role: string
     coach_number?: string | null
+    status?: string // Added status
 }
 
 interface CoachTableProps {
@@ -82,6 +84,15 @@ export function CoachTable({ coaches, studentCounts }: CoachTableProps) {
                     <TableRow>
                         <TableHead
                             className="cursor-pointer hover:bg-slate-50 transition-colors"
+                            onClick={() => handleSort('status')}
+                        >
+                            <div className="flex items-center">
+                                状態
+                                <SortIcon column="status" />
+                            </div>
+                        </TableHead>
+                        <TableHead
+                            className="cursor-pointer hover:bg-slate-50 transition-colors"
                             onClick={() => handleSort('full_name')}
                         >
                             <div className="flex items-center">
@@ -113,6 +124,13 @@ export function CoachTable({ coaches, studentCounts }: CoachTableProps) {
                 <TableBody>
                     {sortedCoaches.map((coach) => (
                         <TableRow key={coach.id}>
+                            <TableCell>
+                                {coach.status === 'pending' ? (
+                                    <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">招待中</Badge>
+                                ) : (
+                                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">有効</Badge>
+                                )}
+                            </TableCell>
                             <TableCell className="flex items-center gap-3 font-medium">
                                 <Avatar>
                                     <AvatarImage src={coach.avatar_url || undefined} />
@@ -131,6 +149,9 @@ export function CoachTable({ coaches, studentCounts }: CoachTableProps) {
                             </TableCell>
                             <TableCell className="text-right">
                                 <div className="flex justify-end gap-2">
+                                    {coach.status === 'pending' && (
+                                        <CoachResendButton coachId={coach.id} coachName={coach.full_name} />
+                                    )}
                                     <Button variant="ghost" size="icon" asChild>
                                         <Link href={`/admin/coaches/${coach.id}`}>
                                             <ChevronRight className="h-4 w-4" />
@@ -144,7 +165,7 @@ export function CoachTable({ coaches, studentCounts }: CoachTableProps) {
                     ))}
                     {coaches.length === 0 && (
                         <TableRow>
-                            <TableCell colSpan={4} className="text-center py-8 text-gray-500">
+                            <TableCell colSpan={5} className="text-center py-8 text-gray-500">
                                 コーチ登録がありません
                             </TableCell>
                         </TableRow>

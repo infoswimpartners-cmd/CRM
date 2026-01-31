@@ -1,9 +1,10 @@
 'use server'
 
-import { createClient } from '@supabase/supabase-js'
-import { createClient as createServerClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { emailService } from '@/lib/email'
+import { randomUUID } from 'crypto'
+import { addHours } from 'date-fns'
 
 interface CreateCoachState {
     success?: boolean
@@ -19,116 +20,68 @@ export async function createCoach(prevState: CreateCoachState, formData: FormDat
     }
 
     try {
-        // 1. Create User using a clean, non-session client (using logic similar to a new signup)
-        // We use the JS client directly to avoid messing with Next.js cookies/headers
-        const tempClient = createClient(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-        )
+        const supabase = createAdminClient()
 
-        // Generate random password
-        const tempPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-8)
+        // 1. Check if user already exists in profiles (Soft check before Auth)
+        const { data: existingProfile } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('email', email)
+            .single()
 
-        // Ideally we would use 'inviteUserByEmail' but that requires SERVICE_ROLE_KEY
-        // So we use signUp, which sends a confirmation email if configured, or just creates the user
-        const { data: authData, error: authError } = await tempClient.auth.signUp({
-            email,
+        if (existingProfile) {
+            return { error: 'このメールアドレスは既に登録されています。' }
+        }
+
+        // 2. Create User via Admin API
+        // We set a random password that the user doesn't know. They will set their own via the invite link.
+        const tempPassword = randomUUID() + randomUUID() // Long random string
+
+        const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
+            email: email,
             password: tempPassword,
-            options: {
-                data: {
-                    full_name: fullName,
-                }
-            }
+            email_confirm: true, // Auto-confirm email so they can sign in after password reset
+            user_metadata: { full_name: fullName }
         })
 
         if (authError) {
-            console.error('Signup Error:', authError)
-            if (authError.status === 429) {
-                return { error: 'セキュリティ保護のため、リクエストが制限されています。30秒〜1分ほど待ってから再試行してください。' }
-            }
-            return { error: `エラー: ${authError.message} (Code: ${authError.status || 'Unknown'})` }
+            console.error('Create User Error:', authError)
+            return { error: `ユーザー作成エラー: ${authError.message}` }
         }
 
-        if (!authData.user) {
-            return { error: 'ユーザーが作成されませんでした。' }
+        if (!authUser.user) {
+            return { error: 'ユーザー作成に失敗しました。' }
         }
 
-        // Check if email confirmation is enabled/required
-        const isEmailConfirmationRequired = !authData.session
+        const userId = authUser.user.id
 
-        // VERIFY: Only try to sign in if we expect a session (Auto Confirm ON)
-        // If confirmation is required, signInWithPassword will fail anyway (Email not confirmed),
-        // so we skip this check and assume a new user was created successfully.
-        if (!isEmailConfirmationRequired) {
-            const { error: signInError } = await tempClient.auth.signInWithPassword({
-                email,
-                password: tempPassword
-            })
+        // 3. Generate Invitation Token
+        const invitationToken = randomUUID()
+        const expiresAt = addHours(new Date(), 24).toISOString() // 24 hours validity
 
-            if (signInError) {
-                console.error('Password Verification Error:', signInError)
-                return {
-                    error: 'このメールアドレスは既に登録されており、パスワードが一致しません。Supabaseの管理画面(Auth)からユーザーを削除してから再試行してください。'
-                }
-            }
-        }
-
-        const newUserId = authData.user.id
-
-        // 2. Elevate to Coach Role using Admin's session
-        const supabase = await createServerClient()
-
-        // Manual insert with must_change_password flag
-        const { error: insertError } = await supabase
+        // 4. Create Profile with Pending Status
+        const { error: profileError } = await supabase
             .from('profiles')
-            .upsert({
-                id: newUserId,
+            .insert({
+                id: userId,
                 email: email,
                 full_name: fullName,
                 role: 'coach',
-                avatar_url: '',
-                must_change_password: true
+                status: 'pending',
+                invitation_token: invitationToken,
+                invitation_expires_at: expiresAt,
+                must_change_password: false // They set it initially, so no need to force change immediately after
             })
 
-        if (insertError) {
-            console.error('Profile Creation Error:', insertError)
-            if (insertError.code === '23503') {
-                return {
-                    error: 'このメールアドレスは既にシステムに登録されています。以前削除したコーチの場合、SupabaseのAuth管理画面からユーザーを完全に削除するか、別のメールアドレスを使用してください。'
-                }
-            }
-            return { error: `ユーザーは作成されましたが、プロフィールの作成に失敗しました: ${insertError.message}` }
+        if (profileError) {
+            // Cleanup: Delete auth user if profile creation fails? 
+            // Ideally yes, but for now just report error. Admin can delete manually.
+            console.error('Profile Insert Error:', profileError)
+            return { error: `プロフィール作成エラー: ${profileError.message}` }
         }
 
-        // 3. Send Email
-        try {
-            // variable defined above
-
-            await emailService.sendEmail({
-                to: email,
-                subject: '【Swim Partners】コーチアカウントが作成されました',
-                text: `
-${fullName} 様
-
-Swim Partnersのコーチアカウントが作成されました。
-以下の情報でログインしてください。
-
-ログインURL: ${process.env.NEXT_PUBLIC_APP_URL || 'https://manager.swim-partners.com'}/login
-ID (Email): ${email}
-初期パスワード: ${tempPassword}
-
-${isEmailConfirmationRequired ? '【重要】別途Supabaseから届く「確認メール」のリンクを先にクリックしてください。そうしないとログインできません。' : ''}
-※初回ログイン時にパスワードの変更が必要です。
-                `
-            })
-
-            if (isEmailConfirmationRequired) {
-                return { success: true, error: 'ユーザーを作成しましたが、メール確認が必要です。Supabaseから届く確認メールをチェックしてください。' }
-            }
-
-        } catch (emailError) {
-            console.error('Email Send Error:', emailError)
-        }
+        // 5. Send Invitation Email
+        await sendInvitationEmail(email, fullName, invitationToken)
 
         revalidatePath('/admin/coaches')
         return { success: true }
@@ -139,10 +92,86 @@ ${isEmailConfirmationRequired ? '【重要】別途Supabaseから届く「確認
     }
 }
 
+export async function resendInvitation(coachId: string): Promise<{ success?: boolean; error?: string }> {
+    try {
+        const supabase = createAdminClient()
+
+        // Fetch current profile
+        const { data: profile, error: fetchError } = await supabase
+            .from('profiles')
+            .select('email, full_name, status')
+            .eq('id', coachId)
+            .single()
+
+        if (fetchError || !profile) {
+            return { error: 'コーチ情報が見つかりません。' }
+        }
+
+        if (profile.status === 'active') {
+            return { error: 'このコーチは既に登録完了しています。' }
+        }
+
+        // Generate new token
+        const newToken = randomUUID()
+        const newExpiresAt = addHours(new Date(), 24).toISOString()
+
+        // Update Profile
+        const { error: updateError } = await supabase
+            .from('profiles')
+            .update({
+                invitation_token: newToken,
+                invitation_expires_at: newExpiresAt
+            })
+            .eq('id', coachId)
+
+        if (updateError) {
+            return { error: 'トークンの更新に失敗しました。' }
+        }
+
+        // Send Email
+        await sendInvitationEmail(profile.email, profile.full_name || '', newToken)
+
+        revalidatePath('/admin/coaches')
+        return { success: true }
+
+    } catch (err: any) {
+        console.error('Resend error:', err)
+        return { error: '再招待の送信に失敗しました。' }
+    }
+}
+
+async function sendInvitationEmail(email: string, name: string, token: string) {
+    const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://manager.swim-partners.com'}/auth/invite?token=${token}`
+
+    await emailService.sendEmail({
+        to: email,
+        subject: '【Swim Partners】コーチアカウント招待のお知らせ',
+        text: `
+${name} 様
+
+Swim Partnersのコーチアカウントとして招待されました。
+以下のリンクからパスワードを設定し、登録を完了してください。
+
+■パスワード設定URL (24時間有効)
+${inviteUrl}
+
+※このURLの有効期限は24時間です。期限が切れた場合は管理者に再招待を依頼してください。
+
+--------------------------------------------------
+Swim Partners Manager
+        `
+    })
+}
+
 export async function deleteCoach(coachId: string): Promise<{ success?: boolean; error?: string }> {
-    const supabase = await createServerClient()
+    const supabase = createAdminClient() // Use Admin Client to delete from Auth as well
 
     try {
+        // 1. Delete from Profiles (This logic is same as before, check foreign keys)
+        // Actually, if we use Admin Client, we can delete user from Auth, and CASCADE handles profile?
+        // But our `profiles` table might not ideally cascade on delete user in Supabase if RLS is tricky.
+        // Let's stick to deleting profile first to check constraints.
+
         const { error } = await supabase
             .from('profiles')
             .delete()
@@ -154,6 +183,14 @@ export async function deleteCoach(coachId: string): Promise<{ success?: boolean;
                 return { error: 'このコーチはレッスン履歴や担当生徒が存在するため削除できません。' }
             }
             return { error: `削除に失敗しました: ${error.message}` }
+        }
+
+        // 2. Delete from Auth (Cleanup)
+        // If profile delete succeeded, we should cleanup the auth user too.
+        const { error: authDeleteError } = await supabase.auth.admin.deleteUser(coachId)
+        if (authDeleteError) {
+            console.error('Auth Delete Warning:', authDeleteError)
+            // Non-fatal, profile is gone.
         }
 
         revalidatePath('/admin/coaches')
