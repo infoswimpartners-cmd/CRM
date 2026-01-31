@@ -341,6 +341,25 @@ export default function AdminManualPage() {
                                 </div>
                             </CardContent>
                         </Card>
+
+                        <Card className="border-l-4 border-l-rose-500">
+                            <CardHeader>
+                                <CardTitle className="text-lg text-rose-700">登録リンクの発行 (氏名・メール指定なし)</CardTitle>
+                            </CardHeader>
+                            <CardContent className="text-sm space-y-2">
+                                <p className="text-gray-700">
+                                    「コーチ管理」画面右上の<strong>「登録リンクを発行」</strong>ボタンから、氏名やメールを指定しない招待URLを作成できます。
+                                </p>
+                                <ul className="list-disc ml-5 space-y-1 text-gray-700">
+                                    <li>LINEグループ等で多数の人に一斉に共有する場合に便利です。</li>
+                                    <li>アクセスした人が自分で氏名・メール・パスワードを入力して登録します。</li>
+                                    <li>有効期限は<strong>3日間</strong>です。</li>
+                                </ul>
+                                <div className="bg-rose-50 p-2 rounded mt-2 text-rose-800 text-xs font-bold">
+                                    ※このリンクを知っている人は誰でもアカウントを作成できてしまうため、共有範囲には十分注意してください。
+                                </div>
+                            </CardContent>
+                        </Card>
                     </div>
                 </section>
 

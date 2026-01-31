@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { AddCoachDialog } from '@/components/admin/AddCoachDialog'
+import { CoachGenericInviteButton } from '@/components/admin/CoachGenericInviteButton'
 import { CoachTable } from '@/components/admin/CoachTable'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
@@ -44,7 +45,8 @@ export default async function CoachListPage() {
                     <h1 className="text-3xl font-bold tracking-tight">コーチ管理</h1>
                     <p className="text-gray-500">コーチ一覧と担当生徒の確認・引き継ぎ</p>
                 </div>
-                <div className="ml-auto">
+                <div className="ml-auto flex items-center gap-2">
+                    <CoachGenericInviteButton />
                     <AddCoachDialog />
                 </div>
             </div>
