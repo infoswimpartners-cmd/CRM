@@ -14,9 +14,11 @@ interface StripeManagerProps {
     studentId: string
     stripeCustomerId: string | null
     paymentMethodStatus: {
-        hasPaymentMethod: boolean
+        hasPaymentMethod?: boolean
+        deleted?: boolean
         last4?: string
         brand?: string
+        paymentMethod?: any
     } | null
 }
 
