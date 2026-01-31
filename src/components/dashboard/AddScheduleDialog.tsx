@@ -479,10 +479,11 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate }
                                         <Loader2 className="w-3 h-3 animate-spin" />
                                     ) : (
                                         <>
-                                            {membershipName ? `会員種別: ${membershipName}` : '会員種別: 単発/ビジター'}
+                                            {membershipName ? `会員種別: ${membershipName}` : '会員種別: 未設定 (単発扱い)'}
 
                                             {/* Usage Count Display */}
-                                            {monthlyLimit !== null && monthlyLimit > 0 && (
+                                            {/* Usage Count Display - Hide for Single Use */}
+                                            {monthlyLimit !== null && monthlyLimit > 0 && (!membershipName || !membershipName.includes('単発')) && (
                                                 <span className="ml-2 bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs">
                                                     利用状況: {currentCount} / {monthlyLimit} 回
                                                     {rolloverCount > 0 && <span className="ml-1 text-[10px]">(繰越 {rolloverCount}回含)</span>}
