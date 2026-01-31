@@ -420,7 +420,7 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate }
             if (!v) handleClose()
             else onOpenChange(v)
         }}>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-[425px] max-h-[85vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>レッスンスケジュール登録</DialogTitle>
                     <DialogDescription>
