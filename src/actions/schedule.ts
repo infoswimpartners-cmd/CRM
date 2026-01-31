@@ -52,15 +52,6 @@ export async function getStudentsForCoach(coachId: string) {
     try {
         const { data, error } = await supabaseAdmin
             .from('students')
-            .select('id, full_name, status, default_master_id') // Removed default_master_id if it causes issues, but let's check schema..
-            // Actually, schema check:
-            // The browser error 400 suggested query was invalid.
-            // If `default_master_id` is NOT in `students` but comes from join in RPC, that's why direct query failed.
-            // In RPC it was: select s.id, s.full_name, m.default_lesson_master_id ... left join membership_types
-            // SO `default_master_id` is NOT a column on students table. It is on membership_types or calculated.
-            // I need to replicate the join if I want that field.
-
-            // Replicating Query with Join and Membership Name:
             .select(`
                 id,
                 full_name,
