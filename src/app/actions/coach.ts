@@ -9,6 +9,7 @@ import { addHours } from 'date-fns'
 interface CreateCoachState {
     success?: boolean
     error?: string
+    invitationUrl?: string
 }
 
 export async function createCoach(prevState: CreateCoachState, formData: FormData): Promise<CreateCoachState> {
@@ -83,8 +84,11 @@ export async function createCoach(prevState: CreateCoachState, formData: FormDat
         // 5. Send Invitation Email
         await sendInvitationEmail(email, fullName, invitationToken)
 
+        // Generate URL for immediate display
+        const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://manager.swim-partners.com'}/auth/invite?token=${invitationToken}`
+
         revalidatePath('/admin/coaches')
-        return { success: true }
+        return { success: true, invitationUrl: inviteUrl }
 
     } catch (err: any) {
         console.error('Unexpected setup error:', err)
