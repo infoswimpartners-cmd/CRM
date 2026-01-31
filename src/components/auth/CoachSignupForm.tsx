@@ -49,7 +49,7 @@ export function CoachSignupForm({ token }: CoachSignupFormProps) {
                 </CardContent>
                 <CardFooter className="flex justify-center">
                     <Button asChild className="w-full">
-                        <Link href="/auth/login">ログイン画面へ進む</Link>
+                        <Link href="/login">ログイン画面へ進む</Link>
                     </Button>
                 </CardFooter>
             </Card>
