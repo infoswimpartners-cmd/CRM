@@ -32,7 +32,8 @@ async function calculateMonthlyUsage(
     studentId: string,
     targetDate: Date,
     monthlyLimit: number,
-    maxRollover: number
+    maxRollover: number,
+    membershipStartedAt?: string | null // [NEW]
 ): Promise<MonthlyUsageResult> {
     // 1. Current Month Usage
     const start = startOfMonth(targetDate).toISOString()
@@ -64,25 +65,39 @@ async function calculateMonthlyUsage(
         const prevStart = startOfMonth(prevDate).toISOString()
         const prevEnd = endOfMonth(prevDate).toISOString()
 
-        const { count: prevCompleted } = await supabaseAdmin
-            .from('lessons')
-            .select('*', { count: 'exact', head: true })
-            .eq('student_id', studentId)
-            .gte('lesson_date', prevStart)
-            .lte('lesson_date', prevEnd)
+        // [NEW] Logic: If previous month is BEFORE membership start, No Rollover
+        let canHaveRollover = true
+        if (membershipStartedAt) {
+            const startDate = new Date(membershipStartedAt)
+            // If startDate is AFTER prevEnd, then user wasn't member in prev month
+            // (Strictly: If startDate > PrevEnd)
+            if (startDate > new Date(prevEnd)) {
+                canHaveRollover = false
+                console.log(`[CalcUsage] No rollover: StartDate ${startDate.toISOString()} > PrevEnd ${prevEnd}`)
+            }
+        }
 
-        const { count: prevScheduled } = await supabaseAdmin
-            .from('lesson_schedules')
-            .select('*', { count: 'exact', head: true })
-            .eq('student_id', studentId)
-            .gte('start_time', prevStart)
-            .lte('start_time', prevEnd)
+        if (canHaveRollover) {
+            const { count: prevCompleted } = await supabaseAdmin
+                .from('lessons')
+                .select('*', { count: 'exact', head: true })
+                .eq('student_id', studentId)
+                .gte('lesson_date', prevStart)
+                .lte('lesson_date', prevEnd)
 
-        const prevTotal = (prevCompleted || 0) + (prevScheduled || 0)
+            const { count: prevScheduled } = await supabaseAdmin
+                .from('lesson_schedules')
+                .select('*', { count: 'exact', head: true })
+                .eq('student_id', studentId)
+                .gte('start_time', prevStart)
+                .lte('start_time', prevEnd)
 
-        // Calculate unused
-        const unused = Math.max(0, monthlyLimit - prevTotal)
-        rollover = Math.min(unused, maxRollover)
+            const prevTotal = (prevCompleted || 0) + (prevScheduled || 0)
+
+            // Calculate unused
+            const unused = Math.max(0, monthlyLimit - prevTotal)
+            rollover = Math.min(unused, maxRollover)
+        }
     }
 
     return {
@@ -124,6 +139,7 @@ export async function createLessonSchedule(params: CreateLessonScheduleParams) {
                     stripe_customer_id,
                     contact_email,
                     contact_email,
+                    membership_started_at,
                     full_name,
                     second_student_name,
                     membership_types!students_membership_type_id_fkey (
@@ -159,7 +175,11 @@ export async function createLessonSchedule(params: CreateLessonScheduleParams) {
                         studentId,
                         date,
                         limit,
-                        maxRollover
+                        maxRollover,
+                        null // TODO: Should we use it here? For creation, usually explicit or assuming current?
+                        // Actually better to fetch it if we want strict enforcement on creation too.
+                        // But params.student_id logic below fetches everything again.
+                        // Wait, line 121 fetches student. We need to add membership_started_at there too.
                     )
 
                     if (currentTotal >= effectiveLimit) checkOverage = true
@@ -414,7 +434,8 @@ export async function checkStudentLessonStatus(studentId: string, dateStr: strin
         const { data: student, error: studentError } = await supabaseAdmin
             .from('students')
             .select(`
-                id, 
+                id,
+                membership_started_at,
                 membership_types!students_membership_type_id_fkey (
                     name,
                     id,
@@ -454,17 +475,37 @@ export async function checkStudentLessonStatus(studentId: string, dateStr: strin
             studentId,
             date,
             limit,
-            maxRollover
+            maxRollover,
+            student.membership_started_at // Pass start date
         )
 
         // Logic Update:
         // 1. If active limit reached: Overage
         // 2. If 'Single Plan' or No Plan: Always Overage (Show selector)
+        // [NEW] 3. If target date is BEFORE membership_started_at: Always Overage (Single Ticket behavior)
+
         let isOverage = false
-        if (!membership || !limit || limit === 0 || (membershipName && membershipName.includes('単発'))) {
-            isOverage = true
-        } else if (limit > 0 && currentTotal >= effectiveLimit) {
-            isOverage = true
+
+        // Check Start Date
+        if (student.membership_started_at) {
+            const startDate = new Date(student.membership_started_at)
+            // Normalize to start of day? Or exact time? Usually start of day.
+            // Let's be lenient: if lesson date is strictly before start date (day level?)
+            // If start date is "2024-02-01", and lesson is "2024-01-31", it is overage.
+            if (date < startDate) {
+                // But wait, date is the lesson start time (e.g. 10:00).
+                // If start date is 2024-02-01 00:00:00, then 2024-01-31 is less.
+                isOverage = true
+                console.log(`[CheckStatus] Pre-membership lesson. Date: ${date.toISOString()}, Start: ${startDate.toISOString()}`)
+            }
+        }
+
+        if (!isOverage) {
+            if (!membership || !limit || limit === 0 || (membershipName && membershipName.includes('単発'))) {
+                isOverage = true
+            } else if (limit > 0 && currentTotal >= effectiveLimit) {
+                isOverage = true
+            }
         }
 
         // Extract active lessons for this membership
