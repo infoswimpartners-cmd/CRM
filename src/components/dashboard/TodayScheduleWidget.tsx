@@ -59,6 +59,7 @@ export async function TodayScheduleWidget({ coachId }: { coachId: string }) {
                     {schedules.map((schedule) => {
                         const startTime = new Date(schedule.start_time);
                         const endTime = new Date(schedule.end_time);
+                        // @ts-ignore
                         const studentName = Array.isArray(schedule.students)
                             ? schedule.students[0]?.full_name
                             : schedule.students?.full_name;
