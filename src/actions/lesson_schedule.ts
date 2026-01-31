@@ -395,25 +395,19 @@ export async function rejectLessonSchedule(scheduleId: string) {
     }
 
     try {
-        // Change status to 'cancelled' or null?
-        // If we reject billing, does it mean we cancel the lesson? Or just billing?
-        // Usually "Reject Billing" -> "Cancelled" status for billing, but lesson might remain?
-        // Let's set billing_status to 'cancelled_billing' (custom) or just null if we want to remove billing requirement.
-        // But better to keep trace. 'cancelled' seems appropriate if the enum allows string. 
-        // Our billing_status is text, so it's fine.
-
+        // [MODIFIED] User requested to DELETE the schedule if rejected.
         const { error } = await supabaseAdmin
             .from('lesson_schedules')
-            .update({
-                billing_status: 'cancelled',
-                is_overage: false, // Optionally remove overage flag if manual override
-                price: null
-            })
+            .delete()
             .eq('id', scheduleId)
 
         if (error) throw error
 
         revalidatePath('/admin/billing')
+        // Also revalidate schedule pages since it's gone
+        revalidatePath('/admin/schedule')
+        revalidatePath('/coach/schedule')
+
         return { success: true }
     } catch (error: any) {
         return { success: false, error: error.message }
