@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { Loader2, CheckCircle, AlertCircle } from 'lucide-react'
+import { Loader2, CheckCircle, AlertCircle, Eye, EyeOff } from 'lucide-react'
 import { registerCoachWithToken } from '@/app/actions/auth-signup'
 import Link from 'next/link'
 
@@ -16,6 +16,7 @@ interface CoachSignupFormProps {
 export function CoachSignupForm({ token }: CoachSignupFormProps) {
     const [isPending, startTransition] = useTransition()
     const [state, setState] = useState<{ success?: boolean; error?: string }>({})
+    const [showPassword, setShowPassword] = useState(false)
 
     const handleSubmit = (formData: FormData) => {
         // Append token manually or ensure it's in a hidden field
@@ -74,12 +75,43 @@ export function CoachSignupForm({ token }: CoachSignupFormProps) {
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="password">パスワード</Label>
-                        <Input id="password" name="password" type="password" required minLength={8} />
+                        <div className="relative">
+                            <Input
+                                id="password"
+                                name="password"
+                                type={showPassword ? "text" : "password"}
+                                required
+                                minLength={8}
+                                className="pr-10"
+                            />
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                                onClick={() => setShowPassword(!showPassword)}
+                            >
+                                {showPassword ? (
+                                    <EyeOff className="h-4 w-4 text-gray-400" />
+                                ) : (
+                                    <Eye className="h-4 w-4 text-gray-400" />
+                                )}
+                                <span className="sr-only">
+                                    {showPassword ? 'パスワードを隠す' : 'パスワードを表示'}
+                                </span>
+                            </Button>
+                        </div>
                         <p className="text-xs text-muted-foreground">8文字以上で設定してください</p>
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="confirmPassword">パスワード（確認）</Label>
-                        <Input id="confirmPassword" name="confirmPassword" type="password" required minLength={8} />
+                        <Input
+                            id="confirmPassword"
+                            name="confirmPassword"
+                            type={showPassword ? "text" : "password"}
+                            required
+                            minLength={8}
+                        />
                     </div>
 
                     {state.error && (
