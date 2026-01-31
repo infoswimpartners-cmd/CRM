@@ -20,6 +20,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { AdminActivityWidget } from '@/components/admin/AdminActivityWidget'
 import { calculateCoachRate, calculateMonthlyStats } from '@/lib/reward-system'
 import { CoachFinancialsWidget } from '@/components/admin/CoachFinancialsWidget'
+import { getMonthlyRevenue } from '@/actions/analytics'
 
 export default async function AdminDashboard(props: {
     searchParams: Promise<{ [key: string]: string | string[] | undefined }>
@@ -105,41 +106,9 @@ export default async function AdminDashboard(props: {
         .limit(5)
 
 
-    // 5. Fetch 6 Months Revenue Data (Lightweight)
-    const sixMonthsAgo = subMonths(targetDate, 5) // Current + 5 previous = 6 months
-    const sixMonthsStart = startOfMonth(sixMonthsAgo)
-
-    const { data: sixMonthLessons } = await supabase
-        .from('lessons')
-        .select('lesson_date, price')
-        .gte('lesson_date', sixMonthsStart.toISOString())
-        .lte('lesson_date', endOfMonth(targetDate).toISOString())
-
-    // Aggregate Revenue
-    const revenueMap = new Map<string, number>()
-    const graphData = []
-
-    // Initialize last 6 months
-    for (let i = 5; i >= 0; i--) {
-        const d = subMonths(targetDate, i)
-        const key = format(d, 'yyyy-MM')
-        const label = format(d, 'M月')
-        revenueMap.set(key, 0)
-        graphData.push({ name: label, key }) // store key for matching
-    }
-
-    sixMonthLessons?.forEach(l => {
-        const key = format(new Date(l.lesson_date), 'yyyy-MM')
-        if (revenueMap.has(key)) {
-            revenueMap.set(key, revenueMap.get(key)! + (l.price || 0))
-        }
-    })
-
-    const finalGraphData = graphData.map(d => ({
-        name: d.name,
-        revenue: revenueMap.get(d.key) || 0
-    }))
-
+    // 5. Fetch Revenue Data (Current Year)
+    const targetYear = targetDate.getFullYear()
+    const yearlyRevenueData = await getMonthlyRevenue(targetYear)
 
 
     // 6. Fetch Upcoming Lessons (All Coaches)
@@ -343,21 +312,11 @@ export default async function AdminDashboard(props: {
                     <div className="flex items-center justify-between mb-6">
                         <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                             <History className="h-5 w-5 text-cyan-600" />
-                            事業売上推移
+                            事業売上推移 ({targetYear}年)
                         </h3>
-                        <div className="flex gap-2">
-                            <span className="text-xs font-medium text-cyan-700 bg-cyan-100 px-3 py-1 rounded-full cursor-pointer border border-cyan-200">6ヶ月</span>
-                        </div>
                     </div>
                     <div className="flex-1 w-full h-[300px] bg-white rounded-xl overflow-hidden">
-                        <RevenueChart data={[
-                            { name: '8月', revenue: 1540000 },
-                            { name: '9月', revenue: 1620000 },
-                            { name: '10月', revenue: 1480000 },
-                            { name: '11月', revenue: 1750000 },
-                            { name: '12月', revenue: 1920000 },
-                            { name: '1月', revenue: totalSales },
-                        ]} />
+                        <RevenueChart data={yearlyRevenueData} />
                     </div>
                 </div>
 
