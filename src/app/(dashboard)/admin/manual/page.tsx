@@ -1,4 +1,4 @@
-import { BookOpen, AlertCircle, Calendar, CreditCard, CheckCircle, Info } from 'lucide-react'
+import { BookOpen, AlertCircle, Calendar, CreditCard, CheckCircle, Info, User } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 
@@ -278,6 +278,68 @@ export default function AdminManualPage() {
                                 <p>レッスン報告、新規入会対応、会員種別変更（即時/予約）</p>
                             </div>
                         </div>
+                    </div>
+                </section>
+
+                <Separator />
+
+                {/* Section: Coach Management */}
+                <section className="space-y-4">
+                    <h2 className="text-2xl font-bold flex items-center gap-2">
+                        <User className="h-6 w-6 text-indigo-600" />
+                        コーチ管理・アカウント発行
+                    </h2>
+                    <p className="text-gray-700">
+                        従来の「パスワード通知」方式は廃止され、セキュリティの高い「招待リンク」方式に変更されました。
+                    </p>
+
+                    <div className="grid md:grid-cols-2 gap-4">
+                        <Card className="border-l-4 border-l-indigo-500">
+                            <CardHeader>
+                                <CardTitle className="text-lg text-indigo-700">招待フロー (アカウント作成)</CardTitle>
+                            </CardHeader>
+                            <CardContent className="text-sm space-y-2">
+                                <ol className="list-decimal ml-5 space-y-2 text-gray-700">
+                                    <li>
+                                        <strong>管理者による招待:</strong><br />
+                                        「コーチ管理」→「コーチを追加」で氏名・メールを入力して送信。<br />
+                                        <span className="text-xs text-gray-500">※ステータスは「招待中」になります。パスワードは設定しません。</span>
+                                    </li>
+                                    <li>
+                                        <strong>招待メール受信:</strong><br />
+                                        コーチにメールが届きます。リンクの有効期限は<strong>24時間</strong>です。
+                                    </li>
+                                    <li>
+                                        <strong>パスワード設定:</strong><br />
+                                        コーチ自身がリンクを開き、パスワードを設定すると登録完了です。
+                                    </li>
+                                </ol>
+                            </CardContent>
+                        </Card>
+
+                        <Card className="border-l-4 border-l-amber-500">
+                            <CardHeader>
+                                <CardTitle className="text-lg text-amber-700">再招待・リンク切れ対応</CardTitle>
+                            </CardHeader>
+                            <CardContent className="text-sm space-y-2">
+                                <div className="space-y-3">
+                                    <div>
+                                        <strong>リンクが切れた場合:</strong><br />
+                                        <span className="text-gray-600">24時間を過ぎるとリンクは無効になります。</span>
+                                    </div>
+                                    <div>
+                                        <strong>再招待の手順:</strong><br />
+                                        <span className="text-gray-600">
+                                            コーチ一覧の「招待中」ステータス横にある<br />
+                                            <strong>「再招待ボタン（紙飛行機アイコン）」</strong>をクリックしてください。
+                                        </span>
+                                    </div>
+                                    <div className="bg-amber-50 p-2 rounded mt-2 text-amber-800 text-xs">
+                                        ※既に「有効（Active）」なコーチには再招待できません。「パスワードをお忘れですか？」を利用するよう案内してください。
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
                     </div>
                 </section>
 
