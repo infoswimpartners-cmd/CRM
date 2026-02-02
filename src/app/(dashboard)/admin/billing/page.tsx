@@ -1,17 +1,36 @@
 
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { BillingApprovalList } from '@/components/admin/BillingApprovalList'
 import { FileCheck } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
 export default async function BillingApprovalPage() {
-    const supabase = await createClient()
+    const supabase = createAdminClient()
 
-    const { data: schedules } = await supabase
+    // 1. Unpaid Schedules (Awaiting Payment or Error)
+    const { data: unpaidSchedules } = await supabase
         .from('lesson_schedules')
         .select(`
-            id, start_time, title, price,
+            id, start_time, title, price, billing_status, stripe_invoice_item_id,
+            student:students (
+                full_name,
+                second_student_name
+            )
+        `)
+        .in('billing_status', ['awaiting_payment', 'awaiting_approval', 'error', 'pending', 'approved']) // Include approval pending & approved (future)
+        .order('start_time', { ascending: true })
+
+    console.log('[BillingPage] Fetched Unpaid Schedules:', unpaidSchedules ? unpaidSchedules.length : 'null')
+    if (unpaidSchedules && unpaidSchedules.length > 0) {
+        console.log('[BillingPage] Sample Status:', unpaidSchedules[0].billing_status)
+    }
+
+    // 2. Paid / Refunded Schedules (History)
+    const { data: paidSchedules } = await supabase
+        .from('lesson_schedules')
+        .select(`
+            id, start_time, title, price, billing_status, status, stripe_invoice_item_id,
             student:students (
                 full_name,
                 second_student_name
@@ -20,30 +39,16 @@ export default async function BillingApprovalPage() {
                 name
             )
         `)
-        .eq('billing_status', 'awaiting_approval')
-        .order('start_time', { ascending: true })
+        .in('billing_status', ['paid', 'refunded', 'partially_refunded'])
+        .order('start_time', { ascending: false })
+        .limit(50)
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center gap-3">
-                <div className="p-3 bg-gradient-to-br from-orange-400 to-amber-600 rounded-xl shadow-lg shrink-0">
-                    <FileCheck className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-800 tracking-tight">請求承認管理</h1>
-                    <p className="text-slate-500 font-medium">過不足金などの追加請求承認</p>
-                </div>
-            </div>
-
-            <div className="bg-white/50 backdrop-blur-sm p-4 rounded-xl border border-white/40 text-sm text-slate-600 leading-relaxed shadow-sm">
-                <p>
-                    <span className="font-bold text-orange-600">⚠ 注意事項:</span><br />
-                    以下のレッスンは、月規定回数超過などの理由で追加請求が発生しています。<br />
-                    内容を確認し、承認を行ってください。承認後、所定の期日（レッスン前日昼など）に自動的にStripeにて請求処理（Invoice Item作成）が実行されます。
-                </p>
-            </div>
-
-            <BillingApprovalList schedules={schedules as any || []} />
+            <BillingApprovalList
+                unpaidSchedules={unpaidSchedules as any || []}
+                paidSchedules={paidSchedules as any || []}
+            />
         </div>
     )
 }

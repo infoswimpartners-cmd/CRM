@@ -66,6 +66,29 @@ export async function updateStudent(id: string, formData: any) {
             if (plan) {
                 // 2. Ensure Stripe Customer ID
                 let stripeCustomerId = currentStudent.stripe_customer_id
+
+                // Verify if the customer actually exists in Stripe
+                if (stripeCustomerId) {
+                    try {
+                        const existingCustomer = await stripe.customers.retrieve(stripeCustomerId)
+                        if (existingCustomer.deleted) {
+                            console.warn(`[UpdateStudent] Customer ${stripeCustomerId} is deleted in Stripe. Creating new one.`)
+                            stripeCustomerId = null
+                        }
+                    } catch (e: any) {
+                        // specific error code for customer not found is 'resource_missing'
+                        if (e.code === 'resource_missing') {
+                            console.warn(`[UpdateStudent] Customer ${stripeCustomerId} not found in Stripe. Creating new one.`)
+                            stripeCustomerId = null
+                        } else {
+                            // If it's another error (e.g. API connection), we should probably let it fail or handle it.
+                            // For now, rethrow to be safe, or we could assume checking failed and try to create?
+                            // Safest is to rethrow if it's not a "not found" error.
+                            throw e
+                        }
+                    }
+                }
+
                 if (!stripeCustomerId) {
                     // Create Stripe Customer if missing
                     const customer = await stripe.customers.create({
@@ -151,6 +174,8 @@ export async function updateStudent(id: string, formData: any) {
                         const subscriptionParams: any = {
                             customer: stripeCustomerId,
                             items: [{ price: plan.stripe_price_id }],
+                            payment_behavior: 'default_incomplete',
+                            expand: ['latest_invoice.payment_intent'],
                         }
 
                         // Always set trial_end to align cycle to 1st of next month

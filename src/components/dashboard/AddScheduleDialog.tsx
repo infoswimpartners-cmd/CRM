@@ -366,6 +366,7 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate }
                     notes: notes
                 })
 
+                if (!result) throw new Error('処理結果が取得できませんでした')
                 if (!result.success) throw new Error(result.error)
 
                 if (result.isOverage) {

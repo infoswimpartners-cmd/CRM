@@ -3,6 +3,20 @@
 import { createClient } from '@/lib/supabase/server'
 import { stripe } from '@/lib/stripe'
 import { revalidatePath } from 'next/cache'
+import * as fs from 'fs'
+import * as path from 'path'
+
+function debugLog(msg: string) {
+    try {
+        const logPath = path.join(process.cwd(), 'debug_membership.log')
+        const time = new Date().toISOString()
+        fs.appendFileSync(logPath, `[${time}] ${msg}\n`)
+    } catch (e) {
+        console.error('Failed to write debug log:', e)
+    }
+}
+
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://manager.swim-partners.com'
 
 export async function createStripeCustomer(studentId: string) {
     const supabase = await createClient()
@@ -91,19 +105,20 @@ export async function createPaymentSetupLink(studentId: string) {
     if (!student?.stripe_customer_id) return { success: false, error: 'No Stripe Customer ID' }
 
     try {
+
         const session = await stripe.checkout.sessions.create({
             customer: student.stripe_customer_id,
             mode: 'setup',
             currency: 'jpy',
-            success_url: `${process.env.NEXT_PUBLIC_APP_URL}/customers/${studentId}?payment_setup=success`,
-            cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/customers/${studentId}?payment_setup=cancel`,
+            success_url: `${APP_URL}/customers/${studentId}?payment_setup=success`,
+            cancel_url: `${APP_URL}/customers/${studentId}?payment_setup=cancel`,
             payment_method_types: ['card'],
         })
 
         return { success: true, url: session.url }
-    } catch (error) {
+    } catch (error: any) {
         console.error('Stripe Setup Link Error:', error)
-        return { success: false, error: 'Failed to create setup link' }
+        return { success: false, error: error.message || 'Failed to create setup link' }
     }
 }
 
@@ -154,7 +169,6 @@ export async function assignMembership(studentId: string, membershipTypeId: stri
     // --- RESERVATION MODE ---
     if (isNextMonth) {
         // If membershipTypeId is provided, store it as reservation.
-        // If null, we treat it as "Clear Reservation" (Cancel pending change)
         const updateData = { next_membership_type_id: membershipTypeId || null }
 
         const { error } = await supabase.from('students')
@@ -253,8 +267,6 @@ export async function assignMembership(studentId: string, membershipTypeId: stri
                 console.log(`[Stripe] Found existing subscription ${subscriptionId}, linking student ${studentId}`)
             } else {
                 // Calculate Billing Anchor
-                // If today is 1st -> Start Immediately (Normal)
-                // If today is NOT 1st -> Start Next Month 1st (Stub period)
                 const now = new Date()
                 const isFirstOfMonth = now.getDate() === 1
 
@@ -270,12 +282,20 @@ export async function assignMembership(studentId: string, membershipTypeId: stri
                     const nextMonthTimestamp = Math.floor(nextMonth.getTime() / 1000)
 
                     subscriptionParams.billing_cycle_anchor = nextMonthTimestamp
+                    // Changed: Disable proration, add manual full price item
                     subscriptionParams.proration_behavior = 'none'
+                    subscriptionParams.add_invoice_items = [{
+                        price: membership.stripe_price_id,
+                        quantity: 1
+                    }]
                 }
+
+                debugLog(`[AssignMembership] Creating Sub: ${JSON.stringify(subscriptionParams)}`)
 
                 // Create new subscription
                 const subscription = await stripe.subscriptions.create(subscriptionParams)
                 subscriptionId = subscription.id
+                debugLog(`[AssignMembership] Created Sub ID: ${subscriptionId}`)
             }
         }
 
@@ -293,6 +313,90 @@ export async function assignMembership(studentId: string, membershipTypeId: stri
 
     } catch (error: any) {
         console.error('Assign Membership Error:', error)
+        debugLog(`[AssignMembership] Error: ${error.message}`)
         return { success: false, error: error.message || 'Failed to update membership' }
+    }
+}
+
+export async function createImmediatePaymentInvoice(scheduleId: string) {
+    const supabase = await createClient()
+
+    try {
+        // 1. Fetch Schedule & Student
+        const { data: schedule } = await supabase
+            .from('lesson_schedules')
+            .select(`
+                id,
+                title,
+                start_time,
+                price,
+                student:students (
+                    id,
+                    stripe_customer_id,
+                    email:contact_email
+                )
+            `)
+            .eq('id', scheduleId)
+            .single()
+
+        if (!schedule) throw new Error('Schedule not found')
+        // @ts-ignore
+        if (!schedule.student?.stripe_customer_id) throw new Error('No Stripe Customer ID')
+        if (!schedule.price) throw new Error('Price not set')
+
+        // 2. Create Invoice Item
+        // @ts-ignore
+        const customerId = schedule.student.stripe_customer_id
+        const itemDescription = `追加レッスン料 (${new Date(schedule.start_time).toLocaleDateString()}): ${schedule.title}`
+
+        const invoiceItem = await stripe.invoiceItems.create({
+            customer: customerId,
+            amount: schedule.price,
+            currency: 'jpy',
+            description: itemDescription,
+            metadata: {
+                schedule_id: schedule.id,
+                type: 'immediate_overage'
+            }
+        })
+
+        // 3. Create Invoice (Collection Method: send_invoice)
+        const invoice = await stripe.invoices.create({
+            customer: customerId,
+            collection_method: 'send_invoice',
+            days_until_due: 1, // Due tomorrow basically
+            auto_advance: true, // Auto-finalize
+            metadata: {
+                schedule_id: schedule.id,
+                type: 'immediate_overage'
+            }
+        })
+
+        // 4. Finalize
+        const finalized = await stripe.invoices.finalizeInvoice(invoice.id)
+
+        // [FIX] Casting to any to avoid "payment_intent does not exist on type Response<Invoice>" error
+        const paymentIntentId = (finalized as any).payment_intent
+
+        // 5. Update DB
+        await supabase
+            .from('lesson_schedules')
+            .update({
+                billing_status: 'awaiting_payment', // Confirmed status
+                stripe_invoice_item_id: invoiceItem.id,
+                // Handle payment_intent id extraction (string or object)
+                payment_intent_id: typeof paymentIntentId === 'string' ? paymentIntentId : paymentIntentId?.id ?? null
+            })
+            .eq('id', scheduleId)
+
+        return {
+            success: true,
+            invoiceUrl: finalized.hosted_invoice_url,
+            paymentIntentId: typeof paymentIntentId === 'string' ? paymentIntentId : paymentIntentId?.id ?? null
+        }
+
+    } catch (error: any) {
+        console.error('Create Immediate Invoice Error:', error)
+        return { success: false, error: error.message }
     }
 }

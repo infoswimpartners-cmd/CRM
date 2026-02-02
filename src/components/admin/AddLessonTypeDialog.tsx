@@ -18,6 +18,7 @@ import {
 import { toast } from 'sonner'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Plus } from 'lucide-react'
+import { createLessonMasterAction } from '@/actions/masters'
 
 export function AddLessonTypeDialog() {
     const [open, setOpen] = useState(false)
@@ -31,23 +32,18 @@ export function AddLessonTypeDialog() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setLoading(true)
-        const supabase = createClient()
-
         try {
-            const { error } = await supabase
-                .from('lesson_masters')
-                .insert({
-                    name,
-                    unit_price: parseInt(price),
-                    is_trial: isTrial,
-                })
+            const result = await createLessonMasterAction({
+                name,
+                price: parseInt(price),
+                isTrial
+            })
 
-            if (error) throw error
+            if (!result.success) throw new Error(result.error)
 
-            toast.success('レッスンタイプを追加しました')
+            toast.success('レッスンタイプを追加しました (Stripe連携)')
             setOpen(false)
             setName('')
-            setPrice('0')
             setPrice('0')
             setIsTrial(false)
             router.refresh()

@@ -18,6 +18,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from 'sonner'
 import { Plus } from 'lucide-react'
+import { createMembershipTypeAction } from '@/actions/masters'
 
 interface LessonMaster {
     id: string
@@ -71,46 +72,32 @@ export function AddMembershipTypeDialog() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setLoading(true)
-        const supabase = createClient()
-
         try {
-            // 1. Create Membership Type
-            const { data: typeData, error: typeError } = await supabase
-                .from('membership_types')
-                .insert({
-                    name,
-                    fee: parseInt(fee),
-                    default_lesson_master_id: null,
-                    reward_master_id: null,
-                })
-                .select()
-                .single()
+            // Prepare data for Server Action
+            const selectedLessonsArray = Array.from(selectedLessons.entries()).map(([lessonId, priceStr]) => ({
+                id: lessonId,
+                rewardPrice: priceStr && !isNaN(parseInt(priceStr)) ? parseInt(priceStr) : null
+            }))
 
-            if (typeError) throw typeError
+            // Call Server Action
+            const result = await createMembershipTypeAction({
+                name,
+                fee: parseInt(fee),
+                selectedLessons: selectedLessonsArray
+            })
 
-            // 2. Create Relations
-            if (selectedLessons.size > 0) {
-                const relations = Array.from(selectedLessons.entries()).map(([lessonId, priceStr]) => ({
-                    membership_type_id: typeData.id,
-                    lesson_master_id: lessonId,
-                    reward_price: priceStr && !isNaN(parseInt(priceStr)) ? parseInt(priceStr) : null
-                }))
-
-                const { error: relationError } = await supabase
-                    .from('membership_type_lessons')
-                    .insert(relations)
-
-                if (relationError) throw relationError
+            if (!result.success) {
+                throw new Error(result.error)
             }
 
-            toast.success('会員区分を追加しました')
+            toast.success('会員区分を追加しました (Stripe連携)')
             setOpen(false)
             setName('')
             setFee('0')
             setSelectedLessons(new Map())
             router.refresh()
         } catch (error: any) {
-            console.error('Error adding membership type:', error.message, error.details, error.hint)
+            console.error('Error adding membership type:', error)
             toast.error(`追加に失敗しました: ${error.message}`)
         } finally {
             setLoading(false)

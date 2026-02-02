@@ -95,6 +95,63 @@ export async function POST(req: NextRequest) {
                 }
                 break
             }
+            case 'invoice.paid': {
+                const invoice = event.data.object as Stripe.Invoice
+                const scheduleId = invoice.metadata?.schedule_id
+
+                if (scheduleId) {
+                    console.log(`[Stripe Webhook] Invoice paid for schedule: ${scheduleId}`)
+                    await supabaseAdmin
+                        .from('lesson_schedules')
+                        .update({
+                            billing_status: 'paid',
+                            payment_intent_id: typeof (invoice as any).payment_intent === 'string' ? (invoice as any).payment_intent : (invoice as any).payment_intent?.id
+                        })
+                        .eq('id', scheduleId)
+                }
+                break
+            }
+            case 'charge.refunded': {
+                const charge = event.data.object as Stripe.Charge
+                const paymentIntentId = typeof charge.payment_intent === 'string' ? charge.payment_intent : charge.payment_intent?.id
+
+                if (paymentIntentId) {
+                    const { data: schedule } = await supabaseAdmin
+                        .from('lesson_schedules')
+                        .select('id')
+                        .eq('payment_intent_id', paymentIntentId)
+                        .single()
+
+                    if (schedule) {
+                        const isFull = charge.refunded // Boolean on charge object
+                        // or check amount_refunded
+
+                        await supabaseAdmin
+                            .from('lesson_schedules')
+                            .update({
+                                billing_status: charge.refunded ? 'refunded' : 'partially_refunded',
+                                refund_status: charge.refunded ? 'full' : 'partial'
+                                // if partially refunded, status might just be partially_refunded?
+                                // charge.refunded is true if fully refunded? No, it means "has been refunded".
+                                // We should check amount_refunded vs amount.
+                            })
+                            .eq('id', schedule.id)
+
+                        // Refined Logic:
+                        const isFullyRefunded = charge.amount_refunded >= charge.amount
+                        await supabaseAdmin
+                            .from('lesson_schedules')
+                            .update({
+                                billing_status: isFullyRefunded ? 'refunded' : 'partially_refunded',
+                                refund_status: isFullyRefunded ? 'full' : 'partial'
+                            })
+                            .eq('id', schedule.id)
+
+                        console.log(`[Stripe Webhook] Refund processed for schedule ${schedule.id}. Status: ${isFullyRefunded ? 'refunded' : 'partially_refunded'}`)
+                    }
+                }
+                break
+            }
             default:
             // Unhandled event type
         }

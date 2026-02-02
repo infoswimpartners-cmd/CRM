@@ -59,10 +59,10 @@ export async function TodayScheduleWidget({ coachId }: { coachId: string }) {
                     {schedules.map((schedule) => {
                         const startTime = new Date(schedule.start_time);
                         const endTime = new Date(schedule.end_time);
-                        // @ts-ignore
-                        const studentName = Array.isArray(schedule.students)
-                            ? schedule.students[0]?.full_name
-                            : schedule.students?.full_name;
+                        const students: any = schedule.students;
+                        const studentName = Array.isArray(students)
+                            ? students[0]?.full_name
+                            : students?.full_name;
 
                         return (
                             <div key={schedule.id} className="p-4 hover:bg-slate-50 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4">
