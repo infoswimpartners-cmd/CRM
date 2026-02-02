@@ -5,7 +5,8 @@
 ALTER TABLE public.lesson_schedules
 ADD COLUMN IF NOT EXISTS payment_intent_id TEXT,
 ADD COLUMN IF NOT EXISTS refund_id TEXT,
-ADD COLUMN IF NOT EXISTS refund_status TEXT DEFAULT 'none';
+ADD COLUMN IF NOT EXISTS refund_status TEXT DEFAULT 'none',
+ADD COLUMN IF NOT EXISTS billing_status TEXT DEFAULT 'pending';
 
 -- Add check constraint for refund_status
 DO $$

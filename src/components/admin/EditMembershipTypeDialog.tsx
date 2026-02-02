@@ -124,6 +124,7 @@ export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembe
                 .update({
                     name,
                     fee: parseInt(fee),
+                    default_lesson_master_id: selectedLessons.size > 0 ? Array.from(selectedLessons.keys())[0] : null,
                 })
                 .eq('id', type.id)
 

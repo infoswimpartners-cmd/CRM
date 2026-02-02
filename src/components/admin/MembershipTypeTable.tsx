@@ -259,6 +259,7 @@ export function MembershipTypeTable({ types }: { types: MembershipType[] }) {
                 <Table>
                     <TableHeader>
                         <TableRow>
+                            <TableHead className="w-10"></TableHead>
                             <TableHead
                                 className="cursor-pointer hover:bg-slate-50 transition-colors"
                                 onClick={() => handleSort('name')}
