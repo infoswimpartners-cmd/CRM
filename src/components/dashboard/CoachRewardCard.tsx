@@ -39,10 +39,10 @@ export function CoachRewardCard() {
 
             if (!user) return
 
-            // Fetch profile to check role (Admin/Owner)
+            // Fetch profile to check role (Admin/Owner) and override rank
             const { data: profile } = await supabase
                 .from('profiles')
-                .select('role')
+                .select('role, override_coach_rank')
                 .eq('id', user.id)
                 .single()
 
@@ -77,6 +77,23 @@ export function CoachRewardCard() {
             if (isOwner) {
                 currentRank = 'Owner'
                 rate = 1.0 // 100% Reward for Owners
+            } else if (profile?.override_coach_rank) {
+                // Use override rank if set
+                rate = profile.override_coach_rank
+
+                // Map rate to Rank name for display
+                if (rate >= 1.0) currentRank = 'Owner'
+                else if (Math.abs(rate - 0.7000001) < 0.0000001) currentRank = 'Owner' // Special Exception treated as Owner-ish or just display as Special?
+                // Actually let's just map standard ranks based on rate
+                else if (rate >= 0.70) currentRank = 'Platinum'
+                else if (rate >= 0.65) currentRank = 'Gold'
+                else if (rate >= 0.60) currentRank = 'Silver'
+                else if (rate >= 0.55) currentRank = 'Bronze'
+                else currentRank = 'Standard'
+
+                // Special handling for the "Special Exception" rate (0.7000001) if we want a specific display?
+                // For now, mapping it to Platinum (>= 0.70) is safe, or maybe we should add a 'Special' rank type?
+                // The interface Rank only has specific strings. Let's stick to valid Rank strings.
             } else {
                 if (average >= 30) {
                     currentRank = 'Platinum'
@@ -139,7 +156,13 @@ export function CoachRewardCard() {
 
                     if (master.is_trial) {
                         // Trial Lesson: Fixed 4,500 JPY
-                        const amount = 4500
+                        // Check for Special Exception Rate for Trial Lessons
+                        // Special Exception Rate (approx 0.7000001) gets 5000 JPY for trial
+                        let amount = 4500
+                        if (Math.abs(rate - 0.7000001) < 0.0000001) {
+                            amount = 5000
+                        }
+
                         totalReward += amount
                         trialAmount += amount
                         trialCount++

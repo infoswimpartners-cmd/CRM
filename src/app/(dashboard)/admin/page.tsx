@@ -41,120 +41,74 @@ export default async function AdminDashboard(props: {
     // 1. Fetch Coaches (Profiles)
     // Note: In a real app we might filter by role, but assuming all profiles are relevant or we filter later
     // Let's assume anyone who has given a lesson is definitely a coach, but clearer to fetch all profiles
-    const { data: coaches } = await supabase
-        .from('profiles')
-        .select('*')
-
-    // 2. Fetch Lessons for Stats (Target Month + Past 3 Months for Rank)
-    // We fetch broader range to cover rank calculation history relative to target date
-    // Rank needs 3 months prior. Current stats need target month.
-    // Ideally we filter in DB, but fetching all is simpler for now as designed.
-    const { data: lessons, error } = await supabase
-        .from('lessons')
-        .select(`
-            *,
-            profiles (
-                full_name,
-                email
-            ),
-            lesson_masters (
-                unit_price,
-                is_trial
-            ),
-            students (
-                membership_types!students_membership_type_id_fkey (
-                    reward_master:lesson_masters!reward_master_id (
-                        unit_price
-                    )
-                )
-            )
-        `)
-        .order('lesson_date', { ascending: false })
-
-    // 3. Fetch My Coach Data (Recent Lessons) - Similar to coach/page.tsx
-    const { data: myRecentLessons } = await supabase
-        .from('lessons')
-        .select(`
-            *,
-            lesson_masters (
-                is_trial,
-                unit_price
-            ),
-            students (
-                membership_types!students_membership_type_id_fkey (
-                    reward_master:lesson_masters!reward_master_id (
-                        unit_price
-                    )
-                )
-            )
-        `)
-        .eq('coach_id', user.id)
-        .order('lesson_date', { ascending: false }) // Use lesson_date for display order
-        .limit(5)
-
-    // 4. Fetch Recent Reports (All Coaches)
-    const { data: recentReports } = await supabase
-        .from('lessons')
-        .select(`
-            *,
-            profiles (
-                full_name,
-                avatar_url
-            )
-        `)
-        .order('lesson_date', { ascending: false })
-        .limit(5)
-
-
     // 5. Fetch Revenue Data (Current Year)
     const targetYear = targetDate.getFullYear()
-    const yearlyRevenueData = await getMonthlyRevenue(targetYear)
 
+    // Parallelize independent data fetches
+    const [
+        { data: coaches },
+        { data: lessons, error },
+        { data: myRecentLessons },
+        { data: recentReports },
+        yearlyRevenueData,
+        { data: upcomingSchedules },
+        { count: totalStudents }
+    ] = await Promise.all([
+        // 1. Fetch Coaches
+        supabase.from('profiles').select('*'),
 
-    // 6. Fetch Upcoming Lessons (All Coaches)
-    const { data: upcomingLessons } = await supabase
-        .from('lesson_schedules')
-        .select(`
-            id,
-            title,
-            start_time,
-            end_time,
-            location,
-            students (
-                id,
-                full_name
-            ),
-            profiles (
-                full_name,
-                avatar_url
-            )
-        `)
-        .gte('start_time', new Date().toISOString())
-        .order('start_time', { ascending: true })
-        .limit(20) // Increase limit to ensure Master's schedule isn't just pushed out
+        // 2. Fetch Lessons for Stats
+        supabase.from('lessons')
+            .select(`
+                *,
+                profiles ( full_name, email ),
+                lesson_masters ( unit_price, is_trial ),
+                students (
+                    membership_types!students_membership_type_id_fkey (
+                        reward_master:lesson_masters!reward_master_id ( unit_price )
+                    )
+                )
+            `)
+            .order('lesson_date', { ascending: false }),
 
-    const upcomingSchedules = upcomingLessons?.map(l => ({
-        id: l.id,
-        title: l.title || 'レッスン',
-        start_time: l.start_time,
-        end_time: l.end_time,
-        location: l.location,
-        // @ts-ignore
-        student_name: Array.isArray(l.students) ? l.students[0]?.full_name : l.students?.full_name,
-        // @ts-ignore
-        student_id: Array.isArray(l.students) ? l.students[0]?.id : l.students?.id,
-        coach: {
-            // @ts-ignore
-            full_name: l.profiles?.full_name || '管理者(Master)',
-            // @ts-ignore
-            avatar_url: l.profiles?.avatar_url
-        }
-    })) || []
+        // 3. Fetch My Coach Data
+        supabase.from('lessons')
+            .select(`
+                *,
+                lesson_masters ( is_trial, unit_price ),
+                students (
+                    membership_types!students_membership_type_id_fkey (
+                        reward_master:lesson_masters!reward_master_id ( unit_price )
+                    )
+                )
+            `)
+            .eq('coach_id', user.id)
+            .order('lesson_date', { ascending: false })
+            .limit(5),
 
-    // 7. Fetch Total Students Count
-    const { count: totalStudents } = await supabase
-        .from('students')
-        .select('*', { count: 'exact', head: true })
+        // 4. Fetch Recent Reports
+        supabase.from('lessons')
+            .select(`*, profiles ( full_name, avatar_url )`)
+            .order('lesson_date', { ascending: false })
+            .limit(5),
+
+        // 5. Fetch Revenue Data
+        getMonthlyRevenue(targetYear),
+
+        // 6. Fetch Upcoming Lessons
+        supabase.from('lesson_schedules')
+            .select(`
+                id, title, start_time, end_time, location,
+                students ( id, full_name ),
+                profiles ( full_name, avatar_url )
+            `)
+            .gte('start_time', new Date().toISOString())
+            .order('start_time', { ascending: true })
+            .limit(20),
+
+        // 7. Fetch Total Students Count
+        supabase.from('students').select('*', { count: 'exact', head: true })
+    ])
 
     // Calculate Reward Rate for current user (Admin is always 100% locally, but for display logic)
     // Actually Admin rate is fixed 1.0 in calculation, but let's reuse logic for display consistency if needed.
@@ -191,7 +145,7 @@ export default async function AdminDashboard(props: {
 
     // Calcluate Financials using Shared Logic
     const coachFinancials = activeCoaches.map(coach => {
-        const rate = coach.role === 'admin' ? 1.0 : calculateCoachRate(coach.id, lessons as any[], targetDate)
+        const rate = coach.role === 'admin' ? 1.0 : calculateCoachRate(coach.id, lessons as any[], targetDate, coach.override_coach_rank)
         const stats = calculateMonthlyStats(coach.id, thisMonthLessons as any[], rate)
 
         return {
@@ -241,6 +195,14 @@ export default async function AdminDashboard(props: {
 
         return Math.floor(basePrice * myRate)
     }
+
+    // Format Schedules for Widget
+    const formattedSchedules = upcomingSchedules?.map((s: any) => ({
+        ...s,
+        coach: s.profiles, // maps 'profiles' from join to 'coach' for widget
+        student_name: s.students?.full_name,
+        student_id: s.students?.id
+    })) || []
 
     return (
         <div className="space-y-8 pb-8">
@@ -323,7 +285,7 @@ export default async function AdminDashboard(props: {
                 {/* Activity Widget (Tabs) */}
                 <div className="h-[500px]">
                     {/* @ts-ignore */}
-                    <AdminActivityWidget schedules={upcomingSchedules} reports={recentReports || []} />
+                    <AdminActivityWidget schedules={formattedSchedules} reports={recentReports || []} />
                 </div>
             </div>
 

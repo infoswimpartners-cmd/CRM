@@ -1,26 +1,77 @@
+
 'use client'
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Download, FileText, CheckCircle, Clock } from "lucide-react"
-import { PaymentDetailDialog } from "./PaymentDetailDialog"
+import { Download, FileText, CheckCircle, Clock, Loader2 } from "lucide-react"
+import { PaymentDetailDialog, MonthlyRewardStats } from "./PaymentDetailDialog"
+import { createClient } from '@/lib/supabase/client'
 
 export function PaymentHistory() {
-    const [selectedPayment, setSelectedPayment] = useState<any>(null)
+    const [payments, setPayments] = useState<MonthlyRewardStats[]>([])
+    const [selectedPayment, setSelectedPayment] = useState<MonthlyRewardStats | null>(null)
     const [detailOpen, setDetailOpen] = useState(false)
+    const [loading, setLoading] = useState(true)
+    const [companyInfo, setCompanyInfo] = useState<any>(null)
+    const [bankInfo, setBankInfo] = useState<any>(null)
+    const [userName, setUserName] = useState('')
 
-    // Mock data with extended fields for detail view
-    // baseAmount = 税抜金額
-    const payments = [
-        { id: '2023-12', month: '2023年12月分', amount: 142000, status: 'paid', date: '2024/01/25', baseAmount: 160000, isInvoiceRegistered: true },
-        { id: '2023-11', month: '2023年11月分', amount: 138000, status: 'paid', date: '2023/12/25', baseAmount: 155000, isInvoiceRegistered: true },
-        { id: '2023-10', month: '2023年10月分', amount: 125000, status: 'paid', date: '2023/11/25', baseAmount: 140000, isInvoiceRegistered: false }, // 免税例
-        { id: '2023-09', month: '2023年9月分', amount: 110000, status: 'paid', date: '2023/10/25', baseAmount: 125000, isInvoiceRegistered: false },
-    ]
+    useEffect(() => {
+        const fetchData = async () => {
+            setLoading(true)
+            try {
+                const supabase = createClient()
+                const { data: { user } } = await supabase.auth.getUser()
 
-    const handleOpenDetail = (payment: any) => {
+                if (user) {
+                    const { data: profile } = await supabase.from('profiles').select('full_name, id').eq('id', user.id).single()
+                    setUserName(profile?.full_name || '')
+
+                    // Fetch Bank Info from settings API (configured for self-fetch)
+                    const bankRes = await fetch('/api/settings/bank')
+                    if (bankRes.ok) {
+                        const bankData = await bankRes.json()
+                        setBankInfo(bankData)
+                    }
+                }
+
+                // Fetch Payments
+                const payRes = await fetch('/api/teacher/payments')
+                if (payRes.ok) {
+                    const payData = await payRes.json()
+                    // Filter out future months or empty processing data if needed, 
+                    // but logic in API already handles 12 months lookback.
+                    // Let's filter to show only if there is activity? 
+                    // API returns even if totalReward is 0 if it's in the loop? 
+                    // API logic: "if (monthLessons.length === 0 && i > 0) continue"
+                    // So it should be fine.
+                    setPayments(payData)
+                }
+
+                // Fetch Company Info
+                const companyRes = await fetch('/api/admin/settings/company')
+                if (companyRes.ok) {
+                    const companyData = await companyRes.json()
+                    setCompanyInfo(companyData)
+                }
+
+            } catch (error) {
+                console.error('Error fetching payment history:', error)
+            } finally {
+                setLoading(false)
+            }
+        }
+
+        fetchData()
+    }, [])
+
+    const handleOpenDetail = (payment: MonthlyRewardStats) => {
         setSelectedPayment(payment)
         setDetailOpen(true)
+    }
+
+    if (loading) {
+        return <div className="p-8 text-center text-slate-500"><Loader2 className="animate-spin h-6 w-6 mx-auto mb-2" />読み込み中...</div>
     }
 
     return (
@@ -45,8 +96,14 @@ export function PaymentHistory() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {payments.map((payment) => (
-                                <tr key={payment.id} className="hover:bg-slate-50/50 transition-colors">
+                            {payments.length === 0 ? (
+                                <tr>
+                                    <td colSpan={5} className="px-6 py-8 text-center text-slate-400">
+                                        支払い履歴がありません
+                                    </td>
+                                </tr>
+                            ) : payments.map((payment) => (
+                                <tr key={payment.month} className="hover:bg-slate-50/50 transition-colors">
                                     <td className="px-6 py-4 font-medium text-slate-900 flex items-center gap-3">
                                         <div className="h-8 w-8 rounded-lg bg-cyan-50 flex items-center justify-center text-cyan-600">
                                             <FileText className="h-4 w-4" />
@@ -54,7 +111,7 @@ export function PaymentHistory() {
                                         {payment.month}
                                     </td>
                                     <td className="px-6 py-4 text-slate-700 font-semibold">
-                                        ¥{payment.amount.toLocaleString()}
+                                        ¥{payment.finalAmount.toLocaleString()}
                                     </td>
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-1.5">
@@ -72,7 +129,7 @@ export function PaymentHistory() {
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 text-slate-500">
-                                        {payment.date}
+                                        {payment.paymentDate}
                                     </td>
                                     <td className="px-6 py-4 text-right">
                                         <Button
@@ -96,8 +153,12 @@ export function PaymentHistory() {
                 open={detailOpen}
                 onOpenChange={setDetailOpen}
                 payment={selectedPayment}
-                coachName="山田 太郎" // Mock current user name
+                coachName={userName}
+                companyInfo={companyInfo}
+                bankInfo={bankInfo}
             />
         </>
     )
 }
+
+

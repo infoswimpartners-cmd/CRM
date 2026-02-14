@@ -33,14 +33,21 @@ type PayoutStatus = {
     rate: number
     details: any[]
     payouts: any[]
+    baseAmount: number
+    consumptionTax: number
+    withholdingTax: number
+    systemFee: number
+    transferFee: number
+    finalAmount: number
 }
 
 interface PayoutDashboardProps {
     data: PayoutStatus[]
     targetMonth: string
+    companyInfo: any // Record<string, string>
 }
 
-export function PayoutDashboard({ data, targetMonth }: PayoutDashboardProps) {
+export function PayoutDashboard({ data, targetMonth, companyInfo }: PayoutDashboardProps) {
     const [statusFilter, setStatusFilter] = useState<string>('all')
     const [searchQuery, setSearchQuery] = useState('')
 
@@ -79,7 +86,7 @@ export function PayoutDashboard({ data, targetMonth }: PayoutDashboardProps) {
             item.paid_amount,
             item.pending_amount,
             item.unpaid_amount,
-            item.status
+            item.status === 'paid' ? '支払完了' : item.status === 'partial' ? '一部支払い' : '未払い'
         ])
 
         const csvContent = [
@@ -262,7 +269,13 @@ export function PayoutDashboard({ data, targetMonth }: PayoutDashboardProps) {
                                             targetMonth={item.target_month}
                                             rate={item.rate}
                                             details={item.details}
-                                            totalReward={item.total_reward}
+                                            baseAmount={item.baseAmount}
+                                            consumptionTax={item.consumptionTax}
+                                            withholdingTax={item.withholdingTax}
+                                            systemFee={item.systemFee}
+                                            transferFee={item.transferFee}
+                                            finalAmount={item.finalAmount}
+                                            companyInfo={companyInfo}
                                         />
                                     </td>
                                     <td className="px-6 py-4 text-right">

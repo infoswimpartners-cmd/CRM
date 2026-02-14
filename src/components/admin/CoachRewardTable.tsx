@@ -227,7 +227,16 @@ export function CoachRewardTable({ coaches, lessons, targetDate }: CoachRewardTa
                                 </TableCell>
                                 <TableCell>
                                     <Badge variant="outline" className={getRankColor(row.rank)}>
-                                        {row.rank} {(row.rate * 100).toFixed(0)}%
+                                        {
+                                            {
+                                                'Owner': 'オーナー',
+                                                'Platinum': 'プラチナ',
+                                                'Gold': 'ゴールド',
+                                                'Silver': 'シルバー',
+                                                'Bronze': 'ブロンズ',
+                                                'Standard': 'スタンダード'
+                                            }[row.rank] || row.rank
+                                        } {(row.rate * 100).toFixed(0)}%
                                     </Badge>
                                 </TableCell>
                                 <TableCell className="text-right">{row.lessonCount}件</TableCell>

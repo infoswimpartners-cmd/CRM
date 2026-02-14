@@ -80,7 +80,16 @@ export function CoachRewardDetailDialog({ coach, stats, lessons, open, onOpenCha
                     <div className="border rounded-lg p-4 bg-slate-50">
                         <div className="text-sm text-muted-foreground mb-1">ランク</div>
                         <div className="font-bold text-lg flex items-center gap-2">
-                            {stats.rank}
+                            {
+                                {
+                                    'Owner': 'オーナー',
+                                    'Platinum': 'プラチナ',
+                                    'Gold': 'ゴールド',
+                                    'Silver': 'シルバー',
+                                    'Bronze': 'ブロンズ',
+                                    'Standard': 'スタンダード'
+                                }[stats.rank] || stats.rank
+                            }
                             <Badge variant="outline" className="text-xs font-normal bg-white">
                                 {(stats.rate * 100).toFixed(0)}%
                             </Badge>

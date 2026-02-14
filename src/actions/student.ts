@@ -35,6 +35,7 @@ export async function updateStudent(id: string, formData: any) {
             status: formData.status,
             second_student_name: formData.second_student_name || null,
             second_student_name_kana: formData.second_student_name_kana || null,
+            second_student_gender: formData.second_student_gender || null,
             membership_type_id: formData.membership_type_id === 'unassigned' ? null : (formData.membership_type_id || null)
         }
 
@@ -43,6 +44,12 @@ export async function updateStudent(id: string, formData: any) {
             updates.birth_date = formData.birth_date
         } else {
             updates.birth_date = null
+        }
+
+        if (formData.second_student_birth_date) {
+            updates.second_student_birth_date = formData.second_student_birth_date
+        } else {
+            updates.second_student_birth_date = null
         }
 
 

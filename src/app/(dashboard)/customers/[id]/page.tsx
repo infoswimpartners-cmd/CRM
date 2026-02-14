@@ -108,11 +108,28 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
                                 <span className="text-sm bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold">2人目</span>
                                 <span className="text-xl font-bold text-gray-700">{student.second_student_name}</span>
                             </div>
-                            {student.second_student_name_kana && (
-                                <p className="text-gray-500 text-sm ml-14">
-                                    {student.second_student_name_kana}
+                            <div className="ml-14">
+                                {student.second_student_name_kana && (
+                                    <p className="text-gray-500 text-sm">
+                                        {student.second_student_name_kana}
+                                    </p>
+                                )}
+                                <p className="text-gray-500 text-sm">
+                                    {[
+                                        student.second_student_gender,
+                                        student.second_student_birth_date ? (() => {
+                                            const age = new Date().getFullYear() - new Date(student.second_student_birth_date).getFullYear();
+                                            // Simplified age calculation for display or use util if imported
+                                            // Since I can't easily import utils here without checking if it's already there (it is not imported in original snippet for this specific file in the imports section shown, wait.
+                                            // actually `calculateAge` is NOT imported in `[id]/page.tsx` based on Step 24 viewing.
+                                            // But I can import it or just format the date string.
+                                            // Let's just show birth_date for now or try to use a simple calc or modify imports.
+                                            // To be safe and simple: just show gender and birth date string if available.
+                                            return `${student.second_student_birth_date}生まれ`;
+                                        })() : null
+                                    ].filter(Boolean).join(' / ')}
                                 </p>
-                            )}
+                            </div>
                         </div>
                     )}
                     <p className="text-gray-500 mt-1">

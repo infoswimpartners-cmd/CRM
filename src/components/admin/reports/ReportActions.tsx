@@ -8,9 +8,10 @@ import { DeleteReportDialog } from './DeleteReportDialog'
 
 interface ReportActionsProps {
     report: any
+    lessonMasters: any[]
 }
 
-export function ReportActions({ report }: ReportActionsProps) {
+export function ReportActions({ report, lessonMasters }: ReportActionsProps) {
     const [isEditOpen, setIsEditOpen] = useState(false)
     const [isDeleteOpen, setIsDeleteOpen] = useState(false)
 
@@ -35,6 +36,7 @@ export function ReportActions({ report }: ReportActionsProps) {
 
             <EditReportDialog
                 report={report}
+                lessonMasters={lessonMasters}
                 open={isEditOpen}
                 onOpenChange={setIsEditOpen}
                 onSuccess={() => {/* revalidate handled by action */ }}

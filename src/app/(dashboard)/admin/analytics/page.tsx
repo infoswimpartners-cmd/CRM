@@ -108,7 +108,8 @@ export default async function AnalyticsPage() {
             profiles (
                 id,
                 full_name,
-                avatar_url
+                avatar_url,
+                override_coach_rank
             ),
             lesson_masters (
                 id,
@@ -144,7 +145,7 @@ export default async function AnalyticsPage() {
 
         // Calculate Current Rate (using today as reference)
         // @ts-ignore: Type compatibility for helper function
-        const currentRate = calculateCoachRate(coachId, lessons, new Date())
+        const currentRate = calculateCoachRate(coachId, lessons, new Date(), profile.override_coach_rank)
 
         let totalSales = 0
         let totalReward = 0

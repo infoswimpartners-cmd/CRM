@@ -24,10 +24,12 @@ export default function EditStudentPage({ params }: { params: Promise<{ id: stri
     const [formData, setFormData] = useState({
         full_name: '',
         full_name_kana: '',
-        second_student_name: '',
-        second_student_name_kana: '',
         gender: '',
         birth_date: '',
+        second_student_name: '',
+        second_student_name_kana: '',
+        second_student_gender: '',
+        second_student_birth_date: '',
         contact_email: '',
         contact_phone: '',
         student_notes: '', // notes on students table
@@ -80,6 +82,8 @@ export default function EditStudentPage({ params }: { params: Promise<{ id: stri
                 full_name_kana: data.full_name_kana || '',
                 second_student_name: data.second_student_name || '',
                 second_student_name_kana: data.second_student_name_kana || '',
+                second_student_gender: data.second_student_gender || '',
+                second_student_birth_date: data.second_student_birth_date || '',
                 gender: data.gender || '',
                 birth_date: data.birth_date || '',
                 contact_email: data.contact_email || '',
@@ -101,6 +105,14 @@ export default function EditStudentPage({ params }: { params: Promise<{ id: stri
 
     const ageInfo = formData.birth_date ? (() => {
         const date = new Date(formData.birth_date)
+        return !isNaN(date.getTime()) ? {
+            age: calculateAge(date),
+            grade: calculateSchoolGrade(date)
+        } : null
+    })() : null
+
+    const ageInfo2 = formData.second_student_birth_date ? (() => {
+        const date = new Date(formData.second_student_birth_date)
         return !isNaN(date.getTime()) ? {
             age: calculateAge(date),
             grade: calculateSchoolGrade(date)
@@ -152,13 +164,15 @@ export default function EditStudentPage({ params }: { params: Promise<{ id: stri
         <div className="max-w-2xl mx-auto space-y-6">
             <h1 className="text-2xl font-bold">生徒情報編集</h1>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>基本情報</CardTitle>
-                    <CardDescription>生徒の情報を修正してください。</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-6">
+
+                {/* 1. Basic Information */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>基本情報</CardTitle>
+                        <CardDescription>生徒の基本情報を入力してください。</CardDescription>
+                    </CardHeader>
+                    <CardContent>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="full_name">氏名 *</Label>
@@ -170,15 +184,7 @@ export default function EditStudentPage({ params }: { params: Promise<{ id: stri
                             </div>
                         </div>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="second_student_name">2人目の生徒名 (同時受講の場合)</Label>
-                            <div className="grid grid-cols-2 gap-4">
-                                <Input id="second_student_name" value={formData.second_student_name} onChange={handleChange} placeholder="同伴する生徒名" />
-                                <Input id="second_student_name_kana" value={formData.second_student_name_kana} onChange={handleChange} placeholder="フリガナ (2人目)" />
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-2 gap-4 mt-4">
                             <div className="space-y-2">
                                 <Label>性別</Label>
                                 <Select value={formData.gender} onValueChange={(val) => setFormData({ ...formData, gender: val })}>
@@ -207,7 +213,15 @@ export default function EditStudentPage({ params }: { params: Promise<{ id: stri
                                 )}
                             </div>
                         </div>
+                    </CardContent>
+                </Card>
 
+                {/* 2. Contact Information */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>連絡先情報</CardTitle>
+                    </CardHeader>
+                    <CardContent>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="contact_email">メールアドレス</Label>
@@ -218,31 +232,67 @@ export default function EditStudentPage({ params }: { params: Promise<{ id: stri
                                 <Input id="contact_phone" type="tel" value={formData.contact_phone} onChange={handleChange} />
                             </div>
                         </div>
+                    </CardContent>
+                </Card>
 
-
-
-                        <div className="space-y-2">
-                            <Label htmlFor="student_notes">備考</Label>
-                            <Textarea id="student_notes" value={formData.student_notes} onChange={handleChange} />
-                        </div>
-
+                {/* 3. Second Student Information */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>2人目の生徒情報</CardTitle>
+                        <CardDescription>同時受講する場合のみ入力してください。</CardDescription>
+                    </CardHeader>
+                    <CardContent>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label htmlFor="status">ステータス</Label>
-                                <Select value={formData.status} onValueChange={(val) => setFormData({ ...formData, status: val })}>
+                                <Label htmlFor="second_student_name">名前</Label>
+                                <Input id="second_student_name" value={formData.second_student_name} onChange={handleChange} placeholder="同伴する生徒名" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="second_student_name_kana">フリガナ</Label>
+                                <Input id="second_student_name_kana" value={formData.second_student_name_kana} onChange={handleChange} placeholder="フリガナ (2人目)" />
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4 mt-4">
+                            <div className="space-y-2">
+                                <Label>性別 (2人目)</Label>
+                                <Select value={formData.second_student_gender} onValueChange={(val) => setFormData({ ...formData, second_student_gender: val })}>
                                     <SelectTrigger>
                                         <SelectValue placeholder="選択してください" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="trial_pending">体験予定</SelectItem>
-                                        <SelectItem value="trial_confirmed">体験確定</SelectItem>
-                                        <SelectItem value="trial_done">体験受講済</SelectItem>
-                                        <SelectItem value="active">会員</SelectItem>
-                                        <SelectItem value="resting">休会中</SelectItem>
-                                        <SelectItem value="withdrawn">退会</SelectItem>
+                                        <SelectItem value="男性">男性</SelectItem>
+                                        <SelectItem value="女性">女性</SelectItem>
+                                        <SelectItem value="その他">その他</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="second_student_birth_date">生年月日 (2人目)</Label>
+                                <div className="space-y-1">
+                                    <Input
+                                        id="second_student_birth_date"
+                                        type="date"
+                                        value={formData.second_student_birth_date}
+                                        onChange={handleChange}
+                                    />
+                                    {ageInfo2 && (
+                                        <p className="text-sm text-green-600 font-medium whitespace-nowrap">
+                                            {ageInfo2.age}歳 ({ageInfo2.grade})
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* 4. Details & Status */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>契約・ステータス</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="membership_type">会員種別</Label>
                                 <Select value={formData.membership_type_id} onValueChange={(val) => setFormData({ ...formData, membership_type_id: val })}>
@@ -259,12 +309,28 @@ export default function EditStudentPage({ params }: { params: Promise<{ id: stri
                                     </SelectContent>
                                 </Select>
                             </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="status">ステータス</Label>
+                                <Select value={formData.status} onValueChange={(val) => setFormData({ ...formData, status: val })}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="選択してください" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="trial_pending">体験予定</SelectItem>
+                                        <SelectItem value="trial_confirmed">体験確定</SelectItem>
+                                        <SelectItem value="trial_done">体験受講済</SelectItem>
+                                        <SelectItem value="active">会員</SelectItem>
+                                        <SelectItem value="resting">休会中</SelectItem>
+                                        <SelectItem value="withdrawn">退会</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
                         </div>
 
-                        {/* Membership Start Timing - Only show if membership is selected */}
+                        {/* Membership Start Timing */}
                         {formData.membership_type_id && formData.membership_type_id !== 'unassigned' && (
-                            <div className="bg-blue-50 p-4 rounded-md border border-blue-100">
-                                <Label className="block mb-3">課金・サブスクリプション開始時期</Label>
+                            <div className="bg-blue-50 p-4 rounded-md border border-blue-100 mt-4">
+                                <Label className="block mb-3">課金・サブスクリプション(会費ペイ)開始時期</Label>
                                 <div className="flex flex-col gap-3">
                                     <label className="flex items-start gap-2 cursor-pointer p-2 rounded hover:bg-white/50 transition-colors">
                                         <input
@@ -276,9 +342,9 @@ export default function EditStudentPage({ params }: { params: Promise<{ id: stri
                                             className="mt-1"
                                         />
                                         <div>
-                                            <span className="font-bold block text-sm">今月から開始 (即時引き落とし)</span>
+                                            <span className="font-bold block text-sm">今月から開始</span>
                                             <span className="text-xs text-gray-500">
-                                                直ちにStripeでの決済処理が実行され、定期課金が開始されます。
+                                                直ちに会費ペイ請求が有効化されます。
                                             </span>
                                         </div>
                                     </label>
@@ -292,27 +358,45 @@ export default function EditStudentPage({ params }: { params: Promise<{ id: stri
                                             className="mt-1"
                                         />
                                         <div>
-                                            <span className="font-bold block text-sm">来月から開始 (翌月1日引き落とし)</span>
+                                            <span className="font-bold block text-sm">来月から開始</span>
                                             <span className="text-xs text-gray-500">
-                                                今月末までは「都度払い（単発）」扱いとなります。<br />
-                                                次回請求は来月1日に自動で行われます。
+                                                今月末までは「都度払い」扱い、来月1日から自動課金を開始します。
                                             </span>
                                         </div>
                                     </label>
                                 </div>
                             </div>
                         )}
+                    </CardContent>
+                </Card>
 
-                        <div className="flex justify-end gap-2 pt-4">
-                            <Button variant="outline" type="button" onClick={() => router.back()}>キャンセル</Button>
-                            <Button type="submit" disabled={saving}>
-                                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                更新
-                            </Button>
+                {/* 5. Notes */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>備考</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-2">
+                            <Textarea
+                                id="student_notes"
+                                value={formData.student_notes}
+                                onChange={handleChange}
+                                placeholder="特記事項など"
+                                className="min-h-[100px]"
+                            />
                         </div>
-                    </form>
-                </CardContent>
-            </Card>
+                    </CardContent>
+                </Card>
+
+                {/* Actions */}
+                <div className="flex justify-end gap-2 pt-4 pb-12">
+                    <Button variant="outline" type="button" onClick={() => router.back()}>キャンセル</Button>
+                    <Button type="submit" disabled={saving}>
+                        {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        更新
+                    </Button>
+                </div>
+            </form>
         </div >
     )
 }

@@ -26,8 +26,10 @@ export default async function FinancePage() {
             *,
             lesson_masters ( is_trial, unit_price ),
             students (
-                membership_types (
-                    reward_master:lesson_masters!reward_master_id ( unit_price )
+                full_name,
+                membership_types!students_membership_type_id_fkey (
+                    reward_master:lesson_masters!reward_master_id ( unit_price ),
+                    membership_type_lessons ( lesson_master_id, reward_price )
                 )
             )
         `)
@@ -40,9 +42,15 @@ export default async function FinancePage() {
     for (let i = 0; i < 9; i++) { // Fetch 9 months for finance page
         const d = subMonths(today, i)
         const monthStart = startOfMonth(d)
+
+        // Skip months before registration
+        if (profile?.created_at && monthStart < startOfMonth(new Date(profile.created_at))) {
+            continue
+        }
+
         const monthEnd = endOfMonth(d)
 
-        const monthRate = isAdmin ? 1.0 : calculateCoachRate(user.id, allLessons as any || [], d)
+        const monthRate = isAdmin ? 1.0 : calculateCoachRate(user.id, allLessons as any || [], d, profile?.override_coach_rank)
 
         const monthLessons = allLessons?.filter(l => {
             const date = new Date(l.lesson_date)
@@ -70,7 +78,7 @@ export default async function FinancePage() {
                     <DollarSign className="h-6 w-6" />
                 </div>
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900">売上管理</h1>
+                    <h1 className="text-2xl font-bold text-slate-900">支払い通知書一覧</h1>
                     <p className="text-slate-500 text-sm">報酬額や支払い状況を確認できます</p>
                 </div>
             </div>

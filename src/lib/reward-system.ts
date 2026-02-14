@@ -11,6 +11,7 @@ export type LessonData = {
         is_trial: boolean
     }
     students?: {
+        full_name?: string
         membership_types?: {
             id: string
             // Junction table data, usually fetched as an array
@@ -22,7 +23,9 @@ export type LessonData = {
     }
 }
 
-export function calculateCoachRate(coachId: string, allLessons: LessonData[], referenceDate: Date): number {
+export function calculateCoachRate(coachId: string, allLessons: LessonData[], referenceDate: Date, overrideRate?: number | null): number {
+    if (overrideRate) return overrideRate;
+
     const rankStart = startOfMonth(subMonths(referenceDate, 3))
     const rankEnd = endOfMonth(subMonths(referenceDate, 1))
 
@@ -41,6 +44,9 @@ export function calculateCoachRate(coachId: string, allLessons: LessonData[], re
     else return 0.50
 }
 
+
+export const SPECIAL_EXCEPTION_RATE = 0.7000001
+
 export function calculateLessonReward(lesson: LessonData, rate: number): number {
     // @ts-ignore
     const master = lesson.lesson_masters
@@ -49,20 +55,35 @@ export function calculateLessonReward(lesson: LessonData, rate: number): number 
 
     if (!master) return 0
 
-    if (master.is_trial) {
-        return 4500
-    }
-
     let basePrice = master.unit_price
 
     // Check for custom reward price in membership configuration
-    if (membership?.membership_type_lessons && Array.isArray(membership.membership_type_lessons)) {
-        const config = membership.membership_type_lessons.find(
+    if (membership?.membership_type_lessons) {
+        // Handle both array (joined) and object (if single object returned, though usually array)
+        const configs = Array.isArray(membership.membership_type_lessons)
+            ? membership.membership_type_lessons
+            : [membership.membership_type_lessons]
+
+        const config = configs.find(
             (l: any) => l.lesson_master_id === master.id
         )
         if (config && config.reward_price !== null && config.reward_price !== undefined) {
             basePrice = config.reward_price
         }
+    }
+
+    if (master.is_trial) {
+        // Admin Rate (100%) -> Return Full Price
+        if (rate === 1.0) {
+            return basePrice
+        }
+
+        // Special Exception Check: Use epsilon for float comparison safety
+        // If rate is effectively SPECIAL_EXCEPTION_RATE (approx 0.7000001)
+        if (Math.abs(rate - SPECIAL_EXCEPTION_RATE) < 0.00000001) {
+            return 5000
+        }
+        return 4500
     }
 
     return Math.floor(basePrice * rate)
@@ -73,7 +94,7 @@ export function calculateMonthlyStats(coachId: string, monthLessons: LessonData[
         totalSales: 0,
         totalReward: 0,
         lessonCount: 0,
-        details: [] as { date: string, title: string, price: number, reward: number }[]
+        details: [] as { date: string, title: string, studentName: string, price: number, reward: number }[]
     }
 
     const myLessons = monthLessons.filter(l => l.coach_id === coachId)
@@ -89,6 +110,7 @@ export function calculateMonthlyStats(coachId: string, monthLessons: LessonData[
             date: l.lesson_date,
             // @ts-ignore
             title: l.lesson_masters?.is_trial ? '体験レッスン' : '通常レッスン', // Simplified title
+            studentName: l.students?.full_name || '',
             price: price,
             reward: reward
         })
@@ -101,21 +123,29 @@ export function calculateMonthlyStats(coachId: string, monthLessons: LessonData[
 export function calculateHistoricalMonthlyRewards(
     coachId: string,
     allLessons: LessonData[],
-    monthsToLookBack: number = 12
+    monthsToLookBack: number = 12,
+    coachCreatedAt?: string,
+    overrideRate?: number | null
 ) {
     const today = new Date()
     const history = []
+    const registrationDate = coachCreatedAt ? startOfMonth(new Date(coachCreatedAt)) : null
 
     for (let i = 0; i < monthsToLookBack; i++) {
         const d = subMonths(today, i)
         const monthStart = startOfMonth(d)
+
+        // Skip months before registration
+        if (registrationDate && monthStart < registrationDate) {
+            continue
+        }
+
         const monthEnd = endOfMonth(d)
         const monthKey = format(d, 'yyyy-MM')
 
         // 1. Calculate Rate applicable for THIS month (based on 3 months prior to this month)
-        // Note: calculateCoachRate logic uses 1-3 months prior to referenceDate.
-        // So passing 'd' (current month in loop) as referenceDate is correct for "Rate applied to this month".
-        const historicalRate = calculateCoachRate(coachId, allLessons, d)
+        // Optionally apply override if provided
+        const historicalRate = calculateCoachRate(coachId, allLessons, d, overrideRate)
 
         // 2. Filter lessons for this month
         const monthLessons = allLessons.filter(l => {

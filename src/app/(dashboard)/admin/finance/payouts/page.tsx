@@ -22,21 +22,28 @@ type PayoutStatus = {
     rate: number
     details: any[]
     payouts: any[]
+    baseAmount: number
+    consumptionTax: number
+    withholdingTax: number
+    systemFee: number
+    transferFee: number
+    finalAmount: number
 }
 
 export default async function PayoutsPage({ searchParams }: { searchParams: { month?: string } }) {
     const supabase = await createClient()
 
     // Default to last month (most common payout scenario)
+    const resolvedParams = await searchParams
     const today = new Date()
     const lastMonth = subMonths(today, 1) // default target
-    const targetMonthStr = searchParams.month || format(lastMonth, 'yyyy-MM')
+    const targetMonthStr = resolvedParams.month || format(lastMonth, 'yyyy-MM')
 
     // 1. Fetch Coaches
     const { data: coaches } = await supabase
         .from('profiles')
-        .select('id, full_name, avatar_url, role')
-        .eq('role', 'coach')
+        .select('id, full_name, avatar_url, role, override_coach_rank')
+        .in('role', ['coach', 'admin'])
 
     // 2. Fetch Lessons needed for calculation (Last 12 months for safety/history)
     // We'll calculate historical for say 12 months back, then filter for the selected month.
@@ -47,7 +54,7 @@ export default async function PayoutsPage({ searchParams }: { searchParams: { mo
         .select(`
             id, price, lesson_date, coach_id,
             lesson_masters (id, unit_price, is_trial),
-            students (membership_types (id, membership_type_lessons (lesson_master_id, reward_price)))
+            students (membership_types!students_membership_type_id_fkey (id, membership_type_lessons (lesson_master_id, reward_price)))
         `)
         .gte('lesson_date', twelveMonthsAgo.toISOString())
 
@@ -68,13 +75,38 @@ export default async function PayoutsPage({ searchParams }: { searchParams: { mo
         coachLessonsMap.set(l.coach_id, list)
     })
 
+    // 3.5 Fetch Tax Settings AND Company Info
+    const { data: appConfigs } = await supabase
+        .from('app_configs')
+        .select('key, value')
+        .or('key.like.coach_tax:%,key.eq.company_info')
+
+    const taxMap = new Map<string, boolean>()
+    let companyInfo = null
+
+    appConfigs?.forEach(c => {
+        if (c.key === 'company_info') {
+            try {
+                companyInfo = JSON.parse(c.value)
+            } catch { }
+        } else if (c.key.startsWith('coach_tax:')) {
+            const coachId = c.key.replace('coach_tax:', '')
+            try {
+                const val = JSON.parse(c.value)
+                taxMap.set(coachId, val.enabled !== false)
+            } catch {
+                taxMap.set(coachId, true)
+            }
+        }
+    })
+
     if (coaches) {
         for (const coach of coaches) {
             const lessons = coachLessonsMap.get(coach.id) || []
 
             // Calculate History (we only need the specific month but function calculates all)
             // Ideally we'd have a specific function for one month but this works.
-            const history = calculateHistoricalMonthlyRewards(coach.id, lessons, 12)
+            const history = calculateHistoricalMonthlyRewards(coach.id, lessons, 12, undefined, coach.override_coach_rank)
 
             // Find the target month data
             const targetData = history.find(h => h.month === targetMonthStr)
@@ -83,6 +115,36 @@ export default async function PayoutsPage({ searchParams }: { searchParams: { mo
             const totalSales = targetData?.totalSales || 0
             const rate = targetData?.rate || 0
             const details = targetData?.details || []
+
+            // Calculate Final Amount with Tax/Withholding
+            const taxEnabled = taxMap.has(coach.id) ? taxMap.get(coach.id) : true // Default true
+
+            // Logic: Total Reward is Tax Inclusive
+            const totalTaxIncluded = totalReward
+
+            // 1. Separate Taxable and Non-Taxable
+            const nonTaxableAmount = 0
+            const taxableAmountIncluded = totalTaxIncluded - nonTaxableAmount
+
+            // 2. Extract Consumption Tax (Internal)
+            const taxRate = 0.10
+            // Assuming invoice registered = true for now as per rewards.ts
+            const isInvoiceRegistered = true
+            // Base = Inclusive / 1.10
+            const taxableBase = isInvoiceRegistered ? Math.floor(taxableAmountIncluded / (1 + taxRate)) : taxableAmountIncluded
+            const consumptionTax = taxableAmountIncluded - taxableBase
+
+            const RATE_WITHHOLDING = 0.1021
+            const SYSTEM_FEE_RATE = 0
+            const TRANSFER_FEE = 0
+
+            // 3. Withholding Tax (On Taxable Base)
+            const withholdingTax = taxEnabled ? Math.floor(taxableBase * RATE_WITHHOLDING) : 0
+
+            const systemFee = Math.floor(totalTaxIncluded * SYSTEM_FEE_RATE)
+            const transferFee = totalTaxIncluded > 0 ? TRANSFER_FEE : 0
+
+            const finalAmount = totalTaxIncluded - withholdingTax - systemFee - transferFee
 
             // Sum payouts
             const coachPayouts = payouts?.filter(p => p.coach_id === coach.id) || []
@@ -93,16 +155,14 @@ export default async function PayoutsPage({ searchParams }: { searchParams: { mo
                 .filter(p => p.status === 'pending')
                 .reduce((sum, p) => sum + p.amount, 0)
 
-            const unpaidAmount = totalReward - paidAmount
+            // Status Logic: Compare Paid Amount with Final Amount (Transfer Target)
+            const unpaidAmount = finalAmount - paidAmount
+
             let status: PayoutStatus['status'] = 'unpaid'
-            // Logic: Unpaid > 0 but Unpaid - Pending <= 0 -> Processing
-            // Actually, simply:
-            if (unpaidAmount <= 0 && totalReward > 0) status = 'paid'
+            if (unpaidAmount <= 0 && finalAmount > 0) status = 'paid'
             else if (paidAmount > 0) status = 'partial'
-            else if (unpaidAmount > 0 && (unpaidAmount - pendingAmount) <= 0) status = 'partial' // Or distinct 'processing'? 
-            // Let's stick to existing types 'paid' | 'partial' | 'unpaid' for now, but maybe pass 'pending_amount' to dashboard to visualize.
-            // If pending covers the rest, maybe we call it 'partial' but show a blue badge in dashboard.
-            else if (totalReward === 0) status = 'paid'
+            else if (unpaidAmount > 0 && (unpaidAmount - pendingAmount) <= 0) status = 'partial'
+            else if (finalAmount === 0) status = 'paid'
 
             payoutStatuses.push({
                 coach_id: coach.id,
@@ -110,14 +170,38 @@ export default async function PayoutsPage({ searchParams }: { searchParams: { mo
                 avatar_url: coach.avatar_url,
                 target_month: targetMonthStr,
                 total_sales: totalSales,
-                total_reward: totalReward,
+                total_reward: finalAmount, // Update to show Transfer Target Amount (or maybe totalReward as base?)
+                // User requirement: "Admin reward payment management page also updated"
+                // Usually dashboard shows "Payout Amount", so finalAmount is more appropriate.
+                // But previously it was totalReward. Let's use finalAmount and maybe rename field or keep as is?
+                // Using finalAmount is safer for "Payout" context.
+                // To be robust, let's pass all distinct values if PayoutStatus supports it.
+                // But PayoutStatus interface only has total_reward.
+                // I'll stick to putting finalAmount into total_reward for now, OR add base_reward field.
+                // Better to use finalAmount (transfer target) for "total_reward" in Payout Dashboard context.
+
                 paid_amount: paidAmount,
-                pending_amount: pendingAmount, // New
+                pending_amount: pendingAmount,
                 unpaid_amount: Math.max(0, unpaidAmount),
                 status,
                 rate,
-                details,
-                payouts: coachPayouts // Pass raw payouts for history
+                details: details.map(d => ({
+                    ...d,
+                    studentName: d.studentName || ''
+                })),
+                payouts: coachPayouts,
+
+                // Add extra fields for the dialog which reads from this object?
+                // The dashboard likely passes this object to the dialog. 
+                // We need to ensure the dialog gets consumptionTax, withholdingTax etc.
+                // But PayoutStatus type doesn't have them.
+                // I need to update PayoutStatus type definition in page.tsx as well.
+                baseAmount: taxableBase,
+                consumptionTax,
+                withholdingTax,
+                systemFee,
+                transferFee,
+                finalAmount
             })
         }
     }
@@ -152,7 +236,7 @@ export default async function PayoutsPage({ searchParams }: { searchParams: { mo
                 </Link>
             </div>
 
-            <PayoutDashboard data={payoutStatuses} targetMonth={targetMonthStr} />
+            <PayoutDashboard data={payoutStatuses} targetMonth={targetMonthStr} companyInfo={companyInfo} />
         </div>
     )
 }

@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from '@/components/ui/button'
 import { Lock } from 'lucide-react'
 import Link from 'next/link'
+import { BankInfoForm } from '@/components/settings/BankInfoForm'
 
 export default async function SettingsPage() {
     const supabase = await createClient()
@@ -90,6 +91,8 @@ export default async function SettingsPage() {
                         </div>
                     </CardContent>
                 </Card>
+
+                <BankInfoForm />
             </div>
         </div>
     )

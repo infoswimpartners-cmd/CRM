@@ -18,6 +18,7 @@ type MonthlyReport = {
     details: {
         date: string
         title: string
+        studentName: string
         price: number
         reward: number
     }[]
@@ -69,6 +70,9 @@ export function MonthlyFinancialsWidget({ reports }: { reports: MonthlyReport[] 
                                         <div key={idx} className="flex justify-between items-center text-sm py-1 border-b border-slate-50 last:border-0">
                                             <div className="flex flex-col">
                                                 <span className="text-slate-700">{format(new Date(detail.date), 'M/d')} - {detail.title}</span>
+                                                {detail.studentName && (
+                                                    <span className="text-xs text-slate-500">{detail.studentName} 様</span>
+                                                )}
                                             </div>
                                             <div className="flex items-center gap-4">
                                                 <span className="font-medium text-slate-700">¥{detail.reward.toLocaleString()}</span>

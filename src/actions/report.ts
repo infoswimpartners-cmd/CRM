@@ -15,6 +15,7 @@ const formSchema = z.object({
     location: z.string().min(1, '場所は必須です'),
     menu_description: z.string().optional(),
     price: z.number().min(0),
+    billing_price: z.number().min(0).optional(),
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -192,25 +193,35 @@ export async function updateLessonReport(lessonId: string, values: FormValues) {
     if (!parsed.success) return { success: false, error: 'Invalid input' }
     const data = parsed.data
 
-    // Recalculate billing price
-    let billingPrice = data.price
-    if (data.student_id) {
-        const { data: student } = await supabase
-            .from('students')
-            .select('membership_types ( fee )')
-            .eq('id', data.student_id)
-            .single()
+    // Recalculate billing price only if not provided
+    let billingPrice = data.billing_price
 
-        const membership = Array.isArray(student?.membership_types)
-            ? student.membership_types[0]
-            : student?.membership_types
+    if (billingPrice === undefined) {
+        billingPrice = data.price
+        if (data.student_id) {
+            const { data: student } = await supabase
+                .from('students')
+                .select('membership_types ( fee )')
+                .eq('id', data.student_id)
+                .single()
 
-        if (membership && membership.fee > 0) {
-            billingPrice = 0
+            const membership = Array.isArray(student?.membership_types)
+                ? student.membership_types[0]
+                : student?.membership_types
+
+            if (membership && membership.fee > 0) {
+                billingPrice = 0
+            }
         }
     }
 
     try {
+        console.log('Updating lesson report:', lessonId, {
+            lesson_master_id: data.lesson_master_id,
+            price: data.price,
+            billing_price: billingPrice
+        })
+
         const { error } = await supabase.from('lessons').update({
             student_id: data.student_id || null,
             student_name: data.student_name,
@@ -222,7 +233,10 @@ export async function updateLessonReport(lessonId: string, values: FormValues) {
             billing_price: billingPrice
         }).eq('id', lessonId)
 
-        if (error) throw error
+        if (error) {
+            console.error('Supabase Update Error:', error)
+            throw error
+        }
 
         revalidatePath('/admin/reports')
         return { success: true }

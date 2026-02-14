@@ -106,6 +106,85 @@ export interface Database {
             referencedColumns: ["id"]
           }
         ]
+      },
+      students: {
+        Row: {
+          id: string
+          created_at: string
+          full_name: string
+          full_name_kana: string | null
+          second_student_name: string | null
+          second_student_name_kana: string | null
+          gender: string | null
+          birth_date: string | null
+          second_student_gender: string | null
+          second_student_birth_date: string | null
+          contact_email: string | null
+          contact_phone: string | null
+          notes: string | null
+          status: string | null
+          student_number: string | null
+          membership_type_id: string | null
+          coach_id: string | null
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          full_name: string
+          full_name_kana?: string | null
+          second_student_name?: string | null
+          second_student_name_kana?: string | null
+          gender?: string | null
+          birth_date?: string | null
+          second_student_gender?: string | null
+          second_student_birth_date?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          notes?: string | null
+          status?: string | null
+          student_number?: string | null
+          membership_type_id?: string | null
+          coach_id?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+        }
+        Update: {
+          id?: string
+          created_at?: string
+          full_name?: string
+          full_name_kana?: string | null
+          second_student_name?: string | null
+          second_student_name_kana?: string | null
+          gender?: string | null
+          birth_date?: string | null
+          second_student_gender?: string | null
+          second_student_birth_date?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          notes?: string | null
+          status?: string | null
+          student_number?: string | null
+          membership_type_id?: string | null
+          coach_id?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "students_membership_type_id_fkey"
+            columns: ["membership_type_id"]
+            referencedRelation: "membership_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "students_coach_id_fkey"
+            columns: ["coach_id"]
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          }
+        ]
       }
     }
     Views: {

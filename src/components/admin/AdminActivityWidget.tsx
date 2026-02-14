@@ -12,6 +12,7 @@ type Schedule = {
     end_time: string
     location?: string
     student_name?: string
+    student_id?: string
     coach: {
         full_name: string
         avatar_url?: string | null

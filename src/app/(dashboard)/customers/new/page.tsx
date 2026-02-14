@@ -23,10 +23,12 @@ export default function NewStudentPage() {
     const [formData, setFormData] = useState({
         full_name: '',
         full_name_kana: '',
-        second_student_name: '',
-        second_student_name_kana: '',
         gender: '',
         birth_date: '',
+        second_student_name: '',
+        second_student_name_kana: '',
+        second_student_gender: '',
+        second_student_birth_date: '',
         contact_email: '',
         contact_phone: '',
         student_notes: '', // notes on students table
@@ -40,6 +42,14 @@ export default function NewStudentPage() {
 
     const ageInfo = formData.birth_date ? (() => {
         const date = new Date(formData.birth_date)
+        return !isNaN(date.getTime()) ? {
+            age: calculateAge(date),
+            grade: calculateSchoolGrade(date)
+        } : null
+    })() : null
+
+    const ageInfo2 = formData.second_student_birth_date ? (() => {
+        const date = new Date(formData.second_student_birth_date)
         return !isNaN(date.getTime()) ? {
             age: calculateAge(date),
             grade: calculateSchoolGrade(date)
@@ -93,6 +103,8 @@ export default function NewStudentPage() {
                 full_name_kana: formData.full_name_kana,
                 second_student_name: formData.second_student_name || null,
                 second_student_name_kana: formData.second_student_name_kana || null,
+                second_student_gender: formData.second_student_gender || null,
+                second_student_birth_date: formData.second_student_birth_date || null,
                 gender: formData.gender,
                 birth_date: formData.birth_date || null,
                 contact_email: formData.contact_email,
@@ -120,13 +132,15 @@ export default function NewStudentPage() {
         <div className="max-w-2xl mx-auto space-y-6">
             <h1 className="text-2xl font-bold">新規生徒登録</h1>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>基本情報</CardTitle>
-                    <CardDescription>生徒の連絡先などを入力してください。</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-6">
+
+                {/* 1. Basic Information */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>基本情報</CardTitle>
+                        <CardDescription>生徒の基本情報を入力してください。</CardDescription>
+                    </CardHeader>
+                    <CardContent>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="full_name">氏名 *</Label>
@@ -138,15 +152,7 @@ export default function NewStudentPage() {
                             </div>
                         </div>
 
-                        <div className="space-y-2">
-                            <Label htmlFor="second_student_name">2人目の生徒名 (同時受講の場合)</Label>
-                            <div className="grid grid-cols-2 gap-4">
-                                <Input id="second_student_name" value={formData.second_student_name} onChange={handleChange} placeholder="同伴する生徒名" />
-                                <Input id="second_student_name_kana" value={formData.second_student_name_kana} onChange={handleChange} placeholder="フリガナ (2人目)" />
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-2 gap-4 mt-4">
                             <div className="space-y-2">
                                 <Label>性別</Label>
                                 <Select onValueChange={(val) => setFormData({ ...formData, gender: val })}>
@@ -175,7 +181,15 @@ export default function NewStudentPage() {
                                 )}
                             </div>
                         </div>
+                    </CardContent>
+                </Card>
 
+                {/* 2. Contact Information */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>連絡先情報</CardTitle>
+                    </CardHeader>
+                    <CardContent>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="contact_email">メールアドレス</Label>
@@ -186,14 +200,66 @@ export default function NewStudentPage() {
                                 <Input id="contact_phone" type="tel" value={formData.contact_phone} onChange={handleChange} />
                             </div>
                         </div>
+                    </CardContent>
+                </Card>
 
-
-
-                        <div className="space-y-2">
-                            <Label htmlFor="student_notes">備考</Label>
-                            <Textarea id="student_notes" value={formData.student_notes} onChange={handleChange} />
+                {/* 3. Second Student Information */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>2人目の生徒情報</CardTitle>
+                        <CardDescription>同時受講する場合のみ入力してください。</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="second_student_name">名前</Label>
+                                <Input id="second_student_name" value={formData.second_student_name} onChange={handleChange} placeholder="同伴する生徒名" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="second_student_name_kana">フリガナ</Label>
+                                <Input id="second_student_name_kana" value={formData.second_student_name_kana} onChange={handleChange} placeholder="フリガナ (2人目)" />
+                            </div>
                         </div>
+                        <div className="grid grid-cols-2 gap-4 mt-4">
+                            <div className="space-y-2">
+                                <Label>性別 (2人目)</Label>
+                                <Select onValueChange={(val) => setFormData({ ...formData, second_student_gender: val })}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="性別 (2人目)" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="男性">男性</SelectItem>
+                                        <SelectItem value="女性">女性</SelectItem>
+                                        <SelectItem value="その他">その他</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <div className="flex gap-2 items-center">
+                                    <Input
+                                        id="second_student_birth_date"
+                                        type="date"
+                                        value={formData.second_student_birth_date}
+                                        onChange={handleChange}
+                                        placeholder="生年月日 (2人目)"
+                                    />
+                                    {ageInfo2 && (
+                                        <span className="text-sm text-green-600 font-medium whitespace-nowrap">
+                                            {ageInfo2.age}歳 ({ageInfo2.grade})
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
 
+                {/* 4. Membership & Coach */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>契約・担当</CardTitle>
+                    </CardHeader>
+                    <CardContent>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label>会員区分</Label>
@@ -223,17 +289,36 @@ export default function NewStudentPage() {
                                 </Select>
                             </div>
                         </div>
+                    </CardContent>
+                </Card>
 
-                        <div className="flex justify-end gap-2 pt-4">
-                            <Button variant="outline" type="button" onClick={() => router.back()}>キャンセル</Button>
-                            <Button type="submit" disabled={loading}>
-                                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                登録
-                            </Button>
+                {/* 5. Notes */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>備考</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-2">
+                            <Textarea
+                                id="student_notes"
+                                value={formData.student_notes}
+                                onChange={handleChange}
+                                placeholder="特記事項など"
+                                className="min-h-[100px]"
+                            />
                         </div>
-                    </form>
-                </CardContent>
-            </Card>
+                    </CardContent>
+                </Card>
+
+                {/* Actions */}
+                <div className="flex justify-end gap-2 pt-4 pb-12">
+                    <Button variant="outline" type="button" onClick={() => router.back()}>キャンセル</Button>
+                    <Button type="submit" disabled={loading}>
+                        {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        登録
+                    </Button>
+                </div>
+            </form>
         </div>
     )
 }

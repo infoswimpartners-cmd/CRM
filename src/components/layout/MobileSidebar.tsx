@@ -99,7 +99,7 @@ export function MobileSidebar({ userProfile }: { userProfile: any }) {
                             <NavItem href="/coach" icon={LayoutDashboard} label="ダッシュボード" isActive={pathname === '/coach'} />
                             <NavItem href="/students" icon={Users} label="生徒管理" isActive={pathname?.startsWith('/students')} />
                             <NavItem href="/coach/schedule" icon={Calendar} label="スケジュール" isActive={pathname === '/coach/schedule'} />
-                            <NavItem href="/finance" icon={DollarSign} label="売上管理" isActive={pathname?.startsWith('/finance')} />
+                            <NavItem href="/finance" icon={DollarSign} label="支払い通知書一覧" isActive={pathname?.startsWith('/finance')} />
 
                             <div className="px-4 mt-6 mb-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">設定</div>
                             <NavItem href="/settings" icon={Settings} label="アカウント設定" isActive={pathname?.startsWith('/settings')} />

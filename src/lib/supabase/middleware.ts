@@ -41,6 +41,19 @@ export async function updateSession(request: NextRequest) {
     // supabase.auth.getUser(). A simple mistake could make it very hard to debug
     // issues with users being randomly logged out.
 
+    // List of reliable paths that don't need auth check if no cookies present
+    const isAuthPage = request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname.startsWith('/forgot-password')
+
+    // If on an auth page and no cookies, we can skip the getUser call
+    if (isAuthPage) {
+        const allCookies = request.cookies.getAll()
+        // Simple heuristic: if no cookies at all, or very few, user is likely not logged in
+        // A more robust check might look for specific supabase cookie names if known
+        if (allCookies.length === 0) {
+            return supabaseResponse
+        }
+    }
+
     const {
         data: { user },
     } = await supabase.auth.getUser()

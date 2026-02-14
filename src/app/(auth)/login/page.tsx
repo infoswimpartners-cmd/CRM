@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { AlertCircle, Loader2, Eye, EyeOff, Waves } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useEffect } from 'react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import Image from 'next/image'
 
@@ -17,6 +19,12 @@ const initialState = {
 export default function LoginPage() {
     const [state, formAction, isPending] = useActionState(login, initialState)
     const [showPassword, setShowPassword] = useState(false)
+    const router = useRouter()
+
+    useEffect(() => {
+        router.prefetch('/admin')
+        router.prefetch('/coach')
+    }, [router])
 
     return (
         <div className="relative min-h-screen flex items-center justify-center p-4 overflow-hidden bg-slate-50 font-sans">

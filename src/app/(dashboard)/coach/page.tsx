@@ -26,44 +26,61 @@ export default async function CoachDashboard() {
         redirect('/login')
     }
 
-    const { data: profile } = await supabase
+    // Parallel execution for Profile & Lessons/Schedules
+    // Note: optimization - we need profile to display name/avatar, but simpler to fetch all at once if we can. 
+    // However, profile ID is needed for other queries if we didn't have user.id. user.id is available.
+
+    // 1. Fetch Profile
+    const profilePromise = supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
         .single()
 
-    // 1. Fetch Lessons Data (Broad range for 3 months history)
-    const today = new Date()
-    const threeMonthsAgo = startOfMonth(subMonths(today, 3))
-
-    const { data: allLessons } = await supabase
+    // 2. Fetch Lessons Data (Broad range)
+    const allLessonsPromise = supabase
         .from('lessons')
         .select(`
             *,
-            lesson_masters (
-                id,
-                name,
-                unit_price,
-                is_trial
-            ),
+            lesson_masters ( id, name, unit_price, is_trial ),
             students (
-                id,
-                full_name,
-                membership_types!students_membership_type_id_fkey (
-                    id
-                )
+                id, full_name,
+                membership_types!students_membership_type_id_fkey ( id )
             ),
-            profiles (
-                full_name,
-                avatar_url
-            )
+            profiles ( full_name, avatar_url )
         `)
         .eq('coach_id', user.id)
         .order('lesson_date', { ascending: false })
 
+    // 3. Fetch Upcoming Schedules
+    const now = new Date().toISOString()
+    const upcomingSchedulesPromise = supabase
+        .from('lesson_schedules')
+        .select(`
+            id, title, start_time, end_time, location,
+            students ( full_name )
+        `)
+        .eq('coach_id', user.id)
+        .gte('start_time', now)
+        .order('start_time', { ascending: true })
+        .limit(5)
+
+    const [
+        { data: profile },
+        { data: allLessons },
+        { data: upcomingSchedulesRaw }
+    ] = await Promise.all([
+        profilePromise,
+        allLessonsPromise,
+        upcomingSchedulesPromise
+    ])
+
+    // DATA PROCESSING AFTER FETCH
+    const today = new Date()
+
     // 2. Calculate Stats for this month and past months
     const isAdmin = profile?.role === 'admin'
-    const currentRate = isAdmin ? 1.0 : calculateCoachRate(user.id, allLessons as any || [], today)
+    const currentRate = isAdmin ? 1.0 : calculateCoachRate(user.id, allLessons as any || [], today, profile?.override_coach_rank)
     const thisMonthStart = startOfMonth(today)
     const thisMonthEnd = endOfMonth(today)
 
@@ -78,29 +95,12 @@ export default async function CoachDashboard() {
     const lastMonthDate = subMonths(today, 1)
     const lastMonthStart = startOfMonth(lastMonthDate)
     const lastMonthEnd = endOfMonth(lastMonthDate)
-    const lastMonthRate = isAdmin ? 1.0 : calculateCoachRate(user.id, allLessons as any || [], lastMonthDate)
+    const lastMonthRate = isAdmin ? 1.0 : calculateCoachRate(user.id, allLessons as any || [], lastMonthDate, profile?.override_coach_rank)
     const lastMonthLessons = allLessons?.filter(l => {
         const d = new Date(l.lesson_date)
         return d >= lastMonthStart && d <= lastMonthEnd
     }) || []
     const lastMonthStats = calculateMonthlyStats(user.id, lastMonthLessons as any[], lastMonthRate)
-
-    // 3. (Kept) Fetch Upcoming Schedules for Right Activity Widget
-    const now = new Date().toISOString()
-    const { data: upcomingSchedulesRaw } = await supabase
-        .from('lesson_schedules')
-        .select(`
-            id,
-            title,
-            start_time,
-            end_time,
-            location,
-            students ( full_name )
-        `)
-        .eq('coach_id', user.id)
-        .gte('start_time', now)
-        .order('start_time', { ascending: true })
-        .limit(5)
 
     const upcomingSchedules = upcomingSchedulesRaw?.map(s => ({
         id: s.id,
@@ -115,8 +115,6 @@ export default async function CoachDashboard() {
             avatar_url: profile?.avatar_url
         }
     })) || []
-
-    const recentLessons = allLessons?.slice(0, 5) || []
 
     // Calculate Active & New Students
     const threeMonthsStart = startOfMonth(subMonths(today, 2))
@@ -137,6 +135,9 @@ export default async function CoachDashboard() {
 
     // Calculate Lesson Diff
     const lessonDiff = thisMonthStats.lessonCount - lastMonthStats.lessonCount
+
+    // Recent Lessons for Activity Widget
+    const recentLessons = allLessons?.slice(0, 5) || []
 
     return (
         <div className="space-y-8 animate-fade-in-up pb-10">

@@ -19,11 +19,11 @@ async function applyMigration() {
         await client.connect()
         console.log('Connected to database.')
 
-        const sql = fs.readFileSync('supabase/migrations/20260122_update_student_status_constraint.sql', 'utf8')
+        const sql = fs.readFileSync('supabase/migrations/20260212100000_add_coach_rank_override.sql', 'utf8')
         console.log('Applying migration:\n', sql)
 
         await client.query(sql)
-        console.log('✅ Migration updated status constraint applied successfully.')
+        console.log('✅ Migration add_coach_rank_override applied successfully.')
     } catch (err) {
         console.error('Migration failed:', err)
     } finally {

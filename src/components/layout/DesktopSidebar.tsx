@@ -90,7 +90,7 @@ export function DesktopSidebar({ role }: DesktopSidebarProps) {
                         <NavItem href="/coach/report" icon={PlusCircle} label="レッスン報告" isActive={pathname?.startsWith('/coach/report')} />
 
                         <NavHeading>分析・集計</NavHeading>
-                        <NavItem href="/finance" icon={DollarSign} label="売上管理" isActive={pathname?.startsWith('/finance')} />
+                        <NavItem href="/finance" icon={DollarSign} label="支払い通知書一覧" isActive={pathname?.startsWith('/finance')} />
 
                         <NavHeading>設定</NavHeading>
                         <NavItem href="/settings" icon={Settings} label="アカウント設定" isActive={pathname?.startsWith('/settings')} />

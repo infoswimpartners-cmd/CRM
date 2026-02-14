@@ -6,6 +6,9 @@ import Link from 'next/link'
 import { AssignedStudentsTable } from '@/components/admin/AssignedStudentsTable'
 import { notFound } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { CoachBankInfoForm } from '@/components/admin/CoachBankInfoForm'
+import { CoachTaxSettingsForm } from '@/components/admin/CoachTaxSettingsForm'
 
 export const dynamic = 'force-dynamic'
 
@@ -81,10 +84,30 @@ export default async function CoachDetailPage({ params }: PageProps) {
                 </div>
             </div>
 
+            <div className="grid gap-6 md:grid-cols-2">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>振込先口座情報</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <CoachBankInfoForm coachId={coach.id} />
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>税務設定</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <CoachTaxSettingsForm coachId={coach.id} />
+                    </CardContent>
+                </Card>
+            </div>
+
             <AssignedStudentsTable
                 coachId={coach.id}
                 students={students || []}
             />
-        </div>
+        </div >
     )
 }

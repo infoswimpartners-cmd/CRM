@@ -1,2 +1,2 @@
 alter table lesson_masters
-add column stripe_price_id text null;
+add column if not exists stripe_price_id text null;;

@@ -25,6 +25,7 @@ interface ProfileFormProps {
         full_name_kana: string | null
         avatar_url: string | null
         role?: string
+        override_coach_rank?: number | null
     }
     redirectPath: string
     title?: string
@@ -41,6 +42,7 @@ export function ProfileForm({ profileId, initialData, redirectPath, title = "プ
         full_name_kana: initialData.full_name_kana || '',
         avatar_url: initialData.avatar_url || '',
         role: initialData.role || 'coach',
+        override_coach_rank: initialData.override_coach_rank ?? 'auto', // use string 'auto' for null in select
     })
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -49,6 +51,10 @@ export function ProfileForm({ profileId, initialData, redirectPath, title = "プ
 
     const handleRoleChange = (value: string) => {
         setFormData({ ...formData, role: value })
+    }
+
+    const handleRankChange = (value: string) => {
+        setFormData({ ...formData, override_coach_rank: value })
     }
 
     const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -106,6 +112,7 @@ export function ProfileForm({ profileId, initialData, redirectPath, title = "プ
 
             if (enableRoleEdit) {
                 updates.role = formData.role
+                updates.override_coach_rank = formData.override_coach_rank === 'auto' ? null : parseFloat(formData.override_coach_rank as string)
             }
 
             const { error } = await supabase
@@ -185,6 +192,34 @@ export function ProfileForm({ profileId, initialData, redirectPath, title = "プ
                         </div>
                     )}
 
+                    {enableRoleEdit && (
+                        <div className="space-y-2">
+                            <Label htmlFor="rank">コーチランク設定 (報酬率)</Label>
+                            <Select
+                                value={formData.override_coach_rank?.toString() || 'auto'}
+                                onValueChange={handleRankChange}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="自動判定" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="auto">自動判定 (実績ベース)</SelectItem>
+                                    <SelectItem value="1.0">管理者 (100%)</SelectItem>
+                                    <SelectItem value="0.7000001">特例 (70% + 体験¥5,000)</SelectItem>
+                                    <SelectItem value="0.7">Special (70%)</SelectItem>
+                                    <SelectItem value="0.65">S (65%)</SelectItem>
+                                    <SelectItem value="0.6">A (60%)</SelectItem>
+                                    <SelectItem value="0.55">B (55%)</SelectItem>
+                                    <SelectItem value="0.5">Regular (50%)</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <p className="text-xs text-muted-foreground">
+                                ※「自動判定」を選択すると、直近3ヶ月のレッスン数に基づいて自動的に計算されます。<br />
+                                ※固定値を設定すると、自動判定を無視して常にそのランクが適用されます。
+                            </p>
+                        </div>
+                    )}
+
                     <div className="flex justify-end gap-2 pt-4">
                         <Button variant="outline" type="button" onClick={() => router.back()}>キャンセル</Button>
                         <Button type="submit" disabled={loading || uploading}>
@@ -194,6 +229,6 @@ export function ProfileForm({ profileId, initialData, redirectPath, title = "プ
                     </div>
                 </form>
             </CardContent>
-        </Card>
+        </Card >
     )
 }

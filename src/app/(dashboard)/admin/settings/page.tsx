@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { CompanySettingsForm } from "@/components/admin/CompanySettingsForm"
 
 export default async function SettingsPage() {
     return (
@@ -7,6 +8,15 @@ export default async function SettingsPage() {
                 <h1 className="text-3xl font-bold tracking-tight">システム設定</h1>
                 <p className="text-gray-500">アプリケーションの環境設定</p>
             </div>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>会社情報・支払通知書設定</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <CompanySettingsForm />
+                </CardContent>
+            </Card>
 
             <Card>
                 <CardHeader>

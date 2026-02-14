@@ -25,6 +25,13 @@ import { Textarea } from "@/components/ui/textarea"
 import { updateLessonReport } from '@/actions/report'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
 
 const formSchema = z.object({
     student_id: z.string().optional(),
@@ -34,16 +41,18 @@ const formSchema = z.object({
     location: z.string().min(1, '場所は必須です'),
     menu_description: z.string().optional(),
     price: z.number().min(0),
+    billing_price: z.number().min(0),
 })
 
 interface EditReportDialogProps {
     report: any
+    lessonMasters: any[]
     open: boolean
     onOpenChange: (open: boolean) => void
     onSuccess: () => void
 }
 
-export function EditReportDialog({ report, open, onOpenChange, onSuccess }: EditReportDialogProps) {
+export function EditReportDialog({ report, lessonMasters, open, onOpenChange, onSuccess }: EditReportDialogProps) {
     const [loading, setLoading] = useState(false)
     const router = useRouter()
 
@@ -57,8 +66,17 @@ export function EditReportDialog({ report, open, onOpenChange, onSuccess }: Edit
             location: report.location,
             menu_description: report.menu_description || '',
             price: report.price,
+            billing_price: report.billing_price !== null && report.billing_price !== undefined ? report.billing_price : report.price,
         },
     })
+
+    const handleLessonMasterChange = (value: string) => {
+        const selectedMaster = lessonMasters.find(m => m.id === value)
+        if (selectedMaster) {
+            form.setValue('price', selectedMaster.unit_price)
+            form.setValue('billing_price', selectedMaster.unit_price)
+        }
+    }
 
     const onSubmit = async (values: z.infer<typeof formSchema>) => {
         if (!confirm('変更内容を保存しますか？')) return
@@ -125,6 +143,37 @@ export function EditReportDialog({ report, open, onOpenChange, onSuccess }: Edit
                         <div className="grid grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
+                                name="lesson_master_id"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>レッスン種類</FormLabel>
+                                        <Select
+                                            onValueChange={(value) => {
+                                                field.onChange(value)
+                                                handleLessonMasterChange(value)
+                                            }}
+                                            value={field.value}
+                                        >
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="レッスン種類を選択" />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                {lessonMasters.map((master) => (
+                                                    <SelectItem key={master.id} value={master.id}>
+                                                        {master.name}
+                                                        {master.is_trial ? ' (体験)' : ''}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                                control={form.control}
                                 name="lesson_date"
                                 render={({ field }) => (
                                     <FormItem>
@@ -136,12 +185,33 @@ export function EditReportDialog({ report, open, onOpenChange, onSuccess }: Edit
                                     </FormItem>
                                 )}
                             />
+                        </div>
+                        <FormField
+                            control={form.control}
+                            name="price"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>売上金額</FormLabel>
+                                    <FormControl>
+                                        <Input
+                                            type="number"
+                                            {...field}
+                                            onChange={e => field.onChange(parseInt(e.target.value) || 0)}
+                                        />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
+
+                        <div className="grid grid-cols-2 gap-4">
                             <FormField
                                 control={form.control}
-                                name="price"
+                                name="billing_price"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>売上金額</FormLabel>
+                                        <FormLabel>請求金額 (生徒への請求)</FormLabel>
                                         <FormControl>
                                             <Input
                                                 type="number"
@@ -194,6 +264,6 @@ export function EditReportDialog({ report, open, onOpenChange, onSuccess }: Edit
                     </form>
                 </Form>
             </DialogContent>
-        </Dialog>
+        </Dialog >
     )
 }

@@ -33,7 +33,13 @@ export async function AllReportsTable() {
             )
         `)
         .order('lesson_date', { ascending: false })
+        .order('lesson_date', { ascending: false })
         .limit(100) // Limit for now
+
+    const { data: lessonMasters } = await supabase
+        .from('lesson_masters')
+        .select('*')
+        .order('name')
 
     if (!reports) return <div>データがありません</div>
 
@@ -90,7 +96,7 @@ export async function AllReportsTable() {
                                 )}
                             </TableCell>
                             <TableCell>
-                                <ReportActions report={report} />
+                                <ReportActions report={report} lessonMasters={lessonMasters || []} />
                             </TableCell>
                         </TableRow>
                     ))}

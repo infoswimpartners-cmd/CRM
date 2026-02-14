@@ -23,7 +23,7 @@ export async function login(prevState: any, formData: FormData) {
         return { error: 'Invalid inputs' }
     }
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data: { user }, error } = await supabase.auth.signInWithPassword({
         email,
         password,
     })
@@ -32,8 +32,7 @@ export async function login(prevState: any, formData: FormData) {
         return { error: error.message }
     }
 
-    // Fetch user role to redirect appropriately
-    const { data: { user } } = await supabase.auth.getUser()
+    // User is already available from signInWithPassword response
 
     if (!user) {
         return redirect('/login')
