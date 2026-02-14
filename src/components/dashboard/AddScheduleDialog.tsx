@@ -34,7 +34,6 @@ import {
 } from "@/components/ui/select"
 import { toast } from 'sonner'
 import Link from 'next/link'
-import { confirmTrialAndBill } from '@/actions/onboarding'
 import { getStudentsForCoach, getLessonMasters as fetchMasters } from '@/actions/schedule'
 import { createLessonSchedule } from '@/actions/lesson_schedule'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -74,7 +73,7 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate }
 
     // Trial Logic
     const [isTrialMode, setIsTrialMode] = useState(false)
-    const [sendTrialInvoice, setSendTrialInvoice] = useState(false)
+    // const [sendTrialInvoice, setSendTrialInvoice] = useState(false) // Removed
 
     // Google Calendar Link State
     const [createdEventUrl, setCreatedEventUrl] = useState<string | null>(null)
@@ -218,7 +217,7 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate }
                     setIsTrialMode(true)
                 } else {
                     setIsTrialMode(false)
-                    setSendTrialInvoice(false)
+                    // setSendTrialInvoice(false)
                 }
             }
         } else {
@@ -329,55 +328,59 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate }
             }
 
 
-            // If sending trial invoice, use the Server Action
-            if (isTrialMode && sendTrialInvoice && studentId !== 'none') {
-                if (!confirm('体験確定と請求メール送信を実行しますか？\n（スケジュールも自動登録されます）')) {
-                    setLoading(false)
-                    return
+            // Adjust Date if End Time crossed midnight? (Assume same day for simplified UI)
+            if (eh < sh) {
+                endDateTime.setDate(endDateTime.getDate() + 1)
+            }
+
+
+            // NORMAL SCHEDULE creation
+            // Auto-update trial_pending -> trial_confirmed
+            if (studentId !== 'none') {
+                const student = students.find(s => s.id === studentId)
+                if (student?.status === 'trial_pending') {
+                    // Start Trial Workflow (Approval based)
+                    // We don't update status to 'trial_confirmed' immediately anymore?
+                    // Actually, if we just schedule it, it remains 'trial_pending' until lesson done?
+                    // Or maybe we should update it. 
+                    // Existing logic: "Auto-update trial_pending -> trial_confirmed"
+                    // approaches:
+                    // 1. Keep it pending until lesson is done/paid.
+                    // 2. Confirm it now.
+                    // Let's keep existing logic of confirming it if they schedule a lesson?
+                    // But wait, "Trial Pending" means they enquired. 
+                    // "Trial Confirmed" means date is set. So yes, update to confirmed.
+
+                    await supabase.from('students').update({ status: 'trial_confirmed' }).eq('id', studentId)
                 }
+            }
 
-                // Use server action.
-                // @ts-ignore
-                const res = await confirmTrialAndBill(studentId, startDateTime, selectedCoachId)
-                if (!res.success) throw new Error(res.error)
+            // Use Server Action
+            // @ts-ignore
+            const result = await createLessonSchedule({
+                coach_id: selectedCoachId,
+                student_id: studentId === 'none' ? null : studentId,
+                lesson_master_id: (isOverage && selectedMasterId !== 'default') ? selectedMasterId : null,
+                start_time: startDateTime.toISOString(),
+                end_time: endDateTime.toISOString(),
+                title: title,
+                location: location,
+                notes: notes
+            })
 
-                toast.success('体験確定・請求送信・スケジュール登録が完了しました')
+            if (!result) throw new Error('処理結果が取得できませんでした')
+            if (!result.success) throw new Error(result.error)
 
-            } else {
-                // NORMAL SCHEDULE creation
-                // Auto-update trial_pending -> trial_confirmed
-                if (studentId !== 'none') {
-                    const student = students.find(s => s.id === studentId)
-                    if (student?.status === 'trial_pending') {
-                        await supabase.from('students').update({ status: 'trial_confirmed' }).eq('id', studentId)
-                    }
-                }
-
-                // Use Server Action
-                // @ts-ignore
-                const result = await createLessonSchedule({
-                    coach_id: selectedCoachId,
-                    student_id: studentId === 'none' ? null : studentId,
-                    lesson_master_id: (isOverage && selectedMasterId !== 'default') ? selectedMasterId : null,
-                    start_time: startDateTime.toISOString(),
-                    end_time: endDateTime.toISOString(),
-                    title: title,
-                    location: location,
-                    notes: notes
-                })
-
-                if (!result) throw new Error('処理結果が取得できませんでした')
-                if (!result.success) throw new Error(result.error)
-
-                if (result.isOverage) {
-                    if (membershipName && membershipName.includes('単発')) {
-                        toast.success('レッスンを追加し、レッスン料の請求処理予約を行いました。')
-                    } else {
-                        toast.warning('月の上限回数を超えているため、超過分（単発）として登録されました。')
-                    }
+            if (result.isOverage) {
+                if (membershipName && membershipName.includes('単発')) {
+                    toast.success('レッスンを追加し、レッスン料の請求処理予約を行いました。')
+                } else if (isTrialMode) {
+                    toast.success('体験レッスンを追加しました。請求管理から承認を行ってください。')
                 } else {
-                    toast.success('スケジュールを追加しました')
+                    toast.warning('月の上限回数を超えているため、超過分（単発）として登録されました。')
                 }
+            } else {
+                toast.success('スケジュールを追加しました')
             }
 
             const gCalUrl = generateGoogleCalendarUrl(title, location, notes, date, startTime, endTime)
@@ -410,7 +413,7 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate }
         setNotes('')
         setTitle('')
         setIsTrialMode(false)
-        setSendTrialInvoice(false)
+        // setSendTrialInvoice(false) // Removed
         setIsOverage(false)
         setMembershipName(null)
         if (currentUser) setSelectedCoachId(currentUser.id)
@@ -459,15 +462,21 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate }
                                     <SelectItem value="none" disabled>生徒を選択してください</SelectItem>
                                     {students.map(s => (
                                         <SelectItem key={s.id} value={s.id}>
-                                            <div className="flex items-center gap-2">
-                                                <span>{s.full_name}</span>
-                                                {/* Show Membership Name */}
-                                                {(s as any).membership_name && (
-                                                    <span className="text-xs text-gray-500 bg-gray-100 px-1 rounded">
-                                                        {(s as any).membership_name}
-                                                    </span>
-                                                )}
-                                                {s.status === 'trial_pending' && <span className="text-xs text-orange-500">(体験予定)</span>}
+                                            <div className="flex flex-wrap items-center gap-2 py-0.5">
+                                                <span className="font-medium">{s.full_name}</span>
+                                                <div className="flex flex-wrap gap-1">
+                                                    {/* Show Membership Name */}
+                                                    {(s as any).membership_name && (
+                                                        <span className="text-[10px] sm:text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded whitespace-nowrap">
+                                                            {(s as any).membership_name}
+                                                        </span>
+                                                    )}
+                                                    {s.status === 'trial_pending' && (
+                                                        <span className="text-[10px] sm:text-xs text-orange-600 font-bold bg-orange-100 px-1.5 py-0.5 rounded whitespace-nowrap">
+                                                            体験予定
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </div>
                                         </SelectItem>
                                     ))}
@@ -475,7 +484,7 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate }
                             </Select>
                             {/* Membership Status Display (Separate Line) */}
                             {studentId !== 'none' && (
-                                <div className="text-xs text-blue-600 flex items-center gap-2">
+                                <div className="text-xs text-blue-600 flex flex-wrap items-center gap-2 pt-1 leading-relaxed">
                                     {checkingStatus ? (
                                         <Loader2 className="w-3 h-3 animate-spin" />
                                     ) : (
@@ -483,9 +492,8 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate }
                                             {membershipName ? `会員種別: ${membershipName}` : '会員種別: 未設定 (単発扱い)'}
 
                                             {/* Usage Count Display */}
-                                            {/* Usage Count Display - Hide for Single Use */}
                                             {monthlyLimit !== null && monthlyLimit > 0 && (!membershipName || !membershipName.includes('単発')) && (
-                                                <span className="ml-2 bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs">
+                                                <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs whitespace-nowrap">
                                                     利用状況: {currentCount} / {monthlyLimit} 回
                                                     {rolloverCount > 0 && <span className="ml-1 text-[10px]">(繰越 {rolloverCount}回含)</span>}
                                                 </span>
@@ -494,9 +502,13 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate }
                                             {/* Message Logic */}
                                             {isOverage && (
                                                 (!membershipName || (membershipName && membershipName.includes('単発'))) ? (
-                                                    <span className="text-red-600 font-bold ml-2">※レッスン種別を選択してください</span>
+                                                    <span className="text-red-600 font-bold block sm:inline w-full sm:w-auto mt-1 sm:mt-0">
+                                                        ※レッスン種別を選択してください
+                                                    </span>
                                                 ) : (
-                                                    <span className="text-red-600 font-bold ml-2">※月上限超過 (単発扱い)</span>
+                                                    <span className="text-red-600 font-bold block sm:inline w-full sm:w-auto mt-1 sm:mt-0">
+                                                        ※月上限超過 (単発扱い)
+                                                    </span>
                                                 )
                                             )}
                                         </>
@@ -533,23 +545,15 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate }
                         </div>
 
 
-                        {/* Trial Confirmation UI */}
+                        {/* Trial Info UI (Modified: No Checkbox, just info) */}
                         {isTrialMode && (
                             <div className="p-4 border-2 border-orange-200 bg-orange-50 rounded-lg space-y-3">
                                 <div className="flex items-center gap-2">
-                                    <span className="text-orange-600 font-bold text-sm">体験レッスン設定</span>
+                                    <span className="text-orange-600 font-bold text-sm">体験レッスン (承認制)</span>
                                 </div>
-                                <div className="flex items-start space-x-2">
-                                    <Checkbox id="trial_confirm" checked={sendTrialInvoice} onCheckedChange={(c) => setSendTrialInvoice(!!c)} />
-                                    <div className="grid gap-1.5 leading-none">
-                                        <label
-                                            htmlFor="trial_confirm"
-                                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                                        >
-                                            体験確定・請求送信を行う
-                                        </label>
-                                    </div>
-                                </div>
+                                <p className="text-xs text-orange-700">
+                                    体験レッスンとして登録します。登録後、管理画面の「請求管理」から承認を行うことで、請求メールが送信されます。
+                                </p>
                             </div>
                         )}
 
@@ -585,7 +589,7 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate }
                             </Popover>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="grid gap-2">
                                 <Label>開始時間</Label>
                                 <div className="flex gap-2 items-center">
@@ -593,7 +597,7 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate }
                                         value={startTime.split(':')[0]}
                                         onValueChange={(h) => setStartTime(`${h}:${startTime.split(':')[1]}`)}
                                     >
-                                        <SelectTrigger className="w-[80px]">
+                                        <SelectTrigger className="w-full sm:w-[80px]">
                                             <SelectValue placeholder="時" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -608,7 +612,7 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate }
                                         value={startTime.split(':')[1]}
                                         onValueChange={(m) => setStartTime(`${startTime.split(':')[0]}:${m}`)}
                                     >
-                                        <SelectTrigger className="w-[80px]">
+                                        <SelectTrigger className="w-full sm:w-[80px]">
                                             <SelectValue placeholder="分" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -622,7 +626,7 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate }
                             </div>
                             <div className="grid gap-2">
                                 <Label>終了時間 (自動)</Label>
-                                <div className="flex h-9 w-full rounded-md border border-input bg-gray-100 px-3 py-1 text-base shadow-sm items-center text-gray-600">
+                                <div className="flex h-10 w-full rounded-md border border-input bg-gray-100 px-3 py-2 text-base shadow-sm items-center text-gray-600">
                                     {endTime}
                                 </div>
                                 {/* Hidden Input not needed if we manage endTime state directly */}
@@ -646,7 +650,7 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate }
                         <DialogFooter>
                             <Button type="submit" disabled={loading || checkingStatus}>
                                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                {isTrialMode && sendTrialInvoice ? '確定して送信' : '保存'}
+                                保存
                             </Button>
                         </DialogFooter>
                     </form>
@@ -656,8 +660,8 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate }
                         <div className="bg-green-50 p-4 rounded-lg text-center space-y-2">
                             <div className="text-green-600 font-bold text-lg">登録完了</div>
                             <p className="text-sm text-green-700">
-                                {isTrialMode && sendTrialInvoice
-                                    ? '体験確定メール送信とスケジュール登録が完了しました。'
+                                {isTrialMode
+                                    ? '体験レッスンを登録しました。請求管理から承認を行ってください。'
                                     : 'スケジュールを保存しました。'}
                             </p>
                         </div>

@@ -76,7 +76,8 @@ export function PaymentHistory() {
 
     return (
         <>
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            {/* Desktop View (Table) */}
+            <div className="hidden md:block bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="p-6 border-b border-slate-100 flex items-center justify-between">
                     <h3 className="text-lg font-bold text-slate-900">支払い通知書一覧</h3>
                     <Button variant="outline" size="sm" className="bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100">
@@ -85,7 +86,7 @@ export function PaymentHistory() {
                     </Button>
                 </div>
                 <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-left tabular-nums">
+                    <table className="w-full text-sm text-left tabular-nums whitespace-nowrap">
                         <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-100">
                             <tr>
                                 <th className="px-6 py-4">対象月</th>
@@ -147,6 +148,59 @@ export function PaymentHistory() {
                         </tbody>
                     </table>
                 </div>
+            </div>
+
+            {/* Mobile View (Cards) */}
+            <div className="md:hidden space-y-4">
+                <div className="flex items-center justify-between mb-2 px-1">
+                    <h3 className="font-bold text-slate-900">支払い通知書一覧</h3>
+                    <Button variant="outline" size="sm" className="h-8 text-xs bg-white">
+                        <Download className="h-3 w-3 mr-1" />
+                        一括保存
+                    </Button>
+                </div>
+
+                {payments.length === 0 ? (
+                    <div className="text-center p-8 text-slate-400 bg-slate-50 rounded-xl border border-slate-200">
+                        支払い履歴がありません
+                    </div>
+                ) : (
+                    payments.map((payment) => (
+                        <div key={payment.month} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+                            <div className="flex justify-between items-start">
+                                <div className="flex items-center gap-3">
+                                    <div className="h-10 w-10 rounded-lg bg-cyan-50 flex items-center justify-center text-cyan-600">
+                                        <FileText className="h-5 w-5" />
+                                    </div>
+                                    <div>
+                                        <p className="font-bold text-slate-900">{payment.month}</p>
+                                        <p className="text-xs text-slate-500">支払日: {payment.paymentDate}</p>
+                                    </div>
+                                </div>
+                                <div className={`px-2 py-1 rounded-md text-xs font-bold border ${payment.status === 'paid'
+                                        ? 'bg-green-50 text-green-700 border-green-100'
+                                        : 'bg-orange-50 text-orange-700 border-orange-100'
+                                    }`}>
+                                    {payment.status === 'paid' ? '支払完了' : '処理中'}
+                                </div>
+                            </div>
+
+                            <div className="flex items-end justify-between pt-2 border-t border-slate-100">
+                                <div>
+                                    <p className="text-xs text-slate-500 mb-0.5">支払金額 (手取り)</p>
+                                    <p className="text-xl font-bold text-slate-900">¥{payment.finalAmount.toLocaleString()}</p>
+                                </div>
+                                <Button
+                                    size="sm"
+                                    className="bg-cyan-600 hover:bg-cyan-700 text-white h-9 px-4"
+                                    onClick={() => handleOpenDetail(payment)}
+                                >
+                                    詳細
+                                </Button>
+                            </div>
+                        </div>
+                    ))
+                )}
             </div>
 
             <PaymentDetailDialog

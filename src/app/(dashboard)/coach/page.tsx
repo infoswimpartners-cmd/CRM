@@ -144,7 +144,7 @@ export default async function CoachDashboard() {
             {/* Header / Welcome / Important Actions */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white/50 backdrop-blur-sm p-6 rounded-2xl border border-white/20 shadow-sm">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-900">
+                    <h1 className="text-xl md:text-2xl font-bold text-slate-900">
                         Welcome back, <span className="text-blue-600">{profile?.full_name || 'Coach'}</span>
                     </h1>
                     <p className="text-slate-500 text-sm mt-1">今日の予定を確認して、レッスン業務を開始しましょう。</p>
@@ -190,7 +190,7 @@ export default async function CoachDashboard() {
                                 <div className="absolute right-0 top-0 h-full w-24 bg-white/10 -skew-x-12 transform translate-x-12 transition-transform group-hover:translate-x-6" />
                                 <CardContent className="p-6 relative z-10">
                                     <p className="text-blue-100 text-sm font-medium">報酬合計</p>
-                                    <h3 className="text-3xl font-bold mt-2">¥{thisMonthStats.totalReward.toLocaleString()}</h3>
+                                    <h3 className="text-2xl md:text-3xl font-bold mt-2">¥{thisMonthStats.totalReward.toLocaleString()}</h3>
                                     <p className="text-xs text-blue-100 mt-4 opacity-80">確定までお待ちください</p>
                                 </CardContent>
                                 <DollarSign className="absolute right-4 bottom-4 text-white/20 w-24 h-24 -mb-8 -mr-8" />
@@ -202,7 +202,7 @@ export default async function CoachDashboard() {
                                     <div className="flex justify-between items-start">
                                         <div>
                                             <p className="text-sm font-medium text-slate-500">実施レッスン</p>
-                                            <h3 className="text-3xl font-bold text-slate-900 mt-2">{thisMonthStats.lessonCount}</h3>
+                                            <h3 className="text-2xl md:text-3xl font-bold text-slate-900 mt-2">{thisMonthStats.lessonCount}</h3>
                                         </div>
                                         <div className="p-2 bg-purple-50 rounded-lg text-purple-600 group-hover:bg-purple-100 transition-colors">
                                             <CalendarIcon className="w-5 h-5" />
@@ -223,7 +223,7 @@ export default async function CoachDashboard() {
                                     <div className="flex justify-between items-start">
                                         <div>
                                             <p className="text-sm font-medium text-slate-500">生徒数</p>
-                                            <h3 className="text-3xl font-bold text-slate-900 mt-2">{activeStudents}</h3>
+                                            <h3 className="text-2xl md:text-3xl font-bold text-slate-900 mt-2">{activeStudents}</h3>
                                         </div>
                                         <div className="p-2 bg-blue-50 rounded-lg text-blue-600 group-hover:bg-blue-100 transition-colors">
                                             <Users className="w-5 h-5" />

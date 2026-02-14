@@ -231,11 +231,17 @@ export async function createLessonSchedule(params: CreateLessonScheduleParams) {
                     }
 
                     // Determine Billing Status
-                    if (student.stripe_customer_id) {
-                        billingStatus = 'awaiting_approval' // [MODIFIED] Wait for approval first
-                    } else {
-                        billingStatus = 'error' // No Stripe Customer
-                    }
+                    // [MODIFIED] Allow awaiting_approval even if no Stripe Customer ID (will create later)
+                    billingStatus = 'awaiting_approval'
+                    // if (student.stripe_customer_id) {
+                    //     billingStatus = 'awaiting_approval' // [MODIFIED] Wait for approval first
+                    // } else {
+                    //     // For Trial users, they might not have ID yet.
+                    //     // We will create it on Approval.
+                    //     // But what if it's a regular user?
+                    //     // Let's allow 'awaiting_approval' universally here, and check in processLessonBilling.
+                    //     billingStatus = 'awaiting_approval'
+                    // }
                     console.log(`[CreateLesson] Overage Detected. Price: ${overagePrice}. Status: ${billingStatus}`)
                 } // End if (checkOverage)
 
@@ -451,6 +457,7 @@ export async function checkStudentLessonStatus(studentId: string, dateStr: strin
             .from('students')
             .select(`
                 id,
+                status,
                 membership_started_at,
                 created_at,
                 membership_types!students_membership_type_id_fkey (
@@ -484,7 +491,7 @@ export async function checkStudentLessonStatus(studentId: string, dateStr: strin
         const membership = Array.isArray(student.membership_types) ? student.membership_types[0] : student.membership_types
         const limit = membership?.monthly_lesson_limit || 0
         const maxRollover = membership?.max_rollover_limit || 0
-        const membershipName = membership?.name
+        let membershipName = membership?.name
 
         // Count
         const { currentTotal, effectiveLimit, rollover } = await calculateMonthlyUsage(
@@ -497,51 +504,74 @@ export async function checkStudentLessonStatus(studentId: string, dateStr: strin
             student.created_at // Pass created_at
         )
 
-        // Logic Update:
-        // 1. If active limit reached: Overage
-        // 2. If 'Single Plan' or No Plan: Always Overage (Show selector)
-        // [NEW] 3. If target date is BEFORE membership_started_at: Always Overage (Single Ticket behavior)
-
         let isOverage = false
+        let availableLessons: any[] = []
 
-        // Check Start Date
-        if (student.membership_started_at) {
-            const startDate = new Date(student.membership_started_at)
-            // Normalize to start of day? Or exact time? Usually start of day.
-            // Let's be lenient: if lesson date is strictly before start date (day level?)
-            // If start date is "2024-02-01", and lesson is "2024-01-31", it is overage.
-            if (date < startDate) {
-                // But wait, date is the lesson start time (e.g. 10:00).
-                // If start date is 2024-02-01 00:00:00, then 2024-01-31 is less.
-                isOverage = true
-                console.log(`[CheckStatus] Pre-membership lesson. Date: ${date.toISOString()}, Start: ${startDate.toISOString()}`)
+        // [NEW] Trial Logic: If student is 'trial_pending', return ONLY Trial Lessons
+        if (student.status === 'trial_pending') {
+            console.log('[CheckStatus] Student is trial_pending. Fetching Trial Lessons only.')
+
+            // Fetch lessons with "体験" in name
+            const { data: trialLessons } = await supabaseAdmin
+                .from('lesson_masters')
+                .select('id, name, unit_price')
+                .ilike('name', '%体験%')
+                .eq('active', true)
+
+            availableLessons = trialLessons || []
+            membershipName = '体験利用' // Override for UI display
+
+            // Trial lessons must be billed (even if free/special price), so we treat them as "Overage"
+            // to trigger the Billing Flow (which will be set to 'awaiting_approval' in createLessonSchedule).
+            isOverage = true
+
+        } else {
+            // Normal Logic (Existing)
+
+            // Logic Update:
+            // 1. If active limit reached: Overage
+            // 2. If 'Single Plan' or No Plan: Always Overage (Show selector)
+            // [NEW] 3. If target date is BEFORE membership_started_at: Always Overage (Single Ticket behavior)
+
+            // Check Start Date
+            if (student.membership_started_at) {
+                const startDate = new Date(student.membership_started_at)
+                // Normalize to start of day? Or exact time? Usually start of day.
+                // Let's be lenient: if lesson date is strictly before start date (day level?)
+                // If start date is "2024-02-01", and lesson is "2024-01-31", it is overage.
+                if (date < startDate) {
+                    // But wait, date is the lesson start time (e.g. 10:00).
+                    // If start date is 2024-02-01 00:00:00, then 2024-01-31 is less.
+                    isOverage = true
+                    console.log(`[CheckStatus] Pre-membership lesson. Date: ${date.toISOString()}, Start: ${startDate.toISOString()}`)
+                }
             }
-        }
 
-        if (!isOverage) {
-            if (!membership || !limit || limit === 0 || (membershipName && membershipName.includes('単発'))) {
-                isOverage = true
-            } else if (limit > 0 && currentTotal >= effectiveLimit) {
-                isOverage = true
+            if (!isOverage) {
+                if (!membership || !limit || limit === 0 || (membershipName && membershipName.includes('単発'))) {
+                    isOverage = true
+                } else if (limit > 0 && currentTotal >= effectiveLimit) {
+                    isOverage = true
+                }
             }
+
+            // Extract active lessons for this membership
+            // @ts-ignore
+            const linkedLessons = membership?.membership_type_lessons?.map((mtl: any) => mtl.lesson_masters) || []
+
+            availableLessons = linkedLessons.filter((l: any) => l) // filter nulls
+
+            // Ensure default lesson is included if exists
+            // @ts-ignore
+            const defaultLesson = membership?.default_lesson
+            // @ts-ignore
+            if (defaultLesson && !availableLessons.find(l => l.id === defaultLesson.id)) {
+                availableLessons.push(defaultLesson)
+            }
+
+            // Sort by name for consistency
+            availableLessons.sort((a: any, b: any) => a.name.localeCompare(b.name))
         }
-
-        // Extract active lessons for this membership
-        // @ts-ignore
-        const linkedLessons = membership?.membership_type_lessons?.map((mtl: any) => mtl.lesson_masters) || []
-
-        let availableLessons = linkedLessons.filter((l: any) => l) // filter nulls
-
-        // Ensure default lesson is included if exists
-        // @ts-ignore
-        const defaultLesson = membership?.default_lesson
-        // @ts-ignore
-        if (defaultLesson && !availableLessons.find(l => l.id === defaultLesson.id)) {
-            availableLessons.push(defaultLesson)
-        }
-
-        // Sort by name for consistency
-        availableLessons.sort((a: any, b: any) => a.name.localeCompare(b.name))
 
         return {
             success: true,

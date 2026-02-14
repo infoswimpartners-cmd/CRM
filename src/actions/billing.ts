@@ -61,11 +61,37 @@ export async function processLessonBilling(scheduleId: string) {
         }
 
         // 2. Stripe Billing
+        let stripeCustomerId = student.stripe_customer_id
+
+        // [MODIFIED] Auto-create Stripe Customer if missing (e.g., Trial Users)
+        if (!stripeCustomerId) {
+            console.log('[Billing] Stripe Customer ID missing. Creating new customer...')
+            try {
+                const customer = await stripe.customers.create({
+                    email: student.contact_email,
+                    name: student.full_name,
+                    metadata: { studentId: student.id }
+                })
+                stripeCustomerId = customer.id
+
+                // Update DB
+                await supabaseAdmin
+                    .from('students')
+                    .update({ stripe_customer_id: stripeCustomerId })
+                    .eq('id', student.id)
+
+                console.log('[Billing] Created Stripe Customer:', stripeCustomerId)
+            } catch (err: any) {
+                console.error('[Billing] Failed to create Stripe Customer:', err)
+                return { success: false, error: 'Stripe Customer Creation Failed' }
+            }
+        }
+
         const itemDescription = `追加レッスン料 (${format(new Date(data.start_time), 'yyyy/MM/dd')}): ${data.title}`
 
         // A. Invoice Item
         const invoiceItem = await stripe.invoiceItems.create({
-            customer: student.stripe_customer_id,
+            customer: stripeCustomerId,
             amount: price,
             currency: 'jpy',
             description: itemDescription,
@@ -77,7 +103,7 @@ export async function processLessonBilling(scheduleId: string) {
 
         // B. Create Invoice
         const invoice = await stripe.invoices.create({
-            customer: student.stripe_customer_id,
+            customer: stripeCustomerId,
             collection_method: 'send_invoice',
             days_until_due: 1,
             auto_advance: true,
@@ -117,26 +143,48 @@ export async function processLessonBilling(scheduleId: string) {
         if (student.contact_email && paymentUrl) {
             console.log('[Billing] Sending email to:', student.contact_email)
 
-            // Helper to format names
-            const formatStudentNames = (s: any) => {
-                if (s.second_student_name) return `${s.full_name}・${s.second_student_name}`
-                return s.full_name
-            }
-
             const lessonDate = new Date(data.start_time)
 
-            await emailService.sendTemplateEmail(
-                'immediate_payment_request',
-                student.contact_email,
-                {
-                    student_name: formatStudentNames(student),
-                    date: format(lessonDate, 'yyyy/MM/dd'),
-                    time: format(lessonDate, 'HH:mm'),
-                    title: data.title,
-                    amount: price.toLocaleString() + '円',
-                    payment_url: paymentUrl
+            // [MODIFIED] Check if Trial Lesson (is_overage + title check or just title?)
+            // Or better: Check if student status is trial_pending? 
+            // We don't have student status here, but usually trial lessons have "体験" in title.
+            // Let's rely on Title or Overage + No Membership?
+            // Safer: Check Title for "体験"
+            const isTrial = data.title && data.title.includes('体験')
+
+            if (isTrial) {
+                console.log('[Billing] Detected Trial Lesson. Sending trial_payment_request.')
+                await emailService.sendTemplateEmail(
+                    'trial_payment_request',
+                    student.contact_email,
+                    {
+                        name: student.full_name,
+                        lesson_date: format(lessonDate, 'yyyy/MM/dd HH:mm'), // Template expects string? Previous code was localString
+                        amount: price.toLocaleString(),
+                        payment_link: paymentUrl
+                    }
+                )
+            } else {
+                // Regular Overage
+                // Helper to format names
+                const formatStudentNames = (s: any) => {
+                    if (s.second_student_name) return `${s.full_name}・${s.second_student_name}`
+                    return s.full_name
                 }
-            )
+
+                await emailService.sendTemplateEmail(
+                    'immediate_payment_request',
+                    student.contact_email,
+                    {
+                        student_name: formatStudentNames(student),
+                        date: format(lessonDate, 'yyyy/MM/dd'),
+                        time: format(lessonDate, 'HH:mm'),
+                        title: data.title,
+                        amount: price.toLocaleString() + '円',
+                        payment_url: paymentUrl
+                    }
+                )
+            }
         } else {
             console.log('[Billing] Skipping email. Email:', student.contact_email, 'URL:', !!paymentUrl)
         }

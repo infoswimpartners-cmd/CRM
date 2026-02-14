@@ -72,39 +72,47 @@ export function PaymentDetailDialog({ open, onOpenChange, payment, coachName, co
                 </DialogHeader>
 
                 {/* 書類本体エリア - 印刷用スタイルを意識 */}
-                <div className="p-6 border border-slate-200 rounded-lg bg-slate-50/50 space-y-8 font-serif" id="payment-notice-print">
+                <div className="p-4 md:p-6 border border-slate-200 rounded-lg bg-slate-50/50 space-y-6 md:space-y-8 font-serif" id="payment-notice-print">
 
                     {/* Header Info */}
-                    <div className="flex justify-between items-start border-b-2 border-slate-200 pb-6">
-                        <div>
-                            <h2 className="text-2xl font-bold border-b border-slate-400 inline-block pb-1 mb-2">
+                    <div className="flex flex-col md:flex-row justify-between items-start border-b-2 border-slate-200 pb-6 gap-4">
+                        <div className="w-full md:w-auto">
+                            <h2 className="text-xl md:text-2xl font-bold border-b border-slate-400 inline-block pb-1 mb-2">
                                 {coachName} 様
                             </h2>
-                            <p className="text-slate-600 mt-2">下記の通り、報酬をお{isPaid ? '支払いいたします' : '支払いする予定です'}。</p>
+                            <p className="text-sm md:text-base text-slate-600 mt-2">下記の通り、報酬をお{isPaid ? '支払いいたします' : '支払いする予定です'}。</p>
                         </div>
-                        <div className="text-right text-sm text-slate-600 space-y-1">
-                            <p><span className="font-semibold">発行日:</span> <span style={numberFont}>{payment.paymentDate}</span></p>
-                            {/* Use month as ID if ID is missing */}
-                            <p><span className="font-semibold">No:</span> <span style={numberFont}>{payment.id || payment.month.replace(/[^0-9]/g, '')}</span></p>
-                            <p><span className="font-semibold">状態:</span> {isPaid ? '支払済' : '未払'}</p>
+                        <div className="w-full md:w-auto text-left md:text-right text-sm text-slate-600 space-y-1 bg-white md:bg-transparent p-3 md:p-0 rounded-lg border md:border-none border-slate-200">
+                            <div className="flex justify-between md:block">
+                                <span className="font-semibold md:hidden">発行日:</span>
+                                <div><span className="hidden md:inline font-semibold">発行日:</span> <span style={numberFont}>{payment.paymentDate}</span></div>
+                            </div>
+                            <div className="flex justify-between md:block">
+                                <span className="font-semibold md:hidden">No:</span>
+                                <div><span className="hidden md:inline font-semibold">No:</span> <span style={numberFont}>{payment.id || payment.month.replace(/[^0-9]/g, '')}</span></div>
+                            </div>
+                            <div className="flex justify-between md:block">
+                                <span className="font-semibold md:hidden">状態:</span>
+                                <div><span className="hidden md:inline font-semibold">状態:</span> {isPaid ? '支払済' : '未払'}</div>
+                            </div>
                         </div>
                     </div>
 
                     {/* Main Amount */}
-                    <div className="bg-white p-4 border border-slate-200 rounded-lg text-center">
-                        <p className="text-sm text-slate-500 mb-1">支払金額合計 (手取り額)</p>
-                        <p className="text-4xl font-bold text-slate-900" style={numberFont}>
+                    <div className="bg-white p-4 border border-slate-200 rounded-lg text-center shadow-sm">
+                        <p className="text-xs md:text-sm text-slate-500 mb-1">支払金額合計 (手取り額)</p>
+                        <p className="text-3xl md:text-4xl font-bold text-slate-900" style={numberFont}>
                             ¥{payment.finalAmount.toLocaleString()}
                         </p>
                     </div>
 
                     {/* Payment Info */}
-                    <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm bg-white md:bg-transparent p-4 md:p-0 rounded-lg border md:border-none border-slate-200">
                         <div className="space-y-1">
-                            <p className="font-semibold text-slate-700">【振込先情報】</p>
+                            <p className="font-semibold text-slate-700 mb-2 border-b md:border-none pb-1 md:pb-0">【振込先情報】</p>
                             <p>支払予定日: <span style={numberFont}>{payment.paymentDate}</span></p>
                             {bInfo.bank_name ? (
-                                <p>振込先: {bInfo.bank_name} {bInfo.branch_name} {bInfo.account_type} <span style={numberFont}>{bInfo.account_number}</span> <br /> {bInfo.account_holder_name}</p>
+                                <p>振込先: {bInfo.bank_name} {bInfo.branch_name} {bInfo.account_type} <span style={numberFont}>{bInfo.account_number}</span> <br className="md:hidden" /> {bInfo.account_holder_name}</p>
                             ) : (
                                 <p className="text-red-500">※振込先口座情報が未登録です</p>
                             )}
@@ -114,30 +122,51 @@ export function PaymentDetailDialog({ open, onOpenChange, payment, coachName, co
                     {/* Details Table */}
                     <div>
                         <p className="font-semibold text-slate-700 mb-2">【内訳詳細】</p>
-                        <table className="w-full text-sm border-collapse tabular-nums">
-                            <thead>
-                                <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
-                                    <th className="py-2 font-medium">日付</th>
-                                    <th className="py-2 font-medium">レッスン</th>
-                                    <th className="py-2 font-medium">生徒氏名</th>
-                                    <th className="py-2 text-right font-medium">金額</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {payment.details.map((detail, i) => (
-                                    <tr key={i} className="border-b border-slate-100 last:border-0">
-                                        <td className="py-2 text-slate-600" style={numberFont}>{detail.date}</td>
-                                        <td className="py-2 text-slate-900">{detail.title}</td>
-                                        <td className="py-2 text-slate-600">{detail.studentName}</td>
-                                        <td className="py-2 text-right font-medium" style={numberFont}>¥{detail.reward.toLocaleString()}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
 
-                        {/* Summary & Tax Breakdown - New Section for Admin Dialog */}
-                        <div className="mt-8 grid grid-cols-2 gap-8">
-                            <div>
+                        {/* Desktop Table */}
+                        <div className="hidden md:block">
+                            <table className="w-full text-sm border-collapse tabular-nums whitespace-nowrap">
+                                <thead>
+                                    <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
+                                        <th className="py-2 font-medium">日付</th>
+                                        <th className="py-2 font-medium">レッスン</th>
+                                        <th className="py-2 font-medium">生徒氏名</th>
+                                        <th className="py-2 text-right font-medium">金額</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {payment.details.map((detail, i) => (
+                                        <tr key={i} className="border-b border-slate-100 last:border-0">
+                                            <td className="py-2 text-slate-600" style={numberFont}>{detail.date}</td>
+                                            <td className="py-2 text-slate-900">{detail.title}</td>
+                                            <td className="py-2 text-slate-600">{detail.studentName}</td>
+                                            <td className="py-2 text-right font-medium" style={numberFont}>¥{detail.reward.toLocaleString()}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Mobile List */}
+                        <div className="md:hidden space-y-3">
+                            {payment.details.map((detail, i) => (
+                                <div key={i} className="bg-white p-3 rounded-lg border border-slate-200 text-sm shadow-sm">
+                                    <div className="flex justify-between items-start mb-1">
+                                        <span className="font-bold text-slate-700" style={numberFont}>{detail.date}</span>
+                                        <span className="font-bold text-slate-900" style={numberFont}>¥{detail.reward.toLocaleString()}</span>
+                                    </div>
+                                    <div className="text-xs text-slate-500 mb-1">{detail.title}</div>
+                                    <div className="text-xs text-slate-600 flex items-center gap-1">
+                                        <span className="bg-slate-100 px-1.5 py-0.5 rounded">生徒</span>
+                                        {detail.studentName}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Summary & Tax Breakdown */}
+                        <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+                            <div className="bg-white md:bg-transparent p-4 md:p-0 rounded-lg border md:border-none border-slate-200">
                                 <h4 className="font-semibold text-slate-700 mb-2">税率別内訳</h4>
                                 <table className="w-full text-sm text-left border-collapse border border-slate-200">
                                     <thead className="bg-slate-50">
@@ -156,9 +185,9 @@ export function PaymentDetailDialog({ open, onOpenChange, payment, coachName, co
                                     </tbody>
                                 </table>
                             </div>
-                            <div>
+                            <div className="bg-white md:bg-transparent p-4 md:p-0 rounded-lg border md:border-none border-slate-200">
                                 <h4 className="font-semibold text-slate-700 mb-2">支払金額計算</h4>
-                                <table className="w-full text-sm border-collapse tabular-nums">
+                                <table className="w-full text-sm border-collapse tabular-nums whitespace-nowrap">
                                     <tbody>
                                         <tr className="border-b border-slate-200">
                                             <td className="py-2 text-slate-600">小計</td>
@@ -185,17 +214,17 @@ export function PaymentDetailDialog({ open, onOpenChange, payment, coachName, co
 
                     {/* Footer / Issuer */}
                     <div className="border-t-2 border-slate-200 pt-6 mt-8">
-                        <div className="flex justify-end">
-                            <div className="text-right text-sm text-slate-600 space-y-1">
-                                <p className="font-bold text-base text-slate-800">{cInfo.company_name || 'SWIM PARTNERS'}</p>
+                        <div className="flex justify-start md:justify-end">
+                            <div className="w-full md:w-auto text-left md:text-right text-sm text-slate-600 space-y-1 bg-white md:bg-transparent p-4 md:p-0 rounded-lg border md:border-none border-slate-200">
+                                <p className="font-bold text-base text-slate-800 mb-2 md:mb-0">{cInfo.company_name || 'SWIM PARTNERS'}</p>
                                 {cInfo.invoice_registration_number && (
-                                    <p>登録番号：{cInfo.invoice_registration_number}</p>
+                                    <p className="flex justify-between md:block"><span className="md:hidden">登録番号:</span> <span>登録番号：{cInfo.invoice_registration_number}</span></p>
                                 )}
                                 {cInfo.company_address && (
-                                    <p>住所：{cInfo.company_address}</p>
+                                    <p className="flex justify-between md:block"><span className="md:hidden">住所:</span> <span>住所：{cInfo.company_address}</span></p>
                                 )}
                                 {cInfo.contact_email && (
-                                    <p>連絡先：{cInfo.contact_email}</p>
+                                    <p className="flex justify-between md:block"><span className="md:hidden">連絡先:</span> <span>連絡先：{cInfo.contact_email}</span></p>
                                 )}
                             </div>
                         </div>

@@ -208,7 +208,7 @@ export default async function AdminDashboard(props: {
         <div className="space-y-8 pb-8">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex flex-col gap-2">
-                    <h1 className="text-3xl font-bold tracking-tight">管理者ダッシュボード</h1>
+                    <h1 className="text-2xl md:text-3xl font-bold tracking-tight">管理者ダッシュボード</h1>
                     <p className="text-gray-500">Swim Partnersの活動状況概要</p>
                 </div>
                 <MonthSelector currentMonth={monthParam} />
@@ -227,7 +227,7 @@ export default async function AdminDashboard(props: {
                         </div>
                         <div>
                             <p className="text-sm font-medium text-slate-500">今月の売上</p>
-                            <h3 className="text-3xl font-bold text-slate-900 mt-1">¥{totalSales.toLocaleString()}</h3>
+                            <h3 className="text-2xl md:text-3xl font-bold text-slate-900 mt-1">¥{totalSales.toLocaleString()}</h3>
                             <div className={`flex items-center gap-2 mt-4 text-sm w-fit px-2 py-1 rounded-lg ${diffSales >= 0 ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'}`}>
                                 <span>{diffSales >= 0 ? '+' : ''}{diffSales.toLocaleString()}</span>
                                 <span className="text-slate-500">前月比</span>
@@ -243,7 +243,7 @@ export default async function AdminDashboard(props: {
                         </div>
                         <div>
                             <p className="text-sm font-medium text-slate-500">アクティブ生徒数</p>
-                            <h3 className="text-3xl font-bold text-slate-900 mt-1">{activeCoaches.length} <span className="text-base font-normal text-slate-500">コーチ</span></h3>
+                            <h3 className="text-2xl md:text-3xl font-bold text-slate-900 mt-1">{activeCoaches.length} <span className="text-base font-normal text-slate-500">コーチ</span></h3>
                             <div className="flex items-center gap-2 mt-4 text-sm text-slate-500 bg-slate-100 w-fit px-2 py-1 rounded-lg">
                                 <span>全生徒数: {totalStudents?.toLocaleString() || '-'}名</span>
                             </div>
@@ -258,7 +258,7 @@ export default async function AdminDashboard(props: {
                         </div>
                         <div>
                             <p className="text-sm font-medium text-slate-500">レッスン数 (今月)</p>
-                            <h3 className="text-3xl font-bold text-slate-900 mt-1">{thisMonthLessons.length}</h3>
+                            <h3 className="text-2xl md:text-3xl font-bold text-slate-900 mt-1">{thisMonthLessons.length}</h3>
                             <div className={`flex items-center gap-2 mt-4 text-sm w-fit px-2 py-1 rounded-lg ${diffCount >= 0 ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'}`}>
                                 <span>{diffCount >= 0 ? '+' : ''}{diffCount}</span>
                                 <span className="text-slate-500">前月比</span>

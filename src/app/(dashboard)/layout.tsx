@@ -96,8 +96,8 @@ export default async function DashboardLayout({
                 </div>
 
                 {/* Floating Header */}
-                <header className="relative md:sticky md:top-4 z-40 mx-4 md:mx-6 mt-4">
-                    <div className="glass rounded-2xl px-6 py-3 flex items-center justify-between shadow-sm border border-white/40">
+                <header className="relative md:sticky md:top-4 z-40 mx-3 md:mx-6 mt-3 md:mt-4">
+                    <div className="glass rounded-2xl px-4 md:px-6 py-2 md:py-3 flex items-center justify-between shadow-sm border border-white/40">
                         <div className="flex-1 max-w-md relative">
                             <Suspense fallback={
                                 <div className="h-11 w-full max-w-md bg-white/20 backdrop-blur-md rounded-full animate-pulse ring-1 ring-white/10" />
@@ -133,7 +133,7 @@ export default async function DashboardLayout({
                     </div>
                 </header>
 
-                <main className="relative z-10 flex-1 p-6 space-y-6">
+                <main className="relative z-10 flex-1 p-4 md:p-6 space-y-6">
                     {children}
                 </main>
             </div >
