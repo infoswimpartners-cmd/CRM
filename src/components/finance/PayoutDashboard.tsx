@@ -182,7 +182,7 @@ export function PayoutDashboard({ data, targetMonth, companyInfo }: PayoutDashbo
             <Card className="bg-white border-slate-200 shadow-sm overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left">
-                        <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-100">
+                        <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-100 whitespace-nowrap">
                             <tr>
                                 <th className="px-6 py-3 font-medium">コーチ</th>
                                 <th className="px-6 py-3 font-medium text-right">適用レート</th>
@@ -210,7 +210,7 @@ export function PayoutDashboard({ data, targetMonth, companyInfo }: PayoutDashbo
                                                 <AvatarImage src={item.avatar_url} />
                                                 <AvatarFallback>{item.full_name?.[0]}</AvatarFallback>
                                             </Avatar>
-                                            <Link href={`/admin/coaches/${item.coach_id}`} className="font-medium text-slate-700 hover:text-cyan-600 hover:underline">
+                                            <Link href={`/admin/coaches/${item.coach_id}`} className="font-medium text-slate-700 hover:text-cyan-600 hover:underline whitespace-nowrap">
                                                 {item.full_name}
                                             </Link>
                                         </div>

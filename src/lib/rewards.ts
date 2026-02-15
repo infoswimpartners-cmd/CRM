@@ -78,7 +78,7 @@ export async function calculateHistoricalPayments(
         .select(`
             id, price, lesson_date, coach_id,
             lesson_masters (id, unit_price, is_trial),
-            students (id, full_name, membership_types!students_membership_type_id_fkey (id, membership_type_lessons (lesson_master_id, reward_price)))
+            students (id, full_name, is_two_person_lesson, membership_types!students_membership_type_id_fkey (id, membership_type_lessons (lesson_master_id, reward_price)))
         `)
         .gte('lesson_date', startDate.toISOString())
         .eq('coach_id', coachId)

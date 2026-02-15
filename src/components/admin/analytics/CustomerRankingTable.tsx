@@ -1,7 +1,6 @@
 'use client'
 
 import { Card } from '@/components/ui/card'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import Link from 'next/link'
 
 interface CustomerRanking {
@@ -45,10 +44,7 @@ export function CustomerRankingTable({ data, title = "優良顧客ランキン�
                                     </td>
                                     <td className="px-3 py-2.5 whitespace-nowrap">
                                         <div className="flex items-center gap-2">
-                                            <Avatar className="h-6 w-6">
-                                                <AvatarImage src={customer.student.avatar_url || ''} />
-                                                <AvatarFallback className="text-[10px]">{customer.student.full_name?.[0]}</AvatarFallback>
-                                            </Avatar>
+
                                             <Link href={`/customers/${customer.student.id}`} className="font-medium text-slate-700 hover:text-cyan-600 hover:underline truncate max-w-[100px]">
                                                 {customer.student.full_name}
                                             </Link>

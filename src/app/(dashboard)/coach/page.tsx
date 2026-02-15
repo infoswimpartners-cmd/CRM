@@ -63,16 +63,26 @@ export default async function CoachDashboard() {
         .eq('coach_id', user.id)
         .gte('start_time', now)
         .order('start_time', { ascending: true })
+        .gte('start_time', now)
+        .order('start_time', { ascending: true })
         .limit(5)
+
+    // 4. Fetch Registered Student Count
+    const studentCountPromise = supabase
+        .from('student_coaches')
+        .select('*', { count: 'exact', head: true })
+        .eq('coach_id', user.id)
 
     const [
         { data: profile },
         { data: allLessons },
-        { data: upcomingSchedulesRaw }
+        { data: upcomingSchedulesRaw },
+        { count: studentCount }
     ] = await Promise.all([
         profilePromise,
         allLessonsPromise,
-        upcomingSchedulesPromise
+        upcomingSchedulesPromise,
+        studentCountPromise
     ])
 
     // DATA PROCESSING AFTER FETCH
@@ -117,11 +127,12 @@ export default async function CoachDashboard() {
     })) || []
 
     // Calculate Active & New Students
-    const threeMonthsStart = startOfMonth(subMonths(today, 2))
-    const activeStudents = new Set(
-        allLessons?.filter(l => new Date(l.lesson_date) >= threeMonthsStart)
-            .map(l => l.student_id)
-    ).size
+    // Note: activeStudents is now replaced by registered students count (studentCount)
+    // const threeMonthsStart = startOfMonth(subMonths(today, 2))
+    // const activeStudents = new Set(
+    //     allLessons?.filter(l => new Date(l.lesson_date) >= threeMonthsStart)
+    //         .map(l => l.student_id)
+    // ).size
 
     const previousStudents = new Set(
         allLessons?.filter(l => new Date(l.lesson_date) < thisMonthStart)
@@ -218,27 +229,34 @@ export default async function CoachDashboard() {
                             </Card>
 
                             {/* Students Card */}
-                            <Card className="group hover:shadow-lg transition-all duration-300 border-slate-200 bg-white">
-                                <CardContent className="p-6">
-                                    <div className="flex justify-between items-start">
-                                        <div>
-                                            <p className="text-sm font-medium text-slate-500">生徒数</p>
-                                            <h3 className="text-2xl md:text-3xl font-bold text-slate-900 mt-2">{activeStudents}</h3>
-                                        </div>
-                                        <div className="p-2 bg-blue-50 rounded-lg text-blue-600 group-hover:bg-blue-100 transition-colors">
-                                            <Users className="w-5 h-5" />
+                            <Link href="/students" className="block group">
+                                <Card className="h-full hover:shadow-lg transition-all duration-300 border-slate-200 bg-white cursor-pointer relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 p-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <div className="bg-slate-100 rounded-full p-1">
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
                                         </div>
                                     </div>
-                                    <div className="mt-4 flex items-center gap-2 text-sm">
-                                        {newStudentsCount > 0 && (
-                                            <span className="text-green-600 font-medium badge bg-green-50 px-2 py-0.5 rounded text-xs">
-                                                +{newStudentsCount} 新規
-                                            </span>
-                                        )}
-                                        <span className="text-slate-400 text-xs text-right ml-auto">直近3ヶ月</span>
-                                    </div>
-                                </CardContent>
-                            </Card>
+                                    <CardContent className="p-6">
+                                        <div className="flex justify-between items-start">
+                                            <div>
+                                                <p className="text-sm font-medium text-slate-500">生徒数</p>
+                                                <h3 className="text-2xl md:text-3xl font-bold text-slate-900 mt-2">{studentCount || 0}</h3>
+                                            </div>
+                                            <div className="p-2 bg-blue-50 rounded-lg text-blue-600 group-hover:bg-blue-100 transition-colors">
+                                                <Users className="w-5 h-5" />
+                                            </div>
+                                        </div>
+                                        <div className="mt-4 flex items-center gap-2 text-sm">
+                                            {newStudentsCount > 0 && (
+                                                <span className="text-green-600 font-medium badge bg-green-50 px-2 py-0.5 rounded text-xs">
+                                                    +{newStudentsCount} 新規
+                                                </span>
+                                            )}
+                                            <span className="text-slate-400 text-xs text-right ml-auto">登録生徒</span>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </Link>
                         </div>
                     </div>
                 </div>

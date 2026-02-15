@@ -41,7 +41,7 @@ export function StudentLessonHistory({ lessons }: { lessons: any[] }) {
                             <TableHead className="w-[120px]">日時</TableHead>
                             <TableHead className="w-[150px]">担当コーチ</TableHead>
                             <TableHead>内容</TableHead>
-                            <TableHead className="text-right w-[100px]">金額</TableHead>
+                            <TableHead className="text-right w-[120px]">レッスン種類</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -55,13 +55,13 @@ export function StudentLessonHistory({ lessons }: { lessons: any[] }) {
                                     {format(new Date(lesson.lesson_date), "yyyy/MM/dd", { locale: ja })}
                                 </TableCell>
                                 <TableCell>
-                                    {lesson.profiles?.full_name || '不明'}
+                                    {lesson.coach_full_name || lesson.profiles?.full_name || '不明'}
                                 </TableCell>
                                 <TableCell className="max-w-[200px] truncate text-slate-600">
                                     {lesson.menu_description || '報告なし'}
                                 </TableCell>
-                                <TableCell className="text-right font-bold text-slate-900">
-                                    ¥{lesson.price.toLocaleString()}
+                                <TableCell className="text-right font-medium text-slate-900">
+                                    {lesson.lesson_name || '不明'}
                                 </TableCell>
                             </TableRow>
                         ))}
@@ -97,15 +97,15 @@ export function StudentLessonHistory({ lessons }: { lessons: any[] }) {
                                         <User className="h-3 w-3" /> 担当コーチ
                                     </span>
                                     <p className="text-sm font-medium">
-                                        {selectedLesson.profiles?.full_name || '不明'}
+                                        {selectedLesson.coach_full_name || selectedLesson.profiles?.full_name || '不明'}
                                     </p>
                                 </div>
                                 <div className="space-y-1">
                                     <span className="text-xs text-slate-500 flex items-center gap-1">
-                                        <DollarSign className="h-3 w-3" /> 金額
+                                        <FileText className="h-3 w-3" /> レッスン種類
                                     </span>
-                                    <p className="text-sm font-bold text-blue-600">
-                                        ¥{selectedLesson.price.toLocaleString()}
+                                    <p className="text-sm font-medium text-blue-600">
+                                        {selectedLesson.lesson_name || '不明'}
                                     </p>
                                 </div>
                             </div>

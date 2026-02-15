@@ -15,17 +15,23 @@ CREATE TABLE IF NOT EXISTS student_coaches (
 ALTER TABLE student_coaches ENABLE ROW LEVEL SECURITY;
 
 -- Policies for student_coaches
-CREATE POLICY "Authenticated users can view student_coaches" ON student_coaches
-    FOR SELECT USING (auth.role() = 'authenticated');
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'student_coaches' AND policyname = 'Authenticated users can view student_coaches'
+    ) THEN
+        CREATE POLICY "Authenticated users can view student_coaches" ON student_coaches FOR SELECT USING (auth.role() = 'authenticated');
+    END IF;
 
-CREATE POLICY "Admins can manage student_coaches" ON student_coaches
-    FOR ALL USING (
-        EXISTS (
-            SELECT 1 FROM profiles
-            WHERE profiles.id = auth.uid()
-            AND profiles.role = 'admin'
-        )
-    );
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'student_coaches' AND policyname = 'Admins can manage student_coaches'
+    ) THEN
+        CREATE POLICY "Admins can manage student_coaches" ON student_coaches FOR ALL USING (
+            EXISTS (SELECT 1 FROM profiles WHERE profiles.id = auth.uid() AND profiles.role = 'admin')
+        );
+    END IF;
+END
+$$;
 
 -- Data Migration: Move existing coach_id from students to student_coaches
 INSERT INTO student_coaches (student_id, coach_id, role)

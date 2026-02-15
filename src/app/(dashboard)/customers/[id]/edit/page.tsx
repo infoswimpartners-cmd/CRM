@@ -40,6 +40,7 @@ export default function EditStudentPage({ params }: { params: Promise<{ id: stri
         coach_id: '', // primary coach
         coach_ids: [] as string[], // all assigned coaches
         is_bank_transfer: false,
+        is_two_person_lesson: false,
         start_timing: 'current' // 'current' | 'next'
     })
 
@@ -108,6 +109,7 @@ export default function EditStudentPage({ params }: { params: Promise<{ id: stri
                 coach_id: data.coach_id || '',
                 coach_ids: [], // will fetch below
                 is_bank_transfer: data.is_bank_transfer || false,
+                is_two_person_lesson: data.is_two_person_lesson || false,
                 start_timing: 'current'
             })
 
@@ -367,6 +369,18 @@ export default function EditStudentPage({ params }: { params: Promise<{ id: stri
                             <Switch
                                 checked={formData.is_bank_transfer}
                                 onCheckedChange={(checked) => setFormData({ ...formData, is_bank_transfer: checked })}
+                            />
+                        </div>
+
+                        {/* 2人同時レッスンフラグ */}
+                        <div className="mt-4 flex items-center justify-between p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                            <div className="space-y-0.5">
+                                <Label className="text-base font-bold text-blue-900">2人同時レッスン (報酬+1000円)</Label>
+                                <p className="text-xs text-blue-700">有効にすると、この生徒のレッスン報酬が自動的に+1000円されます。</p>
+                            </div>
+                            <Switch
+                                checked={formData.is_two_person_lesson}
+                                onCheckedChange={(checked) => setFormData({ ...formData, is_two_person_lesson: checked })}
                             />
                         </div>
 

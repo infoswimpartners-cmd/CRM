@@ -56,16 +56,16 @@ export function PaymentSlipModal({
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button variant="ghost" size="icon" title="支払明細書">
+                <Button variant="ghost" size="icon" title="支払通知書">
                     <FileText className="h-4 w-4 text-slate-500 hover:text-cyan-600" />
                 </Button>
             </DialogTrigger>
             <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto print:max-w-none print:max-h-none print:shadow-none print:border-none">
                 <div className="print:hidden">
                     <DialogHeader>
-                        <DialogTitle>支払明細書プレビュー</DialogTitle>
+                        <DialogTitle>支払通知書プレビュー</DialogTitle>
                         <DialogDescription>
-                            {targetMonth}分の支払明細詳細です。
+                            {targetMonth}分の支払通知詳細です。
                         </DialogDescription>
                     </DialogHeader>
                 </div>
@@ -73,13 +73,13 @@ export function PaymentSlipModal({
                 {/* Printable Area */}
                 <div className="p-8 bg-white" id="payment-slip">
                     <div className="text-center mb-8 border-b pb-4">
-                        <h2 className="text-2xl font-bold text-slate-900 mb-2">支払明細書</h2>
+                        <h2 className="text-2xl font-bold text-slate-900 mb-2">支払通知書</h2>
                         <p className="text-slate-500" style={numberFont}>{targetMonth}分</p>
                     </div>
 
                     <div className="flex justify-between items-end mb-8">
                         <div>
-                            <h3 className="text-xl font-bold text-slate-800">{coachName} 様</h3>
+                            <h3 className="text-xl font-bold text-slate-800 whitespace-nowrap">{coachName} 様</h3>
                         </div>
                         <div className="text-right">
                             <p className="text-sm text-slate-500 mb-1">適用レート</p>
@@ -90,7 +90,7 @@ export function PaymentSlipModal({
                     <div className="mb-8">
                         <table className="w-full text-sm text-left border-collapse">
                             <thead>
-                                <tr className="border-b border-slate-200">
+                                <tr className="border-b border-slate-200 whitespace-nowrap">
                                     <th className="py-2 font-medium text-slate-500">日付</th>
                                     <th className="py-2 font-medium text-slate-500">レッスン</th>
                                     <th className="py-2 font-medium text-slate-500">生徒氏名</th>

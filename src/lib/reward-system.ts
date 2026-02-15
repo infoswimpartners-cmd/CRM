@@ -12,6 +12,7 @@ export type LessonData = {
     }
     students?: {
         full_name?: string
+        is_two_person_lesson?: boolean
         membership_types?: {
             id: string
             // Junction table data, usually fetched as an array
@@ -70,6 +71,34 @@ export function calculateLessonReward(lesson: LessonData, rate: number): number 
         if (config && config.reward_price !== null && config.reward_price !== undefined) {
             basePrice = config.reward_price
         }
+    }
+
+    // If 2-person simultaneous lesson, add +1000 JPY
+    // Check if student has the flag
+    if (lesson.students?.is_two_person_lesson) {
+        // Only apply for normal lessons (usually). 
+        // Request says "2人同時レッスンの場合はコーチの報酬をプラス1000円にします". 
+        // It doesn't specify if it applies to trial or not, but usually trial is fixed reward.
+        // However, "通常の報酬に加えて1000円上乗せ" implies base reward + 1000.
+        // If trial reward is 4500, +1000 = 5500?
+        // Let's assume it applies to ALL lessons since the setting is on the student.
+        // Wait, trial lessons usually don't have a "student" record fully set up in the same way?
+        // Actually they do. So let's apply +1000 to the calculated reward.
+
+        let reward = 0
+        if (master.is_trial) {
+            if (rate === 1.0) {
+                reward = basePrice
+            } else if (Math.abs(rate - SPECIAL_EXCEPTION_RATE) < 0.00000001) {
+                reward = 5000
+            } else {
+                reward = 4500
+            }
+        } else {
+            reward = Math.floor(basePrice * rate)
+        }
+
+        return reward + 1000
     }
 
     if (master.is_trial) {

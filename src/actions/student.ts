@@ -38,7 +38,8 @@ export async function updateStudent(id: string, formData: any) {
             second_student_gender: formData.second_student_gender || null,
             membership_type_id: formData.membership_type_id === 'unassigned' ? null : (formData.membership_type_id || null),
             coach_id: formData.coach_id === 'unassigned' ? null : (formData.coach_id || null),
-            is_bank_transfer: formData.is_bank_transfer || false
+            is_bank_transfer: formData.is_bank_transfer || false,
+            is_two_person_lesson: formData.is_two_person_lesson || false
         }
 
         // Handle birth_date correctly (empty string -> null)
@@ -328,6 +329,7 @@ export async function createStudent(formData: any) {
             membership_type_id: (!formData.membership_type_id || formData.membership_type_id === 'unassigned') ? null : formData.membership_type_id,
             coach_id: (!formData.coach_id || formData.coach_id === 'unassigned') ? null : formData.coach_id,
             is_bank_transfer: formData.is_bank_transfer || false,
+            is_two_person_lesson: formData.is_two_person_lesson || false,
             birth_date: toNull(formData.birth_date),
             second_student_birth_date: toNull(formData.second_student_birth_date)
         }

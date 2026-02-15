@@ -1,10 +1,11 @@
--- Enable Realtime for specific tables
-begin;
-  -- Remove existing if any (to avoid duplicates)
-  alter publication supabase_realtime drop table if exists lesson_schedules;
-  alter publication supabase_realtime drop table if exists lessons;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'lesson_schedules') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE lesson_schedules;
+  END IF;
 
-  -- Add tables to the realtime publication
-  alter publication supabase_realtime add table lesson_schedules;
-  alter publication supabase_realtime add table lessons;
-commit;
+  IF NOT EXISTS (SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND tablename = 'lessons') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE lessons;
+  END IF;
+END
+$$;

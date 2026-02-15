@@ -155,10 +155,7 @@ export function GlobalSearch({ students, coaches = [], isAdmin }: GlobalSearchPr
                                 value={student.full_name}
                                 className="group py-2 px-3 rounded-lg aria-selected:bg-blue-50 aria-selected:text-blue-900 cursor-pointer transition-colors mb-1"
                             >
-                                <Avatar className="mr-3 h-8 w-8 border border-white shadow-sm">
-                                    <AvatarImage src={student.avatar_url || undefined} />
-                                    <AvatarFallback className="bg-blue-100 text-blue-700">{student.full_name[0]}</AvatarFallback>
-                                </Avatar>
+
                                 <span className="font-medium">{student.full_name}</span>
                             </CommandItem>
                         ))}

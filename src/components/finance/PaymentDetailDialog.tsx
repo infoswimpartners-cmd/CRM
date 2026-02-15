@@ -77,7 +77,7 @@ export function PaymentDetailDialog({ open, onOpenChange, payment, coachName, co
                     {/* Header Info */}
                     <div className="flex flex-col md:flex-row justify-between items-start border-b-2 border-slate-200 pb-6 gap-4">
                         <div className="w-full md:w-auto">
-                            <h2 className="text-xl md:text-2xl font-bold border-b border-slate-400 inline-block pb-1 mb-2">
+                            <h2 className="text-xl md:text-2xl font-bold border-b border-slate-400 inline-block pb-1 mb-2 whitespace-nowrap">
                                 {coachName} 様
                             </h2>
                             <p className="text-sm md:text-base text-slate-600 mt-2">下記の通り、報酬をお{isPaid ? '支払いいたします' : '支払いする予定です'}。</p>
@@ -127,7 +127,7 @@ export function PaymentDetailDialog({ open, onOpenChange, payment, coachName, co
                         <div className="hidden md:block">
                             <table className="w-full text-sm border-collapse tabular-nums whitespace-nowrap">
                                 <thead>
-                                    <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
+                                    <tr className="border-b border-slate-200 text-left text-xs text-slate-500 whitespace-nowrap">
                                         <th className="py-2 font-medium">日付</th>
                                         <th className="py-2 font-medium">レッスン</th>
                                         <th className="py-2 font-medium">生徒氏名</th>

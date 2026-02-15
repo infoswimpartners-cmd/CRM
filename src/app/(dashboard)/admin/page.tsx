@@ -446,9 +446,6 @@ export default async function AdminDashboard(props: {
                                                 <Badge className="bg-white text-slate-600 border-slate-200 text-[9px] md:text-[10px] h-3.5 md:h-4 px-1.5 md:px-2">{s.location || '場所未設定'}</Badge>
                                             </div>
                                             <div className="flex items-center gap-2 mt-1">
-                                                <Avatar className="h-4 w-4 md:h-5 md:w-5">
-                                                    <AvatarFallback className="text-[8px] md:text-[10px]">{s.students?.full_name?.[0]}</AvatarFallback>
-                                                </Avatar>
                                                 <span className="text-xs md:text-sm font-medium text-slate-700 truncate">{s.students?.full_name}</span>
                                             </div>
                                         </div>
