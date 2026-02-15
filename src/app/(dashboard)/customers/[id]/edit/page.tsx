@@ -14,6 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { calculateAge, calculateSchoolGrade } from '@/lib/utils'
 import React from 'react'
 import { updateStudent } from '@/actions/student'
+import { Switch } from '@/components/ui/switch'
+import { Checkbox } from '@/components/ui/checkbox'
 
 export default function EditStudentPage({ params }: { params: Promise<{ id: string }> }) {
     const router = useRouter()
@@ -35,10 +37,14 @@ export default function EditStudentPage({ params }: { params: Promise<{ id: stri
         student_notes: '', // notes on students table
         status: 'trial_pending',
         membership_type_id: '',
+        coach_id: '', // primary coach
+        coach_ids: [] as string[], // all assigned coaches
+        is_bank_transfer: false,
         start_timing: 'current' // 'current' | 'next'
     })
 
     const [membershipTypes, setMembershipTypes] = useState<{ id: string, name: string }[]>([])
+    const [coaches, setCoaches] = useState<{ id: string, full_name: string }[]>([])
 
     useEffect(() => {
         const fetchMembershipTypes = async () => {
@@ -60,6 +66,14 @@ export default function EditStudentPage({ params }: { params: Promise<{ id: stri
                 .eq('active', true)
                 .order('fee')
             if (data) setMembershipTypes(data)
+
+            // コーチ一覧を取得
+            const { data: coachData } = await supabase
+                .from('profiles')
+                .select('id, full_name')
+                .in('role', ['coach', 'admin', 'owner'])
+                .order('full_name')
+            if (coachData) setCoaches(coachData)
         }
         fetchMembershipTypes()
     }, [])
@@ -91,8 +105,23 @@ export default function EditStudentPage({ params }: { params: Promise<{ id: stri
                 student_notes: data.notes || '',
                 status: data.status || 'trial_pending',
                 membership_type_id: data.membership_type_id || '',
+                coach_id: data.coach_id || '',
+                coach_ids: [], // will fetch below
+                is_bank_transfer: data.is_bank_transfer || false,
                 start_timing: 'current'
             })
+
+            // Fetch assigned coaches
+            const { data: assignedCoaches } = await supabase
+                .from('student_coaches')
+                .select('coach_id')
+                .eq('student_id', resolvedParams.id)
+
+            if (assignedCoaches) {
+                const ids = assignedCoaches.map(c => c.coach_id)
+                setFormData(prev => ({ ...prev, coach_ids: ids }))
+            }
+
             setLoading(false)
         }
         fetchStudent()
@@ -325,6 +354,79 @@ export default function EditStudentPage({ params }: { params: Promise<{ id: stri
                                     </SelectContent>
                                 </Select>
                             </div>
+                        </div>
+
+
+
+                        {/* 銀行振込対応フラグ */}
+                        <div className="mt-6 flex items-center justify-between p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                            <div className="space-y-0.5">
+                                <Label className="text-base font-bold text-orange-900">銀行振込対応 (特例)</Label>
+                                <p className="text-xs text-orange-700">原則のStripe決済以外で対応する場合に有効にします。</p>
+                            </div>
+                            <Switch
+                                checked={formData.is_bank_transfer}
+                                onCheckedChange={(checked) => setFormData({ ...formData, is_bank_transfer: checked })}
+                            />
+                        </div>
+
+                        {/* 担当コーチ選択 (複数対応) */}
+                        <div className="mt-6 space-y-3">
+                            <Label className="text-sm font-bold text-slate-700">担当コーチアサイン (複数選択可)</Label>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                {coaches.map((coach) => (
+                                    <div key={coach.id} className="flex items-center space-x-2 bg-slate-50 p-2 rounded-md border border-slate-100">
+                                        <Checkbox
+                                            id={`coach-${coach.id}`}
+                                            checked={formData.coach_ids.includes(coach.id)}
+                                            onCheckedChange={(checked) => {
+                                                if (checked) {
+                                                    setFormData({
+                                                        ...formData,
+                                                        coach_ids: [...formData.coach_ids, coach.id],
+                                                        // もしメインコーチが未設定なら設定
+                                                        coach_id: formData.coach_id === '' || formData.coach_id === 'unassigned' ? coach.id : formData.coach_id
+                                                    })
+                                                } else {
+                                                    setFormData({
+                                                        ...formData,
+                                                        coach_ids: formData.coach_ids.filter(id => id !== coach.id),
+                                                        // メインコーチが解除されたらリセット
+                                                        coach_id: formData.coach_id === coach.id ? '' : formData.coach_id
+                                                    })
+                                                }
+                                            }}
+                                        />
+                                        <Label
+                                            htmlFor={`coach-${coach.id}`}
+                                            className="text-sm cursor-pointer whitespace-nowrap overflow-hidden text-ellipsis"
+                                        >
+                                            {coach.full_name}
+                                        </Label>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {formData.coach_ids.length > 0 && (
+                                <div className="mt-4 pt-4 border-t border-slate-100">
+                                    <Label className="text-xs text-slate-500 mb-2 block">メイン担当コーチを選択</Label>
+                                    <Select
+                                        value={formData.coach_id}
+                                        onValueChange={(val) => setFormData({ ...formData, coach_id: val })}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="メインコーチを選択" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {coaches.filter(c => formData.coach_ids.includes(c.id)).map((coach) => (
+                                                <SelectItem key={coach.id} value={coach.id}>
+                                                    {coach.full_name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            )}
                         </div>
 
                         {/* Membership Start Timing */}

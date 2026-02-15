@@ -76,7 +76,9 @@ export async function createMembershipTypeAction(data: {
         const { data: typeData, error: typeError } = await supabase
             .from('membership_types')
             .insert({
+                name: data.name, // Added missing name
                 fee: data.fee,
+                stripe_product_id: product.id, // Store Product ID
                 stripe_price_id: price.id,
                 default_lesson_master_id: data.selectedLessons.length > 0 ? data.selectedLessons[0].id : null,
                 reward_master_id: null,
@@ -140,6 +142,7 @@ export async function createLessonMasterAction(data: {
                 name: data.name,
                 unit_price: data.price,
                 is_trial: data.isTrial,
+                stripe_product_id: product.id, // Store Product ID
                 stripe_price_id: price.id
             })
 

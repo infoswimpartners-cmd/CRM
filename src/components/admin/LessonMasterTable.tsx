@@ -101,6 +101,16 @@ function SortableRow({ master, toggleActive, setEditingMaster, setDeletingId }: 
                     </span>
                 </div>
             </TableCell>
+            <TableCell>
+                <div className="flex flex-col gap-0.5 max-w-[120px]">
+                    <span className="text-[10px] text-gray-400 truncate" title={(master as any).stripe_product_id}>
+                        {(master as any).stripe_product_id || '-'}
+                    </span>
+                    <span className="text-[10px] text-gray-400 truncate" title={(master as any).stripe_price_id}>
+                        {(master as any).stripe_price_id || '-'}
+                    </span>
+                </div>
+            </TableCell>
 
             <TableCell className="text-right">
                 <div className="flex justify-end gap-2">
@@ -286,6 +296,7 @@ export function LessonMasterTable({ masters }: { masters: LessonMaster[] }) {
                                     <SortIcon column="active" />
                                 </div>
                             </TableHead>
+                            <TableHead className="text-xs text-gray-500 font-normal">Stripe ID</TableHead>
                             <TableHead className="text-right">操作</TableHead>
                         </TableRow>
                     </TableHeader>

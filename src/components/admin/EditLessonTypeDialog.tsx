@@ -39,6 +39,8 @@ export function EditLessonTypeDialog({ master, open, onOpenChange }: EditLessonT
     const [name, setName] = useState(master.name)
     const [price, setPrice] = useState(master.unit_price.toString())
     const [isTrial, setIsTrial] = useState(master.is_trial || false)
+    const [stripeProductId, setStripeProductId] = useState((master as any).stripe_product_id || '')
+    const [stripePriceId, setStripePriceId] = useState((master as any).stripe_price_id || '')
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -52,6 +54,8 @@ export function EditLessonTypeDialog({ master, open, onOpenChange }: EditLessonT
                     name,
                     unit_price: parseInt(price),
                     is_trial: isTrial,
+                    stripe_product_id: stripeProductId || null,
+                    stripe_price_id: stripePriceId || null,
                 })
                 .eq('id', master.id)
 
@@ -102,6 +106,30 @@ export function EditLessonTypeDialog({ master, open, onOpenChange }: EditLessonT
                                 onChange={(e) => setPrice(e.target.value)}
                                 className="col-span-3"
                                 required
+                            />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="stripe-product-id" className="text-right whitespace-nowrap text-xs">
+                                Stripe商品ID
+                            </Label>
+                            <Input
+                                id="stripe-product-id"
+                                value={stripeProductId}
+                                onChange={(e) => setStripeProductId(e.target.value)}
+                                className="col-span-3"
+                                placeholder="prod_..."
+                            />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="stripe-price-id" className="text-right whitespace-nowrap text-xs">
+                                Stripe価格ID
+                            </Label>
+                            <Input
+                                id="stripe-price-id"
+                                value={stripePriceId}
+                                onChange={(e) => setStripePriceId(e.target.value)}
+                                className="col-span-3"
+                                placeholder="price_..."
                             />
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">

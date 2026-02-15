@@ -166,6 +166,7 @@ export async function createLessonSchedule(params: CreateLessonScheduleParams) {
                     created_at,
                     full_name,
                     second_student_name,
+                    status,
                     membership_types!students_membership_type_id_fkey (
                         monthly_lesson_limit,
                         max_rollover_limit,
@@ -178,7 +179,7 @@ export async function createLessonSchedule(params: CreateLessonScheduleParams) {
 
             if (studentError) {
                 console.error('Student fetch error:', studentError)
-            } else if (student && student.membership_types) {
+            } else if (student) {
                 // @ts-ignore
                 const membership = Array.isArray(student.membership_types) ? student.membership_types[0] : student.membership_types
                 const limit = membership?.monthly_lesson_limit
@@ -189,9 +190,17 @@ export async function createLessonSchedule(params: CreateLessonScheduleParams) {
                 // A. If limit > 0, check count. If count >= limit -> Overage.
                 // B. If Membership includes '単発' -> Always Overage (Single Fee).
                 // C. If limit == 0 and NOT Single? -> Overage (No plan).
+                // [NEW] D. If Student has NO membership (e.g. Trial or Deleted) -> Overage (Single Fee).
 
                 let checkOverage = false
-                if (membershipName?.includes('単発')) {
+
+                // 2.5 Handle Missing Membership explicitly
+                // If membership is null/undefined, treat as "No Plan" (Overage = true)
+                if (!membership) {
+                    checkOverage = true
+                    console.log(`[CreateLesson] Student ${studentId} has NO membership. Defaulting to Overage.`)
+                }
+                else if (membershipName?.includes('単発')) {
                     checkOverage = true
                 } else if (limit > 0) {
                     const { currentTotal, effectiveLimit } = await calculateMonthlyUsage(
@@ -205,6 +214,12 @@ export async function createLessonSchedule(params: CreateLessonScheduleParams) {
                     )
 
                     if (currentTotal >= effectiveLimit) checkOverage = true
+                } else {
+                    // Limit is 0 or undefined, but not '単発' explicit name?
+                    // Treat as Overage if limit is 0.
+                    if (!limit || limit === 0) {
+                        checkOverage = true
+                    }
                 }
 
                 if (checkOverage) {
@@ -222,26 +237,19 @@ export async function createLessonSchedule(params: CreateLessonScheduleParams) {
                             overagePrice = lm.unit_price
                         }
                     }
+
                     if (overagePrice === 0) {
+                        // Fallback price logic
                         if (membership?.fee && limit > 0) {
                             overagePrice = Math.floor(membership.fee / limit)
                         } else {
+                            // Default fallback if no membership fee or limit
                             overagePrice = 8800
                         }
                     }
 
                     // Determine Billing Status
-                    // [MODIFIED] Allow awaiting_approval even if no Stripe Customer ID (will create later)
                     billingStatus = 'awaiting_approval'
-                    // if (student.stripe_customer_id) {
-                    //     billingStatus = 'awaiting_approval' // [MODIFIED] Wait for approval first
-                    // } else {
-                    //     // For Trial users, they might not have ID yet.
-                    //     // We will create it on Approval.
-                    //     // But what if it's a regular user?
-                    //     // Let's allow 'awaiting_approval' universally here, and check in processLessonBilling.
-                    //     billingStatus = 'awaiting_approval'
-                    // }
                     console.log(`[CreateLesson] Overage Detected. Price: ${overagePrice}. Status: ${billingStatus}`)
                 } // End if (checkOverage)
 
@@ -269,18 +277,44 @@ export async function createLessonSchedule(params: CreateLessonScheduleParams) {
 
                 if (insertError) throw insertError
 
-                // [REMOVED] Immediate Billing Logic - moved to approveLessonSchedule
-
                 revalidatePath('/coach/schedule')
                 revalidatePath('/admin/schedule')
                 revalidatePath('/admin/billing')
 
-                return { success: true, data: inserted, isOverage }
+                const isTrial = (student.status === 'trial_pending' || student.status === 'trial_confirmed') && !membership
 
+                return { success: true, data: inserted, isOverage, isTrial }
 
+            } else {
+                // Should not happen if student_id is valid, but handle case where student not found
+                return { success: false, error: 'Student not found or system error' }
+            }
+        } else {
+            // No student_id provided (e.g. blocking out time?)
+            // If logic allows schedule without student:
+            const { data: inserted, error: insertError } = await supabaseAdmin
+                .from('lesson_schedules')
+                .insert({
+                    coach_id: params.coach_id,
+                    student_id: null,
+                    lesson_master_id: null,
+                    start_time: params.start_time,
+                    end_time: params.end_time,
+                    title: params.title,
+                    location: params.location,
+                    notes: params.notes,
+                    is_overage: false,
+                    billing_status: 'pending',
+                    price: null
+                })
+                .select()
+                .single()
 
-            } // else if student
-        } // if params.student_id
+            if (insertError) throw insertError
+
+            revalidatePath('/coach/schedule')
+            return { success: true, data: inserted }
+        }
     } catch (error: any) {
         console.error('createLessonSchedule Error:', error)
         return { success: false, error: error.message }
@@ -485,7 +519,7 @@ export async function checkStudentLessonStatus(studentId: string, dateStr: strin
 
         if (studentError || !student) throw new Error('Student not found')
 
-        console.log(`[CheckStatus] Student ${studentId} membership data:`, student.membership_types)
+        console.log(`[CheckStatus] Student: ${student.id} (${studentId}), Status: ${student.status}`)
 
         // @ts-ignore
         const membership = Array.isArray(student.membership_types) ? student.membership_types[0] : student.membership_types
@@ -507,16 +541,23 @@ export async function checkStudentLessonStatus(studentId: string, dateStr: strin
         let isOverage = false
         let availableLessons: any[] = []
 
-        // [NEW] Trial Logic: If student is 'trial_pending', return ONLY Trial Lessons
-        if (student.status === 'trial_pending') {
-            console.log('[CheckStatus] Student is trial_pending. Fetching Trial Lessons only.')
+        // [NEW] Trial Logic: If student is 'trial_pending' OR 'trial_confirmed' (and no membership), return ONLY Trial Lessons
+        // Note: 'trial_confirmed' happens after they book, but if they cancel and re-book, they might still be 'trial_confirmed' but no membership.
+        if ((student.status === 'trial_pending' || student.status === 'trial_confirmed') && !membership) {
+            console.log(`[CheckStatus] Student is ${student.status}. Fetching Trial Lessons only.`)
 
             // Fetch lessons with "体験" in name
-            const { data: trialLessons } = await supabaseAdmin
+            const { data: trialLessons, error: trialError } = await supabaseAdmin
                 .from('lesson_masters')
                 .select('id, name, unit_price')
                 .ilike('name', '%体験%')
                 .eq('active', true)
+
+            if (trialError) {
+                console.error('[CheckStatus] Error fetching trial lessons:', trialError)
+            } else {
+                console.log(`[CheckStatus] Found ${trialLessons?.length} trial lessons`)
+            }
 
             availableLessons = trialLessons || []
             membershipName = '体験利用' // Override for UI display
@@ -587,6 +628,42 @@ export async function checkStudentLessonStatus(studentId: string, dateStr: strin
 
     } catch (error: any) {
         console.error('checkStatus Error:', error)
+        return { success: false, error: error.message }
+    }
+}
+
+export async function approveLessonScheduleManually(scheduleId: string) {
+    const supabase = await createClient()
+    const supabaseAdmin = createAdminClient()
+
+    // Auth Check
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { success: false, error: 'Unauthorized' }
+
+    // Admin Check
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+    if (profile?.role !== 'admin' && profile?.role !== 'owner') {
+        return { success: false, error: 'Permission denied' }
+    }
+
+    try {
+        console.log('[ApproveManually] Updating to paid status:', scheduleId)
+
+        const { error } = await supabaseAdmin
+            .from('lesson_schedules')
+            .update({
+                billing_status: 'paid',
+                payment_intent_id: 'manual_approval', // Track that it was manual
+                notes: `[手動承認] ${new Date().toLocaleString('ja-JP')} に管理者により手動で決済済みに更新されました。`
+            })
+            .eq('id', scheduleId)
+
+        if (error) throw error
+
+        revalidatePath('/admin/billing')
+        return { success: true }
+    } catch (error: any) {
+        console.error('[ApproveManually] Error:', error)
         return { success: false, error: error.message }
     }
 }

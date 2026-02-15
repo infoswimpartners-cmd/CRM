@@ -36,7 +36,9 @@ export async function updateStudent(id: string, formData: any) {
             second_student_name: formData.second_student_name || null,
             second_student_name_kana: formData.second_student_name_kana || null,
             second_student_gender: formData.second_student_gender || null,
-            membership_type_id: formData.membership_type_id === 'unassigned' ? null : (formData.membership_type_id || null)
+            membership_type_id: formData.membership_type_id === 'unassigned' ? null : (formData.membership_type_id || null),
+            coach_id: formData.coach_id === 'unassigned' ? null : (formData.coach_id || null),
+            is_bank_transfer: formData.is_bank_transfer || false
         }
 
         // Handle birth_date correctly (empty string -> null)
@@ -59,7 +61,7 @@ export async function updateStudent(id: string, formData: any) {
         const newMembership = updates.membership_type_id
         const startTiming = formData.start_timing // 'current' | 'next'
 
-        if (newMembership && newMembership !== oldMembership) {
+        if (newMembership && newMembership !== oldMembership && !updates.is_bank_transfer) {
             console.log(`[UpdateStudent] Membership Changed: ${oldMembership} -> ${newMembership}`)
             updates.status = 'active'
 
@@ -223,6 +225,22 @@ export async function updateStudent(id: string, formData: any) {
 
         if (updateError) throw updateError
 
+        // 4. Update student_coaches (Multiple coaches)
+        if (formData.coach_ids && Array.isArray(formData.coach_ids)) {
+            // First, remove existing
+            await supabase.from('student_coaches').delete().eq('student_id', id)
+
+            // Then, insert new ones
+            if (formData.coach_ids.length > 0) {
+                const records = formData.coach_ids.map((cId: string, index: number) => ({
+                    student_id: id,
+                    coach_id: cId,
+                    role: (cId === updates.coach_id || (updates.coach_id === null && index === 0)) ? 'main' : 'sub'
+                }))
+                await supabase.from('student_coaches').insert(records)
+            }
+        }
+
         revalidatePath(`/customers/${id}`)
         return { success: true, emailSent }
 
@@ -282,5 +300,74 @@ export async function updateStudentStatus(studentId: string, newStatus: string) 
     } catch (error: any) {
         console.error('Update Status Error:', error)
         return { success: false, error: error.message || 'Failed to update status' }
+    }
+}
+
+export async function createStudent(formData: any) {
+    const supabase = await createClient()
+
+    // 1. Auth Check - Ensure Admin
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { success: false, error: 'Unauthorized' }
+
+    try {
+        // 空文字をnullに変換するヘルパー
+        const toNull = (val: any) => (val === '' || val === undefined) ? null : val
+
+        const studentData: any = {
+            full_name: formData.full_name,
+            full_name_kana: toNull(formData.full_name_kana),
+            gender: toNull(formData.gender),
+            contact_email: toNull(formData.contact_email),
+            contact_phone: toNull(formData.contact_phone),
+            notes: toNull(formData.student_notes),
+            status: 'trial_pending',
+            second_student_name: toNull(formData.second_student_name),
+            second_student_name_kana: toNull(formData.second_student_name_kana),
+            second_student_gender: toNull(formData.second_student_gender),
+            membership_type_id: (!formData.membership_type_id || formData.membership_type_id === 'unassigned') ? null : formData.membership_type_id,
+            coach_id: (!formData.coach_id || formData.coach_id === 'unassigned') ? null : formData.coach_id,
+            is_bank_transfer: formData.is_bank_transfer || false,
+            birth_date: toNull(formData.birth_date),
+            second_student_birth_date: toNull(formData.second_student_birth_date)
+        }
+
+        console.log('[createStudent] Attempting to insert:', studentData)
+
+        // 2. Insert into DB
+        const { data, error: insertError } = await supabase
+            .from('students')
+            .insert(studentData)
+            .select()
+            .single()
+
+        if (insertError) {
+            console.error('[createStudent] DB Insert Error:', insertError)
+            return {
+                success: false,
+                error: `DBエラー: ${insertError.message}`,
+                details: insertError.details,
+                code: insertError.code
+            }
+        }
+
+        // 3. Handle multiple coaches
+        if (formData.coach_ids && Array.isArray(formData.coach_ids)) {
+            const records = formData.coach_ids.map((cId: string, index: number) => ({
+                student_id: data.id,
+                coach_id: cId,
+                role: (cId === studentData.coach_id || (studentData.coach_id === null && index === 0)) ? 'main' : 'sub'
+            }))
+            if (records.length > 0) {
+                await supabase.from('student_coaches').insert(records)
+            }
+        }
+
+        revalidatePath('/customers')
+        return { success: true, studentId: data.id }
+
+    } catch (error: any) {
+        console.error('[createStudent] Unexpected Error:', error)
+        return { success: false, error: error.message || '予期せぬエラーが発生しました' }
     }
 }

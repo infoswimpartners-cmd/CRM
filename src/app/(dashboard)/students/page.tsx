@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { MoreHorizontal, Filter, Plus, Search } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { statusLabels, statusColors } from '@/components/admin/StudentStatusSelect'
-import { cn } from '@/lib/utils'
+import { cn, calculateSchoolGrade } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,25 +19,32 @@ export default async function StudentsPage() {
         redirect('/login')
     }
 
-    // Reuse existing query logic or fetch students for coach
-    // Note: This matches "get_students_for_coach_public" logic roughly
-    const { data: students } = await supabase
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+    const isCoach = profile?.role === 'coach'
+
+    // Use wildcard selection to avoid missing/renamed column errors
+    let query = supabase
         .from('students')
         .select(`
-            id,
-            video_url,
-            contact_email,
-            full_name,
-            grade,
-            sex,
-            memo,
-            status,
-            membership_types (
+            *,
+            membership_types:membership_type_id (
                 name
             )
         `)
         .neq('status', 'withdrawn')
-        .order('created_at', { ascending: false })
+
+    if (isCoach) {
+        console.log(`[StudentsPage] Filtering for coach: ${user.id}`)
+        query = query.eq('coach_id', user.id)
+    }
+
+    const { data: students, error } = await query.order('created_at', { ascending: false })
+
+    if (error) {
+        console.error('[StudentsPage] Fetch Error details:', JSON.stringify(error, null, 2))
+    }
+
+    console.log(`[StudentsPage] Students fetched: ${students?.length || 0}`)
 
     const filteredStudents = students?.filter(student => student.status !== 'withdrawn') || []
 
@@ -82,7 +89,7 @@ export default async function StudentsPage() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {filteredStudents.map((student) => (
+                            {filteredStudents.map((student: any) => (
                                 <tr key={student.id} className="group hover:bg-slate-50 transition-colors">
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-3">
@@ -110,15 +117,15 @@ export default async function StudentsPage() {
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-2">
                                             <span className="px-2 py-1 rounded bg-slate-100 text-xs text-slate-600 border border-slate-200">
-                                                {student.grade || '-'}
+                                                {student.birth_date ? calculateSchoolGrade(new Date(student.birth_date)) : '-'}
                                             </span>
                                             <span className="px-2 py-1 rounded bg-slate-100 text-xs text-slate-600 border border-slate-200 capitalize">
-                                                {student.sex || '-'}
+                                                {student.gender || '-'}
                                             </span>
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 text-slate-500">
-                                        2 days ago
+                                        -
                                     </td>
                                     <td className="px-6 py-4 text-right">
                                         <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-slate-600 hover:bg-slate-100">

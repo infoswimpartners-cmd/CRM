@@ -147,9 +147,11 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate }
     useEffect(() => {
         if (!open || !selectedCoachId) return
         const fetchStudents = async () => {
+            console.log(`[AddScheduleDialog] Fetching students for coachId: ${selectedCoachId}`)
             try {
                 const res = await getStudentsForCoach(selectedCoachId)
                 if (res.success && res.data) {
+                    console.log(`[AddScheduleDialog] Students fetched: ${res.data.length}`)
                     setStudents(res.data)
                 } else {
                     console.error('Failed to fetch students:', res.error)
@@ -213,7 +215,7 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate }
             if (student) {
                 setTitle(`${student.full_name}様 レッスン`)
                 // Trial check ...
-                if (student.status === 'trial_pending') {
+                if (student.status === 'trial_pending' || student.status === 'trial_confirmed') {
                     setIsTrialMode(true)
                 } else {
                     setIsTrialMode(false)
@@ -371,10 +373,10 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate }
             if (!result) throw new Error('処理結果が取得できませんでした')
             if (!result.success) throw new Error(result.error)
 
-            if (result.isOverage) {
+            if (result.isTrial || result.isOverage) {
                 if (membershipName && membershipName.includes('単発')) {
                     toast.success('レッスンを追加し、レッスン料の請求処理予約を行いました。')
-                } else if (isTrialMode) {
+                } else if (result.isTrial || isTrialMode) {
                     toast.success('体験レッスンを追加しました。請求管理から承認を行ってください。')
                 } else {
                     toast.warning('月の上限回数を超えているため、超過分（単発）として登録されました。')
@@ -444,6 +446,7 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate }
                                         <SelectValue placeholder="コーチを選択" />
                                     </SelectTrigger>
                                     <SelectContent>
+                                        <SelectItem value="all">全コーチ (生徒から検索)</SelectItem>
                                         {coaches.map(c => (
                                             <SelectItem key={c.id} value={c.id}>{c.full_name || '未設定'}</SelectItem>
                                         ))}
@@ -454,7 +457,20 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate }
 
                         <div className="grid gap-2">
                             <Label>生徒 <span className="text-red-500">*</span></Label>
-                            <Select value={studentId} onValueChange={setStudentId} required>
+                            <Select value={studentId} onValueChange={(val) => {
+                                setStudentId(val)
+                                // Auto-select coach if in 'all' mode or different
+                                if (val !== 'none') {
+                                    const s = students.find(st => st.id === val)
+                                    // @ts-ignore
+                                    if (s && s.coach_id && s.coach_id !== selectedCoachId) {
+                                        // @ts-ignore
+                                        console.log(`[AutoSelectCoach] Switching to assigned coach: ${s.coach_id}`)
+                                        // @ts-ignore
+                                        setSelectedCoachId(s.coach_id)
+                                    }
+                                }
+                            }} required>
                                 <SelectTrigger>
                                     <SelectValue placeholder="生徒を選択" />
                                 </SelectTrigger>
@@ -463,17 +479,16 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate }
                                     {students.map(s => (
                                         <SelectItem key={s.id} value={s.id}>
                                             <div className="flex flex-wrap items-center gap-2 py-0.5">
-                                                <span className="font-medium">{s.full_name}</span>
+                                                <span className="font-medium">
+                                                    {s.full_name}
+                                                    {s.status === 'trial_pending' && <span className="text-orange-600 ml-1 font-normal">(体験予定)</span>}
+                                                    {s.status === 'trial_confirmed' && <span className="text-green-600 ml-1 font-normal">(体験確定)</span>}
+                                                </span>
                                                 <div className="flex flex-wrap gap-1">
                                                     {/* Show Membership Name */}
                                                     {(s as any).membership_name && (
                                                         <span className="text-[10px] sm:text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded whitespace-nowrap">
                                                             {(s as any).membership_name}
-                                                        </span>
-                                                    )}
-                                                    {s.status === 'trial_pending' && (
-                                                        <span className="text-[10px] sm:text-xs text-orange-600 font-bold bg-orange-100 px-1.5 py-0.5 rounded whitespace-nowrap">
-                                                            体験予定
                                                         </span>
                                                     )}
                                                 </div>

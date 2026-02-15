@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
 import * as z from 'zod'
 import { format } from 'date-fns'
+import { ja } from 'date-fns/locale'
 import { CalendarIcon, Loader2 } from 'lucide-react'
 
 import { createClient } from '@/lib/supabase/client'
@@ -14,6 +15,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
 import { Checkbox } from '@/components/ui/checkbox'
+import { parseISO } from 'date-fns'
 import {
     Form,
     FormControl,
@@ -64,6 +66,8 @@ export function LessonReportForm() {
     const [coachId, setCoachId] = useState<string>('')
     const [restrictedLessonIds, setRestrictedLessonIds] = useState<string[] | null>(null)
     const [keepValues, setKeepValues] = useState(true)
+    const searchParams = useSearchParams()
+    const scheduleId = searchParams.get('scheduleId')
 
     // Load lesson masters and current user on mount
     useEffect(() => {
@@ -100,6 +104,42 @@ export function LessonReportForm() {
         },
     })
 
+    // Load schedule data if scheduleId is provided
+    useEffect(() => {
+        if (!scheduleId || !coachId) return
+
+        const fetchSchedule = async () => {
+            const supabase = createClient()
+            const { data: schedule } = await supabase
+                .from('lesson_schedules')
+                .select(`
+                    *,
+                    students (
+                        id,
+                        full_name
+                    )
+                `)
+                .eq('id', scheduleId)
+                .single()
+
+            if (schedule) {
+                // Handle students which could be an object or an array depending on Supabase query result
+                const studentsData: any = schedule.students
+                const student = Array.isArray(studentsData) ? studentsData[0] : studentsData
+
+                const studentId = student?.id
+                const studentName = student?.full_name
+
+                if (studentId) form.setValue('student_id', studentId)
+                if (studentName) form.setValue('student_name', studentName)
+                if (schedule.lesson_master_id) form.setValue('lesson_master_id', schedule.lesson_master_id)
+                if (schedule.start_time) form.setValue('lesson_date', new Date(schedule.start_time))
+                if (schedule.location) form.setValue('location', schedule.location)
+            }
+        }
+        fetchSchedule()
+    }, [scheduleId, coachId, form])
+
     // Watch lesson_master_id to auto-update price
     const selectedMasterId = form.watch('lesson_master_id')
     useEffect(() => {
@@ -113,12 +153,13 @@ export function LessonReportForm() {
     const selectedStudentId = form.watch('student_id')
     useEffect(() => {
         const fetchAllowedLessons = async () => {
-            // Reset selection when student changes
-            form.setValue('lesson_master_id', '')
-            form.setValue('price', 0)
-
             if (!selectedStudentId) {
                 setRestrictedLessonIds(null)
+                // Only clear if not already empty (to avoid unnecessary form dirtying)
+                if (form.getValues('lesson_master_id')) {
+                    form.setValue('lesson_master_id', '')
+                    form.setValue('price', 0)
+                }
                 return
             }
 
@@ -146,12 +187,21 @@ export function LessonReportForm() {
                 const ids = allowed.map(a => a.lesson_master_id)
                 setRestrictedLessonIds(ids)
 
-                // Auto-select if only one option
-                if (ids.length === 1) {
-                    form.setValue('lesson_master_id', ids[0])
+                // IMPORTANT: Only reset if the current selection is NOT allowed for this student
+                const currentMasterId = form.getValues('lesson_master_id')
+                if (!currentMasterId || !ids.includes(currentMasterId)) {
+                    // Auto-select if only one option, otherwise clear
+                    if (ids.length === 1) {
+                        form.setValue('lesson_master_id', ids[0])
+                    } else {
+                        form.setValue('lesson_master_id', '')
+                        form.setValue('price', 0)
+                    }
                 }
             } else {
-                setRestrictedLessonIds([]) // No allowed lessons found -> Empty list (forcing setup)
+                setRestrictedLessonIds([]) // No allowed lessons found
+                form.setValue('lesson_master_id', '')
+                form.setValue('price', 0)
             }
         }
         fetchAllowedLessons()
@@ -276,7 +326,7 @@ export function LessonReportForm() {
                                             )}
                                         >
                                             {field.value ? (
-                                                format(field.value, "PPP")
+                                                format(field.value, "PPP", { locale: ja })
                                             ) : (
                                                 <span>日付を選択</span>
                                             )}
@@ -293,6 +343,7 @@ export function LessonReportForm() {
                                             date > new Date() || date < new Date("1900-01-01")
                                         }
                                         initialFocus
+                                        locale={ja}
                                     />
                                 </PopoverContent>
                             </Popover>

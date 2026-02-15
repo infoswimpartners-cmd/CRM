@@ -22,6 +22,7 @@ export async function TodayScheduleWidget({ coachId }: { coachId: string }) {
             start_time,
             end_time,
             location,
+            lesson_master_id,
             students ( full_name )
         `)
         .eq('coach_id', coachId)
@@ -84,7 +85,7 @@ export async function TodayScheduleWidget({ coachId }: { coachId: string }) {
                                     </div>
                                 </div>
                                 <Button asChild size="sm" className="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-sm">
-                                    <Link href={`/coach/report/new?scheduleId=${schedule.id}`}>
+                                    <Link href={`/coach/report?scheduleId=${schedule.id}`}>
                                         <Edit className="mr-2 h-3 w-3" />
                                         完了報告を入力
                                     </Link>

@@ -153,9 +153,9 @@ export async function processLessonBilling(scheduleId: string) {
             const isTrial = data.title && data.title.includes('体験')
 
             if (isTrial) {
-                console.log('[Billing] Detected Trial Lesson. Sending trial_payment_request.')
+                console.log('[Billing] Detected Trial Lesson. Sending trial_payment_completed.')
                 await emailService.sendTemplateEmail(
-                    'trial_payment_request',
+                    'trial_payment_completed',
                     student.contact_email,
                     {
                         name: student.full_name,

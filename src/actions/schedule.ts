@@ -50,18 +50,24 @@ export async function getStudentsForCoach(coachId: string) {
     const supabaseAdmin = createAdminClient()
 
     try {
-        const { data, error } = await supabaseAdmin
+        let query = supabaseAdmin
             .from('students')
             .select(`
                 id,
                 full_name,
                 status,
+                coach_id,
                 membership_types:membership_type_id (
                     default_lesson_master_id,
                     name
                 )
             `)
-            .eq('coach_id', coachId)
+
+        if (coachId && coachId !== 'all') {
+            query = query.eq('coach_id', coachId)
+        }
+
+        const { data, error } = await query
 
         if (error) throw error
 

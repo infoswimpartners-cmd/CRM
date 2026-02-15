@@ -16,7 +16,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table'
-import { approveLessonSchedule, rejectLessonSchedule } from '@/actions/lesson_schedule'
+import { approveLessonSchedule, rejectLessonSchedule, approveLessonScheduleManually } from '@/actions/lesson_schedule'
 import { formatCurrency } from '@/lib/utils'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { RefundDialog } from './RefundDialog'
@@ -75,6 +75,25 @@ export function BillingApprovalList({ unpaidSchedules, paidSchedules }: BillingA
             }
         } catch (error) {
             toast.error('エラーが発生しました')
+        } finally {
+            setProcessingId(null)
+        }
+    }
+
+    const handleManualApprove = async (id: string, name: string) => {
+        if (!confirm(`${name}様の決済を手動で完了（Stripe外での入金確認済み）としてマークしますか？`)) return
+
+        setProcessingId(id)
+        try {
+            const result = await approveLessonScheduleManually(id)
+            if (result.success) {
+                toast.success('決済完了としてマークしました')
+                router.refresh()
+            } else {
+                toast.error('エラーが発生しました: ' + (result as any).error)
+            }
+        } catch (error) {
+            toast.error('通信エラーが発生しました')
         } finally {
             setProcessingId(null)
         }
@@ -188,14 +207,38 @@ export function BillingApprovalList({ unpaidSchedules, paidSchedules }: BillingA
                                         ) : (
                                             <>
                                                 {isApprovalPending && (
+                                                    <div className="flex flex-col gap-1">
+                                                        <Button
+                                                            size="sm"
+                                                            onClick={() => handleApprove(schedule.id, schedule.student?.full_name || '')}
+                                                            disabled={!!processingId}
+                                                            className="bg-blue-600 hover:bg-blue-700 text-white h-7 text-[10px]"
+                                                        >
+                                                            <CheckCircle className="h-3 w-3 mr-1" />
+                                                            Stripeで請求
+                                                        </Button>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={() => handleManualApprove(schedule.id, schedule.student?.full_name || '')}
+                                                            disabled={!!processingId}
+                                                            className="border-blue-600 text-blue-600 hover:bg-blue-50 h-7 text-[10px]"
+                                                        >
+                                                            <RefreshCw className="h-3 w-3 mr-1" />
+                                                            手動決済
+                                                        </Button>
+                                                    </div>
+                                                )}
+                                                {!isApprovalPending && isPaymentPending && (
                                                     <Button
                                                         size="sm"
-                                                        onClick={() => handleApprove(schedule.id, schedule.student?.full_name || '')}
+                                                        variant="outline"
+                                                        onClick={() => handleManualApprove(schedule.id, schedule.student?.full_name || '')}
                                                         disabled={!!processingId}
-                                                        className="bg-blue-600 hover:bg-blue-700 text-white h-8 text-xs"
+                                                        className="border-green-600 text-green-600 hover:bg-green-50 h-8 text-xs"
                                                     >
                                                         <CheckCircle className="h-3 w-3 mr-1" />
-                                                        承認
+                                                        手動決済
                                                     </Button>
                                                 )}
                                                 <Button

@@ -41,8 +41,8 @@ export function AdminActivityWidget({ schedules, reports }: AdminActivityWidgetP
             <Tabs defaultValue="schedule" className="h-full flex flex-col">
                 <div className="flex items-center justify-between mb-2">
                     <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="schedule">今後の予定</TabsTrigger>
-                        <TabsTrigger value="report">最新の報告</TabsTrigger>
+                        <TabsTrigger value="schedule" className="whitespace-nowrap">今後の予定</TabsTrigger>
+                        <TabsTrigger value="report" className="whitespace-nowrap">最新の報告</TabsTrigger>
                     </TabsList>
                 </div>
 

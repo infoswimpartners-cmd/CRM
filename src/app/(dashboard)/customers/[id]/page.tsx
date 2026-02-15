@@ -13,6 +13,8 @@ import { StudentStatusSelect, statusLabels, statusColors } from '@/components/ad
 import { TrialConfirmButton } from '@/components/admin/TrialConfirmButton'
 import { StripeManager } from '@/components/admin/students/StripeManager'
 import { getStripeCustomerStatus } from '@/actions/stripe'
+import { Badge } from '@/components/ui/badge'
+import { Landmark } from 'lucide-react'
 
 export default async function StudentDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params
@@ -58,6 +60,19 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
         paymentMethodStatus = await getStripeCustomerStatus(student.stripe_customer_id)
     }
 
+    // Fetch All Assigned Coaches
+    const { data: assignedCoaches } = await supabase
+        .from('student_coaches')
+        .select(`
+            role,
+            profiles (
+                id,
+                full_name,
+                avatar_url
+            )
+        `)
+        .eq('student_id', student.id)
+
     return (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
@@ -99,6 +114,11 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColors[student.status || 'trial_pending']}`}>
                                 {statusLabels[student.status || 'trial_pending']}
                             </span>
+                        )}
+                        {student.is_bank_transfer && (
+                            <Badge variant="outline" className="border-orange-200 text-orange-700 bg-orange-50 gap-1">
+                                <Landmark className="h-3 w-3" /> 銀行振込対応
+                            </Badge>
                         )}
                     </div>
                     <h1 className="text-3xl font-bold">{student.full_name}</h1>
@@ -149,16 +169,23 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
                 </div>
                 <div>
                     <span className="font-semibold block mb-1">担当コーチ:</span>
-                    {isAdmin ? (
-                        <StudentCoachAssigner
-                            studentId={student.id}
-                            currentCoachId={student.coach_id}
-                        />
-                    ) : (
-                        <span className="text-gray-900 font-medium">
-                            {student.profiles?.full_name || '担当なし'}
-                        </span>
-                    )}
+                    <div className="flex flex-wrap gap-2">
+                        {assignedCoaches && assignedCoaches.length > 0 ? (
+                            assignedCoaches.map((ac: any) => (
+                                <Badge key={ac.profiles.id} variant={ac.role === 'main' ? 'default' : 'secondary'} className="px-2 py-0.5">
+                                    {ac.profiles.full_name}
+                                    {ac.role === 'main' && <span className="ml-1 text-[10px] opacity-70">(メイン)</span>}
+                                </Badge>
+                            ))
+                        ) : (
+                            <span className="text-gray-400">担当なし</span>
+                        )}
+                        {isAdmin && (
+                            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" asChild>
+                                <Link href={`/customers/${student.id}/edit`}>変更</Link>
+                            </Button>
+                        )}
+                    </div>
                 </div>
                 {isAdmin && (
                     <div className="md:col-span-2">
@@ -172,16 +199,26 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
             </div>
 
             <Tabs defaultValue="chart" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="chart">カルテ・備考</TabsTrigger>
-                    <TabsTrigger value="counseling">カウンセリング</TabsTrigger>
+                <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="chart">カルテ・カウンセリング</TabsTrigger>
                     <TabsTrigger value="history">レッスン履歴</TabsTrigger>
                 </TabsList>
-                <TabsContent value="chart" className="mt-4">
-                    <StudentChart student={student} />
-                </TabsContent>
-                <TabsContent value="counseling" className="mt-4">
-                    <StudentCounseling studentId={student.id} />
+                <TabsContent value="chart" className="mt-4 space-y-8">
+                    <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                            <span className="w-1.5 h-6 bg-cyan-500 rounded-full"></span>
+                            カウンセリング内容
+                        </h3>
+                        <StudentCounseling studentId={student.id} />
+                    </div>
+
+                    <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                        <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                            <span className="w-1.5 h-6 bg-blue-500 rounded-full"></span>
+                            カルテ・備考
+                        </h3>
+                        <StudentChart student={student} />
+                    </div>
                 </TabsContent>
                 <TabsContent value="history" className="mt-4">
                     <StudentLessonHistory lessons={lessons || []} />
