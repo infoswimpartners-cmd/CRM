@@ -26,14 +26,14 @@ export function AnnouncementsList({ announcements }: { announcements: Announceme
     const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
 
     return (
-        <Card className="border-slate-200 shadow-sm overflow-hidden h-full flex flex-col">
-            <CardHeader className="bg-slate-50 border-b border-slate-100 py-3 shrink-0">
+        <Card className="border-slate-200 shadow-sm overflow-hidden w-full">
+            <CardHeader className="bg-slate-50 border-b border-slate-100 py-3">
                 <CardTitle className="text-base font-medium flex items-center gap-2 text-slate-700">
                     <Megaphone className="h-4 w-4 text-blue-500" />
                     事務局からのお知らせ
                 </CardTitle>
             </CardHeader>
-            <CardContent className="p-0 flex-1 overflow-y-auto">
+            <CardContent className="p-0 max-h-[300px] overflow-y-auto">
                 {announcements.length === 0 ? (
                     <div className="p-4 text-center text-sm text-slate-500">
                         お知らせはありません。
