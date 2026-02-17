@@ -34,7 +34,6 @@ export function LessonHistoryRow({ lesson }: Props) {
             <TableCell className="font-medium">
                 <div className="flex flex-col">
                     <span>{format(new Date(lesson.lesson_date), 'M/d(E)', { locale: ja })}</span>
-                    <span className="text-xs text-muted-foreground">{format(new Date(lesson.lesson_date), 'HH:mm')}</span>
                 </div>
             </TableCell>
             <TableCell>{lesson.student_name}</TableCell>

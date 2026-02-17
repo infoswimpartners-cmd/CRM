@@ -79,16 +79,23 @@ export default async function PayoutsPage({ searchParams }: { searchParams: { mo
     const { data: appConfigs } = await supabase
         .from('app_configs')
         .select('key, value')
-        .or('key.like.coach_tax:%,key.eq.company_info')
+        .or('key.like.coach_tax:%,key.in.(company_name,company_address,invoice_registration_number,contact_email,company_payment_bank_name,company_info)')
 
     const taxMap = new Map<string, boolean>()
-    let companyInfo = null
+
+    // Initialize with empty object
+    let companyInfo: Record<string, string> = {}
 
     appConfigs?.forEach(c => {
         if (c.key === 'company_info') {
+            // Legacy support: if company_info JSON exists, use it as base
             try {
-                companyInfo = JSON.parse(c.value)
+                const legacyInfo = JSON.parse(c.value)
+                companyInfo = { ...companyInfo, ...legacyInfo }
             } catch { }
+        } else if (['company_name', 'company_address', 'invoice_registration_number', 'contact_email', 'company_payment_bank_name'].includes(c.key)) {
+            // Overwrite with individual keys (preferred)
+            companyInfo[c.key] = c.value
         } else if (c.key.startsWith('coach_tax:')) {
             const coachId = c.key.replace('coach_tax:', '')
             try {

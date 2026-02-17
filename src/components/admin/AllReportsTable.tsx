@@ -61,9 +61,7 @@ export async function AllReportsTable() {
                         <TableRow key={report.id} className="hover:bg-slate-50/50">
                             <TableCell className="font-medium">
                                 {format(new Date(report.lesson_date), 'yyyy/MM/dd', { locale: ja })}
-                                <div className="text-xs text-slate-400">
-                                    {format(new Date(report.lesson_date), 'HH:mm', { locale: ja })}
-                                </div>
+
                             </TableCell>
                             <TableCell>
                                 <div className="flex items-center gap-2">

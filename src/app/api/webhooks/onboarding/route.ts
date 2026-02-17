@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
         }
 
         // 4. Create Student in Supabase (CMS) - NO STRIPE YET
-        console.log(`[Onboarding] Creating Student Record (Status: inquiry)...`)
+        console.log(`[Onboarding] Creating Student Record (Status: inquiry_pending)...`)
         const { data: newStudent, error: dbError } = await supabaseAdmin
             .from('students')
             .insert({
@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
                 contact_email: email,
                 contact_phone: phone,
                 notes: notes || null,
-                status: 'inquiry',
+                status: 'inquiry', // Use existing 'inquiry' status
                 stripe_customer_id: null
             })
             .select()
@@ -129,7 +129,8 @@ export async function POST(req: NextRequest) {
         // 4. Notify Admin (Optional - Logging for now, could send email to Admin)
         console.log(`[Onboarding] Success! Lead Created: ${newStudent.id}`)
 
-        // 5. Send Receipt Email (Using Template)
+        // 5. Send Receipt Email -> REMOVED (Manual Approval Required)
+        /*
         // Convert all received data to string variables for the template
         const variables: Record<string, string> = {}
         const inputLines: string[] = []
@@ -153,10 +154,35 @@ export async function POST(req: NextRequest) {
         variables['name'] = formattedName
 
         await emailService.sendTemplateEmail('inquiry_received', email, variables)
+        */
+
+        // Instead, notify admin (Implementation of admin notification)
+        const adminEmail = process.env.ADMIN_EMAIL || process.env.SMTP_USER
+        if (adminEmail) {
+            const formattedName = second_name ? `${name}・${second_name}` : name
+            await emailService.sendEmail({
+                to: adminEmail,
+                subject: `【新規問合せ】${formattedName}様`,
+                text: `
+ウェブサイトから新規の問い合わせがありました。
+管理画面から内容を確認し、ステータス変更または返信を行ってください。
+
+■申込者情報
+氏名: ${formattedName}
+メール: ${email}
+電話: ${phone || '(なし)'}
+種別: ${result.data.type}
+
+--------------------------------------------------
+Swim Partners Manager
+                `.trim()
+            })
+        }
 
         return NextResponse.json({
             success: true,
-            studentId: newStudent.id
+            studentId: newStudent.id,
+            message: 'Inquiry received. Wating for admin approval.'
         }, { status: 200 })
 
     } catch (error) {

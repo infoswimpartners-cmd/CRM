@@ -13,9 +13,10 @@ import { TrialConfirmButton } from '@/components/admin/TrialConfirmButton'
 import { StripeManager } from '@/components/admin/students/StripeManager'
 import { getStripeCustomerStatus } from '@/actions/stripe'
 import { Badge } from '@/components/ui/badge'
-import { Landmark, Users } from 'lucide-react' // Users was already imported or added in step 2.
+import { Landmark, Users } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
+import { calculateAge } from '@/lib/utils'
 
 export default async function StudentDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params
@@ -136,7 +137,7 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
                                 )}
                                 {student.birth_date && (
                                     <Badge variant="secondary" className="font-normal text-gray-600">
-                                        {new Date(student.birth_date).toLocaleDateString('ja-JP')}生まれ
+                                        {new Date(student.birth_date).toLocaleDateString('ja-JP')}生まれ ({calculateAge(new Date(student.birth_date))}歳)
                                     </Badge>
                                 )}
                             </div>

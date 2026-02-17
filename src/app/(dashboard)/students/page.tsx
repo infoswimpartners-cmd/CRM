@@ -128,6 +128,7 @@ export default function StudentsPage() {
                             <tr>
                                 <th className="px-6 py-4">生徒名</th>
                                 <th className="px-6 py-4">ステータス</th>
+                                <th className="px-6 py-4">会員種別</th>
                                 <th className="px-6 py-4">学年 / 性別</th>
                                 <th className="px-6 py-4">最終更新</th>
                                 <th className="px-6 py-4 text-right">操作</th>
@@ -166,6 +167,12 @@ export default function StudentsPage() {
                                         <td className="px-6 py-4">
                                             <Badge variant="secondary" className={cn("border-0", statusColors[student.status] || 'bg-gray-100 text-gray-800')}>
                                                 {statusLabels[student.status] || student.status || '不明'}
+                                            </Badge>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <Badge variant="outline" className="bg-white text-slate-600 font-normal">
+                                                {/* @ts-ignore */}
+                                                {student.membership_types?.name || student.membership_types?.[0]?.name || '-'}
                                             </Badge>
                                         </td>
                                         <td className="px-6 py-4">

@@ -76,7 +76,7 @@ export function MobileSidebar({ userProfile }: { userProfile: any }) {
 
                             <div className="px-4 mt-6 mb-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">分析・集計</div>
                             <NavItem href="/admin/analytics" icon={DollarSign} label="売上詳細" isActive={pathname?.startsWith('/admin/analytics')} />
-                            <NavItem href="/admin/billing" icon={FileCheck} label="請求承認" isActive={pathname?.startsWith('/admin/billing')} />
+                            <NavItem href="/admin/approvals" icon={FileCheck} label="承認管理" isActive={pathname?.startsWith('/admin/approvals')} />
                             <NavItem href="/admin/reports" icon={Calendar} label="実施メモ一覧" isActive={pathname?.startsWith('/admin/reports')} />
 
                             <div className="px-4 mt-6 mb-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">運営管理</div>

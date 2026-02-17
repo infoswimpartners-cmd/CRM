@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { CompanySettingsForm } from "@/components/admin/CompanySettingsForm"
+import { PaymentSlipTemplateForm } from "@/components/admin/PaymentSlipTemplateForm"
 
 export default async function SettingsPage() {
     return (
@@ -15,6 +16,15 @@ export default async function SettingsPage() {
                 </CardHeader>
                 <CardContent>
                     <CompanySettingsForm />
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>通知書テンプレート設定</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <PaymentSlipTemplateForm />
                 </CardContent>
             </Card>
 

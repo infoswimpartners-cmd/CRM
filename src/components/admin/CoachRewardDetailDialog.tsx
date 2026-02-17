@@ -151,7 +151,7 @@ export function CoachRewardDetailDialog({ coach, stats, lessons, open, onOpenCha
                                     return (
                                         <TableRow key={lesson.id}>
                                             <TableCell className="font-medium">
-                                                {format(new Date(lesson.lesson_date), 'M/d(E) HH:mm', { locale: ja })}
+                                                {format(new Date(lesson.lesson_date), 'M/d(E)', { locale: ja })}
                                             </TableCell>
                                             <TableCell>{lesson.student_name}</TableCell>
                                             <TableCell>{lesson.lesson_masters?.name || '-'}</TableCell>

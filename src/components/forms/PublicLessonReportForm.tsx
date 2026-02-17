@@ -8,6 +8,8 @@ import * as z from 'zod'
 import { format } from 'date-fns'
 import { CalendarIcon, Loader2, Check, ChevronsUpDown } from 'lucide-react'
 
+import { submitPublicLessonReport } from '@/actions/report'
+
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -40,6 +42,7 @@ import {
     CommandItem,
     CommandList,
 } from "@/components/ui/command"
+
 
 const formSchema = z.object({
     coach_id: z.string().min(1, 'コーチを選択してください'),
@@ -85,14 +88,6 @@ export function PublicLessonReportForm() {
     const [isLoadingCoach, setIsLoadingCoach] = useState(false)
     const [restrictedLessonId, setRestrictedLessonId] = useState<string | null>(null)
 
-    // ... (useEffect for masters)
-
-    // ... (useEffect for coaches - wait, coaches logic was removed/simplified? No, strictly removed coaches state in previous steps? No, strictly kept it? 
-    // Actually, foundCoach replaces the list. 
-    // Let's just look at where to add the state. Top of component.)
-
-    // ...
-
     // Filter masters based on restriction
     const displayMasters = restrictedLessonId
         ? lessonMasters.filter(m => m.id === restrictedLessonId)
@@ -103,17 +98,7 @@ export function PublicLessonReportForm() {
         const fetchData = async () => {
             const supabase = createClient()
 
-            // Fetch active lesson masters (publicly visible by policy? OR need active check)
-            // Note: RLS 'Coaches can view active lesson masters'. Public might not see it.
-            // If RLS blocks public, we need an RPC or adjust RLS.
-            // Assumption: RLS allows 'active=true'. Wait, previous RLS was "Coaches".
-            // "Coaches can view active lesson masters" -> authenticated.
-            // ERROR: Public user cannot fetch lesson_masters.
-            // FIX: I will use RPC fetch masters OR rely on the User enabling public on masters.
-            // Let's assume I need to query them. If it fails, I'll know.
-            // FIX: I will likely need an RPC for masters too. 
-            // Or I can add `get_active_lesson_masters_public` to the SQL. 
-            // For now let's Try fetching. If blocked, I'll update the RLS task.
+            // Fetch active lesson masters
             const { data: masters, error: mastersError } = await supabase
                 .from('lesson_masters')
                 .select('id, name, unit_price')
@@ -127,7 +112,7 @@ export function PublicLessonReportForm() {
                 .from('profiles')
                 .select('id, full_name')
                 .eq('role', 'coach')
-                .order('full_name') // Assuming role 'coach' or just all.
+                .order('full_name')
 
             if (profiles) setCoaches(profiles)
         }
@@ -160,8 +145,6 @@ export function PublicLessonReportForm() {
         form.setValue('coach_id', '')
 
         const supabase = createClient()
-        // Format input: ensure 'C' prefix
-        // User inputs only numbers now.
         const searchId = `C${coachNumber}`
 
         const { data, error } = await supabase
@@ -191,7 +174,6 @@ export function PublicLessonReportForm() {
                 return
             }
             const supabase = createClient()
-            // RPC call to fetch students safely
             const { data, error } = await supabase.rpc('get_students_for_coach_public', {
                 p_coach_id: selectedCoachId
             })
@@ -211,35 +193,32 @@ export function PublicLessonReportForm() {
 
     async function onSubmit(values: FormValues) {
         setIsSubmitting(true)
-        const supabase = createClient()
 
         try {
-            // Use RPC to submit report
-            const { data, error } = await supabase.rpc('submit_lesson_report_public', {
-                p_coach_id: values.coach_id,
-                p_student_id: values.student_id ? values.student_id : null,
-                p_student_name: values.student_name,
-                p_lesson_date: values.lesson_date.toISOString(),
-                p_description: values.menu_description || '',
-                p_lesson_master_id: values.lesson_master_id,
-                p_price: values.price,
-                p_location: values.location
+            // Server Action
+            const result = await submitPublicLessonReport({
+                ...values,
+                lesson_date: values.lesson_date.toISOString() as any,
             })
 
-            if (error) throw error
+            if (!result.success) {
+                console.error('Server Action Error:', result.error, result.details)
+                throw new Error(result.error as string)
+            }
 
             toast.success('レポートを送信しました！')
             form.reset()
             router.push('/')
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error submitting report:', error)
-            toast.error('送信に失敗しました。')
+            toast.error(error.message || '送信に失敗しました。')
         } finally {
             setIsSubmitting(false)
         }
     }
 
     return (
+
         <Form {...form}>
             {/* @ts-ignore */}
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">

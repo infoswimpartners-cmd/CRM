@@ -14,6 +14,7 @@ export function PaymentHistory() {
     const [loading, setLoading] = useState(true)
     const [companyInfo, setCompanyInfo] = useState<any>(null)
     const [bankInfo, setBankInfo] = useState<any>(null)
+    const [templateConfig, setTemplateConfig] = useState<any>(null)
     const [userName, setUserName] = useState('')
 
     useEffect(() => {
@@ -53,6 +54,13 @@ export function PaymentHistory() {
                 if (companyRes.ok) {
                     const companyData = await companyRes.json()
                     setCompanyInfo(companyData)
+                }
+
+                // Fetch Template Config
+                const templateRes = await fetch('/api/admin/settings/payment-template')
+                if (templateRes.ok) {
+                    const templateData = await templateRes.json()
+                    setTemplateConfig(templateData)
                 }
 
             } catch (error) {
@@ -178,8 +186,8 @@ export function PaymentHistory() {
                                     </div>
                                 </div>
                                 <div className={`px-2 py-1 rounded-md text-xs font-bold border ${payment.status === 'paid'
-                                        ? 'bg-green-50 text-green-700 border-green-100'
-                                        : 'bg-orange-50 text-orange-700 border-orange-100'
+                                    ? 'bg-green-50 text-green-700 border-green-100'
+                                    : 'bg-orange-50 text-orange-700 border-orange-100'
                                     }`}>
                                     {payment.status === 'paid' ? '支払完了' : '処理中'}
                                 </div>
@@ -210,6 +218,7 @@ export function PaymentHistory() {
                 coachName={userName}
                 companyInfo={companyInfo}
                 bankInfo={bankInfo}
+                templateConfig={templateConfig}
             />
         </>
     )

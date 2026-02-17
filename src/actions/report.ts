@@ -177,6 +177,7 @@ export async function deleteLessonReport(lessonId: string) {
     }
 }
 
+
 export async function updateLessonReport(lessonId: string, values: FormValues) {
     const supabase = await createClient()
 
@@ -245,3 +246,99 @@ export async function updateLessonReport(lessonId: string, values: FormValues) {
         return { success: false, error: '更新に失敗しました' }
     }
 }
+
+const publicFormSchema = z.object({
+    coach_id: z.string().min(1, 'コーチを選択してください'),
+    student_id: z.string().optional(),
+    student_name: z.string().min(1, '生徒名は必須です'),
+    lesson_date: z.string(), // ISO string
+    lesson_master_id: z.string().min(1, 'レッスンの種類を選択してください'),
+    location: z.string().min(1, '場所は必須です'),
+    menu_description: z.string().optional(),
+    price: z.number().min(0),
+})
+
+type PublicFormValues = z.infer<typeof publicFormSchema>
+
+export async function submitPublicLessonReport(values: PublicFormValues) {
+    const supabase = await createClient()
+
+    // 1. Validate Input
+    const parsed = publicFormSchema.safeParse(values)
+    if (!parsed.success) {
+        return { success: false, error: '入力内容が正しくありません', details: parsed.error.flatten() }
+    }
+    const data = parsed.data
+
+    try {
+        // 2. Insert into Supabase using Public RPC
+        const { data: newId, error } = await supabase.rpc('submit_lesson_report_public', {
+            p_coach_id: data.coach_id,
+            p_student_id: data.student_id || null,
+            p_student_name: data.student_name,
+            p_lesson_date: data.lesson_date,
+            p_description: data.menu_description || '',
+            p_lesson_master_id: data.lesson_master_id,
+            p_price: data.price,
+            p_location: data.location
+        })
+
+        if (error) throw error
+
+        // 3. Send Email Notification
+        const toAddress = process.env.REPORT_NOTIFICATION_EMAIL || process.env.SMTP_USER
+
+        if (toAddress) {
+            // Fetch names for email
+            const { data: lessonMaster } = await supabase
+                .from('lesson_masters')
+                .select('name')
+                .eq('id', data.lesson_master_id)
+                .single()
+
+            const { data: coach } = await supabase
+                .from('profiles')
+                .select('full_name')
+                .eq('id', data.coach_id)
+                .single()
+
+            const lessonName = lessonMaster?.name || '不明なレッスン'
+            const coachName = coach?.full_name || 'コーチ'
+            const dateStr = new Date(data.lesson_date).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric', weekday: 'short' })
+
+            // Construct Email Content
+            const subject = `【レッスン報告】${data.student_name}様 (${dateStr})`
+            const emailBody = `
+レッスン報告が提出されました (Public)。
+
+■基本情報
+担当コーチ: ${coachName}
+生徒名: ${data.student_name}
+日時: ${dateStr}
+場所: ${data.location}
+
+■レッスン内容
+種類: ${lessonName}
+金額: ${data.price.toLocaleString()}円
+
+■記録・メモ
+${data.menu_description || '(なし)'}
+
+--------------------------------------------------
+Swim Partners Manager
+            `.trim()
+
+            await emailService.sendEmail({
+                to: toAddress,
+                subject: subject,
+                text: emailBody,
+            })
+        }
+
+        return { success: true }
+    } catch (error: any) {
+        console.error('Public Submission Error:', error)
+        return { success: false, error: '送信に失敗しました' }
+    }
+}
+

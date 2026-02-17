@@ -6,22 +6,20 @@ import { NextResponse } from 'next/server'
 export async function GET(request: Request) {
     const supabase = await createClient()
 
-    // Allow coaches to read company info (for payment notice)
-    // Check auth?
+    // Auth check
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Use Admin Client to bypass RLS for reading public company info
+    // Use Admin Client to bypass RLS (just in case)
     const adminClient = createAdminClient()
 
     const keys = [
-        'company_name',
-        'company_address',
-        'invoice_registration_number',
-        'contact_email',
-        'company_payment_bank_name'
+        'payment_slip_title',
+        'payment_slip_header_paid',
+        'payment_slip_header_processing',
+        'payment_slip_footer'
     ]
 
     const { data: configs, error } = await adminClient
@@ -33,7 +31,6 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    // Transform to object
     const result: Record<string, string> = {}
     configs?.forEach(c => {
         result[c.key] = c.value
@@ -45,7 +42,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
     const supabase = await createClient()
 
-    // Check admin
+    // Admin check
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 

@@ -26,6 +26,12 @@ interface PaymentSlipModalProps {
     transferFee: number
     finalAmount: number
     companyInfo: any // Record<string, string>
+    templateConfig?: {
+        title?: string
+        headerPaid?: string
+        headerProcessing?: string
+        footer?: string
+    }
 }
 
 export function PaymentSlipModal({
@@ -39,7 +45,8 @@ export function PaymentSlipModal({
     systemFee,
     transferFee,
     finalAmount,
-    companyInfo
+    companyInfo,
+    templateConfig
 }: PaymentSlipModalProps) {
     const [open, setOpen] = useState(false)
 
@@ -50,8 +57,6 @@ export function PaymentSlipModal({
     // Fallback if APIs fail
     // Use provided info or empty object
     const cInfo = companyInfo || {}
-
-    const numberFont = { fontFamily: '"MS Mincho", "Hiragino Mincho ProN", serif' }
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
@@ -73,43 +78,43 @@ export function PaymentSlipModal({
                 {/* Printable Area */}
                 <div className="p-8 bg-white" id="payment-slip">
                     <div className="text-center mb-8 border-b pb-4">
-                        <h2 className="text-2xl font-bold text-slate-900 mb-2">支払通知書</h2>
-                        <p className="text-slate-500" style={numberFont}>{targetMonth}分</p>
+                        <h2 className="text-2xl font-bold text-slate-900 mb-2">{templateConfig?.title || '支払通知書'}</h2>
+                        <p className="text-slate-500">{targetMonth}分</p>
                     </div>
 
-                    <div className="flex justify-between items-end mb-8">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 gap-4">
                         <div>
-                            <h3 className="text-xl font-bold text-slate-800 whitespace-nowrap">{coachName} 様</h3>
+                            <h3 className="text-xl font-bold text-slate-800">{coachName} 様</h3>
                         </div>
-                        <div className="text-right">
+                        <div className="text-left md:text-right">
                             <p className="text-sm text-slate-500 mb-1">適用レート</p>
-                            <p className="text-lg font-bold" style={numberFont}>{(rate * 100).toFixed(0)}%</p>
+                            <p className="text-lg font-bold">{(rate * 100).toFixed(0)}%</p>
                         </div>
                     </div>
 
-                    <div className="mb-8">
+                    <div className="mb-8 overflow-x-auto">
                         <table className="w-full text-sm text-left border-collapse">
                             <thead>
-                                <tr className="border-b border-slate-200 whitespace-nowrap">
-                                    <th className="py-2 font-medium text-slate-500">日付</th>
+                                <tr className="border-b border-slate-200">
+                                    <th className="py-2 font-medium text-slate-500 whitespace-nowrap">日付</th>
                                     <th className="py-2 font-medium text-slate-500">レッスン</th>
                                     <th className="py-2 font-medium text-slate-500">生徒氏名</th>
-                                    <th className="py-2 font-medium text-slate-500 text-right">売上(税込)</th>
-                                    <th className="py-2 font-medium text-slate-500 text-right">報酬額</th>
+                                    <th className="py-2 font-medium text-slate-500 text-right whitespace-nowrap">売上<br className="md:hidden" />(税込)</th>
+                                    <th className="py-2 font-medium text-slate-500 text-right whitespace-nowrap">報酬額</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {details.map((detail, index) => (
                                     <tr key={index} className="border-b border-slate-100">
-                                        <td className="py-3 text-slate-700" style={numberFont}>
+                                        <td className="py-3 text-slate-700 whitespace-nowrap">
                                             {format(new Date(detail.date), 'MM/dd')}
                                         </td>
                                         <td className="py-3 text-slate-700">{detail.title}</td>
                                         <td className="py-3 text-slate-700">{detail.studentName}</td>
-                                        <td className="py-3 text-right text-slate-700" style={numberFont}>
+                                        <td className="py-3 text-right text-slate-700 whitespace-nowrap">
                                             ¥{detail.price.toLocaleString()}
                                         </td>
-                                        <td className="py-3 text-right font-medium" style={numberFont}>
+                                        <td className="py-3 text-right font-medium whitespace-nowrap">
                                             ¥{detail.reward.toLocaleString()}
                                         </td>
                                     </tr>
@@ -117,16 +122,16 @@ export function PaymentSlipModal({
                             </tbody>
                             <tfoot>
                                 <tr className="border-t-2 border-slate-300 bg-slate-50">
-                                    <td colSpan={4} className="py-2 pl-2 font-bold text-slate-600">報酬金額 (税込)</td>
-                                    <td className="py-2 text-right font-bold text-slate-800" style={numberFont}>¥{baseAmount.toLocaleString()}</td>
+                                    <td colSpan={4} className="py-2 pl-2 font-bold text-slate-600">報酬金額 <span className="text-xs font-normal text-slate-500">(税込)</span></td>
+                                    <td className="py-2 text-right font-bold text-slate-800 whitespace-nowrap">¥{baseAmount.toLocaleString()}</td>
                                 </tr>
                                 <tr className="border-b border-slate-200">
                                     <td colSpan={4} className="py-2 pl-2 text-slate-600">源泉所得税</td>
-                                    <td className="py-2 text-right font-medium text-red-600" style={numberFont}>▲¥{withholdingTax.toLocaleString()}</td>
+                                    <td className="py-2 text-right font-medium text-red-600 whitespace-nowrap">▲¥{withholdingTax.toLocaleString()}</td>
                                 </tr>
                                 <tr className="border-t-2 border-slate-800">
                                     <td colSpan={4} className="py-4 pl-2 font-bold text-xl text-slate-900">手取支給額</td>
-                                    <td className="py-4 text-right font-bold text-xl text-slate-900" style={numberFont}>
+                                    <td className="py-4 text-right font-bold text-xl text-slate-900 whitespace-nowrap">
                                         ¥{finalAmount.toLocaleString()}
                                     </td>
                                 </tr>
@@ -153,7 +158,7 @@ export function PaymentSlipModal({
                     </div>
 
                     <div className="text-center text-xs text-slate-400 mt-12 print:mt-24">
-                        <p>Swim Partners Manager System</p>
+                        <p>{templateConfig?.footer || 'Swim Partners Manager System'}</p>
                     </div>
                 </div>
 

@@ -16,6 +16,26 @@ import {
 } from "@/components/ui/table"
 import { StudentStatusSelect } from '@/components/customers/StudentStatusSelect'
 import { StudentMembershipSelect } from '@/components/customers/StudentMembershipSelect'
+import { ReceptionEmailButton } from '@/components/customers/ReceptionEmailButton'
+import { calculateAge } from '@/lib/utils'
+import { ArrowUpDown } from 'lucide-react'
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
+
+const statusLabels: Record<string, string> = {
+    inquiry: '問合せ対応中',
+    trial_pending: '体験予定',
+    trial_confirmed: '体験確定',
+    trial_done: '体験受講済',
+    active: '会員',
+    resting: '休会中',
+    withdrawn: '退会'
+}
 
 interface Student {
     id: string
@@ -29,11 +49,20 @@ interface Student {
     membership_types?: {
         name: string
     }
+    contact_email?: string | null
+    birth_date?: string | null
+}
+
+type SortConfig = {
+    key: keyof Student | 'age' | 'membership_name'
+    direction: 'asc' | 'desc'
 }
 
 export default function StudentListPage() {
     const [students, setStudents] = useState<Student[]>([])
     const [search, setSearch] = useState('')
+    const [statusFilter, setStatusFilter] = useState<string>('all')
+    const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'created_at', direction: 'desc' })
     const [loading, setLoading] = useState(true)
     const [isAdmin, setIsAdmin] = useState(false)
 
@@ -62,10 +91,10 @@ export default function StudentListPage() {
                 *,
                 membership_types:membership_type_id (
                     name
-                )
+                ),
+                contact_email
             `)
             .neq('status', 'withdrawn')
-            .order('created_at', { ascending: false })
 
         const { data, error } = await query
         if (error) {
@@ -75,10 +104,39 @@ export default function StudentListPage() {
         setLoading(false)
     }
 
-    const filteredStudents = students.filter(s =>
-        s.full_name.includes(search) ||
-        (s.full_name_kana && s.full_name_kana.includes(search))
-    )
+    const handleSort = (key: SortConfig['key']) => {
+        setSortConfig(current => ({
+            key,
+            direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc'
+        }))
+    }
+
+    const filteredStudents = students
+        .filter(s => {
+            const matchesSearch = s.full_name.includes(search) ||
+                (s.full_name_kana && s.full_name_kana.includes(search))
+
+            if (statusFilter === 'all') return matchesSearch
+            return matchesSearch && s.status === statusFilter
+        })
+        .sort((a, b) => {
+            const { key, direction } = sortConfig
+            let aValue: any = a[key as keyof Student]
+            let bValue: any = b[key as keyof Student]
+
+            // Custom sorting logic
+            if (key === 'membership_name') {
+                aValue = a.membership_types?.name || ''
+                bValue = b.membership_types?.name || ''
+            } else if (key === 'age') {
+                aValue = a.birth_date ? calculateAge(new Date(a.birth_date)) : -1
+                bValue = b.birth_date ? calculateAge(new Date(b.birth_date)) : -1
+            }
+
+            if (aValue < bValue) return direction === 'asc' ? -1 : 1
+            if (aValue > bValue) return direction === 'asc' ? 1 : -1
+            return 0
+        })
 
     return (
         <div className="space-y-6">
@@ -108,7 +166,7 @@ export default function StudentListPage() {
                 )}
             </div>
 
-            <div className="flex items-center py-4">
+            <div className="flex items-center gap-4 py-4">
                 <div className="relative w-full max-w-sm">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
                     <Input
@@ -118,16 +176,43 @@ export default function StudentListPage() {
                         onChange={(e) => setSearch(e.target.value)}
                     />
                 </div>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="ステータス" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">全て表示</SelectItem>
+                        {Object.entries(statusLabels).map(([key, label]) => (
+                            <SelectItem key={key} value={key}>{label}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
             </div>
 
             <div className="border rounded-md bg-white">
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>氏名</TableHead>
-                            <TableHead>ステータス</TableHead>
-                            <TableHead>会員区分</TableHead>
-                            <TableHead>カナ</TableHead>
+                            <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('full_name')}>
+                                <div className="flex items-center gap-1">
+                                    氏名 <ArrowUpDown className="h-3 w-3" />
+                                </div>
+                            </TableHead>
+                            <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('status')}>
+                                <div className="flex items-center gap-1">
+                                    ステータス <ArrowUpDown className="h-3 w-3" />
+                                </div>
+                            </TableHead>
+                            <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('membership_name')}>
+                                <div className="flex items-center gap-1">
+                                    会員区分 <ArrowUpDown className="h-3 w-3" />
+                                </div>
+                            </TableHead>
+                            <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('age')}>
+                                <div className="flex items-center gap-1">
+                                    年齢 <ArrowUpDown className="h-3 w-3" />
+                                </div>
+                            </TableHead>
                             <TableHead>性別</TableHead>
                             <TableHead className="text-right">アクション</TableHead>
                         </TableRow>
@@ -171,12 +256,26 @@ export default function StudentListPage() {
                                             />
                                         </div>
                                     </TableCell>
-                                    <TableCell>{student.full_name_kana || '-'}</TableCell>
+                                    <TableCell>
+                                        {student.birth_date ? (
+                                            <span>{calculateAge(new Date(student.birth_date))}歳</span>
+                                        ) : (
+                                            <span className="text-gray-400">-</span>
+                                        )}
+                                    </TableCell>
                                     <TableCell>{student.gender || '-'}</TableCell>
                                     <TableCell className="text-right">
-                                        <Button variant="ghost" size="sm" asChild>
-                                            <Link href={`/customers/${student.id}`}>詳細</Link>
-                                        </Button>
+                                        <div className="flex justify-end gap-2 items-center">
+                                            <ReceptionEmailButton
+                                                studentId={student.id}
+                                                studentName={student.full_name}
+                                                status={student.status}
+                                                email={student.contact_email}
+                                            />
+                                            <Button variant="ghost" size="sm" asChild>
+                                                <Link href={`/customers/${student.id}`}>詳細</Link>
+                                            </Button>
+                                        </div>
                                     </TableCell>
                                 </TableRow>
                             ))
