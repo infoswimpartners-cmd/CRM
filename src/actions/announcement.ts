@@ -104,7 +104,7 @@ export async function createAnnouncementAction(data: CreateAnnouncementInput) {
 ${data.content}
 
 ━━━━━━━━━━━━━━━━
-ログインして確認: ${process.env.NEXT_PUBLIC_BASE_URL}/coach
+ログインして確認: ${process.env.NEXT_PUBLIC_APP_URL || 'https://manager.swim-partners.com'}/coach
 ━━━━━━━━━━━━━━━━
 `
                 await emailService.sendEmail({
