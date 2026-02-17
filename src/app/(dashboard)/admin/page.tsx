@@ -54,7 +54,8 @@ export default async function AdminDashboard(props: {
         yearlyRevenueData,
         { data: upcomingSchedules },
         { data: myUpcomingSchedules },
-        { count: totalStudents }
+        { count: totalStudents },
+        { data: appConfigs }
     ] = await Promise.all([
         // 1. Fetch Coaches
         supabase.from('profiles').select('*'),
@@ -68,8 +69,13 @@ export default async function AdminDashboard(props: {
                 students (
                     id,
                     full_name,
+                    is_two_person_lesson,
                     membership_types!students_membership_type_id_fkey (
-                        reward_master:lesson_masters!reward_master_id ( unit_price )
+                        reward_master:lesson_masters!reward_master_id ( unit_price ),
+                        membership_type_lessons (
+                            lesson_master_id,
+                            reward_price
+                        )
                     )
                 )
             `)
@@ -83,8 +89,13 @@ export default async function AdminDashboard(props: {
                 students (
                     id,
                     full_name,
+                    is_two_person_lesson,
                     membership_types!students_membership_type_id_fkey (
-                        reward_master:lesson_masters!reward_master_id ( unit_price )
+                        reward_master:lesson_masters!reward_master_id ( unit_price ),
+                        membership_type_lessons (
+                            lesson_master_id,
+                            reward_price
+                        )
                     )
                 )
             `)
@@ -124,7 +135,12 @@ export default async function AdminDashboard(props: {
             .limit(3),
 
         // 8. Fetch Total Students Count
-        supabase.from('students').select('*', { count: 'exact', head: true })
+        supabase.from('students').select('*', { count: 'exact', head: true }),
+
+        // 9. Fetch Tax Settings
+        supabase.from('app_configs')
+            .select('key, value')
+            .like('key', 'coach_tax:%')
     ])
 
     // Calculate Reward Rate for current user (Admin is always 100% locally, but for display logic)
@@ -197,21 +213,7 @@ export default async function AdminDashboard(props: {
     const diffProfit = totalProfit - lastMonthProfit
     const diffCount = thisMonthLessons.length - lastMonthLessons.length
 
-    // Helper for My Recent Lessons UI
-    const calculateMyLessonReward = (lesson: any) => {
-        const master = lesson.lesson_masters
-        if (!master) return 0
 
-        if (master.is_trial) {
-            return 4500
-        }
-
-        // Membership Reward override
-        const membershipRewardPrice = lesson.students?.membership_types?.reward_master?.unit_price
-        const basePrice = membershipRewardPrice ?? master.unit_price
-
-        return Math.floor(basePrice * myRate)
-    }
 
     // Format Schedules for Widget
     const formattedSchedules = upcomingSchedules?.map((s: any) => {
@@ -238,24 +240,62 @@ export default async function AdminDashboard(props: {
         coachRankingMap.set(l.coach_id, existing)
     })
 
+    // Parse Tax Settings
+    const taxMap = new Map<string, boolean>()
+    appConfigs?.forEach((c: any) => {
+        if (c.key.startsWith('coach_tax:')) {
+            const coachId = c.key.replace('coach_tax:', '')
+            try {
+                const val = JSON.parse(c.value)
+                taxMap.set(coachId, val.enabled !== false)
+            } catch {
+                taxMap.set(coachId, true)
+            }
+        }
+    })
+
     const coachRanking = []
     for (const [coachId, cLessons] of coachRankingMap.entries()) {
         const profile = Array.isArray(cLessons[0].profiles) ? cLessons[0].profiles[0] : cLessons[0].profiles
         if (!profile) continue
-        const rate = profile.role === 'admin' ? 1.0 : calculateCoachRate(coachId, lessons as any[], targetDate, profile.override_coach_rank)
+
         let totalSales = 0
-        let totalReward = 0
+        let totalGrossReward = 0
+
+        // 月ごとにグループ化して、その月のレートで報酬を計算する（年間ランキングのため）
+        const monthlyGroups = new Map<string, any[]>()
         cLessons.forEach(l => {
-            totalSales += (l.price || 0)
-            totalReward += calculateLessonReward(l, rate)
+            const d = new Date(l.lesson_date)
+            const mKey = format(d, 'yyyy-MM')
+            if (!monthlyGroups.has(mKey)) monthlyGroups.set(mKey, [])
+            monthlyGroups.get(mKey)!.push(l)
         })
+
+        for (const [mKey, mLessons] of monthlyGroups) {
+            const mDate = new Date(mKey + '-01')
+            // adminは常に1.0、それ以外は該当月のレートを計算
+            const mRate = profile.role === 'admin' ? 1.0 : calculateCoachRate(coachId, lessons as any[], mDate, profile.override_coach_rank)
+
+            mLessons.forEach(l => {
+                totalSales += (l.price || 0)
+                totalGrossReward += calculateLessonReward(l, mRate)
+            })
+        }
+
+        // Calculate Net Reward (Withholding Tax Deduction) - User Request: Gross * 10.21%
+        const taxEnabled = taxMap.has(coachId) ? taxMap.get(coachId) : true
+        // 報酬額から直接引く（課税標準 = 総報酬）
+        const withholdingTax = taxEnabled ? Math.floor(totalGrossReward * 0.1021) : 0
+        const netReward = totalGrossReward - withholdingTax
+
         coachRanking.push({
             id: coachId,
             full_name: profile.full_name,
             avatar_url: profile.avatar_url,
             count: cLessons.length,
             totalSales,
-            totalReward
+            withholdingTax,
+            totalReward: netReward // This is now "Total Payment Amount"
         })
     }
     coachRanking.sort((a, b) => b.totalSales - a.totalSales)

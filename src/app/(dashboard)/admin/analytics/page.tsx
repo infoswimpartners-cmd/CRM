@@ -224,7 +224,8 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
             avatar_url: profile.avatar_url,
             count: lessons.length,
             totalSales,
-            totalReward
+            totalReward,
+            withholdingTax: Math.floor(totalReward * 0.1021)
         })
     }
     coachRanking.sort((a, b) => b.totalSales - a.totalSales)

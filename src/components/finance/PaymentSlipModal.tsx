@@ -122,15 +122,15 @@ export function PaymentSlipModal({
                             </tbody>
                             <tfoot>
                                 <tr className="border-t-2 border-slate-300 bg-slate-50">
-                                    <td colSpan={4} className="py-2 pl-2 font-bold text-slate-600">報酬金額 <span className="text-xs font-normal text-slate-500">(税込)</span></td>
+                                    <td colSpan={4} className="py-2 pl-2 font-bold text-slate-600">報酬金額</td>
                                     <td className="py-2 text-right font-bold text-slate-800 whitespace-nowrap">¥{baseAmount.toLocaleString()}</td>
                                 </tr>
                                 <tr className="border-b border-slate-200">
-                                    <td colSpan={4} className="py-2 pl-2 text-slate-600">源泉所得税</td>
+                                    <td colSpan={4} className="py-2 pl-2 text-slate-600">源泉徴収額</td>
                                     <td className="py-2 text-right font-medium text-red-600 whitespace-nowrap">▲¥{withholdingTax.toLocaleString()}</td>
                                 </tr>
                                 <tr className="border-t-2 border-slate-800">
-                                    <td colSpan={4} className="py-4 pl-2 font-bold text-xl text-slate-900">手取支給額</td>
+                                    <td colSpan={4} className="py-4 pl-2 font-bold text-xl text-slate-900">支払金額合計</td>
                                     <td className="py-4 text-right font-bold text-xl text-slate-900 whitespace-nowrap">
                                         ¥{finalAmount.toLocaleString()}
                                     </td>

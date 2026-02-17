@@ -133,13 +133,13 @@ export default async function PayoutsPage({ searchParams }: { searchParams: { mo
             const nonTaxableAmount = 0
             const taxableAmountIncluded = totalTaxIncluded - nonTaxableAmount
 
-            // 2. Extract Consumption Tax (Internal)
-            const taxRate = 0.10
-            // Assuming invoice registered = true for now as per rewards.ts
-            const isInvoiceRegistered = true
-            // Base = Inclusive / 1.10
-            const taxableBase = isInvoiceRegistered ? Math.floor(taxableAmountIncluded / (1 + taxRate)) : taxableAmountIncluded
-            const consumptionTax = taxableAmountIncluded - taxableBase
+            // 2. Consumption Tax - User Request: Reward Amount = Gross Reward
+            // The "baseAmount" displayed in the slip should be the Total Reward (Gross).
+            // Taxable Base for Withholding is ALSO the Total Reward (Gross).
+            const taxableBase = taxableAmountIncluded // No longer dividing by 1.1
+            const consumptionTax = 0 // Not effectively used/displayed separately as "Consumption Tax" if base is gross
+
+
 
             const RATE_WITHHOLDING = 0.1021
             const SYSTEM_FEE_RATE = 0
