@@ -14,6 +14,9 @@ const formSchema = z.object({
     lesson_master_id: z.string().min(1, 'レッスンの種類を選択してください'),
     location: z.string().min(1, '場所は必須です'),
     menu_description: z.string().optional(),
+    feedback_good: z.string().optional(),
+    feedback_next: z.string().optional(),
+    coach_comment: z.string().optional(),
     price: z.number().min(0),
     billing_price: z.number().min(0).optional(),
 })
@@ -65,6 +68,9 @@ export async function submitLessonReport(values: FormValues) {
             lesson_date: data.lesson_date, // Already ISO string
             location: data.location,
             menu_description: data.menu_description || '',
+            feedback_good: data.feedback_good || '',
+            feedback_next: data.feedback_next || '',
+            coach_comment: data.coach_comment || '',
             price: data.price,
             billing_price: billingPrice,
         })
@@ -230,6 +236,8 @@ export async function updateLessonReport(lessonId: string, values: FormValues) {
             lesson_date: data.lesson_date,
             location: data.location,
             menu_description: data.menu_description || '',
+            feedback_good: data.feedback_good || '',
+            feedback_next: data.feedback_next || '',
             price: data.price,
             billing_price: billingPrice
         }).eq('id', lessonId)

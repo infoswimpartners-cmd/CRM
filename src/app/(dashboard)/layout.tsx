@@ -84,17 +84,10 @@ export default async function DashboardLayout({
             <MobileSidebar userProfile={safeProfile} />
 
             {/* Sidebar (Desktop) */}
-            {/* Sidebar (Desktop) */}
             <DesktopSidebar role={safeProfile.role} />
 
             {/* Main Content */}
-            <div className="md:ml-64 ml-0 flex-1 flex flex-col min-h-screen relative overflow-hidden transition-all duration-300 pt-16 md:pt-0">
-                {/* Background Orbs */}
-                <div className="fixed top-0 left-0 w-full h-full pointer-events-none overflow-hidden z-0">
-                    <div className="absolute top-[-20%] right-[-10%] w-[800px] h-[800px] bg-primary/5 rounded-full blur-[120px] animate-pulse" style={{ animationDuration: '8s' }} />
-                    <div className="absolute bottom-[-20%] left-[10%] w-[600px] h-[600px] bg-blue-400/5 rounded-full blur-[100px] animate-pulse" style={{ animationDuration: '12s' }} />
-                </div>
-
+            <div className="md:ml-64 ml-0 flex-1 flex flex-col min-h-screen transition-all duration-300 pt-16 md:pt-0">
                 {/* Floating Header */}
                 <header className="relative md:sticky md:top-4 z-40 mx-3 md:mx-6 mt-3 md:mt-4">
                     <div className="glass rounded-2xl px-4 md:px-6 py-2 md:py-3 flex items-center justify-between shadow-sm border border-white/40">

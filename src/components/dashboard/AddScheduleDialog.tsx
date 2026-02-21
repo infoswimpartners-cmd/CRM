@@ -149,7 +149,11 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate }
         const fetchStudents = async () => {
             console.log(`[AddScheduleDialog] Fetching students for coachId: ${selectedCoachId}`)
             try {
-                const res = await getStudentsForCoach(selectedCoachId)
+                // If isAdmin and selectedCoachId is 'all', get all students. 
+                // Or if we specifically want to keep the current student, we might need 'all' students 
+                // to avoid the list jumping when coach is changed.
+                const targetId = (isAdmin && studentId !== 'none') ? 'all' : selectedCoachId
+                const res = await getStudentsForCoach(targetId)
                 if (res.success && res.data) {
                     console.log(`[AddScheduleDialog] Students fetched: ${res.data.length}`)
                     setStudents(res.data)
@@ -163,7 +167,7 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate }
             }
         }
         fetchStudents()
-    }, [open, selectedCoachId])
+    }, [open, selectedCoachId, isAdmin, studentId])
 
 
     // Check Student Status when Student & Date selected
@@ -459,15 +463,15 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate }
                             <Label>生徒 <span className="text-red-500">*</span></Label>
                             <Select value={studentId} onValueChange={(val) => {
                                 setStudentId(val)
-                                // Auto-select coach if in 'all' mode or different
+                                // Auto-select coach if in 'all' mode or nothing selected
                                 if (val !== 'none') {
                                     const s = students.find(st => st.id === val)
-                                    // @ts-ignore
-                                    if (s && s.coach_id && s.coach_id !== selectedCoachId) {
-                                        // @ts-ignore
-                                        console.log(`[AutoSelectCoach] Switching to assigned coach: ${s.coach_id}`)
-                                        // @ts-ignore
-                                        setSelectedCoachId(s.coach_id)
+                                    // Only auto-switch if coach is currently 'all' or not set, 
+                                    // and we have an assigned coach for the student.
+                                    // This prevents the "jumping" behavior when editing.
+                                    if (s && (s as any).coach_id && (selectedCoachId === 'all' || !selectedCoachId)) {
+                                        console.log(`[AutoSelectCoach] Switching from ${selectedCoachId} to assigned coach: ${(s as any).coach_id}`)
+                                        setSelectedCoachId((s as any).coach_id)
                                     }
                                 }
                             }} required>

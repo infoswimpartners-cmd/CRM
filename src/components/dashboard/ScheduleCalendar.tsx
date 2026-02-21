@@ -40,6 +40,7 @@ interface Schedule {
     end_time: string
     location?: string
     notes?: string
+    status?: string
     student?: { full_name: string, second_student_name?: string | null } // Joined data structure
     coach_id: string
     profiles?: { full_name: string, avatar_url: string } // Joined Coach data
@@ -47,6 +48,24 @@ interface Schedule {
 
 interface ScheduleCalendarProps {
     adminView?: boolean
+}
+
+const getStatusColor = (status?: string) => {
+    switch (status) {
+        case 'requested': return 'bg-orange-500'
+        case 'booked': return 'bg-blue-600'
+        case 'open': return 'bg-gray-400'
+        default: return 'bg-blue-400'
+    }
+}
+
+const getStatusBorder = (status?: string) => {
+    switch (status) {
+        case 'requested': return 'border-l-4 border-l-orange-500'
+        case 'booked': return 'border-l-4 border-l-blue-600'
+        case 'open': return 'border-l-4 border-l-gray-300'
+        default: return ''
+    }
 }
 
 export function ScheduleCalendar({ adminView = false }: ScheduleCalendarProps) {
@@ -210,7 +229,10 @@ export function ScheduleCalendar({ adminView = false }: ScheduleCalendarProps) {
     const ScheduleCard = ({ schedule }: { schedule: Schedule }) => (
         <Card
             key={schedule.id}
-            className="cursor-pointer hover:shadow-md transition-shadow"
+            className={cn(
+                "cursor-pointer hover:shadow-md transition-shadow",
+                getStatusBorder(schedule.status)
+            )}
             onClick={() => handleScheduleClick(schedule)}
         >
             <CardContent className="p-4 flex gap-4">
@@ -375,8 +397,7 @@ export function ScheduleCalendar({ adminView = false }: ScheduleCalendarProps) {
                                             {schedules.filter(s => isSameDay(new Date(s.start_time), day)).map((s, i) => (
                                                 <div key={s.id} className={cn(
                                                     "w-1.5 h-1.5 rounded-full",
-                                                    // If adminView active, maybe color code? For now just blue default.
-                                                    "bg-blue-400"
+                                                    getStatusColor(s.status)
                                                 )} />
                                             ))}
                                         </div>

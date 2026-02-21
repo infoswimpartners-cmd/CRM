@@ -42,6 +42,8 @@ import {
 } from "@/components/ui/alert-dialog"
 import { toast } from 'sonner'
 
+import { approveSchedule, getStudentsForCoach } from '@/actions/schedule'
+
 interface Schedule {
     id: string
     title: string
@@ -49,8 +51,10 @@ interface Schedule {
     end_time: string
     location?: string
     notes?: string
+    status?: string
     student?: { full_name: string }
     student_id?: string
+    coach_id?: string
 }
 
 interface EditScheduleDialogProps {
@@ -182,15 +186,20 @@ export function EditScheduleDialog({ schedule, open, onOpenChange, onSuccess }: 
     useEffect(() => {
         if (!open || !selectedCoachId) return
         const fetchStudents = async () => {
-            const supabase = createClient()
-            const { data } = await supabase.rpc('get_students_for_coach_public', {
-                p_coach_id: selectedCoachId
-            })
-            if (data) setStudents(data)
-            else setStudents([])
+            // If isAdmin and we want to allow selecting ANY student, or we need to keep currently selected student
+            // For now, let's stick to "Students assigned to the selected coach (Main + Sub)"
+            // But we can use 'all' if we want the same flexibility as AddScheduleDialog for admins
+            const targetId = (isAdmin && studentId !== 'none' && studentId === schedule?.student_id) ? 'all' : selectedCoachId
+
+            const res = await getStudentsForCoach(targetId)
+            if (res.success && res.data) {
+                setStudents(res.data)
+            } else {
+                setStudents([])
+            }
         }
         fetchStudents()
-    }, [open, selectedCoachId])
+    }, [open, selectedCoachId, isAdmin, studentId, schedule?.student_id])
 
 
     // Auto-generate title
@@ -204,6 +213,24 @@ export function EditScheduleDialog({ schedule, open, onOpenChange, onSuccess }: 
         }
     }, [studentId, students, title, open])
 
+
+    const handleApprove = async () => {
+        if (!schedule) return
+        setLoading(true)
+        try {
+            const result = await approveSchedule(schedule.id)
+            if (!result.success) throw new Error(result.error)
+
+            toast.success('予約を確定しました')
+            if (onSuccess) onSuccess()
+            onOpenChange(false)
+        } catch (error: any) {
+            console.error('Approve Error:', error)
+            toast.error(error.message || '確定に失敗しました')
+        } finally {
+            setLoading(false)
+        }
+    }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -427,6 +454,12 @@ export function EditScheduleDialog({ schedule, open, onOpenChange, onSuccess }: 
                                 <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                                     キャンセル
                                 </Button>
+                                {schedule?.status === 'requested' && (
+                                    <Button type="button" onClick={handleApprove} disabled={loading} className="bg-orange-500 hover:bg-orange-600">
+                                        {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                        予約を確定
+                                    </Button>
+                                )}
                                 <Button type="submit" disabled={loading}>
                                     {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                     更新

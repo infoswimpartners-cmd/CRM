@@ -122,6 +122,11 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
                                     {statusLabels[student.status || 'trial_pending'] || '不明'}
                                 </span>
                             )}
+                            {/* Membership Type Badge */}
+                            <Badge variant="outline" className="border-indigo-200 text-indigo-700 bg-indigo-50/50">
+                                {/* @ts-ignore relationship */}
+                                {student.membership_types?.name || '会員種別: 未選択'}
+                            </Badge>
                         </div>
 
                         <div className="flex flex-col sm:flex-row sm:items-end gap-4">
@@ -255,7 +260,7 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
                                 <Label className="text-xs text-slate-500">現在のプラン</Label>
                                 <div className="font-bold text-lg text-slate-800">
                                     {/* @ts-ignore relationship */}
-                                    {student.membership_types?.name || '未設定'}
+                                    {student.membership_types?.name || '未選択'}
                                 </div>
                             </div>
 
@@ -323,6 +328,6 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
                     <StudentLessonHistory lessons={lessons || []} />
                 </TabsContent>
             </Tabs>
-        </div>
+        </div >
     )
 }

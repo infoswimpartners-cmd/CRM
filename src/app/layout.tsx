@@ -8,6 +8,9 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
 };
 
+import AuthProvider from "@/components/providers/AuthProvider";
+import { FluidWaterBackground } from "@/components/layout/FluidWaterBackground";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -16,9 +19,14 @@ export default function RootLayout({
   return (
     <html lang="ja" suppressHydrationWarning>
       <body
-        className={`antialiased font-sans`}
+        className={`antialiased font-sans relative min-h-screen bg-white`}
       >
-        {children}
+        <FluidWaterBackground />
+        <AuthProvider>
+          <div className="relative z-10">
+            {children}
+          </div>
+        </AuthProvider>
         <Toaster />
       </body>
     </html>

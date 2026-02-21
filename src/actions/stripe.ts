@@ -400,3 +400,65 @@ export async function createImmediatePaymentInvoice(scheduleId: string) {
         return { success: false, error: error.message }
     }
 }
+
+export async function createStripeInvoiceItemOnly(scheduleId: string) {
+    const supabase = await createClient()
+
+    try {
+        // 1. Fetch Schedule & Student
+        const { data: schedule } = await supabase
+            .from('lesson_schedules')
+            .select(`
+                id,
+                title,
+                start_time,
+                price,
+                student:students (
+                    id,
+                    stripe_customer_id,
+                    email:contact_email
+                )
+            `)
+            .eq('id', scheduleId)
+            .single()
+
+        if (!schedule) throw new Error('Schedule not found')
+        // @ts-ignore
+        if (!schedule.student?.stripe_customer_id) throw new Error('No Stripe Customer ID')
+        if (!schedule.price) throw new Error('Price not set')
+
+        // 2. Create Invoice Item (Pending, will be picked up by the next invoice/subscription)
+        // @ts-ignore
+        const customerId = schedule.student.stripe_customer_id
+        const itemDescription = `追加レッスン料 (${new Date(schedule.start_time).toLocaleDateString('ja-JP')}): ${schedule.title}`
+
+        const invoiceItem = await stripe.invoiceItems.create({
+            customer: customerId,
+            amount: schedule.price,
+            currency: 'jpy',
+            description: itemDescription,
+            metadata: {
+                schedule_id: schedule.id,
+                type: 'deferred_overage'
+            }
+        })
+
+        // 3. Update DB
+        await supabase
+            .from('lesson_schedules')
+            .update({
+                billing_status: 'ready_to_invoice', // Waiting for the next monthly invoice
+                stripe_invoice_item_id: invoiceItem.id
+            })
+            .eq('id', scheduleId)
+
+        return {
+            success: true,
+            invoiceItemId: invoiceItem.id
+        }
+
+    } catch (error: any) {
+        console.error('Create Invoice Item Only Error:', error)
+        return { success: false, error: error.message }
+    }
+}

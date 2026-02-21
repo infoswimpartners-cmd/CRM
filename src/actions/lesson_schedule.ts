@@ -7,6 +7,7 @@ import { stripe } from '@/lib/stripe'
 import { startOfMonth, endOfMonth, differenceInDays, format, addMonths } from 'date-fns'
 import { emailService } from '@/lib/email'
 import { processLessonBilling } from '@/actions/billing'
+import { createStripeInvoiceItemOnly } from '@/actions/stripe'
 
 import { formatStudentNames } from '@/lib/utils'
 
@@ -367,7 +368,7 @@ export async function approveLessonSchedule(scheduleId: string) {
         // We know student_id exists on scheduleRaw
         const { data: student, error: studentError } = await supabaseAdmin
             .from('students')
-            .select('id, stripe_customer_id, contact_email, full_name, second_student_name, membership_type_id')
+            .select('id, stripe_customer_id, contact_email, full_name, second_student_name, membership_type_id, next_membership_type_id')
             .eq('id', scheduleRaw.student_id)
             .single()
 
@@ -389,7 +390,17 @@ export async function approveLessonSchedule(scheduleId: string) {
         // 2. Check Timing
 
         // [NEW] If student has NO membership (New/Waiting), Force Immediate Billing
+        // UNLESS they have a reservation (next_membership_type_id), then Deferred Billing
         if (!student.membership_type_id) {
+            if (student.next_membership_type_id) {
+                console.log('[ApproveLesson] User has reservation. Creating Deferred Invoice Item.')
+                const billingResult = await createStripeInvoiceItemOnly(schedule.id)
+                if (!billingResult.success) {
+                    return { success: false, error: billingResult.error }
+                }
+                return { success: true, message: '承認完了：次月の月会費と合算して請求されます' }
+            }
+
             console.log('[ApproveLesson] User has no active membership. Forcing Immediate Billing.')
             const billingResult = await processLessonBilling(schedule.id)
             if (!billingResult.success) {
@@ -602,16 +613,28 @@ export async function checkStudentLessonStatus(studentId: string, dateStr: strin
 
             availableLessons = linkedLessons.filter((l: any) => l) // filter nulls
 
-            // Ensure default lesson is included if exists
-            // @ts-ignore
-            const defaultLesson = membership?.default_lesson
-            // @ts-ignore
-            if (defaultLesson && !availableLessons.find(l => l.id === defaultLesson.id)) {
-                availableLessons.push(defaultLesson)
-            }
+            if (availableLessons.length === 0 && !membership) {
+                // [NEW] If NO membership and NO linked lessons, show ALL active lessons
+                console.log(`[CheckStatus] No membership found for student ${studentId}. Fetching all active lessons.`)
+                const { data: allLessons } = await supabaseAdmin
+                    .from('lesson_masters')
+                    .select('id, name, unit_price')
+                    .eq('active', true)
+                    .order('display_order', { ascending: true })
 
-            // Sort by name for consistency
-            availableLessons.sort((a: any, b: any) => a.name.localeCompare(b.name))
+                availableLessons = allLessons || []
+            } else {
+                // Ensure default lesson is included if exists
+                // @ts-ignore
+                const defaultLesson = membership?.default_lesson
+                // @ts-ignore
+                if (defaultLesson && !availableLessons.find(l => l.id === defaultLesson.id)) {
+                    availableLessons.push(defaultLesson)
+                }
+
+                // Sort by name for consistency
+                availableLessons.sort((a: any, b: any) => a.name.localeCompare(b.name))
+            }
         }
 
         return {

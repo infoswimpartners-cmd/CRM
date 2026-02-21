@@ -47,6 +47,9 @@ const formSchema = z.object({
     lesson_master_id: z.string().min(1, 'レッスンの種類を選択してください'),
     location: z.string().min(1, '場所は必須です'),
     menu_description: z.string().optional(),
+    feedback_good: z.string().optional(),
+    feedback_next: z.string().optional(),
+    coach_comment: z.string().optional(),
     price: z.coerce.number().min(0, '金額は0円以上である必要があります'),
 })
 
@@ -100,6 +103,9 @@ export function LessonReportForm() {
             lesson_master_id: '',
             location: '',
             menu_description: '',
+            feedback_good: '',
+            feedback_next: '',
+            coach_comment: '',
             price: 0,
         },
     })
@@ -237,6 +243,8 @@ export function LessonReportForm() {
                     student_id: '',
                     student_name: '',
                     menu_description: '',
+                    feedback_good: '',
+                    feedback_next: '',
                     price: 0,
                     lesson_master_id: '' // Clear this to force re-selection or auto-select based on new student
                 })
@@ -374,14 +382,73 @@ export function LessonReportForm() {
                     name="menu_description"
                     render={({ field }) => (
                         <FormItem>
-                            <FormLabel>レッスン記録/メモ</FormLabel>
+                            <FormLabel>メニュー内容 / メモ</FormLabel>
                             <FormControl>
                                 <Textarea
-                                    placeholder="レッスンの詳細や、特記事項などを入力してください"
-                                    className="resize-none"
+                                    placeholder="実施したメニューや練習内容"
+                                    className="resize-none min-h-[100px]"
                                     {...field}
                                 />
                             </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                        control={form.control as any}
+                        name="feedback_good"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>良かった点</FormLabel>
+                                <FormControl>
+                                    <Textarea
+                                        placeholder="以前より改善された点など"
+                                        className="resize-none min-h-[80px]"
+                                        {...field}
+                                    />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+
+                    <FormField
+                        control={form.control as any}
+                        name="feedback_next"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>次回の課題</FormLabel>
+                                <FormControl>
+                                    <Textarea
+                                        placeholder="次回意識すべきポイントなど"
+                                        className="resize-none min-h-[80px]"
+                                        {...field}
+                                    />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                </div>
+
+                <FormField
+                    control={form.control as any}
+                    name="coach_comment"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>コーチからのコメント</FormLabel>
+                            <FormControl>
+                                <Textarea
+                                    placeholder="保護者や生徒へのメッセージ"
+                                    className="resize-none min-h-[100px]"
+                                    {...field}
+                                />
+                            </FormControl>
+                            <FormDescription>
+                                生徒のダッシュボードに「前回のレポート」として表示されます。
+                            </FormDescription>
                             <FormMessage />
                         </FormItem>
                     )}

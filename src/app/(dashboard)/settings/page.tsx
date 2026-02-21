@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Button } from '@/components/ui/button'
-import { Lock } from 'lucide-react'
+import { Lock, Calendar } from 'lucide-react'
 import Link from 'next/link'
 import { BankInfoForm } from '@/components/settings/BankInfoForm'
 
@@ -88,6 +88,44 @@ export default async function SettingsPage() {
                                     変更する
                                 </Link>
                             </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Googleカレンダー連携</CardTitle>
+                        <CardDescription>
+                            担当コーチのGoogleカレンダーと連携し、予約の空き枠を自動管理します。
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="flex items-center justify-between p-4 border rounded-lg">
+                            <div className="flex items-center gap-4">
+                                <div className="p-2 bg-blue-50 rounded-full">
+                                    <Calendar className="h-6 w-6 text-blue-500" />
+                                </div>
+                                <div>
+                                    <div className="font-medium">Googleカレンダーステータス</div>
+                                    {profile.google_refresh_token ? (
+                                        <div className="flex items-center gap-2 text-sm text-green-600 mt-1">
+                                            <div className="w-2 h-2 bg-green-500 rounded-full" />
+                                            連携済み
+                                        </div>
+                                    ) : (
+                                        <div className="text-sm text-gray-500 mt-1">未連携</div>
+                                    )}
+                                </div>
+                            </div>
+                            {profile.google_refresh_token ? (
+                                <Button variant="outline" disabled className="text-green-600 border-green-200 bg-green-50">
+                                    連携中
+                                </Button>
+                            ) : (
+                                <Button asChild>
+                                    <a href="/api/google/auth">連携する</a>
+                                </Button>
+                            )}
                         </div>
                     </CardContent>
                 </Card>

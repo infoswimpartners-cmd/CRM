@@ -42,13 +42,12 @@ export async function updateSession(request: NextRequest) {
     // issues with users being randomly logged out.
 
     // List of reliable paths that don't need auth check if no cookies present
-    const isAuthPage = request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname.startsWith('/forgot-password')
+    const isAuthPage = request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname.startsWith('/forgot-password') || request.nextUrl.pathname.startsWith('/member/login')
 
     // If on an auth page and no cookies, we can skip the getUser call
     if (isAuthPage) {
         const allCookies = request.cookies.getAll()
         // Simple heuristic: if no cookies at all, or very few, user is likely not logged in
-        // A more robust check might look for specific supabase cookie names if known
         if (allCookies.length === 0) {
             return supabaseResponse
         }
@@ -58,8 +57,27 @@ export async function updateSession(request: NextRequest) {
         data: { user },
     } = await supabase.auth.getUser()
 
-    // Protect routes logic can be added here or in the root middleware
-    // For now, we mainly ensure the session is refreshed
+    // Member routes protection
+    const isMemberPage = request.nextUrl.pathname.startsWith('/member') && !request.nextUrl.pathname.startsWith('/member/login')
+    const isMemberLoginPage = request.nextUrl.pathname.startsWith('/member/login')
+    const nextAuthSessionToken = request.cookies.get('next-auth.session-token')?.value || request.cookies.get('__Secure-next-auth.session-token')?.value
+
+    if (isMemberPage) {
+        // If has Supabase user or NextAuth session, allow access
+        if (user || nextAuthSessionToken) {
+            return supabaseResponse
+        }
+        // Otherwise redirect to login
+        const url = request.nextUrl.clone()
+        url.pathname = '/member/login'
+        return NextResponse.redirect(url)
+    }
+
+    if (isMemberLoginPage && (user || nextAuthSessionToken)) {
+        const url = request.nextUrl.clone()
+        url.pathname = '/member/dashboard'
+        return NextResponse.redirect(url)
+    }
 
     return supabaseResponse
 }

@@ -73,41 +73,99 @@ export async function POST(req: NextRequest) {
                                 location: lessonLocation
                             }
                         )
-                        if (studentEmailSent) {
-                            console.log(`[Stripe Webhook] Trial confirmation email sent to ${student.contact_email}`)
-                        } else {
-                            console.error(`[Stripe Webhook] Failed to send email to ${student.contact_email}`)
+                    }
+                } else if (type === 'ticket_purchase' && studentId) {
+                    // --- TICKET PURCHASE LOGIC ---
+                    const amount = parseInt(session.metadata?.ticketAmount || '0', 10);
+                    console.log(`[Stripe Webhook] Processing Ticket Purchase for Student: ${studentId}, Amount: ${amount}`);
+
+                    if (amount > 0) {
+                        // 1. Fetch current tickets
+                        const { data: student, error: fetchError } = await supabaseAdmin
+                            .from('students')
+                            .select('current_tickets')
+                            .eq('id', studentId)
+                            .single();
+
+                        if (fetchError || !student) {
+                            console.error('[Stripe Webhook] Failed to fetch student for ticket update:', fetchError);
+                            throw fetchError;
                         }
 
-                        // 4. Send Admin Notification
-                        const adminEmail = process.env.ADMIN_EMAIL || process.env.SMTP_USER || 'info@swim-partners.com'
-                        const adminEmailSent = await emailService.sendEmail({
-                            to: adminEmail,
-                            subject: '【管理者通知】体験レッスンの決済が完了しました',
-                            text: `以下の生徒の体験レッスン料の決済が完了しました。\n\n氏名: ${student.full_name}\n日時: ${formattedDate}\n場所: ${lessonLocation}\nステータス: 体験確定\n\n管理画面で確認してください。`
-                        })
-                        if (adminEmailSent) {
-                            console.log(`[Stripe Webhook] Admin notification sent to ${adminEmail}`)
+                        const currentBalance = student.current_tickets || 0;
+                        const newBalance = currentBalance + amount;
+
+                        // 2. Update Student Balance
+                        const { error: updateError } = await supabaseAdmin
+                            .from('students')
+                            .update({ current_tickets: newBalance })
+                            .eq('id', studentId);
+
+                        if (updateError) {
+                            console.error('[Stripe Webhook] Failed to update ticket balance:', updateError);
+                            throw updateError;
                         }
-                    } else {
-                        console.error('[Stripe Webhook] Failed to fetch student info for email')
+
+                        // 3. Record Transaction
+                        // ticket_transactions might not exist if migration failed, so we try/catch or assume it exists based on previous verification
+                        try {
+                            const { error: txError } = await supabaseAdmin
+                                .from('ticket_transactions')
+                                .insert({
+                                    student_id: studentId,
+                                    change_amount: amount,
+                                    balance_after: newBalance,
+                                    reason: 'チケット購入',
+                                    related_id: session.id // Store Stripe Session ID
+                                });
+
+                            if (txError) {
+                                console.error('[Stripe Webhook] Failed to insert transaction record:', txError);
+                                // Non-critical error, balance is already updated
+                            }
+                        } catch (e) {
+                            console.error('[Stripe Webhook] Transaciton insert failed (Unknown error):', e);
+                        }
+
+                        console.log(`[Stripe Webhook] Successfully added ${amount} tickets to Student ${studentId}. New Balance: ${newBalance}`);
                     }
                 }
                 break
             }
             case 'invoice.paid': {
                 const invoice = event.data.object as Stripe.Invoice
-                const scheduleId = invoice.metadata?.schedule_id
+                const mainScheduleId = invoice.metadata?.schedule_id
+                const paymentIntentId = typeof (invoice as any).payment_intent === 'string'
+                    ? (invoice as any).payment_intent
+                    : (invoice as any).payment_intent?.id
 
-                if (scheduleId) {
-                    console.log(`[Stripe Webhook] Invoice paid for schedule: ${scheduleId}`)
+                // 1. Process Main Schedule (Legacy/Direct Invoice)
+                if (mainScheduleId) {
+                    console.log(`[Stripe Webhook] Invoice paid for main schedule: ${mainScheduleId}`)
                     await supabaseAdmin
                         .from('lesson_schedules')
                         .update({
                             billing_status: 'paid',
-                            payment_intent_id: typeof (invoice as any).payment_intent === 'string' ? (invoice as any).payment_intent : (invoice as any).payment_intent?.id
+                            payment_intent_id: paymentIntentId ?? null
                         })
-                        .eq('id', scheduleId)
+                        .eq('id', mainScheduleId)
+                }
+
+                // 2. Process Deferred Schedules (Consolidated Overage Billing)
+                // Consolidated items (InvoiceItems) will have schedule_id in their metadata
+                const lineItems = invoice.lines.data
+                for (const line of lineItems) {
+                    const sid = line.metadata?.schedule_id
+                    if (sid && sid !== mainScheduleId) {
+                        console.log(`[Stripe Webhook] Invoice paid for consolidated schedule: ${sid}`)
+                        await supabaseAdmin
+                            .from('lesson_schedules')
+                            .update({
+                                billing_status: 'paid',
+                                payment_intent_id: paymentIntentId ?? null
+                            })
+                            .eq('id', sid)
+                    }
                 }
                 break
             }
