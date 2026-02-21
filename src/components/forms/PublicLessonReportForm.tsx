@@ -8,7 +8,7 @@ import * as z from 'zod'
 import { format } from 'date-fns'
 import { CalendarIcon, Loader2, Check, ChevronsUpDown } from 'lucide-react'
 
-import { submitPublicLessonReport } from '@/actions/report'
+import { submitPublicLessonReport, getStudentsForCoachPublicAction } from '@/actions/report'
 
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
@@ -173,12 +173,14 @@ export function PublicLessonReportForm() {
                 form.setValue('student_name', '')
                 return
             }
-            const supabase = createClient()
-            const { data, error } = await supabase.rpc('get_students_for_coach_public', {
-                p_coach_id: selectedCoachId
-            })
-            if (data) setStudents(data)
-            if (error) console.error("Error fetching students via RPC:", error)
+            // Use Server Action instead of RPC to bypass RLS without manual DB updates
+            const result = await getStudentsForCoachPublicAction(selectedCoachId)
+
+            if (result.success && result.data) {
+                setStudents(result.data as Student[])
+            } else {
+                console.error("Error fetching students via Server Action")
+            }
         }
         fetchStudents()
     }, [selectedCoachId])

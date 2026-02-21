@@ -350,3 +350,68 @@ Swim Partners Manager
     }
 }
 
+export async function getStudentsForCoachPublicAction(coachId: string) {
+    // Use the admin client to bypass RLS since public (anon) users cannot read the students table
+    const { createAdminClient } = await import('@/lib/supabase/admin')
+    const supabaseAdmin = createAdminClient()
+
+    // Fetch direct associations
+    const { data: directData, error: directError } = await supabaseAdmin
+        .from('students')
+        .select(`
+            id, 
+            full_name, 
+            membership_types ( default_lesson_master_id )
+        `)
+        .eq('coach_id', coachId)
+
+    // Fetch associations via junction table
+    const { data: junctionData, error: junctionError } = await supabaseAdmin
+        .from('student_coaches')
+        .select(`
+            students (
+                id, 
+                full_name, 
+                membership_types ( default_lesson_master_id )
+            )
+        `)
+        .eq('coach_id', coachId)
+
+    if (directError || junctionError) {
+        console.error('Error fetching students server action:', directError || junctionError)
+        return { success: false, data: [] }
+    }
+
+    type StudentData = {
+        id: string;
+        full_name: string;
+        default_master_id?: string;
+    }
+
+    const extractMembership = (s: any): StudentData => {
+        const membership = Array.isArray(s.membership_types) ? s.membership_types[0] : s.membership_types;
+        return {
+            id: s.id,
+            full_name: s.full_name,
+            default_master_id: membership?.default_lesson_master_id
+        }
+    }
+
+    const combined: StudentData[] = (directData || []).map(extractMembership)
+
+    if (junctionData) {
+        for (const item of junctionData) {
+            // relationship is many-to-one, returning a single object via junction
+            const student = item.students as any
+            if (student && !combined.find(s => s.id === student.id)) {
+                combined.push(extractMembership(student))
+            }
+        }
+    }
+
+    // sort by full_name
+    combined.sort((a, b) => a.full_name.localeCompare(b.full_name))
+
+    return { success: true, data: combined }
+}
+
