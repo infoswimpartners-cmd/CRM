@@ -361,7 +361,7 @@ export async function getStudentsForCoachPublicAction(coachId: string) {
         .select(`
             id, 
             full_name, 
-            membership_types ( default_lesson_master_id )
+            membership_types!students_membership_type_id_fkey ( default_lesson_master_id )
         `)
         .eq('coach_id', coachId)
 
@@ -372,7 +372,7 @@ export async function getStudentsForCoachPublicAction(coachId: string) {
             students (
                 id, 
                 full_name, 
-                membership_types ( default_lesson_master_id )
+                membership_types!students_membership_type_id_fkey ( default_lesson_master_id )
             )
         `)
         .eq('coach_id', coachId)
