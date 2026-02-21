@@ -36,14 +36,36 @@ async function calculateMonthlyUsage(
     monthlyLimit: number,
     maxRollover: number,
     membershipStartedAt?: string | null,
-    createdAt?: string | null // [NEW] Fallback
+    createdAt?: string | null
 ): Promise<MonthlyUsageResult> {
-    // 1. Current Month Usage
+    // [NEW] 1. Pre-membership Check
+    // If targetDate is before membershipStartedAt (by month), return 0 limit.
+    const JST_OFFSET = 9 * 60 * 60 * 1000
+    if (membershipStartedAt) {
+        const startUtcTime = new Date(membershipStartedAt).getTime()
+        const startJstTime = startUtcTime + JST_OFFSET
+        const startJstDate = new Date(startJstTime)
+
+        const targetUtcTime = targetDate.getTime()
+        const targetJstTime = targetUtcTime + JST_OFFSET
+        const targetJstDate = new Date(targetJstTime)
+
+        const startMonthCode = startJstDate.getUTCFullYear() * 100 + startJstDate.getUTCMonth()
+        const targetMonthCode = targetJstDate.getUTCFullYear() * 100 + targetJstDate.getUTCMonth()
+
+        if (targetMonthCode < startMonthCode) {
+            console.log(`[CalcUsage] Target Date is before Membership Start Date. Limit is 0.`)
+            return {
+                currentTotal: 0,
+                rollover: 0,
+                effectiveLimit: 0
+            }
+        }
+    }
+
+    // 2. Current Month Usage
     const start = startOfMonth(targetDate).toISOString()
     const end = endOfMonth(targetDate).toISOString()
-
-    // Note: We count ALL lessons/schedules, including overage ones? 
-    // Usually usage counts everything. The Limit determines if the NEXT one is overage.
 
     const { count: completed } = await supabaseAdmin
         .from('lessons')
@@ -61,36 +83,34 @@ async function calculateMonthlyUsage(
 
     const currentTotal = (completed || 0) + (scheduled || 0)
 
-    // 2. Previous Month Rollover calculation
+    // 3. Previous Month Rollover calculation
     let rollover = 0
-    if (monthlyLimit > 0 && maxRollover > 0) {
+    // [NEW] Custom Rollover Limit Logic
+    let appliedMaxRollover = maxRollover
+    if (monthlyLimit === 4) {
+        appliedMaxRollover = 2
+    } else if (monthlyLimit === 2) {
+        appliedMaxRollover = 1
+    }
+
+    if (monthlyLimit > 0 && appliedMaxRollover > 0) {
         const prevDate = addMonths(targetDate, -1)
         const prevStart = startOfMonth(prevDate).toISOString()
         const prevEnd = endOfMonth(prevDate).toISOString()
 
-        // [NEW] Logic: If previous month is BEFORE membership start, No Rollover
-        // [NEW] Logic: If previous month is BEFORE membership start, No Rollover
         let canHaveRollover = true
         if (membershipStartedAt) {
-            // Fix: Compare in JST to handle "1st of Month" joiners correctly
-            // (Server is UTC, so 1st 00:00 JST is PrevMonth 15:00 UTC)
-
-            const JST_OFFSET = 9 * 60 * 60 * 1000
-
-            // 1. Shift timestamps to JST (as UTC scalar)
             const startUtcTime = new Date(membershipStartedAt).getTime()
             const startJstTime = startUtcTime + JST_OFFSET
-            const startJstDate = new Date(startJstTime) // Treated as UTC-container for JST values
+            const startJstDate = new Date(startJstTime)
 
             const targetUtcTime = targetDate.getTime()
             const targetJstTime = targetUtcTime + JST_OFFSET
             const targetJstDate = new Date(targetJstTime)
 
-            // 2. Compare Year-Month
             const startMonthCode = startJstDate.getUTCFullYear() * 100 + startJstDate.getUTCMonth()
             const targetMonthCode = targetJstDate.getUTCFullYear() * 100 + targetJstDate.getUTCMonth()
 
-            // If Start Month is SAME as or AFTER Target Month -> No Rollover (Joined this month or later)
             if (startMonthCode >= targetMonthCode) {
                 canHaveRollover = false
                 console.log(`[CalcUsage] No rollover: StartMonth(JST) ${startMonthCode} >= TargetMonth(JST) ${targetMonthCode}`)
@@ -98,7 +118,6 @@ async function calculateMonthlyUsage(
                 console.log(`[CalcUsage] Rollover ALLOWED: StartMonth(JST) ${startMonthCode} < TargetMonth(JST) ${targetMonthCode}`)
             }
         } else {
-            // [NEW] If no membership started at date, no rollover possible
             canHaveRollover = false
         }
 
@@ -121,9 +140,8 @@ async function calculateMonthlyUsage(
 
             const prevTotal = (prevCompleted || 0) + (prevScheduled || 0)
 
-            // Calculate unused
             const unused = Math.max(0, monthlyLimit - prevTotal)
-            rollover = Math.min(unused, maxRollover)
+            rollover = Math.min(unused, appliedMaxRollover)
         }
     }
 
