@@ -97,6 +97,9 @@ async function calculateMonthlyUsage(
             } else {
                 console.log(`[CalcUsage] Rollover ALLOWED: StartMonth(JST) ${startMonthCode} < TargetMonth(JST) ${targetMonthCode}`)
             }
+        } else {
+            // [NEW] If no membership started at date, no rollover possible
+            canHaveRollover = false
         }
 
         console.log(`[CalcUsage] canHaveRollover: ${canHaveRollover}, StartedAt: ${membershipStartedAt}`)
@@ -160,19 +163,27 @@ export async function createLessonSchedule(params: CreateLessonScheduleParams) {
                 .select(`
                     id, 
                     membership_type_id,
+                    next_membership_type_id,
                     stripe_customer_id,
-                    contact_email,
                     contact_email,
                     membership_started_at,
                     created_at,
                     full_name,
                     second_student_name,
                     status,
-                    membership_types!students_membership_type_id_fkey (
+                    membership:membership_types!students_membership_type_id_fkey (
                         monthly_lesson_limit,
                         max_rollover_limit,
                         fee,
-                        name
+                        name,
+                        default_lesson:lesson_masters!default_lesson_master_id(unit_price)
+                    ),
+                    next_membership:membership_types!students_next_membership_type_id_fkey (
+                        monthly_lesson_limit,
+                        max_rollover_limit,
+                        fee,
+                        name,
+                        default_lesson:lesson_masters!default_lesson_master_id(unit_price)
                     )
                 `)
                 .eq('id', studentId)
@@ -182,7 +193,8 @@ export async function createLessonSchedule(params: CreateLessonScheduleParams) {
                 console.error('Student fetch error:', studentError)
             } else if (student) {
                 // @ts-ignore
-                const membership = Array.isArray(student.membership_types) ? student.membership_types[0] : student.membership_types
+                const membershipSource = student.membership || student.next_membership
+                const membership = Array.isArray(membershipSource) ? membershipSource[0] : membershipSource
                 const limit = membership?.monthly_lesson_limit
                 const maxRollover = membership?.max_rollover_limit || 0
                 const membershipName = membership?.name
@@ -240,11 +252,19 @@ export async function createLessonSchedule(params: CreateLessonScheduleParams) {
                     }
 
                     if (overagePrice === 0) {
-                        // Fallback price logic
-                        if (membership?.fee && limit > 0) {
+                        // [FIX] 会員区分の標準レッスン単価を適用
+                        // @ts-ignore
+                        const defaultLesson = Array.isArray(membership?.default_lesson) ? membership.default_lesson[0] : membership?.default_lesson
+                        const defaultUnitPrice = defaultLesson?.unit_price
+
+                        if (defaultUnitPrice) {
+                            overagePrice = defaultUnitPrice
+                            console.log(`[CreateLesson] Using default lesson unit price: ${overagePrice}`)
+                        } else if (membership?.fee && limit > 0) {
+                            // Fallback to average if no default lesson price
                             overagePrice = Math.floor(membership.fee / limit)
                         } else {
-                            // Default fallback if no membership fee or limit
+                            // Final safety fallback
                             overagePrice = 8800
                         }
                     }
@@ -368,7 +388,7 @@ export async function approveLessonSchedule(scheduleId: string) {
         // We know student_id exists on scheduleRaw
         const { data: student, error: studentError } = await supabaseAdmin
             .from('students')
-            .select('id, stripe_customer_id, contact_email, full_name, second_student_name, membership_type_id, next_membership_type_id')
+            .select('id, stripe_customer_id, contact_email, full_name, second_student_name, membership_type_id, next_membership_type_id, membership_started_at')
             .eq('id', scheduleRaw.student_id)
             .single()
 
@@ -392,6 +412,9 @@ export async function approveLessonSchedule(scheduleId: string) {
         // [NEW] If student has NO membership (New/Waiting), Force Immediate Billing
         // UNLESS they have a reservation (next_membership_type_id), then Deferred Billing
         if (!student.membership_type_id) {
+            // [MODIFIED] If no membership but has reservation OR if it's before start date
+            // The is_overage flag should already be true from createLessonSchedule.
+            // Here we ensure it goes to Deferred Billing if they have a next plan.
             if (student.next_membership_type_id) {
                 console.log('[ApproveLesson] User has reservation. Creating Deferred Invoice Item.')
                 const billingResult = await createStripeInvoiceItemOnly(schedule.id)
@@ -401,12 +424,26 @@ export async function approveLessonSchedule(scheduleId: string) {
                 return { success: true, message: '承認完了：次月の月会費と合算して請求されます' }
             }
 
-            console.log('[ApproveLesson] User has no active membership. Forcing Immediate Billing.')
+            console.log('[ApproveLesson] User has no active membership and no reservation. Forcing Immediate Billing.')
             const billingResult = await processLessonBilling(schedule.id)
             if (!billingResult.success) {
                 return { success: false, error: billingResult.error }
             }
             return { success: true }
+        }
+
+        // [NEW] Also handle case where they HAVE membership_type_id but the lesson is BEFORE membership_started_at
+        if (student.membership_started_at) {
+            const startDate = new Date(student.membership_started_at)
+            const lessonDate = new Date(schedule.start_time)
+            if (lessonDate < startDate) {
+                console.log('[ApproveLesson] Lesson is before membership start. Creating Deferred Invoice Item.')
+                const billingResult = await createStripeInvoiceItemOnly(schedule.id)
+                if (!billingResult.success) {
+                    return { success: false, error: billingResult.error }
+                }
+                return { success: true, message: '承認完了：入会初月の月会費と合算して請求されます' }
+            }
         }
 
         // Deadline: Day before lesson at 12:00 JST
@@ -588,15 +625,14 @@ export async function checkStudentLessonStatus(studentId: string, dateStr: strin
             // Check Start Date
             if (student.membership_started_at) {
                 const startDate = new Date(student.membership_started_at)
-                // Normalize to start of day? Or exact time? Usually start of day.
-                // Let's be lenient: if lesson date is strictly before start date (day level?)
-                // If start date is "2024-02-01", and lesson is "2024-01-31", it is overage.
                 if (date < startDate) {
-                    // But wait, date is the lesson start time (e.g. 10:00).
-                    // If start date is 2024-02-01 00:00:00, then 2024-01-31 is less.
                     isOverage = true
                     console.log(`[CheckStatus] Pre-membership lesson. Date: ${date.toISOString()}, Start: ${startDate.toISOString()}`)
                 }
+            } else if (student.status !== 'trial_pending' && student.status !== 'trial_confirmed') {
+                // [NEW] No active membership and not a trial -> Definitely Overage (Visitor or Next Month Starter)
+                isOverage = true
+                console.log(`[CheckStatus] No active membership. Setting to overage.`)
             }
 
             if (!isOverage) {
