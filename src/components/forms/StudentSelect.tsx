@@ -40,14 +40,54 @@ export function StudentSelect({ onSelect, selectedName, coachId }: StudentSelect
     React.useEffect(() => {
         const fetchStudents = async () => {
             const supabase = createClient()
-            let query = supabase.from('students').select('id, full_name, full_name_kana').order('full_name')
 
             if (coachId) {
-                query = query.eq('coach_id', coachId)
-            }
+                // Fetch direct associations
+                const { data: directData, error: directError } = await supabase
+                    .from('students')
+                    .select('id, full_name, full_name_kana')
+                    .eq('coach_id', coachId)
 
-            const { data } = await query
-            if (data) setStudents(data)
+                // Fetch associations via junction table
+                const { data: junctionData, error: junctionError } = await supabase
+                    .from('student_coaches')
+                    .select('students(id, full_name, full_name_kana)')
+                    .eq('coach_id', coachId)
+
+                if (directError || junctionError) {
+                    console.error('Error fetching students:', directError || junctionError)
+                    return
+                }
+
+                // Merge and deduplicate
+                const combined = [...(directData || [])]
+
+                if (junctionData) {
+                    for (const item of junctionData) {
+                        // relationship is many-to-one, returning a single object
+                        const student = item.students as unknown as Student
+                        if (student && !combined.find(s => s.id === student.id)) {
+                            combined.push(student)
+                        }
+                    }
+                }
+
+                // sort by full_name
+                combined.sort((a, b) => a.full_name.localeCompare(b.full_name))
+                setStudents(combined)
+            } else {
+                const { data, error } = await supabase
+                    .from('students')
+                    .select('id, full_name, full_name_kana')
+                    .order('full_name')
+
+                if (error) {
+                    console.error('Error fetching students:', error)
+                    return
+                }
+
+                if (data) setStudents(data)
+            }
         }
         fetchStudents()
     }, [coachId])
