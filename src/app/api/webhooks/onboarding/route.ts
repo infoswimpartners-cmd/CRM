@@ -1,4 +1,3 @@
-
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { z } from 'zod'
@@ -129,8 +128,7 @@ export async function POST(req: NextRequest) {
         // 4. Notify Admin (Optional - Logging for now, could send email to Admin)
         console.log(`[Onboarding] Success! Lead Created: ${newStudent.id}`)
 
-        // 5. Send Receipt Email -> REMOVED (Manual Approval Required)
-        /*
+        // 5. Send Receipt Email -> Restored (Added to approval queue)
         // Convert all received data to string variables for the template
         const variables: Record<string, string> = {}
         const inputLines: string[] = []
@@ -154,7 +152,6 @@ export async function POST(req: NextRequest) {
         variables['name'] = formattedName
 
         await emailService.sendTemplateEmail('inquiry_received', email, variables)
-        */
 
         // Instead, notify admin (Implementation of admin notification)
         const adminEmail = process.env.ADMIN_EMAIL || process.env.SMTP_USER
