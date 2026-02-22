@@ -146,9 +146,8 @@ ${text}
 
             // Replace variables
             for (const [k, v] of Object.entries(variables)) {
-                // Match {{key}}
-                const regex = new RegExp(`{{ ${k}}
-        }`, 'g')
+                // Match {{ key }}
+                const regex = new RegExp(`\\{\\{\\s*${k}\\s*\\}\\}`, 'g')
                 subject = subject.replace(regex, v)
                 body = body.replace(regex, v)
             }
