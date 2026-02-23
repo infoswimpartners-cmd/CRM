@@ -33,6 +33,7 @@ interface Lesson {
     student_name: string
     lesson_date: string
     lesson_master_id: string
+    coach_id: string
     location: string
     menu_description: string | null
     price: number
@@ -40,14 +41,22 @@ interface Lesson {
 
 interface Props {
     lesson: Lesson
+    currentUserId: string
+    isAdmin?: boolean
     onDelete?: () => void
 }
 
-export function LessonHistoryActions({ lesson, onDelete }: Props) {
+export function LessonHistoryActions({ lesson, currentUserId, isAdmin, onDelete }: Props) {
     const router = useRouter()
     const [isEditOpen, setIsEditOpen] = useState(false)
     const [isDeleteOpen, setIsDeleteOpen] = useState(false)
     const [isDeleting, setIsDeleting] = useState(false)
+
+    const isEditable = isAdmin || currentUserId === lesson.coach_id
+
+    if (!isEditable) {
+        return null
+    }
 
     const handleDelete = async () => {
         setIsDeleting(true)

@@ -13,6 +13,7 @@ interface Lesson {
     student_name: string
     lesson_date: string
     lesson_master_id: string
+    coach_id: string
     location: string
     menu_description: string | null
     price: number
@@ -20,9 +21,11 @@ interface Lesson {
 
 interface Props {
     lesson: Lesson
+    currentUserId: string
+    isAdmin?: boolean
 }
 
-export function LessonHistoryRow({ lesson }: Props) {
+export function LessonHistoryRow({ lesson, currentUserId, isAdmin }: Props) {
     const [isDeleted, setIsDeleted] = useState(false)
 
     if (isDeleted) {
@@ -52,6 +55,8 @@ export function LessonHistoryRow({ lesson }: Props) {
             <TableCell>
                 <LessonHistoryActions
                     lesson={lesson}
+                    currentUserId={currentUserId}
+                    isAdmin={isAdmin}
                     onDelete={() => setIsDeleted(true)}
                 />
             </TableCell>

@@ -29,6 +29,13 @@ export default async function CoachHistoryPage({
         redirect('/login')
     }
 
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+    const isAdmin = profile?.role === 'admin'
+
     // Determine date range for filtering
     const currentDate = new Date()
     let startDate: Date | null = null
@@ -145,7 +152,12 @@ export default async function CoachHistoryPage({
                                 </TableHeader>
                                 <TableBody>
                                     {lessons.map((lesson) => (
-                                        <LessonHistoryRow key={lesson.id} lesson={lesson} />
+                                        <LessonHistoryRow
+                                            key={lesson.id}
+                                            lesson={lesson as any}
+                                            currentUserId={user.id}
+                                            isAdmin={isAdmin}
+                                        />
                                     ))}
                                 </TableBody>
                             </Table>

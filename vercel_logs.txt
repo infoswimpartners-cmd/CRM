@@ -1,0 +1,8 @@
+Vercel CLI 50.22.1
+Retrieving project…
+Resolving deployment "swim-partners-manager.vercel.app"
+Streaming logs for deployment dpl_EBgXNTVMmtJYqjGFL6kZGN1XFeJA starting from 09:40:55.15
+
+waiting for new logs...
+WARN! Exceeded query duration limit of 5 minutes
+

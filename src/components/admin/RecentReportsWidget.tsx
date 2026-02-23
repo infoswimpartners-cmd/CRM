@@ -15,6 +15,7 @@ import {
 
 type RecentReport = {
     id: string
+    coach_id: string
     lesson_date: string
     student_name: string
     menu_description: string | null
@@ -207,14 +208,16 @@ export function RecentReportsWidget({ reports: initialReports, coachId }: { repo
                                 </div>
                             </div>
 
-                            <div className="pt-2">
-                                <Button asChild className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl py-6">
-                                    <Link href={`/coach/lessons/${selectedReport.id}/media`}>
-                                        <Video className="w-4 h-4 mr-2" />
-                                        動画・写真を追加/管理
-                                    </Link>
-                                </Button>
-                            </div>
+                            {(!coachId || (coachId === selectedReport.coach_id)) && (
+                                <div className="pt-2">
+                                    <Button asChild className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl py-6">
+                                        <Link href={`/coach/lessons/${selectedReport.id}/media`}>
+                                            <Video className="w-4 h-4 mr-2" />
+                                            動画・写真を追加/管理
+                                        </Link>
+                                    </Button>
+                                </div>
+                            )}
                         </div>
                     )}
                 </DialogContent>
