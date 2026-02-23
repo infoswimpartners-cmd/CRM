@@ -193,4 +193,22 @@
   .safe-bottom {
     padding-bottom: env(safe-area-inset-bottom);
   }
+
+  /* ーーー 共通コンテナ（全ページ横幅・余白を統一） ーーー */
+  .page-container {
+    @apply w-full max-w-5xl mx-auto px-4 sm:px-6;
+  }
+
+  /* ーーー タップターゲット強制（44px × 44px 以上） ーーー */
+  .tap-target {
+    @apply min-h-[44px] min-w-[44px];
+    touch-action: manipulation;
+  }
+
+  /* ーーー touch-manipulation（ダブルタップズーム防止） ーーー */
+  button,
+  a,
+  [role="button"] {
+    touch-action: manipulation;
+  }
 }

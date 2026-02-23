@@ -114,11 +114,17 @@ export default async function DashboardLayout({
                                 </Avatar>
                                 <div className="hidden md:block text-left">
                                     <p className="text-sm font-medium text-white leading-none">{safeProfile.full_name}</p>
-                                    <div className="flex flex-col mt-1">
+                                    <div className="flex flex-col mt-1 gap-1">
                                         <p className="text-xs text-slate-400 capitalize">{safeProfile.role}</p>
-                                        <p className="text-[10px] text-slate-500 font-mono opacity-70 hover:opacity-100 transition-opacity">
-                                            ID: {safeProfile.coach_number || safeProfile.id.slice(0, 8)}
-                                        </p>
+                                        {safeProfile.role === 'coach' ? (
+                                            <p className="text-[11px] font-medium text-blue-300 font-mono bg-blue-500/10 px-1.5 py-0.5 rounded inline-flex w-fit items-center border border-blue-500/20">
+                                                ID: {safeProfile.coach_number || safeProfile.id.slice(0, 8)}
+                                            </p>
+                                        ) : (
+                                            <p className="text-[10px] text-slate-500 font-mono opacity-70">
+                                                ID: {safeProfile.coach_number || safeProfile.id.slice(0, 8)}
+                                            </p>
+                                        )}
                                     </div>
                                 </div>
                             </Link>
