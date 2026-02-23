@@ -103,10 +103,10 @@ export function DesktopSidebar({ role }: DesktopSidebarProps) {
                 )}
             </nav>
 
-            <div className="p-4 border-t border-white/20 bg-white/10">
+            <div className="flex-shrink-0 p-4 border-t border-white/20 bg-white/10">
                 <form action="/auth/signout" method="post">
-                    <button className="flex items-center gap-3 w-full px-4 py-3 text-slate-500 hover:text-red-500 transition-colors rounded-xl hover:bg-red-50">
-                        <LogOut className="h-5 w-5" />
+                    <button className="flex items-center gap-3 w-full min-h-[44px] px-4 py-2.5 text-slate-500 hover:text-red-500 transition-colors rounded-xl hover:bg-red-50">
+                        <LogOut className="h-5 w-5 flex-shrink-0" />
                         <span className="font-medium">ログアウト</span>
                     </button>
                 </form>
