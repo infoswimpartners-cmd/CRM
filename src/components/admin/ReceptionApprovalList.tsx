@@ -15,6 +15,13 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table'
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog"
 import { sendReceptionEmail, completeReceptionManually } from '@/actions/entry'
 import { useRouter } from 'next/navigation'
 
@@ -132,9 +139,22 @@ function ReceptionStudentRow({ student }: { student: Student }) {
                     {student.status === 'inquiry' ? '問合せ' : '体験待ち'}
                 </div>
             </TableCell>
-            <TableCell>{student.contact_email}</TableCell>
-            <TableCell className="max-w-[200px] truncate text-xs text-slate-500" title={student.notes || ''}>
-                {student.notes}
+            <TableCell>
+                <Dialog>
+                    <DialogTrigger asChild>
+                        <button className="max-w-[200px] truncate text-xs text-slate-500 hover:text-cyan-600 hover:underline text-left" title="詳細を見る">
+                            {student.notes || 'なし'}
+                        </button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[500px]">
+                        <DialogHeader>
+                            <DialogTitle>{student.full_name}様の問い合わせ内容</DialogTitle>
+                        </DialogHeader>
+                        <div className="mt-4 max-h-[60vh] overflow-y-auto whitespace-pre-wrap text-sm text-slate-700 p-4 bg-slate-50 rounded-md border border-slate-100">
+                            {student.notes || '備考・メッセージはありません。'}
+                        </div>
+                    </DialogContent>
+                </Dialog>
             </TableCell>
             <TableCell className="text-center">
                 <div className="flex flex-col gap-2">
