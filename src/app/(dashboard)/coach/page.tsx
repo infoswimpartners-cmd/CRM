@@ -155,10 +155,17 @@ export default async function CoachDashboard() {
             {/* Header / Welcome / Important Actions */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white/50 backdrop-blur-sm p-6 rounded-2xl border border-white/20 shadow-sm">
                 <div>
-                    <h1 className="text-xl md:text-2xl font-bold text-slate-900">
-                        Welcome back, <span className="text-blue-600">{profile?.full_name || 'Coach'}</span>
-                    </h1>
-                    <p className="text-slate-500 text-sm mt-1">今日の予定を確認して、レッスン業務を開始しましょう。</p>
+                    <div className="flex items-center gap-3 mb-1 flex-wrap">
+                        <h1 className="text-xl md:text-2xl font-bold text-slate-900">
+                            Welcome back, <span className="text-blue-600">{profile?.full_name || 'Coach'}</span>
+                        </h1>
+                        {profile?.coach_number && (
+                            <Badge variant="outline" className="text-sm md:text-base px-3 py-1 bg-blue-50 text-blue-700 border-blue-300 shadow-sm font-mono tracking-wide">
+                                ID: {profile.coach_number}
+                            </Badge>
+                        )}
+                    </div>
+                    <p className="text-slate-500 text-sm">今日の予定を確認して、レッスン業務を開始しましょう。</p>
                 </div>
                 <div className="flex items-center gap-3">
                     <Button asChild variant="outline" className="bg-white hover:bg-slate-50 text-slate-700 border-slate-200">
