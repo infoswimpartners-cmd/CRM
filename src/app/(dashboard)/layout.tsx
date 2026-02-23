@@ -87,9 +87,9 @@ export default async function DashboardLayout({
             <DesktopSidebar role={safeProfile.role} />
 
             {/* Main Content */}
-            <div className="md:ml-64 ml-0 flex-1 flex flex-col min-h-screen transition-all duration-300 pt-16 md:pt-0">
-                {/* Floating Header */}
-                <header className="relative md:sticky md:top-4 z-40 mx-3 md:mx-6 mt-3 md:mt-4">
+            <div className="md:ml-64 ml-0 flex-1 flex flex-col min-h-screen transition-all duration-300 pt-16 md:pt-0 min-w-0">
+                {/* Floating Header（モバイルでは非表示・デスクトップのみ） */}
+                <header className="hidden md:block md:sticky md:top-4 z-40 md:mx-6 md:mt-4">
                     <div className="glass rounded-2xl px-4 md:px-6 py-2 md:py-3 flex items-center justify-between shadow-sm border border-white/40">
                         <div className="flex-1 max-w-md relative">
                             <Suspense fallback={

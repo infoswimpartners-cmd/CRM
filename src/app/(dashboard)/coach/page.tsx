@@ -151,32 +151,32 @@ export default async function CoachDashboard() {
     const recentLessons = allLessons?.slice(0, 5) || []
 
     return (
-        <div className="space-y-8 animate-fade-in-up pb-10">
+        <div className="space-y-5 md:space-y-8 animate-fade-in-up pb-10 min-w-0">
             {/* Header / Welcome / Important Actions */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white/50 backdrop-blur-sm p-6 rounded-2xl border border-white/20 shadow-sm">
-                <div>
-                    <div className="flex items-center gap-3 mb-1 flex-wrap">
-                        <h1 className="text-xl md:text-2xl font-bold text-slate-900">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white/50 backdrop-blur-sm p-4 md:p-6 rounded-2xl border border-white/20 shadow-sm min-w-0">
+                <div className="min-w-0">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <h1 className="text-lg md:text-2xl font-bold text-slate-900">
                             Welcome back, <span className="text-blue-600">{profile?.full_name || 'Coach'}</span>
                         </h1>
                         {profile?.coach_number && (
-                            <Badge variant="outline" className="text-sm md:text-base px-3 py-1 bg-blue-50 text-blue-700 border-blue-300 shadow-sm font-mono tracking-wide">
+                            <Badge variant="outline" className="text-xs md:text-sm px-2.5 py-0.5 bg-blue-50 text-blue-700 border-blue-300 shadow-sm font-mono tracking-wide shrink-0">
                                 ID: {profile.coach_number}
                             </Badge>
                         )}
                     </div>
-                    <p className="text-slate-500 text-sm">今日の予定を確認して、レッスン業務を開始しましょう。</p>
+                    <p className="text-slate-500 text-xs md:text-sm">今日の予定を確認して、レッスン業務を開始しましょう。</p>
                 </div>
-                <div className="flex items-center gap-3">
-                    <Button asChild variant="outline" className="bg-white hover:bg-slate-50 text-slate-700 border-slate-200">
+                <div className="grid grid-cols-2 sm:flex items-center gap-2 w-full sm:w-auto">
+                    <Button asChild variant="outline" size="sm" className="bg-white hover:bg-slate-50 text-slate-700 border-slate-200 text-xs md:text-sm">
                         <Link href="/coach/schedule">
-                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
                             予定を登録
                         </Link>
                     </Button>
-                    <Button asChild className="bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-200 border-none">
+                    <Button asChild size="sm" className="bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-200 border-none text-xs md:text-sm">
                         <Link href="/coach/report">
-                            <FileText className="mr-2 h-4 w-4" />
+                            <FileText className="mr-1.5 h-3.5 w-3.5" />
                             レッスン報告
                         </Link>
                     </Button>
@@ -270,7 +270,7 @@ export default async function CoachDashboard() {
 
                 {/* Right Column (Activity Timeline) */}
                 <div className="xl:col-span-1 space-y-6">
-                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm h-full max-h-[800px] overflow-hidden sticky top-6">
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm h-full max-h-[480px] xl:max-h-[800px] overflow-hidden xl:sticky xl:top-6">
                         <CoachActivityWidget
                             // @ts-ignore
                             schedules={upcomingSchedules || []}

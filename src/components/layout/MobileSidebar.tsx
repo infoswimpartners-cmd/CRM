@@ -58,15 +58,24 @@ export function MobileSidebar({ userProfile }: { userProfile: any }) {
                         />
                     </div>
                 </div>
-                {/* ユーザーアバター（小） */}
-                <div className="w-9 h-9 rounded-full bg-slate-200 overflow-hidden ring-2 ring-cyan-100">
-                    {userProfile?.avatar_url ? (
-                        <img src={userProfile.avatar_url} alt="User" className="w-full h-full object-cover" />
-                    ) : (
-                        <div className="w-full h-full flex items-center justify-center bg-cyan-100 text-cyan-700 font-bold text-sm">
-                            {userProfile?.full_name?.charAt(0) || 'U'}
-                        </div>
+                {/* 右側ゾーン: コーチIDバッジ + アバター */}
+                <div className="flex items-center gap-2">
+                    {/* コーチIDバッジ（コーチロールのみ） */}
+                    {userProfile?.role === 'coach' && userProfile?.coach_number && (
+                        <span className="text-[11px] font-mono font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md leading-none select-all">
+                            {userProfile.coach_number}
+                        </span>
                     )}
+                    {/* ユーザーアバター（小） */}
+                    <div className="w-9 h-9 rounded-full bg-slate-200 overflow-hidden ring-2 ring-cyan-100 shrink-0">
+                        {userProfile?.avatar_url ? (
+                            <img src={userProfile.avatar_url} alt="User" className="w-full h-full object-cover" />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-cyan-100 text-cyan-700 font-bold text-sm">
+                                {userProfile?.full_name?.charAt(0) || 'U'}
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 
