@@ -15,6 +15,7 @@ export function DesktopSidebar({ role }: DesktopSidebarProps) {
     const NavItem = ({ href, icon: Icon, label, isActive }: { href: string, icon: any, label: string, isActive?: boolean }) => (
         <Link
             href={href}
+            prefetch={true}
             className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group ${isActive
                 ? 'bg-cyan-100 text-cyan-900 border-l-4 border-cyan-500 font-bold shadow-sm'
                 : 'text-slate-500 hover:text-cyan-700 hover:bg-cyan-50'

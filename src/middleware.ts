@@ -2,17 +2,6 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
 
 export async function middleware(request: NextRequest) {
-    // skip API webhooks and static/image files manually
-    const { pathname } = request.nextUrl
-    if (
-        pathname.startsWith('/api/') ||
-        pathname.startsWith('/_next/') ||
-        pathname.includes('favicon.ico') ||
-        pathname.match(/\.(svg|png|jpg|jpeg|gif|webp)$/)
-    ) {
-        return NextResponse.next()
-    }
-
     try {
         const response = await updateSession(request)
         // Relax CSP to allow 'eval' in development to fix HMR/UI update issues
@@ -23,5 +12,16 @@ export async function middleware(request: NextRequest) {
         return new NextResponse("Middleware Error: " + String(e.message) + " | Stack: " + String(e.stack), { status: 500 })
     }
 }
-// Config removed completely to avoid Edge RegExp compilation failures
-// Next.js will run middleware on all routes and we exclude them manually in code
+
+export const config = {
+    matcher: [
+        /*
+         * 下記のパス以外すべてにミドルウェアを適用:
+         * - _next/static (静的ファイル)
+         * - _next/image (画像最適化)
+         * - favicon.ico (ファビコン)
+         * - publicフォルダ内の画像、manifest.jsonなど
+         */
+        '/((?!_next/static|_next/image|favicon.ico|manifest.json|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    ],
+}

@@ -46,10 +46,10 @@ export async function login(prevState: any, formData: FormData) {
 
     const role = profile?.role || 'coach'
 
-    // Clear cache to ensure dashboard layout fetches fresh profile data
-    revalidatePath('/', 'layout')
+    // Clear cache specifically for dashboard layouts to ensure fresh profile data
     revalidatePath('/admin', 'layout')
     revalidatePath('/coach', 'layout')
+    revalidatePath('/member', 'layout')
 
     if (role === 'admin') {
         redirect('/admin')
