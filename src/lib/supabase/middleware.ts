@@ -53,6 +53,11 @@ export async function updateSession(request: NextRequest) {
         }
     }
 
+    // skip API webhooks from session checks
+    if (request.nextUrl.pathname.startsWith('/api/webhooks/')) {
+        return supabaseResponse
+    }
+
     const {
         data: { user },
     } = await supabase.auth.getUser()
