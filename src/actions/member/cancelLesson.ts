@@ -9,19 +9,7 @@ import { format } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import { emailService } from '@/lib/email'
 
-/**
- * キャンセルペナルティ判定
- * 前日12:00（正午）以降のキャンセルにはペナルティ（100%キャンセル料）が発生する
- */
-export function isCancelPenalty(lessonDate: Date): boolean {
-    const now = new Date()
-    // 前日の12:00 = レッスン日の前日の正午
-    const deadline = new Date(lessonDate)
-    deadline.setDate(deadline.getDate() - 1) // 前日
-    deadline.setHours(12, 0, 0, 0)           // 12:00:00
-
-    return now >= deadline
-}
+import { isCancelPenalty } from '@/lib/utils'
 
 export type CancelLessonResult = {
     success: boolean
