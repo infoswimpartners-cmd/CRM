@@ -37,8 +37,15 @@ export default async function CoachDashboard() {
         .eq('id', user.id)
         .single()
 
-    // 2. Fetch Lessons Data (Broad range)
-    const allLessonsPromise = supabase
+    // 2. Fetch Assigned Students for this coach
+    const { data: assignedStudents } = await supabase
+        .from('student_coaches')
+        .select('student_id')
+        .eq('coach_id', user.id)
+    const assignedIds = assignedStudents?.map(a => a.student_id) || []
+
+    // 3. Fetch Lessons Data (Broad range)
+    let lessonsQuery = supabase
         .from('lessons')
         .select(`
             *,
@@ -49,7 +56,14 @@ export default async function CoachDashboard() {
             ),
             profiles ( full_name, avatar_url )
         `)
-        .eq('coach_id', user.id)
+
+    if (assignedIds.length > 0) {
+        lessonsQuery = lessonsQuery.or(`coach_id.eq.${user.id},student_id.in.(${assignedIds.join(',')})`)
+    } else {
+        lessonsQuery = lessonsQuery.eq('coach_id', user.id)
+    }
+
+    const allLessonsPromise = lessonsQuery
         .order('lesson_date', { ascending: false })
 
     // 3. Fetch Upcoming Schedules
@@ -276,6 +290,7 @@ export default async function CoachDashboard() {
                             schedules={upcomingSchedules || []}
                             // @ts-ignore
                             reports={recentLessons || []}
+                            coachId={user.id}
                         />
                     </div>
                 </div>

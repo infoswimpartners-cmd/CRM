@@ -4,7 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { createAdminClient } from '@/lib/supabase/admin';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, FileText, Calendar, MapPin, ChevronRight, User } from 'lucide-react';
+import { ArrowLeft, FileText, Calendar, MapPin, ChevronRight, User, Play, Image as ImageIcon } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -37,11 +37,13 @@ export default async function ReportsPage() {
         .from('lessons')
         .select(`
             id, lesson_date, location,
-            profiles ( full_name, avatar_url )
+            profiles ( full_name, avatar_url ),
+            lesson_media ( id )
         `)
         .eq('student_id', student.id)
         .lte('lesson_date', now) // Only past/current lessons
         .order('lesson_date', { ascending: false });
+
 
     if (error) {
         console.error(error);
@@ -88,6 +90,16 @@ export default async function ReportsPage() {
                                                         <User className="w-3.5 h-3.5 text-gray-400" />
                                                         {lesson.profiles?.full_name || '担当コーチ'}
                                                     </div>
+                                                </div>
+
+                                                {/* Media Badges */}
+                                                <div className="flex items-center gap-2 mt-2">
+                                                    {lesson.lesson_media && lesson.lesson_media.length > 0 && (
+                                                        <div className="flex items-center gap-1 text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                                                            <Play className="w-3 h-3 fill-current" />
+                                                            動画・写真 {lesson.lesson_media.length}件
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>

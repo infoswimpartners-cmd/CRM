@@ -14,6 +14,7 @@ import { submitLessonReport } from '@/actions/report'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
+import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { parseISO } from 'date-fns'
 import {
@@ -161,11 +162,6 @@ export function LessonReportForm() {
         const fetchAllowedLessons = async () => {
             if (!selectedStudentId) {
                 setRestrictedLessonIds(null)
-                // Only clear if not already empty (to avoid unnecessary form dirtying)
-                if (form.getValues('lesson_master_id')) {
-                    form.setValue('lesson_master_id', '')
-                    form.setValue('price', 0)
-                }
                 return
             }
 
@@ -233,36 +229,46 @@ export function LessonReportForm() {
                 throw new Error(typeof result.error === 'string' ? result.error : 'Submission failed')
             }
 
-            toast.success('レッスン報告を送信しました！')
+            // Show success toast with optional action
+            const lessonId = (result as any).lessonId
+            toast.success('レッスン報告を送信しました！', {
+                action: lessonId ? {
+                    label: '動画を追加',
+                    onClick: () => router.push(`/coach/lessons/${lessonId}/media`)
+                } : undefined,
+                duration: 5000,
+            })
 
             if (keepValues) {
-                // Keep Date, Location. Reset Student-specific fields
+                // Keep Date, Location, Menu, Comment, Lesson Type. Reset only Student
                 const currentValues = form.getValues()
                 form.reset({
                     ...currentValues,
                     student_id: '',
                     student_name: '',
-                    menu_description: '',
                     feedback_good: '',
                     feedback_next: '',
-                    price: 0,
-                    lesson_master_id: '' // Clear this to force re-selection or auto-select based on new student
-                })
-                // Clear any restricted lessons state
-                setRestrictedLessonIds(null)
+                }, { keepDefaultValues: false }) // Reset to these as new defaults
+
+                // Clear scheduleId from URL to prevent unwanted re-fills while staying on page
+                if (scheduleId) {
+                    router.replace('/coach/report', { scroll: false })
+                }
 
                 // Scroll to top to encourage next entry
                 window.scrollTo({ top: 0, behavior: 'smooth' })
             } else {
                 router.push('/coach')
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error submitting report:', error)
-            toast.error('送信に失敗しました。もう一度お試しください。')
+            const message = error.message || '送信に失敗しました。もう一度お試しください。'
+            toast.error(message)
         } finally {
             setIsSubmitting(false)
         }
     }
+
 
     return (
         <Form {...form}>
@@ -382,7 +388,10 @@ export function LessonReportForm() {
                     name="menu_description"
                     render={({ field }) => (
                         <FormItem>
-                            <FormLabel>メニュー内容 / メモ</FormLabel>
+                            <FormLabel className="flex items-center gap-2">
+                                メニュー内容 / メモ
+                                <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-600 border-blue-100 font-normal">メンバーサイトに反映</Badge>
+                            </FormLabel>
                             <FormControl>
                                 <Textarea
                                     placeholder="実施したメニューや練習内容"
@@ -401,7 +410,10 @@ export function LessonReportForm() {
                         name="feedback_good"
                         render={({ field }) => (
                             <FormItem>
-                                <FormLabel>良かった点</FormLabel>
+                                <FormLabel className="flex items-center gap-2">
+                                    良かった点
+                                    <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-600 border-blue-100 font-normal">メンバーサイトに反映</Badge>
+                                </FormLabel>
                                 <FormControl>
                                     <Textarea
                                         placeholder="以前より改善された点など"
@@ -419,7 +431,10 @@ export function LessonReportForm() {
                         name="feedback_next"
                         render={({ field }) => (
                             <FormItem>
-                                <FormLabel>次回の課題</FormLabel>
+                                <FormLabel className="flex items-center gap-2">
+                                    次回の課題
+                                    <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-600 border-blue-100 font-normal">メンバーサイトに反映</Badge>
+                                </FormLabel>
                                 <FormControl>
                                     <Textarea
                                         placeholder="次回意識すべきポイントなど"
@@ -438,7 +453,10 @@ export function LessonReportForm() {
                     name="coach_comment"
                     render={({ field }) => (
                         <FormItem>
-                            <FormLabel>コーチからのコメント</FormLabel>
+                            <FormLabel className="flex items-center gap-2">
+                                コーチからのコメント
+                                <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-600 border-blue-100 font-normal">メンバーサイトに反映</Badge>
+                            </FormLabel>
                             <FormControl>
                                 <Textarea
                                     placeholder="保護者や生徒へのメッセージ"

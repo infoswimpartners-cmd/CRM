@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { FileText, Calendar, User, Info } from 'lucide-react'
+import { FileText, Calendar, User, Info, Video } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import {
@@ -24,16 +24,41 @@ type RecentReport = {
     } | null
 }
 
-export function RecentReportsWidget({ reports: initialReports }: { reports: RecentReport[] }) {
+export function RecentReportsWidget({ reports: initialReports, coachId }: { reports: RecentReport[], coachId?: string }) {
     const [reports, setReports] = useState<RecentReport[]>(initialReports)
     const [selectedReport, setSelectedReport] = useState<RecentReport | null>(null)
     const supabase = createClient()
 
+    // Sync state with props when initialReports changes (e.g. after revalidatePath)
+    useEffect(() => {
+        if (initialReports) {
+            setReports(initialReports)
+        }
+    }, [initialReports])
+
     useEffect(() => {
         const fetchReports = async () => {
-            const { data, error } = await supabase
+            let query = supabase
                 .from('lessons')
                 .select(`*, profiles ( full_name, avatar_url )`)
+
+            if (coachId) {
+                // Also get assigned students for this coach
+                const { data: assigned } = await supabase
+                    .from('student_coaches')
+                    .select('student_id')
+                    .eq('coach_id', coachId)
+
+                const assignedStudentIds = assigned?.map(a => a.student_id) || []
+
+                if (assignedStudentIds.length > 0) {
+                    query = query.or(`coach_id.eq.${coachId},student_id.in.(${assignedStudentIds.join(',')})`)
+                } else {
+                    query = query.eq('coach_id', coachId)
+                }
+            }
+
+            const { data, error } = await query
                 .order('created_at', { ascending: false })
                 .limit(5)
 
@@ -58,11 +83,17 @@ export function RecentReportsWidget({ reports: initialReports }: { reports: Rece
         fetchReports()
 
         // Realtime subscription
+        const filter = coachId ? `coach_id=eq.${coachId}` : undefined
         const channel = supabase
             .channel('public:lessons')
             .on(
                 'postgres_changes',
-                { event: '*', schema: 'public', table: 'lessons' },
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'lessons',
+                    filter: filter
+                },
                 () => {
                     fetchReports()
                 }
@@ -72,7 +103,7 @@ export function RecentReportsWidget({ reports: initialReports }: { reports: Rece
         return () => {
             supabase.removeChannel(channel)
         }
-    }, [supabase])
+    }, [supabase, coachId])
 
     return (
         <Card className="bg-white border-slate-200 shadow-sm h-full flex flex-col">
@@ -82,7 +113,7 @@ export function RecentReportsWidget({ reports: initialReports }: { reports: Rece
                     <span className="truncate">最新のレッスン報告</span>
                 </CardTitle>
                 <Button variant="ghost" size="sm" className="h-8 text-[10px] md:text-xs text-slate-500 hover:text-orange-600 shrink-0" asChild>
-                    <Link href="/admin/reports">すべて見る</Link>
+                    <Link href={coachId ? "/coach/history" : "/admin/reports"}>すべて見る</Link>
                 </Button>
             </CardHeader>
             <CardContent className="flex-1 p-3 md:p-4 overflow-y-auto">
@@ -174,6 +205,15 @@ export function RecentReportsWidget({ reports: initialReports }: { reports: Rece
                                 <div className="bg-slate-50 p-3 md:p-4 rounded-lg border border-slate-100 text-xs md:text-sm leading-relaxed whitespace-pre-wrap min-h-[80px] md:min-h-[100px]">
                                     {selectedReport.menu_description || '内容は入力されていません。'}
                                 </div>
+                            </div>
+
+                            <div className="pt-2">
+                                <Button asChild className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl py-6">
+                                    <Link href={`/coach/lessons/${selectedReport.id}/media`}>
+                                        <Video className="w-4 h-4 mr-2" />
+                                        動画・写真を追加/管理
+                                    </Link>
+                                </Button>
                             </div>
                         </div>
                     )}

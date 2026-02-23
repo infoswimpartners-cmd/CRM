@@ -1,13 +1,11 @@
 import { createClient } from '@/lib/supabase/server';
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, MapPin, User, Clock } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
+import { ArrowLeft, MapPin, User, Clock, Play, Image as ImageIcon, MessageSquare, Star, Target } from 'lucide-react';
+import { LessonMediaGallery } from './_components/LessonMediaGallery';
 
 export default async function ReportDetailPage({ params }: { params: { lessonId: string } }) {
     const supabase = await createClient();
@@ -31,77 +29,154 @@ export default async function ReportDetailPage({ params }: { params: { lessonId:
         .single();
 
     if (error || !lesson) {
-        return <div>Report not found</div>;
+        return <div>レポートが見つかりません</div>;
     }
+
+    // メディア情報を取得
+    const { data: mediaItems } = await client
+        .from('lesson_media')
+        .select('*')
+        .eq('lesson_id', lessonId)
+        .order('display_order', { ascending: true });
 
     const date = new Date(lesson.lesson_date);
 
     return (
-        <div className="space-y-6 pb-20">
-            <div className="flex items-center gap-2">
-                <Link href="/member/reports" className="text-gray-500">
-                    <ArrowLeft size={24} />
+        <div className="space-y-5 pb-24">
+            {/* ヘッダー */}
+            <div className="flex items-center gap-3">
+                <Link href="/member/reports" className="p-2 rounded-full hover:bg-gray-100 transition-colors">
+                    <ArrowLeft size={20} className="text-gray-600" />
                 </Link>
-                <h1 className="text-xl font-bold">
-                    {date.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}
-                </h1>
+                <div>
+                    <h1 className="text-xl font-bold text-gray-800">
+                        {date.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric' })} のレポート
+                    </h1>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                        {date.getFullYear()}年 · {lesson.profiles?.full_name || '担当コーチ'}
+                    </p>
+                </div>
             </div>
 
-            {/* Basic Info */}
-            <Card>
-                <CardContent className="p-4 space-y-3">
-                    <div className="flex items-center gap-3">
-                        <Clock className="w-5 h-5 text-gray-400" />
-                        <span className="font-medium">
-                            {date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} ~
-                        </span>
+            {/* 基本情報カード */}
+            <div className="glass-card p-5 space-y-3">
+                <div className="flex items-center gap-3 text-sm">
+                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                        <Clock className="w-4 h-4 text-blue-600" />
                     </div>
-                    <div className="flex items-center gap-3">
-                        <MapPin className="w-5 h-5 text-gray-400" />
-                        <span>{lesson.location || '場所未定'}</span>
+                    <span className="font-medium text-gray-800">
+                        {date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                </div>
+                <div className="flex items-center gap-3 text-sm">
+                    <div className="w-8 h-8 rounded-full bg-cyan-100 flex items-center justify-center shrink-0">
+                        <MapPin className="w-4 h-4 text-cyan-600" />
                     </div>
-                    <div className="flex items-center gap-3">
-                        <User className="w-5 h-5 text-gray-400" />
-                        <span>担当: {lesson.profiles?.full_name}</span>
+                    <span className="text-gray-700">{lesson.location || '場所未定'}</span>
+                </div>
+                <div className="flex items-center gap-3 text-sm">
+                    <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
+                        <User className="w-4 h-4 text-indigo-600" />
                     </div>
-                </CardContent>
-            </Card>
-
-            {/* Content */}
-            <div className="space-y-4">
-                <Card className="border-l-4 border-l-blue-500">
-                    <CardHeader className="py-3 px-4 bg-blue-50/50">
-                        <CardTitle className="text-sm font-bold text-blue-700">今回のメニュー</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-4 pt-3">
-                        <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-800">
-                            {lesson.menu_description || '記録なし'}
-                        </p>
-                    </CardContent>
-                </Card>
-
-                <Card className="border-l-4 border-l-green-500">
-                    <CardHeader className="py-3 px-4 bg-green-50/50">
-                        <CardTitle className="text-sm font-bold text-green-700">良かった点</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-4 pt-3">
-                        <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-800">
-                            {lesson.feedback_good || '記録なし'}
-                        </p>
-                    </CardContent>
-                </Card>
-
-                <Card className="border-l-4 border-l-orange-500">
-                    <CardHeader className="py-3 px-4 bg-orange-50/50">
-                        <CardTitle className="text-sm font-bold text-orange-700">次回の課題</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-4 pt-3">
-                        <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-800">
-                            {lesson.feedback_next || '記録なし'}
-                        </p>
-                    </CardContent>
-                </Card>
+                    <span className="text-gray-700">{lesson.profiles?.full_name || '担当コーチ'}</span>
+                </div>
             </div>
+
+            {/* 動画・写真セクション */}
+            {mediaItems && mediaItems.length > 0 ? (
+                <section className="space-y-3">
+                    <h2 className="text-sm font-black text-gray-700 flex items-center gap-2 px-1">
+                        <Play className="w-4 h-4 text-blue-500" />
+                        レッスン動画・写真
+                        <span className="text-xs font-normal text-gray-400">({mediaItems.length}件)</span>
+                    </h2>
+                    <LessonMediaGallery mediaItems={mediaItems} />
+                </section>
+            ) : (
+                <div className="glass-card p-6 text-center bg-gradient-to-br from-gray-50/50 to-white/50">
+                    <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
+                        <ImageIcon className="w-6 h-6 text-gray-300" />
+                    </div>
+                    <p className="text-sm text-gray-400">まだ動画・写真はありません</p>
+                    <p className="text-xs text-gray-300 mt-1">コーチがアップロードするとここに表示されます</p>
+                </div>
+            )}
+
+            {/* フィードバックセクション */}
+            <section className="space-y-4">
+                <h2 className="text-sm font-black text-gray-700 flex items-center gap-2 px-1">
+                    <MessageSquare className="w-4 h-4 text-blue-500" />
+                    コーチからのフィードバック
+                </h2>
+
+                {/* 今回のメニュー */}
+                {lesson.menu_description && (
+                    <div className="glass-card overflow-hidden">
+                        <div className="px-5 py-3 bg-blue-500 text-white">
+                            <h3 className="text-sm font-black">今回のメニュー</h3>
+                        </div>
+                        <div className="p-5">
+                            <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700">
+                                {lesson.menu_description}
+                            </p>
+                        </div>
+                    </div>
+                )}
+
+                {/* コーチコメント */}
+                {lesson.coach_comment && (
+                    <div className="glass-card overflow-hidden">
+                        <div className="px-5 py-3 bg-indigo-500 text-white">
+                            <h3 className="text-sm font-black">コーチからのコメント</h3>
+                        </div>
+                        <div className="p-5">
+                            <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700">
+                                {lesson.coach_comment}
+                            </p>
+                        </div>
+                    </div>
+                )}
+
+                {/* 良かった点 */}
+                {lesson.feedback_good && (
+                    <div className="glass-card overflow-hidden">
+                        <div className="px-5 py-3 bg-green-500 text-white flex items-center gap-2">
+                            <Star className="w-4 h-4 fill-current" />
+                            <h3 className="text-sm font-black">良かった点</h3>
+                        </div>
+                        <div className="p-5">
+                            <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700">
+                                {lesson.feedback_good}
+                            </p>
+                        </div>
+                    </div>
+                )}
+
+                {/* 次回の課題 */}
+                {lesson.feedback_next && (
+                    <div className="glass-card overflow-hidden">
+                        <div className="px-5 py-3 bg-orange-500 text-white flex items-center gap-2">
+                            <Target className="w-4 h-4" />
+                            <h3 className="text-sm font-black">次回の課題</h3>
+                        </div>
+                        <div className="p-5">
+                            <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700">
+                                {lesson.feedback_next}
+                            </p>
+                        </div>
+                    </div>
+                )}
+
+                {/* フィードバックがない場合 */}
+                {!lesson.menu_description && !lesson.coach_comment && !lesson.feedback_good && !lesson.feedback_next && (
+                    <div className="glass-card p-8 text-center">
+                        <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
+                            <MessageSquare className="w-6 h-6 text-gray-300" />
+                        </div>
+                        <p className="text-sm text-gray-400">まだフィードバックはありません</p>
+                    </div>
+                )}
+            </section>
         </div>
     );
 }

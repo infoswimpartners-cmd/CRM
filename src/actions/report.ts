@@ -35,7 +35,9 @@ export async function submitLessonReport(values: FormValues) {
     // 2. Validate Input
     const parsed = formSchema.safeParse(values)
     if (!parsed.success) {
-        return { success: false, error: 'Invalid input', details: parsed.error.flatten() }
+        const errors = parsed.error.flatten().fieldErrors
+        const firstError = Object.values(errors).flat()[0]
+        return { success: false, error: firstError || '入力内容が正しくありません' }
     }
     const data = parsed.data
 
@@ -59,8 +61,11 @@ export async function submitLessonReport(values: FormValues) {
     }
 
     try {
-        // 3. Insert into Supabase
-        const { error: dbError } = await supabase.from('lessons').insert({
+        // 3. Insert into Supabase (Base columns only to match current DB schema)
+        // Note: feedback_good, feedback_next, coach_comment, and billing_price 
+        // seem to be missing from the current database schema cache.
+        // We only include columns that are confirmed to exist.
+        const { data: insertedLesson, error: dbError } = await supabase.from('lessons').insert({
             coach_id: user.id,
             student_id: data.student_id || null,
             student_name: data.student_name,
@@ -68,41 +73,45 @@ export async function submitLessonReport(values: FormValues) {
             lesson_date: data.lesson_date, // Already ISO string
             location: data.location,
             menu_description: data.menu_description || '',
-            feedback_good: data.feedback_good || '',
-            feedback_next: data.feedback_next || '',
-            coach_comment: data.coach_comment || '',
             price: data.price,
-            billing_price: billingPrice,
-        })
+            // billing_price: billingPrice, // Temporarily disabled due to schema mismatch
+        }).select('id').single()
 
-        if (dbError) throw dbError
+        if (dbError) {
+            console.error('Database Insertion Error:', dbError)
+            throw new Error(`データベース保存エラー: ${dbError.message}`)
+        }
 
-        // 4. Send Email Notification
-        const toAddress = process.env.REPORT_NOTIFICATION_EMAIL || process.env.SMTP_USER
+        const newLessonId = insertedLesson?.id
 
-        if (toAddress) {
-            // Fetch lesson name for better message
-            const { data: lessonMaster } = await supabase
-                .from('lesson_masters')
-                .select('name')
-                .eq('id', data.lesson_master_id)
-                .single()
 
-            // Get Coach Name (Profile)
-            const { data: profile } = await supabase
-                .from('profiles')
-                .select('full_name')
-                .eq('id', user.id)
-                .single()
+        // 4. Send Email Notification (Non-critical, don't fail the whole action)
+        try {
+            const toAddress = process.env.REPORT_NOTIFICATION_EMAIL || process.env.SMTP_USER
 
-            const lessonName = lessonMaster?.name || '不明なレッスン'
-            const coachName = profile?.full_name || 'コーチ'
-            const dateStr = new Date(data.lesson_date).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric', weekday: 'short' })
+            if (toAddress) {
+                // Fetch lesson name for better message
+                const { data: lessonMaster } = await supabase
+                    .from('lesson_masters')
+                    .select('name')
+                    .eq('id', data.lesson_master_id)
+                    .single()
 
-            // Construct Email Content
-            const subject = `【レッスン報告】${data.student_name}様 (${dateStr})`
-            const emailBody = `
-レッスン報告が提出されました。
+                // Get Coach Name (Profile)
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('full_name')
+                    .eq('id', user.id)
+                    .single()
+
+                const lessonName = lessonMaster?.name || '不明なレッスン'
+                const coachName = profile?.full_name || 'コーチ'
+                const dateStr = new Date(data.lesson_date).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric', weekday: 'short' })
+
+                // Construct Email Content
+                const subject = `【レッスン報告】${data.student_name}様 (${dateStr})`
+                const emailBody = `
+レッスンの報告が提出されました。
 
 ■基本情報
 担当コーチ: ${coachName}
@@ -119,23 +128,26 @@ ${data.menu_description || '(なし)'}
 
 --------------------------------------------------
 Swim Partners Manager
-            `.trim()
+                `.trim()
 
-            await emailService.sendEmail({
-                to: toAddress,
-                subject: subject,
-                text: emailBody,
-            })
-        } else {
-            console.warn('Report email not sent: No recipient address configured (REPORT_NOTIFICATION_EMAIL or SMTP_USER)')
+                await emailService.sendEmail({
+                    to: toAddress,
+                    subject: subject,
+                    text: emailBody,
+                })
+            }
+        } catch (emailError) {
+            console.error('Error sending report notification email:', emailError)
+            // Continue even if email fails
         }
 
         revalidatePath('/coach')
-        return { success: true }
+        return { success: true, lessonId: newLessonId }
 
-    } catch (error) {
+
+    } catch (error: any) {
         console.error('Submission Error:', error)
-        return { success: false, error: 'Failed to submit report' }
+        return { success: false, error: error.message || 'データ保存中にエラーが発生しました' }
     }
 }
 

@@ -7,9 +7,10 @@ import { RecentReportsWidget } from '@/components/admin/RecentReportsWidget'
 interface CoachActivityWidgetProps {
     schedules: any[]
     reports: any[]
+    coachId?: string
 }
 
-export function CoachActivityWidget({ schedules, reports }: CoachActivityWidgetProps) {
+export function CoachActivityWidget({ schedules, reports, coachId }: CoachActivityWidgetProps) {
     return (
         <div className="h-full flex flex-col">
             <Tabs defaultValue="schedule" className="h-full flex flex-col">
@@ -26,7 +27,7 @@ export function CoachActivityWidget({ schedules, reports }: CoachActivityWidgetP
                     </TabsContent>
 
                     <TabsContent value="report" className="h-full mt-0">
-                        <RecentReportsWidget reports={reports} />
+                        <RecentReportsWidget reports={reports} coachId={coachId} />
                     </TabsContent>
                 </div>
             </Tabs>

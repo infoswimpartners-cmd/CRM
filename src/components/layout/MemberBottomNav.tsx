@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, Calendar, FileText, Ticket, MessageCircle } from 'lucide-react'
+import { Home, FileText, XCircle, Ticket, MessageCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export default function MemberBottomNav() {
@@ -11,9 +11,9 @@ export default function MemberBottomNav() {
     const navItems = [
         { href: '/member/dashboard', icon: Home, label: 'ホーム' },
         { href: '/member/reports', icon: FileText, label: 'カルテ' },
-        { href: '/member/reservation', icon: Calendar, label: '予約', isMain: true },
+        { href: '/member/cancel', icon: XCircle, label: 'キャンセル', isMain: true },
         { href: '/member/tickets', icon: Ticket, label: 'チケット' },
-        { href: 'https://lin.ee/placeholder', icon: MessageCircle, label: '公式LINE', external: true },
+        { href: 'https://lin.ee/placeholder', icon: MessageCircle, label: 'LINE', external: true },
     ]
 
     return (

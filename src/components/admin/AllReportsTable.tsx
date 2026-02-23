@@ -16,8 +16,23 @@ import { ReportActions } from '@/components/admin/reports/ReportActions'
 
 export async function AllReportsTable() {
     const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user?.id).single()
+    const isCoach = profile?.role === 'coach'
 
-    const { data: reports } = await supabase
+    // If coach, get assigned student IDs to show their reports too
+    let assignedStudentIds: string[] = []
+    if (isCoach && user) {
+        const { data: assigned } = await supabase
+            .from('student_coaches')
+            .select('student_id')
+            .eq('coach_id', user.id)
+        if (assigned) {
+            assignedStudentIds = assigned.map(a => a.student_id)
+        }
+    }
+
+    let query = supabase
         .from('lessons')
         .select(`
             *,
@@ -32,9 +47,18 @@ export async function AllReportsTable() {
                 is_trial
             )
         `)
+
+    if (isCoach && user) {
+        if (assignedStudentIds.length > 0) {
+            query = query.or(`coach_id.eq.${user.id},student_id.in.(${assignedStudentIds.join(',')})`)
+        } else {
+            query = query.eq('coach_id', user.id)
+        }
+    }
+
+    const { data: reports } = await query
         .order('lesson_date', { ascending: false })
-        .order('lesson_date', { ascending: false })
-        .limit(100) // Limit for now
+        .limit(100)
 
     const { data: lessonMasters } = await supabase
         .from('lesson_masters')

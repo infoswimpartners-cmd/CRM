@@ -45,12 +45,26 @@ export default async function CoachHistoryPage({
         }
     }
 
+    // Get assigned student IDs
+    const { data: assigned } = await supabase
+        .from('student_coaches')
+        .select('student_id')
+        .eq('coach_id', user.id)
+    const assignedStudentIds = assigned?.map(a => a.student_id) || []
+
     // Build query
     let query = supabase
         .from('lessons')
         .select('*')
-        .eq('coach_id', user.id)
-        .order('lesson_date', { ascending: false })
+
+    // Filter by either direct coach_id or assigned students
+    if (assignedStudentIds.length > 0) {
+        query = query.or(`coach_id.eq.${user.id},student_id.in.(${assignedStudentIds.join(',')})`)
+    } else {
+        query = query.eq('coach_id', user.id)
+    }
+
+    query = query.order('lesson_date', { ascending: false })
 
     if (startDate && endDate) {
         query = query
@@ -73,7 +87,10 @@ export default async function CoachHistoryPage({
                         <ChevronLeft className="h-4 w-4" />
                     </Link>
                 </Button>
-                <h1 className="text-2xl font-bold tracking-tight">レッスン履歴</h1>
+                <div>
+                    <h1 className="text-2xl font-bold tracking-tight">レッスン報告一覧</h1>
+                    <p className="text-slate-500 text-sm mt-1">自分もしくは担当生徒のレッスン報告が全て閲覧できます。</p>
+                </div>
             </div>
 
             <div className="flex gap-2 overflow-x-auto pb-2">
