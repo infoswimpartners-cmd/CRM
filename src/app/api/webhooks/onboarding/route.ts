@@ -28,6 +28,13 @@ export async function POST(req: NextRequest) {
         }
     } catch (e) {
         console.error('Body Parse Error:', e)
+        // Log parse error to DB
+        await createAdminClient().from('students').insert({
+            full_name: 'Webhook ParseError',
+            contact_email: 'error@example.com',
+            notes: String(e),
+            status: 'inquiry'
+        });
         return NextResponse.json({ error: 'Invalid Body Format' }, { status: 400 })
     }
 
@@ -66,6 +73,13 @@ export async function POST(req: NextRequest) {
         // 1. Validate Input
         const result = onboardingSchema.safeParse(body)
         if (!result.success) {
+            // Log missing fields/validation errors to DB
+            await createAdminClient().from('students').insert({
+                full_name: 'Webhook ValidationError',
+                contact_email: 'error@example.com',
+                notes: JSON.stringify({ rawBody, body, error: result.error.flatten() }, null, 2),
+                status: 'inquiry'
+            });
             return NextResponse.json(
                 { error: 'Validation Failed', details: result.error.flatten() },
                 { status: 400 }
@@ -99,6 +113,13 @@ export async function POST(req: NextRequest) {
 
         if (exactDuplicate) {
             console.log(`[Onboarding] Exact Duplicate (Email+Name): ${email} / ${name}`)
+            // Log exact duplicate cases
+            await createAdminClient().from('students').insert({
+                full_name: 'Webhook Duplicate',
+                contact_email: 'error@example.com',
+                notes: `Duplicate found: ${email} / ${name}\nPayload: ${JSON.stringify(rawBody, null, 2)}`,
+                status: 'inquiry'
+            });
             return NextResponse.json({ message: 'Student already registered' }, { status: 200 })
         }
 
