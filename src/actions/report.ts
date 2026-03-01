@@ -280,7 +280,6 @@ const publicFormSchema = z.object({
     menu_description: z.string().optional(),
     feedback_good: z.string().optional(),
     feedback_next: z.string().optional(),
-    coach_comment: z.string().optional(),
     price: z.number().min(0),
 })
 
@@ -309,7 +308,7 @@ export async function submitPublicLessonReport(values: PublicFormValues) {
             p_location: data.location,
             p_feedback_good: data.feedback_good || '',
             p_feedback_next: data.feedback_next || '',
-            p_coach_comment: data.coach_comment || ''
+            p_coach_comment: ''
         })
 
         if (error) throw error

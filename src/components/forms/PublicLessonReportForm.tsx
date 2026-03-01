@@ -59,7 +59,6 @@ const formSchema = z.object({
     menu_description: z.string().optional(),
     feedback_good: z.string().optional(),
     feedback_next: z.string().optional(),
-    coach_comment: z.string().optional(),
     price: z.coerce.number().min(0, '金額は0円以上である必要があります'),
 })
 
@@ -139,7 +138,6 @@ export function PublicLessonReportForm() {
             menu_description: '',
             feedback_good: '',
             feedback_next: '',
-            coach_comment: '',
             price: 0,
         },
     })
@@ -539,29 +537,7 @@ export function PublicLessonReportForm() {
                     />
                 </div>
 
-                <FormField
-                    control={form.control as any}
-                    name="coach_comment"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel className="flex items-center gap-2">
-                                保護者へのメッセージ
-                                <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-600 border-blue-100 font-normal">メンバーサイトに反映</Badge>
-                            </FormLabel>
-                            <FormControl>
-                                <Textarea
-                                    placeholder="全体的な総評や、保護者の方へお伝えしたいことなど"
-                                    className="resize-none text-base md:text-sm min-h-[100px]"
-                                    {...field}
-                                />
-                            </FormControl>
-                            <FormDescription>
-                                生徒のダッシュボードに「前回のレポート」として表示されます。
-                            </FormDescription>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
+
 
                 <FormField
                     control={form.control as any}
