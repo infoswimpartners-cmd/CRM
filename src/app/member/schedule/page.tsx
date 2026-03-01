@@ -5,7 +5,8 @@ import BookingRequestForm from './_components/BookingRequestForm';
 
 export default async function MemberSchedulePage() {
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: authData } = await supabase.auth.getUser();
+    const user = authData?.user;
 
     if (!user) {
         redirect('/member/login');

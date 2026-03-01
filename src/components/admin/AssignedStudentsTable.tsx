@@ -16,11 +16,45 @@ import { TransferStudentsDialog } from './TransferStudentsDialog'
 import { AssignStudentsDialog } from './AssignStudentsDialog'
 import { differenceInYears } from 'date-fns'
 
+import { Switch } from "@/components/ui/switch"
+import { toast } from 'sonner'
+import { updateStudentDistantOption } from '@/actions/student'
+
 interface Student {
     id: string
     full_name: string
     birth_date: string | null
     created_at: string
+    is_default_distant_option: boolean
+}
+
+function StudentDistantToggle({ studentId, initialValue }: { studentId: string, initialValue: boolean }) {
+    const [checked, setChecked] = useState(initialValue)
+    const [loading, setLoading] = useState(false)
+
+    const handleToggle = async (newChecked: boolean) => {
+        setChecked(newChecked)
+        setLoading(true)
+        try {
+            const res = await updateStudentDistantOption(studentId, newChecked)
+            if (!res.success) throw new Error(res.error)
+            toast.success('遠方設定を更新しました')
+        } catch (error) {
+            console.error(error)
+            toast.error('遠方設定の更新に失敗しました')
+            setChecked(!newChecked) // revert
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    return (
+        <Switch
+            checked={checked}
+            onCheckedChange={handleToggle}
+            disabled={loading}
+        />
+    )
 }
 
 interface AssignedStudentsTableProps {
@@ -79,6 +113,7 @@ export function AssignedStudentsTable({ coachId, students }: AssignedStudentsTab
                             </TableHead>
                             <TableHead>氏名</TableHead>
                             <TableHead>年齢</TableHead>
+                            <TableHead>遠方設定</TableHead>
                             <TableHead>登録日</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -97,12 +132,23 @@ export function AssignedStudentsTable({ coachId, students }: AssignedStudentsTab
                                         ? `${differenceInYears(new Date(), new Date(student.birth_date))}歳`
                                         : '-'}
                                 </TableCell>
+                                <TableCell>
+                                    <div className="flex items-center space-x-2">
+                                        <StudentDistantToggle
+                                            studentId={student.id}
+                                            initialValue={student.is_default_distant_option}
+                                        />
+                                        <span className="text-sm text-gray-500 whitespace-nowrap">
+                                            {student.is_default_distant_option ? '遠方' : '通常'}
+                                        </span>
+                                    </div>
+                                </TableCell>
                                 <TableCell>{new Date(student.created_at).toLocaleDateString('ja-JP')}</TableCell>
                             </TableRow>
                         ))}
                         {students.length === 0 && (
                             <TableRow>
-                                <TableCell colSpan={4} className="text-center py-8 text-gray-500">
+                                <TableCell colSpan={5} className="text-center py-8 text-gray-500">
                                     担当している生徒はいません
                                 </TableCell>
                             </TableRow>

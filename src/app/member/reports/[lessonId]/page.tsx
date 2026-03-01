@@ -9,7 +9,8 @@ import { LessonMediaGallery } from './_components/LessonMediaGallery';
 
 export default async function ReportDetailPage({ params }: { params: { lessonId: string } }) {
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: authData } = await supabase.auth.getUser();
+    const user = authData?.user;
     const session = await getServerSession(authOptions);
 
     if (!user && !session) {

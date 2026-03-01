@@ -12,18 +12,19 @@ export async function GET(request: Request) {
         const { error } = await supabase.auth.exchangeCodeForSession(code)
 
         if (!error) {
-            // Attempt to link student data immediately after login
-            const result = await linkStudentData();
-
-            if (result.success) {
-                return NextResponse.redirect(`${origin}${next}`)
-            } else {
-                // Linking failed (no student found)
-                console.warn('Linking failed:', result.message);
-                // Redirect to error page or linking page
-                return NextResponse.redirect(`${origin}/member/link-error?message=${encodeURIComponent(result.message)}`)
+            // Attempt to link student data immediately after login (Best effort)
+            try {
+                await linkStudentData();
+            } catch (err) {
+                console.error('Linking error (ignored):', err);
             }
+
+            return NextResponse.redirect(`${origin}${next}`)
+        } else {
+            console.error('Auth callback code exchange error:', error);
         }
+    } else {
+        console.error('Auth callback missing code parameter');
     }
 
     // return the user to an error page with instructions

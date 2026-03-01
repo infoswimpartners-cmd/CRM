@@ -10,7 +10,8 @@ export async function updateStudent(id: string, formData: any) {
     const supabase = await createClient()
 
     // 1. Auth Check - Ensure Admin
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: authData } = await supabase.auth.getUser()
+    const user = authData?.user
     if (!user) return { success: false, error: 'Unauthorized' }
 
     // 2. Fetch current student data to compare membership
@@ -40,6 +41,11 @@ export async function updateStudent(id: string, formData: any) {
             coach_id: formData.coach_id === 'unassigned' ? null : (formData.coach_id || null),
             is_bank_transfer: formData.is_bank_transfer || false,
             is_two_person_lesson: formData.is_two_person_lesson || false
+        }
+
+        // LINE連携解除（管理画面からチェックを外して空文字になった場合、null として保存）
+        if (formData.line_user_id === '') {
+            updates.line_user_id = null
         }
 
         // Handle birth_date correctly (empty string -> null)
@@ -255,7 +261,8 @@ export async function updateStudentStatus(studentId: string, newStatus: string) 
     const supabase = await createClient()
 
     // 1. Auth Check - Ensure AdmiN
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: authData } = await supabase.auth.getUser()
+    const user = authData?.user
     if (!user) return { success: false, error: 'Unauthorized' }
 
     try {
@@ -308,7 +315,8 @@ export async function createStudent(formData: any) {
     const supabase = await createClient()
 
     // 1. Auth Check - Ensure Admin
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: authData } = await supabase.auth.getUser()
+    const user = authData?.user
     if (!user) return { success: false, error: 'Unauthorized' }
 
     try {
@@ -371,5 +379,31 @@ export async function createStudent(formData: any) {
     } catch (error: any) {
         console.error('[createStudent] Unexpected Error:', error)
         return { success: false, error: error.message || '予期せぬエラーが発生しました' }
+    }
+}
+
+export async function updateStudentDistantOption(studentId: string, isDefaultDistantOption: boolean) {
+    const supabase = await createClient()
+
+    const { data: authData } = await supabase.auth.getUser()
+    const user = authData?.user
+    if (!user) return { success: false, error: 'Unauthorized' }
+
+    try {
+        const { error } = await supabase
+            .from('students')
+            .update({ is_default_distant_option: isDefaultDistantOption })
+            .eq('id', studentId)
+
+        if (error) throw error
+
+        // Refresh cache, we don't know the exact path calling this, could be /admin/coaches/[id] or /customers/[id]
+        // But the caller will usually do a router.refresh() anyway or we can blindly revalidate common paths.
+        // Actually, let's just let the client refresh or we can revalidate /admin/coaches/[id] if passed, but it's simpler not to.
+        return { success: true }
+
+    } catch (error: any) {
+        console.error('Update Distant Option Error:', error)
+        return { success: false, error: error.message || 'Failed to update distant option' }
     }
 }

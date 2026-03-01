@@ -24,9 +24,9 @@ export default function LastReportCard({ report }: LastReportCardProps) {
                     <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg">
                         <FileText className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                     </div>
-                    <h3 className="font-bold text-gray-800 dark:text-gray-100">前回のレポート</h3>
+                    <h3 className="font-bold text-gray-800 dark:text-gray-100">最新のフィードバック</h3>
                 </div>
-                <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">まだレポートはありません。</p>
+                <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">まだフィードバックはありません。</p>
             </div>
         )
     }
@@ -48,7 +48,7 @@ export default function LastReportCard({ report }: LastReportCardProps) {
                             <FileText className="w-5 h-5" />
                         </div>
                         <div>
-                            <h3 className="font-black text-gray-800 tracking-tight">前回のレポート</h3>
+                            <h3 className="font-black text-gray-800 tracking-tight">最新のフィードバック</h3>
                             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
                                 {format(date, 'yyyy.MM.dd (E)', { locale: ja })} • {coachName}
                             </p>
@@ -61,7 +61,7 @@ export default function LastReportCard({ report }: LastReportCardProps) {
                     <div className="flex items-start gap-3">
                         <MessageCircle className="w-4 h-4 text-blue-500 mt-1 shrink-0" />
                         <div className="space-y-1">
-                            <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest leading-none mb-1">Coach Message</p>
+                            <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest leading-none mb-1">コーチからのメッセージ</p>
                             <p className="text-sm text-gray-700 font-medium whitespace-pre-wrap leading-relaxed">
                                 {report.coach_comment || "コメントはありません。"}
                             </p>

@@ -17,7 +17,8 @@ export async function purchaseTicket(formData: FormData) {
     }
 
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: authData } = await supabase.auth.getUser();
+    const user = authData?.user;
     const session = await getServerSession(authOptions);
 
     let studentId = null;

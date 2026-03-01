@@ -21,6 +21,7 @@ type Schedule = {
 
 type RecentReport = {
     id: string
+    coach_id: string
     lesson_date: string
     student_name: string
     menu_description: string | null

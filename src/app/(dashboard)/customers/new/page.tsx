@@ -159,6 +159,7 @@ export default function NewStudentPage() {
                                         <SelectItem value="男性">男性</SelectItem>
                                         <SelectItem value="女性">女性</SelectItem>
                                         <SelectItem value="その他">その他</SelectItem>
+                                        <SelectItem value="未回答">未回答</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -227,6 +228,7 @@ export default function NewStudentPage() {
                                         <SelectItem value="男性">男性</SelectItem>
                                         <SelectItem value="女性">女性</SelectItem>
                                         <SelectItem value="その他">その他</SelectItem>
+                                        <SelectItem value="未回答">未回答</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>

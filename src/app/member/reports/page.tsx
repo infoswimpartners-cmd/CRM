@@ -9,31 +9,21 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
-export default async function ReportsPage() {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    const session = await getServerSession(authOptions);
+import { getCachedMemberData } from '@/lib/member-data';
 
-    if (!user && !session) {
+export default async function ReportsPage() {
+    const { user, student } = await getCachedMemberData();
+
+    if (!user) {
         redirect('/member/login');
     }
-
-    const client = user ? supabase : createAdminClient();
-    const field = user ? 'auth_user_id' : 'line_user_id';
-    const userId = user ? user.id : (session?.user as any).id;
-
-    // Fetch Student ID first
-    const { data: student } = await client
-        .from('students')
-        .select('id')
-        .eq(field, userId)
-        .single();
-
     if (!student) return <div>Student not found</div>;
 
-    // Fetch Past Lessons
+    const supabase = await createClient();
     const now = new Date().toISOString();
-    const { data: lessons, error } = await client
+
+    // Fetch Past Lessons
+    const { data: lessons, error } = await supabase
         .from('lessons')
         .select(`
             id, lesson_date, location,

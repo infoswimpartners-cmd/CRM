@@ -9,7 +9,8 @@ import { redirect } from 'next/navigation';
 
 export async function bookLesson(scheduleId: string) {
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: authData } = await supabase.auth.getUser();
+    const user = authData?.user;
     const session = await getServerSession(authOptions);
 
     let studentId = null;
@@ -72,3 +73,55 @@ export async function bookLesson(scheduleId: string) {
     revalidatePath('/member/reservation');
     redirect('/member/dashboard?success=reservation_requested');
 }
+
+export async function bookLessons(scheduleIds: string[]) {
+    const supabase = await createClient();
+    const { data: authData } = await supabase.auth.getUser();
+    const user = authData?.user;
+    const session = await getServerSession(authOptions);
+
+    let studentId = null;
+
+    if (user) {
+        const { data: student } = await supabase
+            .from('students')
+            .select('id')
+            .eq('auth_user_id', user.id)
+            .single();
+        studentId = student?.id;
+    } else if (session?.user) {
+        const lineUserId = (session.user as any).id;
+        const adminClient = createAdminClient();
+        const { data: student } = await adminClient
+            .from('students')
+            .select('id')
+            .eq('line_user_id', lineUserId)
+            .single();
+        studentId = student?.id;
+    }
+
+    if (!studentId) {
+        throw new Error('Student not found');
+    }
+
+    const adminClient = createAdminClient();
+
+    // Request all slots
+    const { error: updateError } = await adminClient
+        .from('lesson_schedules')
+        .update({
+            status: 'requested',
+            student_id: studentId
+        })
+        .in('id', scheduleIds)
+        .eq('status', 'open'); // Only open ones
+
+    if (updateError) {
+        console.error('Update Error:', updateError);
+        throw new Error('予約リクエストの送信に失敗しました。');
+    }
+
+    revalidatePath('/member/reservation');
+    // Does not redirect so that client can handle the LINE redirection
+}
+

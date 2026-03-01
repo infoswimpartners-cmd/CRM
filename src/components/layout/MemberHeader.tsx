@@ -12,45 +12,45 @@ import MemberMobileSidebar from "./MemberMobileSidebar";
 interface MemberHeaderProps {
     unreadCount?: number;
     studentName?: string;
+    planName?: string;
 }
 
-export default function MemberHeader({ unreadCount = 0, studentName }: MemberHeaderProps) {
+export default function MemberHeader({ unreadCount = 0, studentName, planName }: MemberHeaderProps) {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     const handleLogout = async () => {
-        // Logout from Supabase
-        const supabase = createClient();
-        await supabase.auth.signOut();
-
-        // Logout from NextAuth (this will also redirect)
-        await nextAuthSignOut({ callbackUrl: "/member/login" });
+        try {
+            // Logout from Supabase
+            const supabase = createClient();
+            const { data } = await supabase.auth.getSession();
+            const session = data?.session;
+            if (session) {
+                await supabase.auth.signOut();
+            }
+        } catch (error) {
+            console.error('Supabase signOut error:', error);
+        } finally {
+            // Logout from NextAuth (this will also redirect)
+            await nextAuthSignOut({ callbackUrl: "/member/login" });
+        }
     };
 
     return (
         <>
             <header className="sticky top-0 z-50 w-full border-b border-blue-100 bg-white/80 backdrop-blur-xl shadow-sm transition-all duration-300">
                 <div className="container mx-auto px-4 h-14 md:h-16 flex items-center justify-between">
-                    <div className="flex items-center gap-1 md:gap-4">
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => setIsSidebarOpen(true)}
-                            className="mr-1 md:hidden hover:bg-white/50 rounded-full"
-                        >
-                            <Menu className="h-6 w-6 text-gray-600" />
-                        </Button>
-
-                        <Link href="/member/dashboard" className="flex items-center gap-2 transition-opacity hover:opacity-80">
-                            <div className="relative w-28 h-8 md:w-32 md:h-10">
-                                <Image
-                                    src="/logo.png"
-                                    alt="Swim Partners"
-                                    fill
-                                    className="object-contain object-left"
-                                    priority
-                                />
-                            </div>
-                        </Link>
+                    <div className="flex flex-col justify-center py-1">
+                        <span className="text-[10px] md:text-xs text-gray-400 font-medium">
+                            おかえりなさい！
+                        </span>
+                        <span className="font-black text-gray-800 text-lg md:text-xl tracking-tight leading-none mt-0.5 flex items-center gap-2">
+                            {studentName || 'ゲスト'}さん
+                            {planName && (
+                                <span className="text-[10px] bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full font-bold tracking-wider relative -top-0.5">
+                                    {planName}
+                                </span>
+                            )}
+                        </span>
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -69,12 +69,11 @@ export default function MemberHeader({ unreadCount = 0, studentName }: MemberHea
 
                         <Button
                             variant="ghost"
-                            size="sm"
-                            onClick={handleLogout}
-                            className="text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-full px-3 md:px-4"
+                            size="icon"
+                            onClick={() => setIsSidebarOpen(true)}
+                            className="lg:hidden hover:bg-white/50 rounded-full ml-1 md:ml-2"
                         >
-                            <LogOut className="h-4 w-4 md:h-5 md:w-5 md:mr-2" />
-                            <span className="hidden md:inline">ログアウト</span>
+                            <Menu className="h-6 w-6 text-gray-600" />
                         </Button>
                     </div>
                 </div>

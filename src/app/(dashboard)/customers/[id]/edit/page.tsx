@@ -17,6 +17,13 @@ import { updateStudent } from '@/actions/student'
 import { Switch } from '@/components/ui/switch'
 import { Checkbox } from '@/components/ui/checkbox'
 
+const normalizeGender = (g: string | null | undefined) => {
+    if (g === '男') return '男性'
+    if (g === '女') return '女性'
+    if (!g) return ''
+    return g
+}
+
 export default function EditStudentPage({ params }: { params: Promise<{ id: string }> }) {
     const router = useRouter()
     const [loading, setLoading] = useState(true)
@@ -41,7 +48,8 @@ export default function EditStudentPage({ params }: { params: Promise<{ id: stri
         coach_ids: [] as string[], // all assigned coaches
         is_bank_transfer: false,
         is_two_person_lesson: false,
-        start_timing: 'current' // 'current' | 'next'
+        start_timing: 'current', // 'current' | 'next'
+        line_user_id: ''
     })
 
     const [membershipTypes, setMembershipTypes] = useState<{ id: string, name: string }[]>([])
@@ -97,9 +105,9 @@ export default function EditStudentPage({ params }: { params: Promise<{ id: stri
                 full_name_kana: data.full_name_kana || '',
                 second_student_name: data.second_student_name || '',
                 second_student_name_kana: data.second_student_name_kana || '',
-                second_student_gender: data.second_student_gender || '',
+                second_student_gender: normalizeGender(data.second_student_gender),
                 second_student_birth_date: data.second_student_birth_date || '',
-                gender: data.gender || '',
+                gender: normalizeGender(data.gender),
                 birth_date: data.birth_date || '',
                 contact_email: data.contact_email || '',
                 contact_phone: data.contact_phone || '',
@@ -110,7 +118,8 @@ export default function EditStudentPage({ params }: { params: Promise<{ id: stri
                 coach_ids: [], // will fetch below
                 is_bank_transfer: data.is_bank_transfer || false,
                 is_two_person_lesson: data.is_two_person_lesson || false,
-                start_timing: 'current'
+                start_timing: 'current',
+                line_user_id: data.line_user_id || ''
             })
 
             // Fetch assigned coaches
@@ -226,6 +235,7 @@ export default function EditStudentPage({ params }: { params: Promise<{ id: stri
                                         <SelectItem value="男性">男性</SelectItem>
                                         <SelectItem value="女性">女性</SelectItem>
                                         <SelectItem value="その他">その他</SelectItem>
+                                        <SelectItem value="未回答">未回答</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -262,6 +272,39 @@ export default function EditStudentPage({ params }: { params: Promise<{ id: stri
                                 <Label htmlFor="contact_phone">電話番号</Label>
                                 <Input id="contact_phone" type="tel" value={formData.contact_phone} onChange={handleChange} />
                             </div>
+                            <div className="space-y-4 col-span-2 mt-2 pt-4 border-t border-slate-100">
+                                <div>
+                                    <Label className="text-sm font-bold text-slate-700">LINE・会員・通知連携</Label>
+                                    <p className="text-xs text-slate-500 mb-2 mt-1">
+                                        マイページから連携されたLINEアカウント情報です。連携を解除するには、下のチェックを外して更新してください。
+                                    </p>
+                                </div>
+                                <div className="flex items-center space-x-2 bg-emerald-50 p-4 rounded-md border border-emerald-100">
+                                    <Checkbox
+                                        id="line_linked"
+                                        checked={!!formData.line_user_id}
+                                        onCheckedChange={(checked) => {
+                                            if (!checked) {
+                                                setFormData({ ...formData, line_user_id: '' })
+                                            }
+                                        }}
+                                        disabled={!formData.line_user_id}
+                                    />
+                                    <div className="grid gap-1.5 leading-none">
+                                        <Label
+                                            htmlFor="line_linked"
+                                            className={`text-sm font-medium leading-none ${!!formData.line_user_id ? 'text-emerald-800' : 'text-slate-400'}`}
+                                        >
+                                            {!!formData.line_user_id ? 'LINE連携済み' : 'LINE未連携 (メンバーズサイトからユーザー自身で連携する必要があります)'}
+                                        </Label>
+                                        {!!formData.line_user_id && (
+                                            <p className="text-[10px] text-emerald-600 font-mono break-all pr-4">
+                                                ID: {formData.line_user_id}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
@@ -294,6 +337,7 @@ export default function EditStudentPage({ params }: { params: Promise<{ id: stri
                                         <SelectItem value="男性">男性</SelectItem>
                                         <SelectItem value="女性">女性</SelectItem>
                                         <SelectItem value="その他">その他</SelectItem>
+                                        <SelectItem value="未回答">未回答</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>

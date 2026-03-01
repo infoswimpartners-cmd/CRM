@@ -40,7 +40,7 @@ export default function NextLessonCard({ lesson }: NextLessonCardProps) {
                 <div className="flex justify-between items-start mb-6">
                     <div>
                         <span className="inline-block px-3 py-1 bg-blue-50 text-blue-600 text-[10px] font-black uppercase tracking-widest rounded-full mb-2">
-                            Upcoming Lesson
+                            次回の予定
                         </span>
                         <h3 className="text-xl font-black text-gray-800 tracking-tight">次回のレッスン</h3>
                     </div>
@@ -58,7 +58,7 @@ export default function NextLessonCard({ lesson }: NextLessonCardProps) {
                             <User className="w-5 h-5" />
                         </div>
                         <div>
-                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Coach</p>
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">コーチ</p>
                             <p className="font-bold text-gray-800">
                                 {lesson.profiles?.full_name || '担当なし'} コーチ
                             </p>
@@ -70,7 +70,7 @@ export default function NextLessonCard({ lesson }: NextLessonCardProps) {
                             <Calendar className="w-5 h-5" />
                         </div>
                         <div>
-                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Time</p>
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">時間</p>
                             <p className="font-bold text-gray-800">
                                 {format(lessonDate, 'HH:mm', { locale: ja })} ~ {format(new Date(lessonDate.getTime() + 60 * 60 * 1000), 'HH:mm')}
                             </p>
@@ -82,7 +82,7 @@ export default function NextLessonCard({ lesson }: NextLessonCardProps) {
                             <MapPin className="w-5 h-5" />
                         </div>
                         <div>
-                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Location</p>
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">場所</p>
                             <p className="font-bold text-gray-800 line-clamp-1">
                                 {lesson.location || '場所未定'}
                             </p>
@@ -92,13 +92,11 @@ export default function NextLessonCard({ lesson }: NextLessonCardProps) {
             </div>
 
             {/* Action Footer */}
-            {/* 
-            <div className="bg-gray-50/50 p-4 border-t border-gray-100 flex justify-end">
-                <Link href={`/member/lessons/${lesson.id}`} className="text-sm font-bold text-blue-600 flex items-center hover:underline">
-                    詳細を確認 <ArrowRight className="w-4 h-4 ml-1" />
+            <div className="bg-white/50 p-4 border-t border-blue-50 flex justify-end">
+                <Link href="/member/schedule" className="text-sm font-bold text-blue-600 flex items-center group/link">
+                    スケジュールを見る <ArrowRight className="w-4 h-4 ml-1 group-hover/link:translate-x-1 transition-transform" />
                 </Link>
             </div>
-            */}
         </div>
     )
 }

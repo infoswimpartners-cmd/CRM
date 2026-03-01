@@ -23,6 +23,12 @@ export function MastersNav() {
             >
                 <Link href="/admin/masters/membership-types">会員区分</Link>
             </Button>
+            <Button
+                variant={pathname.includes('/facilities') ? 'default' : 'outline'}
+                asChild
+            >
+                <Link href="/admin/masters/facilities">施設管理</Link>
+            </Button>
         </div>
     )
 }

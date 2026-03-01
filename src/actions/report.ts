@@ -27,7 +27,8 @@ export async function submitLessonReport(values: FormValues) {
     const supabase = await createClient()
 
     // 1. Authenticate User
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: authData } = await supabase.auth.getUser()
+    const user = authData?.user
     if (!user) {
         return { success: false, error: 'Unauthorized' }
     }
@@ -154,7 +155,8 @@ Swim Partners Manager
 export async function deleteLessonReport(lessonId: string) {
     const supabase = await createClient()
 
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: authData } = await supabase.auth.getUser()
+    const user = authData?.user
     if (!user) return { success: false, error: 'Unauthorized' }
 
     // Admin Check
@@ -199,7 +201,8 @@ export async function deleteLessonReport(lessonId: string) {
 export async function updateLessonReport(lessonId: string, values: FormValues) {
     const supabase = await createClient()
 
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: authData } = await supabase.auth.getUser()
+    const user = authData?.user
     if (!user) return { success: false, error: 'Unauthorized' }
 
     // Admin Check
@@ -275,6 +278,9 @@ const publicFormSchema = z.object({
     lesson_master_id: z.string().min(1, 'レッスンの種類を選択してください'),
     location: z.string().min(1, '場所は必須です'),
     menu_description: z.string().optional(),
+    feedback_good: z.string().optional(),
+    feedback_next: z.string().optional(),
+    coach_comment: z.string().optional(),
     price: z.number().min(0),
 })
 
@@ -300,7 +306,10 @@ export async function submitPublicLessonReport(values: PublicFormValues) {
             p_description: data.menu_description || '',
             p_lesson_master_id: data.lesson_master_id,
             p_price: data.price,
-            p_location: data.location
+            p_location: data.location,
+            p_feedback_good: data.feedback_good || '',
+            p_feedback_next: data.feedback_next || '',
+            p_coach_comment: data.coach_comment || ''
         })
 
         if (error) throw error

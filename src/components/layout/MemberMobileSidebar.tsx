@@ -11,7 +11,8 @@ import {
     MessageCircle,
     LogOut,
     ChevronRight,
-    User
+    User,
+    Settings
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { usePathname } from 'next/navigation'
@@ -48,6 +49,7 @@ export default function MemberMobileSidebar({
         { href: '/member/reservation', icon: Calendar, label: 'レッスン予約', subLabel: 'スケジュールリクエスト' },
         { href: '/member/reports', icon: FileText, label: 'カルテ・レポート', subLabel: '成長の記録' },
         { href: '/member/tickets', icon: Ticket, label: 'チケット管理', subLabel: '残高・購入履歴' },
+        { href: '/member/profile', icon: Settings, label: 'アカウント設定', subLabel: '基本情報の確認・変更' },
         { href: 'https://lin.ee/placeholder', icon: MessageCircle, label: '公式LINE', subLabel: '運営へのお問い合わせ', external: true },
     ]
 
@@ -74,7 +76,7 @@ export default function MemberMobileSidebar({
                             <User className="w-6 h-6" />
                         </div>
                         <div>
-                            <p className="text-[10px] text-blue-400 font-black tracking-widest uppercase">Member Profile</p>
+                            <p className="text-[10px] text-blue-400 font-black tracking-widest uppercase">会員プロフィール</p>
                             <h2 className="font-black text-gray-800 text-lg">{studentName || 'ゲスト'} 様</h2>
                         </div>
                     </div>

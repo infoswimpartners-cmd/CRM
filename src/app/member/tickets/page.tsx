@@ -18,59 +18,28 @@ import { purchaseTicket } from './actions';
 import TicketCard from '@/components/member/TicketCard';
 import TransactionHistory from '@/components/member/TransactionHistory';
 
-export default async function TicketsPage() {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    const session = await getServerSession(authOptions);
+import { getCachedMemberData } from '@/lib/member-data';
 
-    if (!user && !session) {
+export default async function TicketsPage() {
+    const { user, student: initialStudent } = await getCachedMemberData();
+
+    if (!user) {
         redirect('/member/login');
     }
 
-    let student = null;
+    let student = initialStudent;
     let transactions = [];
+    const supabase = await createClient();
 
-    const fetchStudentData = async (queryUser: boolean, userId: string) => {
-        const client = queryUser ? supabase : createAdminClient();
-        const field = queryUser ? 'auth_user_id' : 'line_user_id';
-
-        const { data: studentData, error } = await client
-            .from('students')
+    if (student) {
+        // 取引履歴の取得を並列化（Promise.all）
+        const { data: txData } = await supabase
+            .from('ticket_transactions')
             .select('*')
-            .eq(field, userId)
-            .single();
+            .eq('student_id', student.id)
+            .order('created_at', { ascending: false });
 
-        if (error || !studentData) return null;
-
-        // Fetch Transactions
-        let txs = [];
-        try {
-            const { data, error: txError } = await client
-                .from('ticket_transactions')
-                .select('*')
-                .eq('student_id', studentData.id)
-                .order('created_at', { ascending: false });
-            if (!txError && data) txs = data;
-        } catch (e) {
-            console.error('Failed to fetch transactions:', e);
-        }
-
-        return { student: studentData, transactions: txs };
-    };
-
-    if (user) {
-        const result = await fetchStudentData(true, user.id);
-        if (result) {
-            student = result.student;
-            transactions = result.transactions;
-        }
-    } else if (session?.user) {
-        const lineUserId = (session.user as any).id;
-        const result = await fetchStudentData(false, lineUserId);
-        if (result) {
-            student = result.student;
-            transactions = result.transactions;
-        }
+        if (txData) transactions = txData;
     }
 
     if (!student) return <div>Loading...</div>;

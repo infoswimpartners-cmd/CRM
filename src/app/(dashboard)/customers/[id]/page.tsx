@@ -13,7 +13,8 @@ import { TrialConfirmButton } from '@/components/admin/TrialConfirmButton'
 import { StripeManager } from '@/components/admin/students/StripeManager'
 import { getStripeCustomerStatus } from '@/actions/stripe'
 import { Badge } from '@/components/ui/badge'
-import { Landmark, Users } from 'lucide-react'
+import { Landmark, Users, MessageCircle } from 'lucide-react'
+import { UnlinkLineButton } from '@/components/admin/UnlinkLineButton'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { calculateAge } from '@/lib/utils'
@@ -164,6 +165,30 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
                             <div>
                                 <Label className="text-xs text-slate-500">電話番号</Label>
                                 <div className="font-medium">{isAdmin ? (student.contact_phone || '-') : '***'}</div>
+                            </div>
+                            <div className="sm:col-span-2 pt-2 border-t border-slate-100">
+                                <Label className="text-xs text-slate-500 mb-1 flex items-center gap-1"><MessageCircle className="h-3.5 w-3.5 text-emerald-500" />LINE連携状況</Label>
+                                {student.line_user_id ? (
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-emerald-50 border border-emerald-100 rounded-lg mt-1">
+                                        <div>
+                                            <div className="font-bold text-emerald-800 text-sm">連携済み</div>
+                                            {isAdmin && (
+                                                <div className="text-xs text-emerald-600 font-mono hidden sm:block">
+                                                    ID: {student.line_user_id.slice(0, 10)}...
+                                                </div>
+                                            )}
+                                        </div>
+                                        {isAdmin && (
+                                            <div className="w-full sm:w-auto">
+                                                <UnlinkLineButton studentId={student.id} />
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="text-sm text-slate-500 italic p-2 bg-slate-50 rounded mt-1 border border-slate-100">
+                                        未連携
+                                    </div>
+                                )}
                             </div>
                             {student.notes && (
                                 <div className="sm:col-span-2 mt-2 pt-2 border-t border-slate-100">

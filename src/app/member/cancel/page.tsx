@@ -7,27 +7,16 @@ import Link from 'next/link';
 import { ArrowLeft, XCircle, CalendarX } from 'lucide-react';
 import { CancelUpcomingLessons } from './_components/CancelUpcomingLessons';
 
-export default async function CancelPage() {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    const session = await getServerSession(authOptions);
+import { getCachedMemberData } from '@/lib/member-data';
 
-    if (!user && !session) {
+export default async function CancelPage() {
+    const { user, student: cachedStudent } = await getCachedMemberData();
+
+    if (!user) {
         redirect('/member/login');
     }
 
-    const client = user ? supabase : createAdminClient();
-    const field = user ? 'auth_user_id' : 'line_user_id';
-    const userId = user ? user.id : (session?.user as any)?.id;
-
-    // 生徒情報を取得
-    const { data: student } = await client
-        .from('students')
-        .select('id, full_name, current_tickets')
-        .eq(field, userId)
-        .single();
-
-    if (!student) {
+    if (!cachedStudent) {
         return (
             <div className="p-4 text-center">
                 <p className="text-red-500">会員情報が見つかりません</p>
@@ -35,9 +24,12 @@ export default async function CancelPage() {
         );
     }
 
+    const supabase = await createClient();
+    const student = cachedStudent;
+
     // 今後のレッスン一覧を取得（キャンセル可能なもの）
     const now = new Date().toISOString();
-    const { data: upcomingLessons } = await client
+    const { data: upcomingLessons } = await supabase
         .from('lessons')
         .select(`
             id,

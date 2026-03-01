@@ -7,29 +7,27 @@ import { ReservationClient } from './client'; // Client component for interactiv
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
-export default async function ReservationPage() {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    const session = await getServerSession(authOptions);
+import { getCachedMemberData } from '@/lib/member-data';
 
-    if (!user && !session) {
+export default async function ReservationPage() {
+    const { user, student: cachedStudent } = await getCachedMemberData();
+
+    if (!user) {
         redirect('/member/login');
     }
 
-    let student = null;
-    const client = user ? supabase : createAdminClient();
-    const field = user ? 'auth_user_id' : 'line_user_id';
-    const userId = user ? user.id : (session?.user as any).id;
+    if (!cachedStudent) return <div>Student not found</div>;
 
-    const { data: studentData } = await client
+    const supabase = await createClient();
+
+    // coach_id等の詳細情報を取得（cachedStudentに含まれていない場合があるため）
+    const { data: student } = await supabase
         .from('students')
         .select('id, coach_id, student_coaches(coach_id)')
-        .eq(field, userId)
+        .eq('id', cachedStudent.id)
         .single();
 
-    student = studentData;
-
-    if (!student) return <div>Student not found</div>;
+    if (!student) return <div>Student data error</div>;
 
     // Determine Coach ID
     let coachId = student.coach_id;

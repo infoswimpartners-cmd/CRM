@@ -191,11 +191,13 @@ export function EditReportDialog({ report, lessonMasters, open, onOpenChange, on
                             name="price"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>売上金額</FormLabel>
+                                    <FormLabel>売上金額 (円)</FormLabel>
                                     <FormControl>
                                         <Input
                                             type="number"
                                             {...field}
+                                            readOnly
+                                            className="bg-slate-50 text-slate-500 cursor-not-allowed"
                                             onChange={e => field.onChange(parseInt(e.target.value) || 0)}
                                         />
                                     </FormControl>
@@ -216,6 +218,8 @@ export function EditReportDialog({ report, lessonMasters, open, onOpenChange, on
                                             <Input
                                                 type="number"
                                                 {...field}
+                                                readOnly
+                                                className="bg-slate-50 text-slate-500 cursor-not-allowed"
                                                 onChange={e => field.onChange(parseInt(e.target.value) || 0)}
                                             />
                                         </FormControl>

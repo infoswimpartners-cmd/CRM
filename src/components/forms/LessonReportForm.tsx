@@ -31,6 +31,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { toast } from 'sonner'
 import { StudentSelect } from './StudentSelect'
+import { LocationSelect } from './LocationSelect'
 import {
     Select,
     SelectContent,
@@ -376,8 +377,14 @@ export function LessonReportForm() {
                         <FormItem>
                             <FormLabel>場所</FormLabel>
                             <FormControl>
-                                <Input placeholder="〇〇市民プール" {...field} />
+                                <LocationSelect
+                                    value={field.value}
+                                    onChange={field.onChange}
+                                />
                             </FormControl>
+                            <FormDescription>
+                                登録済みの施設マスタから場所を選択してください。
+                            </FormDescription>
                             <FormMessage />
                         </FormItem>
                     )}
@@ -479,10 +486,15 @@ export function LessonReportForm() {
                         <FormItem>
                             <FormLabel>金額 (円)</FormLabel>
                             <FormControl>
-                                <Input type="number" {...field} />
+                                <Input
+                                    type="number"
+                                    {...field}
+                                    readOnly
+                                    className="bg-slate-50 text-slate-500 cursor-not-allowed"
+                                />
                             </FormControl>
                             <FormDescription>
-                                このレッスンの売上金額を入力してください。
+                                レッスンの種類に応じて自動的に計算されます。
                             </FormDescription>
                             <FormMessage />
                         </FormItem>

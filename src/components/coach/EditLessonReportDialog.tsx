@@ -313,8 +313,16 @@ export function EditLessonReportDialog({ lesson, open, onOpenChange }: EditLesso
                                 <FormItem>
                                     <FormLabel>金額 (円)</FormLabel>
                                     <FormControl>
-                                        <Input type="number" {...field} />
+                                        <Input
+                                            type="number"
+                                            {...field}
+                                            readOnly
+                                            className="bg-slate-50 text-slate-500 cursor-not-allowed"
+                                        />
                                     </FormControl>
+                                    <FormDescription>
+                                        レッスンの種類に応じて自動的に計算されます。
+                                    </FormDescription>
                                     <FormMessage />
                                 </FormItem>
                             )}

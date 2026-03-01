@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { CoachBankInfoForm } from '@/components/admin/CoachBankInfoForm'
 import { CoachTaxSettingsForm } from '@/components/admin/CoachTaxSettingsForm'
+import { CoachRewardSettingsForm } from '@/components/admin/CoachRewardSettingsForm'
 
 export const dynamic = 'force-dynamic'
 
@@ -100,6 +101,17 @@ export default async function CoachDetailPage({ params }: PageProps) {
                     </CardHeader>
                     <CardContent>
                         <CoachTaxSettingsForm coachId={coach.id} />
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>報酬設定</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <CoachRewardSettingsForm
+                            coachId={coach.id}
+                            initialDistantRewardFee={coach.distant_reward_fee || 4000}
+                        />
                     </CardContent>
                 </Card>
             </div>

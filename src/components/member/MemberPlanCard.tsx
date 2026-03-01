@@ -60,7 +60,7 @@ export default function MemberPlanCard({ student, membershipType }: MemberPlanCa
                             <CreditCard className="w-5 h-5 text-blue-600" />
                         </div>
                         <div>
-                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Current Plan</p>
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">現在のプラン</p>
                             <h3 className="font-black text-gray-800">{membershipType.name}</h3>
                         </div>
                     </div>

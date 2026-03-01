@@ -9,6 +9,7 @@ import { format } from 'date-fns'
 import { CalendarIcon, Loader2, Check, ChevronsUpDown } from 'lucide-react'
 
 import { submitPublicLessonReport, getStudentsForCoachPublicAction } from '@/actions/report'
+import { LocationSelect } from './LocationSelect'
 
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
@@ -25,6 +26,8 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { toast } from 'sonner'
 import {
@@ -54,6 +57,9 @@ const formSchema = z.object({
     lesson_master_id: z.string().min(1, 'レッスンの種類を選択してください'),
     location: z.string().min(1, '場所は必須です'),
     menu_description: z.string().optional(),
+    feedback_good: z.string().optional(),
+    feedback_next: z.string().optional(),
+    coach_comment: z.string().optional(),
     price: z.coerce.number().min(0, '金額は0円以上である必要があります'),
 })
 
@@ -87,6 +93,7 @@ export function PublicLessonReportForm() {
     const [foundCoach, setFoundCoach] = useState<Coach | null>(null)
     const [isLoadingCoach, setIsLoadingCoach] = useState(false)
     const [restrictedLessonId, setRestrictedLessonId] = useState<string | null>(null)
+    const [keepValues, setKeepValues] = useState(false)
 
     // Filter masters based on restriction
     const displayMasters = restrictedLessonId
@@ -130,6 +137,9 @@ export function PublicLessonReportForm() {
             lesson_master_id: '',
             location: '',
             menu_description: '',
+            feedback_good: '',
+            feedback_next: '',
+            coach_comment: '',
             price: 0,
         },
     })
@@ -209,8 +219,22 @@ export function PublicLessonReportForm() {
             }
 
             toast.success('レポートを送信しました！')
-            form.reset()
-            router.push('/')
+
+            if (keepValues) {
+                const currentValues = form.getValues()
+                form.reset({
+                    ...currentValues,
+                    student_id: '',
+                    student_name: '',
+                    feedback_good: '',
+                    feedback_next: '',
+                })
+                setRestrictedLessonId(null)
+                window.scrollTo({ top: 0, behavior: 'smooth' })
+            } else {
+                form.reset()
+                router.push('/')
+            }
         } catch (error: any) {
             console.error('Error submitting report:', error)
             toast.error(error.message || '送信に失敗しました。')
@@ -437,8 +461,14 @@ export function PublicLessonReportForm() {
                         <FormItem>
                             <FormLabel>場所</FormLabel>
                             <FormControl>
-                                <Input placeholder="〇〇市民プール" {...field} className="h-12 text-base md:text-sm" />
+                                <LocationSelect
+                                    value={field.value}
+                                    onChange={field.onChange}
+                                />
                             </FormControl>
+                            <FormDescription>
+                                登録済みの施設マスタから場所を選択してください。
+                            </FormDescription>
                             <FormMessage />
                         </FormItem>
                     )}
@@ -449,14 +479,85 @@ export function PublicLessonReportForm() {
                     name="menu_description"
                     render={({ field }) => (
                         <FormItem>
-                            <FormLabel>メニュー / 内容</FormLabel>
+                            <FormLabel className="flex items-center gap-2">
+                                メニュー内容 / メモ
+                                <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-600 border-blue-100 font-normal">メンバーサイトに反映</Badge>
+                            </FormLabel>
                             <FormControl>
                                 <Textarea
-                                    placeholder="W-UP, 50m x 10 クロール..."
+                                    placeholder="実施したメニューや練習内容"
                                     className="resize-none text-base md:text-sm min-h-[100px]"
                                     {...field}
                                 />
                             </FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                        control={form.control as any}
+                        name="feedback_good"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className="flex items-center gap-2">
+                                    良かった点
+                                    <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-600 border-blue-100 font-normal">メンバーサイトに反映</Badge>
+                                </FormLabel>
+                                <FormControl>
+                                    <Textarea
+                                        placeholder="以前より改善された点など"
+                                        className="resize-none text-base md:text-sm min-h-[80px]"
+                                        {...field}
+                                    />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+
+                    <FormField
+                        control={form.control as any}
+                        name="feedback_next"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className="flex items-center gap-2">
+                                    次回の課題
+                                    <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-600 border-blue-100 font-normal">メンバーサイトに反映</Badge>
+                                </FormLabel>
+                                <FormControl>
+                                    <Textarea
+                                        placeholder="次回意識すべきポイントなど"
+                                        className="resize-none text-base md:text-sm min-h-[80px]"
+                                        {...field}
+                                    />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                </div>
+
+                <FormField
+                    control={form.control as any}
+                    name="coach_comment"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel className="flex items-center gap-2">
+                                保護者へのメッセージ
+                                <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-600 border-blue-100 font-normal">メンバーサイトに反映</Badge>
+                            </FormLabel>
+                            <FormControl>
+                                <Textarea
+                                    placeholder="全体的な総評や、保護者の方へお伝えしたいことなど"
+                                    className="resize-none text-base md:text-sm min-h-[100px]"
+                                    {...field}
+                                />
+                            </FormControl>
+                            <FormDescription>
+                                生徒のダッシュボードに「前回のレポート」として表示されます。
+                            </FormDescription>
                             <FormMessage />
                         </FormItem>
                     )}
@@ -469,8 +570,16 @@ export function PublicLessonReportForm() {
                         <FormItem>
                             <FormLabel>金額 (円)</FormLabel>
                             <FormControl>
-                                <Input type="number" {...field} className="h-12 text-base md:text-sm" />
+                                <Input
+                                    type="number"
+                                    {...field}
+                                    readOnly
+                                    className="h-12 text-base md:text-sm bg-slate-50 text-slate-500 cursor-not-allowed"
+                                />
                             </FormControl>
+                            <FormDescription>
+                                レッスンの種類に応じて自動的に計算されます。
+                            </FormDescription>
                             <FormMessage />
                         </FormItem>
                     )}

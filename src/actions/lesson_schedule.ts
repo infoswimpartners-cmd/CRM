@@ -157,7 +157,8 @@ export async function createLessonSchedule(params: CreateLessonScheduleParams) {
     const supabaseAdmin = createAdminClient()
 
     // 1. Auth Check (Admin or Coach)
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: authData } = await supabase.auth.getUser()
+    const user = authData?.user
     if (!user) return { success: false, error: 'Unauthorized' }
 
     let isOverage = false
@@ -365,7 +366,8 @@ export async function approveLessonSchedule(scheduleId: string) {
     const supabaseAdmin = createAdminClient()
 
     // Auth Check
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: authData } = await supabase.auth.getUser()
+    const user = authData?.user
     if (!user) return { success: false, error: 'Unauthorized' }
 
     // Admin Check
@@ -513,7 +515,8 @@ export async function rejectLessonSchedule(scheduleId: string) {
     const supabaseAdmin = createAdminClient()
 
     // Auth Check
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: authData } = await supabase.auth.getUser()
+    const user = authData?.user
     if (!user) return { success: false, error: 'Unauthorized' }
 
     // Admin Check
@@ -545,7 +548,8 @@ export async function rejectLessonSchedule(scheduleId: string) {
 export async function checkStudentLessonStatus(studentId: string, dateStr: string) {
     const supabase = await createClient()
     const supabaseAdmin = createAdminClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: authData } = await supabase.auth.getUser()
+    const user = authData?.user
     if (!user) return { success: false, error: 'Unauthorized' }
 
     try {
@@ -714,7 +718,8 @@ export async function approveLessonScheduleManually(scheduleId: string) {
     const supabaseAdmin = createAdminClient()
 
     // Auth Check
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: authData } = await supabase.auth.getUser()
+    const user = authData?.user
     if (!user) return { success: false, error: 'Unauthorized' }
 
     // Admin Check
