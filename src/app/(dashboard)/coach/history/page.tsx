@@ -20,8 +20,9 @@ import { LessonHistoryRow } from '@/components/coach/LessonHistoryRow'
 export default async function CoachHistoryPage({
     searchParams,
 }: {
-    searchParams: { month?: string }
+    searchParams: Promise<{ month?: string }>
 }) {
+    const { month: monthParam } = await searchParams
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -37,10 +38,9 @@ export default async function CoachHistoryPage({
     const isAdmin = profile?.role === 'admin'
 
     // Determine date range for filtering
-    const currentDate = new Date()
+    const today = new Date()
     let startDate: Date | null = null
     let endDate: Date | null = null
-    const monthParam = searchParams.month
 
     if (monthParam) {
         // format: yyyy-MM
@@ -82,9 +82,9 @@ export default async function CoachHistoryPage({
     const { data: lessons } = await query
 
     // Calculate months for navigation links
-    const thisMonth = format(currentDate, 'yyyy-MM')
-    const lastMonth = format(subMonths(currentDate, 1), 'yyyy-MM')
-    const twoMonthsAgo = format(subMonths(currentDate, 2), 'yyyy-MM')
+    const thisMonth = format(today, 'yyyy-MM')
+    const lastMonth = format(subMonths(today, 1), 'yyyy-MM')
+    const twoMonthsAgo = format(subMonths(today, 2), 'yyyy-MM')
 
     return (
         <div className="space-y-6">

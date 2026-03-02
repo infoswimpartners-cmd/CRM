@@ -30,7 +30,7 @@ type PayoutStatus = {
     finalAmount: number
 }
 
-export default async function PayoutsPage({ searchParams }: { searchParams: { month?: string } }) {
+export default async function PayoutsPage({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
     const supabase = await createClient()
 
     // Default to last month (most common payout scenario)

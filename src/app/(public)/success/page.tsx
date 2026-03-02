@@ -4,11 +4,12 @@ import Link from 'next/link'
 import { CheckCircle2, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
-export default function SuccessPage({
+export default async function SuccessPage({
     searchParams,
 }: {
-    searchParams: { [key: string]: string | string[] | undefined }
+    searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
+    await searchParams // Unused but need to await for consistency if TypeScript complains or for future use
     // If we wanted to show specific details, we could fetch the session from Stripe here based on session_id
     // For now, a generic success message is sufficient as the email confirms details.
 

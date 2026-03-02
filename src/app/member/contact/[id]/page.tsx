@@ -8,8 +8,9 @@ import { ja } from 'date-fns/locale'
 import { Card, CardContent } from '@/components/ui/card'
 import ReplyForm from './ReplyForm' // Separate client component for reply
 
-export default async function InquiryDetailPage({ params }: { params: { id: string } }) {
-    const data = await getInquiryDetails(params.id)
+export default async function InquiryDetailPage({ params }: { params: Promise<{ id: string }> }) {
+    const { id } = await params
+    const data = await getInquiryDetails(id)
     if (!data) notFound()
 
     const { inquiry, messages } = data
@@ -52,8 +53,8 @@ export default async function InquiryDetailPage({ params }: { params: { id: stri
                 {messages && messages.map((msg: any) => (
                     <div key={msg.id} className={`flex ${msg.is_admin ? 'justify-start' : 'justify-end'}`}>
                         <div className={`max-w-[80%] rounded-lg p-3 ${msg.is_admin
-                                ? 'bg-white border border-gray-200 text-gray-800'
-                                : 'bg-blue-600 text-white'
+                            ? 'bg-white border border-gray-200 text-gray-800'
+                            : 'bg-blue-600 text-white'
                             }`}>
                             <div className="text-sm whitespace-pre-wrap">{msg.message}</div>
                             <div className={`text-[10px] mt-1 ${msg.is_admin ? 'text-gray-400' : 'text-blue-100'

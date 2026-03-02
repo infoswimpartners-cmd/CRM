@@ -14,7 +14,7 @@ const supabaseAdmin = createAdminClient(
 )
 
 // Common keys for bank info
-export const BANK_KEYS = [
+const BANK_KEYS = [
     'bank_name',
     'branch_name',
     'account_type',

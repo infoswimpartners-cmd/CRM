@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { ArrowLeft, MapPin, User, Clock, Play, Image as ImageIcon, MessageSquare, Star, Target } from 'lucide-react';
 import { LessonMediaGallery } from './_components/LessonMediaGallery';
 
-export default async function ReportDetailPage({ params }: { params: { lessonId: string } }) {
+export default async function ReportDetailPage({ params }: { params: Promise<{ lessonId: string }> }) {
     const supabase = await createClient();
     const { data: authData } = await supabase.auth.getUser();
     const user = authData?.user;
@@ -17,8 +17,8 @@ export default async function ReportDetailPage({ params }: { params: { lessonId:
         redirect('/member/login');
     }
 
+    const { lessonId } = await params;
     const client = user ? supabase : createAdminClient();
-    const lessonId = params.lessonId;
 
     const { data: lesson, error } = await client
         .from('lessons')

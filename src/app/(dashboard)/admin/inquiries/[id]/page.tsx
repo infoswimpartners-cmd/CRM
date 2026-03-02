@@ -8,8 +8,9 @@ import { ja } from 'date-fns/locale'
 import AdminReplyForm from './AdminReplyForm' // Separate component
 import CloseButton from './CloseButton' // Separate component
 
-export default async function AdminInquiryDetailPage({ params }: { params: { id: string } }) {
-    const data = await getAdminInquiryDetails(params.id)
+export default async function AdminInquiryDetailPage({ params }: { params: Promise<{ id: string }> }) {
+    const { id } = await params
+    const data = await getAdminInquiryDetails(id)
     if (!data) notFound()
 
     const { inquiry, messages } = data

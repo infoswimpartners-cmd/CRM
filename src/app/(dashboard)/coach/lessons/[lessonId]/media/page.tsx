@@ -4,13 +4,13 @@ import Link from 'next/link'
 import { ArrowLeft, Video, Image as ImageIcon } from 'lucide-react'
 import { LessonMediaUploader } from '@/components/coach/LessonMediaUploader'
 
-export default async function LessonMediaPage({ params }: { params: { lessonId: string } }) {
+export default async function LessonMediaPage({ params }: { params: Promise<{ lessonId: string }> }) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) redirect('/login')
 
-    const { lessonId } = params
+    const { lessonId } = await params
 
     // レッスン情報を取得
     const { data: lesson, error } = await supabase
