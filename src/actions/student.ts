@@ -211,8 +211,8 @@ export async function updateStudent(id: string, formData: any) {
 
                 // 4. Send Email
                 if (updates.contact_email) {
-                    emailSent = await emailService.sendTemplateEmail(
-                        'enrollment_complete',
+                    emailSent = await emailService.sendTriggerEmail(
+                        'enrollment_completed',
                         updates.contact_email,
                         {
                             name: formatStudentNames({ full_name: updates.full_name, second_student_name: updates.second_student_name }),

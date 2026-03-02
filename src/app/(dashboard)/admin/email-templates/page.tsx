@@ -1,5 +1,5 @@
 
-import { getEmailTemplates } from '@/actions/email-template'
+import { getEmailTemplates, getEmailTriggers } from '@/actions/email-template'
 import { EmailTemplateManager } from '@/components/admin/EmailTemplateManager'
 import { Metadata } from 'next'
 
@@ -9,6 +9,7 @@ export const metadata: Metadata = {
 
 export default async function EmailTemplatesPage() {
     const templates = await getEmailTemplates()
+    const triggers = await getEmailTriggers()
 
     return (
         <div className="space-y-6 max-w-[1600px] mx-auto h-full">
@@ -19,7 +20,7 @@ export default async function EmailTemplatesPage() {
                 </p>
             </div>
 
-            <EmailTemplateManager templates={templates} />
+            <EmailTemplateManager templates={templates} triggers={triggers} />
         </div>
     )
 }

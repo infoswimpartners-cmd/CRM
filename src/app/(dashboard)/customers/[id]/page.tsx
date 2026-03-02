@@ -18,6 +18,7 @@ import { UnlinkLineButton } from '@/components/admin/UnlinkLineButton'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { calculateAge } from '@/lib/utils'
+import { StudentScheduleButton } from '@/components/students/StudentScheduleButton'
 
 export default async function StudentDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params
@@ -89,6 +90,7 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
                 </Button>
                 {isAdmin && (
                     <div className="flex items-center gap-2">
+                        <StudentScheduleButton studentId={student.id} />
                         <TrialConfirmButton
                             studentId={student.id}
                             studentName={student.full_name}

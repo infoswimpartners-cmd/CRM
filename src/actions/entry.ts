@@ -3,7 +3,6 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { emailService } from '@/lib/email'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 
@@ -56,28 +55,6 @@ export async function submitEntry(values: EntryFormValues) {
 
         if (error) throw error
 
-        // 3. Notify Admin (Email)
-        const adminEmail = process.env.ADMIN_EMAIL || process.env.SMTP_USER
-        if (adminEmail) {
-            await emailService.sendEmail({
-                to: adminEmail,
-                subject: `【新規申込】${data.full_name}様`,
-                text: `
-ウェブサイトから新規の申し込みがありました。
-管理画面から内容を確認し、受付メールを送信（承認）してください。
-
-■申込者情報
-氏名: ${data.full_name}
-メール: ${data.contact_email}
-電話: ${data.contact_phone}
-備考: ${data.student_notes || '(なし)'}
-
---------------------------------------------------
-Swim Partners Manager
-                `.trim()
-            })
-        }
-
         return { success: true }
 
     } catch (error: any) {
@@ -86,76 +63,7 @@ Swim Partners Manager
     }
 }
 
-export async function sendReceptionEmail(studentId: string) {
-    const supabase = await createClient()
 
-    // 1. Auth Check (Admin Only)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { success: false, error: 'Unauthorized' }
-
-    try {
-        const supabaseAdmin = createAdminClient()
-
-        // 2. Fetch Student Info
-        const { data: student, error: fetchError } = await supabaseAdmin
-            .from('students')
-            .select('contact_email, full_name, status, notes')
-            .eq('id', studentId)
-            .single()
-
-        if (fetchError || !student) throw new Error('Student not found')
-        if (!student.contact_email) throw new Error('メールアドレスが登録されていません')
-
-        // 3. Extract Dates from Notes
-        // Notes format from GAS: ...\n【生年月日】\n...\n\n[追加情報]\n...【第一今望】: 2026/02/17 10:00...
-        // We look for patterns like 【第一希望】: value
-        // value might be till next newline or end of string.
-        let date1 = '(フォームから自動引用できませんでした)'
-        let date2 = '(フォームから自動引用できませんでした)'
-        let date3 = '(フォームから自動引用できませんでした)'
-
-        if (student.notes) {
-            const extract = (key: string) => {
-                const regex = new RegExp(`【${key}】\\s*[:：]?\\s*(.*)`)
-                const match = student.notes!.match(regex)
-                return match ? match[1].trim() : ''
-            }
-
-            // Try to extract from the structured part if available
-            const d1 = extract('第一希望') || extract('第1希望日')
-            const d2 = extract('第二希望') || extract('第2希望日')
-            const d3 = extract('第三希望') || extract('第3希望日')
-
-            if (d1) date1 = d1
-            if (d2) date2 = d2
-            if (d3) date3 = d3
-        }
-
-        const emailSent = await emailService.sendTemplateEmail('reception_completed', student.contact_email, {
-            name: student.full_name,
-            date1,
-            date2,
-            date3
-        })
-
-        if (!emailSent) throw new Error('メール送信に失敗しました')
-
-        // 4. Update Status to 'trial_pending'
-        // This removes it from the "Inquiry" list
-        await supabaseAdmin
-            .from('students')
-            .update({ status: 'trial_pending' })
-            .eq('id', studentId)
-
-        revalidatePath('/customers')
-        revalidatePath('/admin/approvals')
-        return { success: true }
-
-    } catch (error: any) {
-        console.error('Send Reception Email Error:', error)
-        return { success: false, error: error.message }
-    }
-}
 
 export async function completeReceptionManually(studentId: string) {
     const supabase = await createClient()

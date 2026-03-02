@@ -22,7 +22,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog"
-import { sendReceptionEmail, completeReceptionManually } from '@/actions/entry'
+import { completeReceptionManually } from '@/actions/entry'
 import { useRouter } from 'next/navigation'
 
 interface Student {
@@ -72,42 +72,17 @@ function ReceptionStudentRow({ student }: { student: Student }) {
     const [isDeleted, setIsDeleted] = useState(false)
     const router = useRouter()
 
-    const handleApprove = async () => {
-        if (!confirm(`${student.full_name}様へ受付メールを送信して承認しますか？`)) return
-
-        setIsProcessing(true)
-        setIsDeleted(true) // 楽観的削除
-
-        try {
-            const result = await sendReceptionEmail(student.id)
-            if (result.success) {
-                toast.success('受付メールを送信しました')
-                router.refresh()
-                // 成功時は isDeleted = true のまま（非表示維持）
-            } else {
-                setIsDeleted(false) // 失敗時は復活
-                toast.error('送信に失敗しました: ' + result.error)
-            }
-        } catch (error) {
-            setIsDeleted(false)
-            toast.error('エラーが発生しました')
-        } finally {
-            setIsProcessing(false)
-        }
-    }
-
     const handleManualComplete = async () => {
-        if (!confirm(`${student.full_name}様を「手動対応済み」として完了しますか？\n（メールは送信されません）`)) return
+        if (!confirm(`${student.full_name}様を「手動対応済み」として完了しますか？`)) return
 
         setIsProcessing(true)
-        setIsDeleted(true) // 楽観的削除
+        setIsDeleted(true)
 
         try {
             const result = await completeReceptionManually(student.id)
             if (result.success) {
-                toast.success('手動対応済みとして完了しました')
+                toast.success('対応済みとして完了しました')
                 router.refresh()
-                // 成功時は isDeleted = true のまま
             } else {
                 setIsDeleted(false)
                 toast.error('処理に失敗しました: ' + result.error)
@@ -120,9 +95,7 @@ function ReceptionStudentRow({ student }: { student: Student }) {
         }
     }
 
-    if (isDeleted) {
-        return null // DOMから完全に消す（nullを返すと何もレンダリングされない）
-    }
+    if (isDeleted) return null
 
     return (
         <TableRow className="hover:bg-slate-50">
@@ -157,27 +130,16 @@ function ReceptionStudentRow({ student }: { student: Student }) {
                 </Dialog>
             </TableCell>
             <TableCell className="text-center">
-                <div className="flex flex-col gap-2">
-                    <Button
-                        size="sm"
-                        onClick={handleApprove}
-                        disabled={isProcessing}
-                        className="bg-blue-600 hover:bg-blue-700 text-white h-7 text-xs"
-                    >
-                        <Mail className="h-3 w-3 mr-2" />
-                        受付承認
-                    </Button>
-                    <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={handleManualComplete}
-                        disabled={isProcessing}
-                        className="text-slate-500 text-xs h-7"
-                    >
-                        <CheckCircle className="h-3 w-3 mr-2" />
-                        手動で完了
-                    </Button>
-                </div>
+                <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleManualComplete}
+                    disabled={isProcessing}
+                    className="text-slate-500 text-xs h-7 gap-1"
+                >
+                    <CheckCircle className="h-3 w-3" />
+                    対応済みにする
+                </Button>
             </TableCell>
         </TableRow>
     )

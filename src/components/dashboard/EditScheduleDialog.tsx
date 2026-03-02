@@ -43,6 +43,7 @@ import {
 import { toast } from 'sonner'
 
 import { approveSchedule, getStudentsForCoach } from '@/actions/schedule'
+import { LocationSelect } from '@/components/forms/LocationSelect'
 
 interface Schedule {
     id: string
@@ -245,7 +246,7 @@ export function EditScheduleDialog({ schedule, open, onOpenChange, onSuccess }: 
                 return
             }
 
-            // Combine Date and Times
+            // 日付と時間を結合する
             const startDateTime = new Date(date)
             const [sh, sm] = startTime.split(':').map(Number)
             startDateTime.setHours(sh, sm, 0)
@@ -263,7 +264,7 @@ export function EditScheduleDialog({ schedule, open, onOpenChange, onSuccess }: 
                 notes: notes
             }
 
-            // Only update coach_id if admin and valid
+            // 管理者の場合のみ担当コーチを更新
             if (isAdmin && selectedCoachId) {
                 updatePayload.coach_id = selectedCoachId
             }
@@ -428,7 +429,11 @@ export function EditScheduleDialog({ schedule, open, onOpenChange, onSuccess }: 
 
                         <div className="grid gap-2">
                             <Label>場所</Label>
-                            <Input value={location} onChange={e => setLocation(e.target.value)} placeholder="〇〇市民プール" />
+                            {/* 施設マスタと連動したプルダウン */}
+                            <LocationSelect
+                                value={location}
+                                onChange={setLocation}
+                            />
                         </div>
 
                         <div className="grid gap-2">

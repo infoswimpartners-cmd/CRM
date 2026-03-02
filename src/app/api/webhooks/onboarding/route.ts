@@ -172,30 +172,23 @@ export async function POST(req: NextRequest) {
         const formattedName = second_name ? `${name}・${second_name}` : name
         variables['name'] = formattedName
 
-        await emailService.sendTemplateEmail('inquiry_received', email, variables)
+        // 顧客への自動返信
+        // 体験申し込み → reception_completed（受付完了を即時自動返信）
+        // 問い合わせ   → inquiry_received
+        const triggerId = result.data.type === 'trial' ? 'reception_completed' : 'inquiry_received'
+        await emailService.sendTriggerEmail(triggerId, email, variables)
 
-        // Instead, notify admin (Implementation of admin notification)
+        // 管理者・コーチへの通知（trial_form_submitted_admin トリガー経由）
         const adminEmail = process.env.ADMIN_EMAIL || process.env.SMTP_USER
+        const typeLabel = result.data.type === 'trial' ? '体験申し込み' : '問い合わせ'
         if (adminEmail) {
-            const formattedName = second_name ? `${name}・${second_name}` : name
-            await emailService.sendEmail({
-                to: adminEmail,
-                subject: `【新規問合せ】${formattedName}様`,
-                text: `
-ウェブサイトから新規の問い合わせがありました。
-管理画面から内容を確認し、ステータス変更または返信を行ってください。
-
-■申込者情報
-氏名: ${formattedName}
-メール: ${email}
-電話: ${phone || '(なし)'}
-種別: ${result.data.type}
-
---------------------------------------------------
-Swim Partners Manager
-                `.trim()
+            await emailService.sendTriggerEmail('trial_form_submitted_admin', adminEmail, {
+                ...variables,
+                type_label: typeLabel,
             })
         }
+
+
 
         return NextResponse.json({
             success: true,

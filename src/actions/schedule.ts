@@ -6,6 +6,7 @@ import { stripe } from '@/lib/stripe'
 import { format } from 'date-fns'
 import { ja } from 'date-fns/locale'
 
+
 export async function cancelSchedule(scheduleId: string) {
     const supabaseAdmin = createAdminClient()
 
@@ -26,9 +27,6 @@ export async function cancelSchedule(scheduleId: string) {
                 console.log(`[CancelSchedule] Deleted Stripe Invoice Item: ${schedule.stripe_invoice_item_id}`)
             } catch (stripeError: any) {
                 console.error(`[CancelSchedule] Failed to delete Stripe Item (${schedule.stripe_invoice_item_id}):`, stripeError)
-                // Continue with DB deletion? Or block?
-                // Ideally we should warn, but cleaning DB is priority for user. 
-                // We'll log error and proceed.
             }
         }
 
@@ -47,6 +45,93 @@ export async function cancelSchedule(scheduleId: string) {
         return { success: false, error: error.message }
     }
 }
+
+// ─── スケジュール更新（Googleカレンダー同期込み） ────────────────────────────
+interface UpdateScheduleParams {
+    scheduleId: string
+    title: string
+    startTime: string  // ISO 8601
+    endTime: string    // ISO 8601
+    location?: string
+    notes?: string
+    studentId?: string | null
+    coachId?: string | null
+}
+
+export async function updateScheduleWithCalendar(params: UpdateScheduleParams) {
+    const supabaseAdmin = createAdminClient()
+
+    try {
+        // 1. 既存スケジュール（google_event_id）を取得
+        const { data: existing, error: fetchError } = await supabaseAdmin
+            .from('lesson_schedules')
+            .select('google_event_id')
+            .eq('id', params.scheduleId)
+            .single()
+
+        if (fetchError) throw fetchError
+
+        // 2. DBを更新
+        const updatePayload: Record<string, any> = {
+            title: params.title,
+            start_time: params.startTime,
+            end_time: params.endTime,
+            location: params.location || null,
+            notes: params.notes || null,
+            student_id: params.studentId || null,
+        }
+        if (params.coachId) updatePayload.coach_id = params.coachId
+
+        const { error: updateError } = await supabaseAdmin
+            .from('lesson_schedules')
+            .update(updatePayload)
+            .eq('id', params.scheduleId)
+
+        if (updateError) throw updateError
+
+        // 3. Googleカレンダーへ同期
+        try {
+            const { updateCalendarEvent, createCalendarEvent, getAdminRefreshToken } = await import('@/lib/google-calendar')
+            const adminRefreshToken = await getAdminRefreshToken(supabaseAdmin)
+
+            if (adminRefreshToken) {
+                const calPayload = {
+                    summary: params.title,
+                    description: params.notes || '',
+                    location: params.location || '',
+                    start: params.startTime,
+                    end: params.endTime,
+                }
+
+                if (existing?.google_event_id) {
+                    // 既存イベントを更新
+                    await updateCalendarEvent(adminRefreshToken, existing.google_event_id, calPayload)
+                } else {
+                    // イベントが未作成の場合は新規作成してIDを保存
+                    const newEventId = await createCalendarEvent(adminRefreshToken, calPayload)
+                    if (newEventId) {
+                        await supabaseAdmin
+                            .from('lesson_schedules')
+                            .update({ google_event_id: newEventId })
+                            .eq('id', params.scheduleId)
+                    }
+                }
+            }
+        } catch (calErr) {
+            // カレンダー同期失敗はDB更新の成功に影響させない
+            console.error('[updateScheduleWithCalendar] Googleカレンダー同期失敗:', calErr)
+        }
+
+        revalidatePath('/coach/schedule')
+        revalidatePath('/admin/schedule')
+        return { success: true }
+
+    } catch (error: any) {
+        console.error('updateScheduleWithCalendar Error:', error)
+        return { success: false, error: error.message }
+    }
+}
+
 
 export async function getStudentsForCoach(coachId: string) {
     const supabaseAdmin = createAdminClient()

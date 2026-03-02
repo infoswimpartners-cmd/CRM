@@ -102,7 +102,7 @@ export async function confirmTrialAndBill(studentId: string, lessonDate: Date, c
 
         // 6. Send Email (Template)
         console.log(`[Trial Confirm] Sending email to ${student.contact_email}...`)
-        const emailSent = await emailService.sendTemplateEmail('trial_payment_request', student.contact_email, {
+        const emailSent = await emailService.sendTriggerEmail('trial_lesson_reserved', student.contact_email, {
             name: student.full_name,
             lesson_date: lessonDate.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }),
             amount: trialMaster.unit_price.toLocaleString(),

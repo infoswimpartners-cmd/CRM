@@ -92,8 +92,8 @@ export async function adminReplyInquiry(formData: FormData) {
         if (updatedInquiry && updatedInquiry.students?.contact_email) {
             const inquiryUrl = `${process.env.NEXT_PUBLIC_APP_URL}/member/contact/${inquiryId}`
 
-            await emailService.sendTemplateEmail(
-                'inquiry_replied',
+            await emailService.sendTriggerEmail(
+                'inquiry_received',
                 updatedInquiry.students.contact_email,
                 {
                     user_name: updatedInquiry.students.full_name || '会員',

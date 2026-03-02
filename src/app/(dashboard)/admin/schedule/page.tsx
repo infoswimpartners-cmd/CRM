@@ -10,8 +10,6 @@ export default async function AdminSchedulePage() {
         redirect('/login')
     }
 
-    // Optional: Check if user is strictly admin?
-    // The page is under /admin layout usually protected, but safe to check.
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
     if (profile?.role !== 'admin') {
         redirect('/coach/schedule')
@@ -26,7 +24,6 @@ export default async function AdminSchedulePage() {
                 </div>
             </div>
 
-            {/* Render in Admin View Mode */}
             <ScheduleCalendar adminView={true} />
         </div>
     )

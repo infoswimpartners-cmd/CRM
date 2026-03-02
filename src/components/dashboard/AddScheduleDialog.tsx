@@ -37,6 +37,7 @@ import Link from 'next/link'
 import { getStudentsForCoach, getLessonMasters as fetchMasters } from '@/actions/schedule'
 import { createLessonSchedule } from '@/actions/lesson_schedule'
 import { Checkbox } from '@/components/ui/checkbox'
+import { LocationSelect } from '@/components/forms/LocationSelect'
 
 interface Student {
     id: string
@@ -50,9 +51,10 @@ interface AddScheduleDialogProps {
     open: boolean
     onOpenChange: (open: boolean) => void
     initialDate?: Date
+    initialStudentId?: string  // 生徒詳細ページから開く際に指定する初期選択生徒ID
 }
 
-export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate }: AddScheduleDialogProps) {
+export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, initialStudentId }: AddScheduleDialogProps) {
     const [loading, setLoading] = useState(false)
     const [students, setStudents] = useState<Student[]>([])
 
@@ -84,6 +86,15 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate }
             setDate(initialDate)
         }
     }, [open, initialDate])
+
+    // 初期生徒IDが指定されている場合、ダイアログを開いたときに自動選択する
+    useEffect(() => {
+        if (open && initialStudentId) {
+            setStudentId(initialStudentId)
+        } else if (!open) {
+            // ダイアログが閉じるときはリセットしない（handleCloseで管理）
+        }
+    }, [open, initialStudentId])
 
     // Initial Data Fetch (User Role, Coaches)
     // Lesson Masters and Status State
@@ -654,7 +665,11 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate }
 
                         <div className="grid gap-2">
                             <Label>場所</Label>
-                            <Input value={location} onChange={e => setLocation(e.target.value)} placeholder="〇〇市民プール" />
+                            {/* 施設マスタと連動したプルダウン */}
+                            <LocationSelect
+                                value={location}
+                                onChange={setLocation}
+                            />
                         </div>
 
                         <div className="grid gap-2">

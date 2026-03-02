@@ -1,6 +1,7 @@
 
 import nodemailer from 'nodemailer'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { sendGoogleChatMessage, replaceVariables } from '@/lib/google-chat'
 
 interface EmailOptions {
     to: string
@@ -59,7 +60,7 @@ export class EmailService {
         }
     }
 
-    async sendEmail({ to, subject, text, html, bcc, requireApproval = true }: EmailOptions): Promise<boolean> {
+    async sendEmail({ to, subject, text, html, bcc, requireApproval = false }: EmailOptions): Promise<boolean> {
         if (!requireApproval) {
             return this._sendInternalEmail({ to, subject, text, html, bcc })
         }
@@ -141,6 +142,11 @@ ${text}
                 return false
             }
 
+            if (template.is_auto_send_enabled === false) {
+                console.log(`[Auto-Send Disabled] Skipping email template '${key}' to ${to}`);
+                return true; // Return true to indicate it was intentionally skipped and not an error
+            }
+
             let subject = template.subject
             let body = template.body
 
@@ -156,9 +162,101 @@ ${text}
                 to,
                 subject,
                 text: body,
+                requireApproval: template.is_approval_required ?? false,
             })
         } catch (e) {
             console.error('Error in sendTemplateEmail:', e)
+            return false
+        }
+    }
+    async sendTriggerEmail(triggerId: string, to: string, variables: Record<string, string>): Promise<boolean> {
+        try {
+            const supabase = createAdminClient()
+            const { data: trigger, error: triggerError } = await supabase
+                .from('email_triggers')
+                .select('template_id, is_enabled, google_chat_webhook_url, google_chat_enabled, google_chat_message_template')
+                .eq('id', triggerId)
+                .single()
+
+            if (triggerError || !trigger) {
+                console.error(`Email Trigger '${triggerId}' not found: `, triggerError?.message)
+                return false
+            }
+
+            if (!trigger.is_enabled) {
+                console.log(`[Trigger Disabled] Skipping trigger '${triggerId}'`)
+                return true
+            }
+
+            // --- メールテンプレートを先に取得・レンダリング ---
+            // Google Chat のデフォルトメッセージでメール本文を共用するため先に処理する
+            let renderedSubject = ''
+            let renderedBody = ''
+
+            if (trigger.template_id) {
+                const { data: template, error: templateError } = await supabase
+                    .from('email_templates')
+                    .select('*')
+                    .eq('id', trigger.template_id)
+                    .single()
+
+                if (templateError || !template) {
+                    console.error(`Email Template ID '${trigger.template_id}' not found for trigger '${triggerId}': `, templateError?.message)
+                    return false
+                }
+
+                if (template.is_auto_send_enabled === false) {
+                    console.log(`[Auto-Send Disabled] Skipping email template '${template.key}' to ${to}`)
+                    return true
+                }
+
+                renderedSubject = template.subject
+                renderedBody = template.body
+
+                // 変数を置換
+                for (const [k, v] of Object.entries(variables)) {
+                    const regex = new RegExp(`\\{\\{\\s*${k}\\s*\\}\\}`, 'g')
+                    renderedSubject = renderedSubject.replace(regex, v)
+                    renderedBody = renderedBody.replace(regex, v)
+                }
+
+                // メール送信
+                await this.sendEmail({
+                    to,
+                    subject: renderedSubject,
+                    text: renderedBody,
+                    requireApproval: template.is_approval_required ?? false,
+                })
+            } else {
+                console.log(`[Trigger No Template] Skipping email for '${triggerId}'`)
+            }
+
+            // --- Google Chat 送信 ---
+            if (trigger.google_chat_enabled && trigger.google_chat_webhook_url) {
+                try {
+                    let message: string
+
+                    if (trigger.google_chat_message_template) {
+                        // カスタムテンプレートがある場合はそれを使用
+                        message = replaceVariables(trigger.google_chat_message_template, { ...variables, to, trigger_id: triggerId })
+                    } else if (renderedSubject || renderedBody) {
+                        // カスタムテンプレートが空の場合 → メールと同じ件名＋本文を送信
+                        message = `📧 *${renderedSubject}*\n\n${renderedBody}`
+                    } else {
+                        // テンプレートもメールもない場合のフォールバック
+                        message = `🔔 *${triggerId}* が発火しました\n対象: ${to}`
+                    }
+
+                    await sendGoogleChatMessage(trigger.google_chat_webhook_url, message)
+                } catch (chatErr) {
+                    // Google Chatエラーはメール送信をブロックしない
+                    console.error('[GoogleChat] Non-fatal error in trigger:', chatErr)
+                }
+            }
+
+            return true
+        } catch (e: any) {
+            console.error('Error in sendTriggerEmail:', e)
             return false
         }
     }

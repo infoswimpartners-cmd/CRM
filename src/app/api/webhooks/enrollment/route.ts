@@ -130,7 +130,7 @@ export async function POST(req: NextRequest) {
 
         // 5. Send Notification
         // 5. Send Notification (Template)
-        await emailService.sendTemplateEmail('enrollment_complete', email, {
+        await emailService.sendTriggerEmail('enrollment_completed', email, {
             name: student.full_name,
             plan_name: membershipType.name,
             start_date: `${anchorDate.getFullYear()}年${anchorDate.getMonth() + 1}月1日`

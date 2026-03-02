@@ -86,19 +86,18 @@ export async function submitLessonReport(values: FormValues) {
         const newLessonId = insertedLesson?.id
 
 
-        // 4. Send Email Notification (Non-critical, don't fail the whole action)
+        // 4. 管理者通知（メール設定のlesson_report_sentトリガー経由）
         try {
             const toAddress = process.env.REPORT_NOTIFICATION_EMAIL || process.env.SMTP_USER
 
             if (toAddress) {
-                // Fetch lesson name for better message
+                // レッスン名・コーチ名を取得
                 const { data: lessonMaster } = await supabase
                     .from('lesson_masters')
                     .select('name')
                     .eq('id', data.lesson_master_id)
                     .single()
 
-                // Get Coach Name (Profile)
                 const { data: profile } = await supabase
                     .from('profiles')
                     .select('full_name')
@@ -107,39 +106,26 @@ export async function submitLessonReport(values: FormValues) {
 
                 const lessonName = lessonMaster?.name || '不明なレッスン'
                 const coachName = profile?.full_name || 'コーチ'
-                const dateStr = new Date(data.lesson_date).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric', weekday: 'short' })
+                const dateStr = new Date(data.lesson_date).toLocaleDateString('ja-JP', {
+                    year: 'numeric', month: 'long', day: 'numeric', weekday: 'short'
+                })
 
-                // Construct Email Content
-                const subject = `【レッスン報告】${data.student_name}様 (${dateStr})`
-                const emailBody = `
-レッスンの報告が提出されました。
-
-■基本情報
-担当コーチ: ${coachName}
-生徒名: ${data.student_name}
-日時: ${dateStr}
-場所: ${data.location}
-
-■レッスン内容
-種類: ${lessonName}
-金額: ${data.price.toLocaleString()}円
-
-■記録・メモ
-${data.menu_description || '(なし)'}
-
---------------------------------------------------
-Swim Partners Manager
-                `.trim()
-
-                await emailService.sendEmail({
-                    to: toAddress,
-                    subject: subject,
-                    text: emailBody,
+                // lesson_report_sentトリガー経由で送信
+                // テンプレート変数として以下が利用可能:
+                // {{coach_name}} {{student_name}} {{lesson_date}} {{location}} {{lesson_type}} {{price}} {{description}}
+                await emailService.sendTriggerEmail('lesson_report_sent', toAddress, {
+                    coach_name: coachName,
+                    student_name: data.student_name,
+                    lesson_date: dateStr,
+                    location: data.location,
+                    lesson_type: lessonName,
+                    price: data.price.toLocaleString() + '円',
+                    description: data.menu_description || '(なし)',
                 })
             }
         } catch (emailError) {
             console.error('Error sending report notification email:', emailError)
-            // Continue even if email fails
+            // メール失敗しても処理を続行
         }
 
         revalidatePath('/coach')
@@ -313,11 +299,10 @@ export async function submitPublicLessonReport(values: PublicFormValues) {
 
         if (error) throw error
 
-        // 3. Send Email Notification
+        // 3. 管理者通知（メール設定のlesson_report_sentトリガー経由）
         const toAddress = process.env.REPORT_NOTIFICATION_EMAIL || process.env.SMTP_USER
 
         if (toAddress) {
-            // Fetch names for email
             const { data: lessonMaster } = await supabase
                 .from('lesson_masters')
                 .select('name')
@@ -332,34 +317,19 @@ export async function submitPublicLessonReport(values: PublicFormValues) {
 
             const lessonName = lessonMaster?.name || '不明なレッスン'
             const coachName = coach?.full_name || 'コーチ'
-            const dateStr = new Date(data.lesson_date).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric', weekday: 'short' })
+            const dateStr = new Date(data.lesson_date).toLocaleDateString('ja-JP', {
+                year: 'numeric', month: 'long', day: 'numeric', weekday: 'short'
+            })
 
-            // Construct Email Content
-            const subject = `【レッスン報告】${data.student_name}様 (${dateStr})`
-            const emailBody = `
-レッスン報告が提出されました (Public)。
-
-■基本情報
-担当コーチ: ${coachName}
-生徒名: ${data.student_name}
-日時: ${dateStr}
-場所: ${data.location}
-
-■レッスン内容
-種類: ${lessonName}
-金額: ${data.price.toLocaleString()}円
-
-■記録・メモ
-${data.menu_description || '(なし)'}
-
---------------------------------------------------
-Swim Partners Manager
-            `.trim()
-
-            await emailService.sendEmail({
-                to: toAddress,
-                subject: subject,
-                text: emailBody,
+            // lesson_report_sentトリガー経由で送信
+            await emailService.sendTriggerEmail('lesson_report_sent', toAddress, {
+                coach_name: coachName,
+                student_name: data.student_name,
+                lesson_date: dateStr,
+                location: data.location,
+                lesson_type: lessonName,
+                price: data.price.toLocaleString() + '円',
+                description: data.menu_description || '(なし)',
             })
         }
 

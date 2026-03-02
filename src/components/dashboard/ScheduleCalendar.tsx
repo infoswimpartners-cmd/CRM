@@ -14,7 +14,7 @@ import {
     subMonths
 } from 'date-fns'
 import { ja } from 'date-fns/locale'
-import { ChevronLeft, ChevronRight, MapPin, Clock, Plus } from 'lucide-react'
+import { ChevronLeft, ChevronRight, MapPin, Clock, Plus, CalendarPlus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
@@ -66,6 +66,27 @@ const getStatusBorder = (status?: string) => {
         case 'open': return 'border-l-4 border-l-gray-300'
         default: return ''
     }
+}
+
+/** Googleカレンダーのイベント事前入力URLを生成（APIキー不要） */
+function buildGoogleCalendarUrl(schedule: Schedule) {
+    const fmt = (iso: string) =>
+        iso.replace(/[-:]/g, '').replace(/\.\d{3}/, '').replace('Z', 'Z')
+    // タイトルを「〇〇様@レッスン実施場所　担当；〇〇コーチ」形式で生成
+    const studentName = (schedule as any).students?.full_name as string | undefined
+    const coachName = (schedule as any).profiles?.full_name as string | undefined
+    let title = studentName ? `${studentName}様` : schedule.title
+    if (schedule.location) title += `@${schedule.location}`
+    if (coachName) title += `　担当；${coachName}コーチ`
+
+    const params = new URLSearchParams({
+        action: 'TEMPLATE',
+        text: title,
+        dates: `${fmt(schedule.start_time)}/${fmt(schedule.end_time)}`,
+    })
+    if (schedule.location) params.set('location', schedule.location)
+    if (schedule.notes) params.set('details', schedule.notes)
+    return `https://calendar.google.com/calendar/render?${params.toString()}`
 }
 
 export function ScheduleCalendar({ adminView = false }: ScheduleCalendarProps) {
@@ -280,6 +301,19 @@ export function ScheduleCalendar({ adminView = false }: ScheduleCalendarProps) {
                             </div>
                         )}
                     </div>
+                </div>
+                {/* Googleカレンダーに追加ボタン */}
+                <div className="flex items-center">
+                    <a
+                        href={buildGoogleCalendarUrl(schedule)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        title="Googleカレンダーに追加"
+                        className="p-1.5 rounded-md text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                    >
+                        <CalendarPlus className="w-4 h-4" />
+                    </a>
                 </div>
             </CardContent>
         </Card>

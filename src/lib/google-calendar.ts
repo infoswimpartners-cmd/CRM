@@ -13,8 +13,8 @@ export function getGoogleAuthURL() {
         redirect_uri: GOOGLE_OAUTH_CONFIG.redirectUri,
         response_type: 'code',
         scope: 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly',
-        access_type: 'offline', // Critical for refresh token
-        prompt: 'consent', // Force consent to ensure refresh token is returned
+        access_type: 'offline', // リフレッシュトークン取得に必須
+        prompt: 'consent', // リフレッシュトークンが確実に返るよう強制
     });
     return `${GOOGLE_OAUTH_CONFIG.authUrl}?${params.toString()}`;
 }
@@ -85,11 +85,173 @@ export async function getFreeBusy(refreshToken: string, timeMin: string, timeMax
             throw new Error(data.error?.message || 'Failed to fetch freeBusy');
         }
 
-        return data.calendars.primary.busy; // Returns array of { start, end }
+        return data.calendars.primary.busy; // 空き時間リスト { start, end }[] を返す
     } catch (e) {
         console.error('getFreeBusy Error:', e);
-        return []; // Fail safe: return empty so we don't crash app (though this risks double booking)
-        // Ideally we should throw, but for MVP let's assume if sync fails, we rely on manual check or try again.
-        // Actually, safer to throw so UI shows "Can't load availability".
+        return [];
+    }
+}
+
+// ─── カレンダーイベント CRUD ───────────────────────────────────────────────────
+
+/** リフレッシュトークンを使って有効なアクセストークンを取得する内部ヘルパー */
+async function getValidAccessToken(refreshToken: string): Promise<string> {
+    const tokenData = await refreshAccessToken(refreshToken);
+    if (!tokenData.access_token) {
+        throw new Error('アクセストークンの取得に失敗しました');
+    }
+    return tokenData.access_token;
+}
+
+export interface CalendarEventPayload {
+    summary: string;         // イベントタイトル
+    description?: string;    // メモ・詳細
+    location?: string;       // 場所
+    start: string;           // ISO 8601 (例: 2026-03-15T10:00:00+09:00)
+    end: string;             // ISO 8601
+}
+
+/**
+ * Googleカレンダーにイベントを作成し、作成されたイベントIDを返す
+ */
+export async function createCalendarEvent(
+    refreshToken: string,
+    payload: CalendarEventPayload
+): Promise<string | null> {
+    try {
+        const accessToken = await getValidAccessToken(refreshToken);
+
+        const body = {
+            summary: payload.summary,
+            description: payload.description || '',
+            location: payload.location || '',
+            start: { dateTime: payload.start, timeZone: 'Asia/Tokyo' },
+            end: { dateTime: payload.end, timeZone: 'Asia/Tokyo' },
+        };
+
+        const res = await fetch(
+            'https://www.googleapis.com/calendar/v3/calendars/primary/events',
+            {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(body),
+            }
+        );
+
+        const data = await res.json();
+        if (!res.ok) {
+            console.error('[createCalendarEvent] API Error:', data.error?.message);
+            return null;
+        }
+
+        console.log('[createCalendarEvent] 作成成功:', data.id);
+        return data.id as string;
+    } catch (e) {
+        console.error('[createCalendarEvent] Error:', e);
+        return null;
+    }
+}
+
+/**
+ * Googleカレンダーの既存イベントを更新する
+ */
+export async function updateCalendarEvent(
+    refreshToken: string,
+    eventId: string,
+    payload: CalendarEventPayload
+): Promise<boolean> {
+    try {
+        const accessToken = await getValidAccessToken(refreshToken);
+
+        const body = {
+            summary: payload.summary,
+            description: payload.description || '',
+            location: payload.location || '',
+            start: { dateTime: payload.start, timeZone: 'Asia/Tokyo' },
+            end: { dateTime: payload.end, timeZone: 'Asia/Tokyo' },
+        };
+
+        const res = await fetch(
+            `https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`,
+            {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(body),
+            }
+        );
+
+        if (!res.ok) {
+            const data = await res.json();
+            console.error('[updateCalendarEvent] API Error:', data.error?.message);
+            return false;
+        }
+
+        console.log('[updateCalendarEvent] 更新成功:', eventId);
+        return true;
+    } catch (e) {
+        console.error('[updateCalendarEvent] Error:', e);
+        return false;
+    }
+}
+
+/**
+ * Googleカレンダーのイベントを削除する
+ */
+export async function deleteCalendarEvent(
+    refreshToken: string,
+    eventId: string
+): Promise<boolean> {
+    try {
+        const accessToken = await getValidAccessToken(refreshToken);
+
+        const res = await fetch(
+            `https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`,
+            {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                },
+            }
+        );
+
+        // 204 No Content が成功レスポンス
+        if (res.status === 204 || res.ok) {
+            console.log('[deleteCalendarEvent] 削除成功:', eventId);
+            return true;
+        }
+
+        const data = await res.json().catch(() => ({}));
+        console.error('[deleteCalendarEvent] API Error:', data.error?.message);
+        return false;
+    } catch (e) {
+        console.error('[deleteCalendarEvent] Error:', e);
+        return false;
+    }
+}
+
+/**
+ * 管理者のリフレッシュトークンをDBから取得するヘルパー
+ * Server Actions 内で使用するため、supabaseAdminクライアントを引数で受け取る
+ */
+export async function getAdminRefreshToken(supabaseAdmin: any): Promise<string | null> {
+    try {
+        const { data } = await supabaseAdmin
+            .from('profiles')
+            .select('google_refresh_token')
+            .eq('role', 'admin')
+            .not('google_refresh_token', 'is', null)
+            .limit(1)
+            .single();
+
+        return data?.google_refresh_token || null;
+    } catch (e) {
+        console.error('[getAdminRefreshToken] Error:', e);
+        return null;
     }
 }

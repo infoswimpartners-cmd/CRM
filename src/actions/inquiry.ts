@@ -70,7 +70,7 @@ export async function createInquiry(formData: FormData) {
         const userName = profile?.full_name || '不明なユーザー'
         const adminUrl = `${process.env.NEXT_PUBLIC_APP_URL}/admin/inquiries/${inquiry.id}`
 
-        await emailService.sendTemplateEmail(
+        await emailService.sendTriggerEmail(
             'inquiry_received',
             process.env.REPORT_NOTIFICATION_EMAIL || 'admin@example.com',
             {

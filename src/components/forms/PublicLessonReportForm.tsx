@@ -93,6 +93,7 @@ export function PublicLessonReportForm() {
     const [isLoadingCoach, setIsLoadingCoach] = useState(false)
     const [restrictedLessonId, setRestrictedLessonId] = useState<string | null>(null)
     const [keepValues, setKeepValues] = useState(false)
+    const [isCancellation, setIsCancellation] = useState(false)
 
     // Filter masters based on restriction
     const displayMasters = restrictedLessonId
@@ -201,6 +202,19 @@ export function PublicLessonReportForm() {
         }
     }, [selectedMasterId, lessonMasters, form])
 
+    useEffect(() => {
+        if (isCancellation) {
+            form.setValue('location', 'キャンセル')
+            form.setValue('menu_description', '前日12時以降のキャンセル')
+            if (!form.getValues('lesson_date')) {
+                form.setValue('lesson_date', new Date())
+            }
+        } else {
+            form.setValue('location', '')
+            form.setValue('menu_description', '')
+        }
+    }, [isCancellation, form])
+
     async function onSubmit(values: FormValues) {
         setIsSubmitting(true)
 
@@ -229,6 +243,7 @@ export function PublicLessonReportForm() {
                 })
                 setRestrictedLessonId(null)
                 window.scrollTo({ top: 0, behavior: 'smooth' })
+                setIsCancellation(false)
             } else {
                 form.reset()
                 router.push('/')
@@ -410,131 +425,154 @@ export function PublicLessonReportForm() {
                     )}
                 />
 
-                <FormField
-                    control={form.control as any}
-                    name="lesson_date"
-                    render={({ field }) => (
-                        <FormItem className="flex flex-col">
-                            <FormLabel>日時</FormLabel>
-                            <Popover>
-                                <PopoverTrigger asChild>
+                <div className="py-2 border-y border-slate-100 my-4">
+                    <div className="flex flex-col gap-2">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            className={cn(
+                                "w-full md:w-auto font-bold transition-colors h-12 text-base md:text-sm",
+                                isCancellation
+                                    ? "bg-red-50 text-red-600 border-red-200 hover:bg-red-100 hover:text-red-700"
+                                    : "text-slate-600 hover:bg-slate-100"
+                            )}
+                            onClick={() => setIsCancellation(!isCancellation)}
+                        >
+                            {isCancellation ? "キャンセル報告モード（クリックで解除）" : "キャンセルの報告（入力項目の免除）"}
+                        </Button>
+                        <p className="text-sm font-bold text-red-500">
+                            ※注意事項：前日12時以降のキャンセルのみ適応
+                        </p>
+                    </div>
+                </div>
+
+                <div className={cn("space-y-6", isCancellation && "hidden")}>
+                    <FormField
+                        control={form.control as any}
+                        name="lesson_date"
+                        render={({ field }) => (
+                            <FormItem className="flex flex-col">
+                                <FormLabel>日時</FormLabel>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <FormControl>
+                                            <Button
+                                                variant={"outline"}
+                                                className={cn(
+                                                    "w-full pl-3 text-left font-normal h-12 text-base md:text-sm",
+                                                    !field.value && "text-muted-foreground"
+                                                )}
+                                            >
+                                                {field.value ? (
+                                                    format(field.value, "PPP")
+                                                ) : (
+                                                    <span>日付を選択</span>
+                                                )}
+                                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                            </Button>
+                                        </FormControl>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0" align="start">
+                                        <Calendar
+                                            mode="single"
+                                            selected={field.value}
+                                            onSelect={field.onChange}
+                                            disabled={(date) =>
+                                                date > new Date() || date < new Date("1900-01-01")
+                                            }
+                                            initialFocus
+                                        />
+                                    </PopoverContent>
+                                </Popover>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+
+                    <FormField
+                        control={form.control as any}
+                        name="location"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>場所</FormLabel>
+                                <FormControl>
+                                    <LocationSelect
+                                        value={field.value}
+                                        onChange={field.onChange}
+                                    />
+                                </FormControl>
+                                <FormDescription>
+                                    登録済みの施設マスタから場所を選択してください。
+                                </FormDescription>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+
+                    <FormField
+                        control={form.control as any}
+                        name="menu_description"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className="flex items-center gap-2">
+                                    メニュー内容 / メモ
+                                    <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-600 border-blue-100 font-normal">メンバーサイトに反映</Badge>
+                                </FormLabel>
+                                <FormControl>
+                                    <Textarea
+                                        placeholder="実施したメニューや練習内容"
+                                        className="resize-none text-base md:text-sm min-h-[100px]"
+                                        {...field}
+                                    />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <FormField
+                            control={form.control as any}
+                            name="feedback_good"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="flex items-center gap-2">
+                                        良かった点
+                                        <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-600 border-blue-100 font-normal">メンバーサイトに反映</Badge>
+                                    </FormLabel>
                                     <FormControl>
-                                        <Button
-                                            variant={"outline"}
-                                            className={cn(
-                                                "w-full pl-3 text-left font-normal h-12 text-base md:text-sm",
-                                                !field.value && "text-muted-foreground"
-                                            )}
-                                        >
-                                            {field.value ? (
-                                                format(field.value, "PPP")
-                                            ) : (
-                                                <span>日付を選択</span>
-                                            )}
-                                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                        </Button>
+                                        <Textarea
+                                            placeholder="以前より改善された点など"
+                                            className="resize-none text-base md:text-sm min-h-[80px]"
+                                            {...field}
+                                        />
                                     </FormControl>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
-                                    <Calendar
-                                        mode="single"
-                                        selected={field.value}
-                                        onSelect={field.onChange}
-                                        disabled={(date) =>
-                                            date > new Date() || date < new Date("1900-01-01")
-                                        }
-                                        initialFocus
-                                    />
-                                </PopoverContent>
-                            </Popover>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
 
-                <FormField
-                    control={form.control as any}
-                    name="location"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>場所</FormLabel>
-                            <FormControl>
-                                <LocationSelect
-                                    value={field.value}
-                                    onChange={field.onChange}
-                                />
-                            </FormControl>
-                            <FormDescription>
-                                登録済みの施設マスタから場所を選択してください。
-                            </FormDescription>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-
-                <FormField
-                    control={form.control as any}
-                    name="menu_description"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel className="flex items-center gap-2">
-                                メニュー内容 / メモ
-                                <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-600 border-blue-100 font-normal">メンバーサイトに反映</Badge>
-                            </FormLabel>
-                            <FormControl>
-                                <Textarea
-                                    placeholder="実施したメニューや練習内容"
-                                    className="resize-none text-base md:text-sm min-h-[100px]"
-                                    {...field}
-                                />
-                            </FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField
-                        control={form.control as any}
-                        name="feedback_good"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel className="flex items-center gap-2">
-                                    良かった点
-                                    <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-600 border-blue-100 font-normal">メンバーサイトに反映</Badge>
-                                </FormLabel>
-                                <FormControl>
-                                    <Textarea
-                                        placeholder="以前より改善された点など"
-                                        className="resize-none text-base md:text-sm min-h-[80px]"
-                                        {...field}
-                                    />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
-
-                    <FormField
-                        control={form.control as any}
-                        name="feedback_next"
-                        render={({ field }) => (
-                            <FormItem>
-                                <FormLabel className="flex items-center gap-2">
-                                    次回の課題
-                                    <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-600 border-blue-100 font-normal">メンバーサイトに反映</Badge>
-                                </FormLabel>
-                                <FormControl>
-                                    <Textarea
-                                        placeholder="次回意識すべきポイントなど"
-                                        className="resize-none text-base md:text-sm min-h-[80px]"
-                                        {...field}
-                                    />
-                                </FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
+                        <FormField
+                            control={form.control as any}
+                            name="feedback_next"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel className="flex items-center gap-2">
+                                        次回の課題
+                                        <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-600 border-blue-100 font-normal">メンバーサイトに反映</Badge>
+                                    </FormLabel>
+                                    <FormControl>
+                                        <Textarea
+                                            placeholder="次回意識すべきポイントなど"
+                                            className="resize-none text-base md:text-sm min-h-[80px]"
+                                            {...field}
+                                        />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                    </div>
                 </div>
 
 
