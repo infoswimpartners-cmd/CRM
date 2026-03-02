@@ -1,15 +1,15 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
     try {
         const response = await updateSession(request)
         // Relax CSP to allow 'eval' in development to fix HMR/UI update issues
         response.headers.set('Content-Security-Policy', "script-src 'self' 'unsafe-eval' 'unsafe-inline' https:; object-src 'none';")
         return response
     } catch (e: any) {
-        console.error("Middleware caught error:", e)
-        return new NextResponse("Middleware Error: " + String(e.message) + " | Stack: " + String(e.stack), { status: 500 })
+        console.error("Proxy caught error:", e)
+        return new NextResponse("Proxy Error: " + String(e.message) + " | Stack: " + String(e.stack), { status: 500 })
     }
 }
 
