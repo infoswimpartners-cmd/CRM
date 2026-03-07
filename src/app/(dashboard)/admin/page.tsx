@@ -351,147 +351,199 @@ export default async function AdminDashboard(props: {
     void myUpcomingSchedules;
 
     return (
-        <div className="space-y-8 pb-8">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="relative space-y-6 md:space-y-10 pb-12 overflow-hidden px-4 md:px-0">
+            {/* 装飾用背景要素 */}
+            <div className="absolute top-0 right-0 -z-10 w-[600px] h-[600px] bg-linear-to-bl from-blue-500/5 to-transparent rounded-full blur-3xl" />
+            <div className="absolute top-[-100px] left-[-100px] -z-10 w-[500px] h-[500px] bg-linear-to-tr from-cyan-400/5 to-transparent rounded-full blur-3xl" />
+
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div className="flex flex-col gap-2">
-                    <h1 className="text-2xl md:text-3xl font-bold tracking-tight">管理者ダッシュボード</h1>
-                    <p className="text-gray-500">Swim Partnersの活動状況概要</p>
+                    <div className="flex items-center gap-2">
+                        <span className="h-1.5 w-8 bg-blue-600 rounded-full"></span>
+                        <span className="text-xs font-black text-blue-600 tracking-widest uppercase">Overview</span>
+                    </div>
+                    <h1 className="text-2xl md:text-3xl font-black tracking-tight text-slate-900 leading-tight">
+                        管理者ダッシュボード
+                    </h1>
+                    <p className="text-slate-400 text-sm md:text-base font-medium">ビジネスの現在地をリアルタイムに把握</p>
                 </div>
-                <MonthSelector currentMonth={monthParam} />
+                <div className="mx-auto md:mx-0">
+                    <MonthSelector currentMonth={monthParam} />
+                </div>
             </div>
 
-            {/* KPI Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <Link href="/admin/analytics">
-                    <div className="bg-white rounded-2xl p-6 relative overflow-hidden group shadow-sm border border-slate-200 hover:shadow-md transition-shadow cursor-pointer h-full">
-                        <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                            <DollarSign className="w-32 h-32 text-cyan-500" />
-                        </div>
-                        <div>
-                            <p className="text-sm font-medium text-slate-500">全体売上 ({targetYear}年{targetDate.getMonth() + 1}月)</p>
-                            <h3 className="text-2xl md:text-3xl font-bold text-slate-900 mt-1">¥{totalSales.toLocaleString()}</h3>
-                            <div className="flex flex-col gap-2 mt-4">
-                                <div className="flex items-center text-sm text-slate-500 bg-slate-100 w-fit px-2 py-1 rounded-lg">
-                                    <span>粗利額: ¥{grossProfit.toLocaleString()}</span>
+            {/* ビジネス概要セクション */}
+            <section className="space-y-6">
+                <div className="flex items-center gap-3">
+                    <h2 className="text-lg font-bold text-slate-700">ビジネス概況</h2>
+                    <div className="h-px flex-1 bg-slate-100"></div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <Link href="/admin/analytics">
+                        <div className="group relative bg-white rounded-3xl p-6 md:p-8 overflow-hidden border border-slate-200/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_50px_rgba(8,_112,_184,_0.07)] transition-all duration-500 cursor-pointer h-full ring-1 ring-slate-200/50 hover:ring-blue-200">
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-linear-to-bl from-cyan-100/30 to-transparent rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110 duration-700" />
+                            <div className="relative z-10">
+                                <div className="w-12 h-12 bg-cyan-50 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500">
+                                    <DollarSign className="w-6 h-6 text-cyan-600" />
                                 </div>
-                                <div className={`flex items-center gap-2 text-sm w-fit px-2 py-1 rounded-lg ${diffSales >= 0 ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'}`}>
-                                    <span>{diffSales >= 0 ? '+' : ''}{diffSales.toLocaleString()}</span>
-                                    <span className="text-slate-500">前月比(売上)</span>
+                                <p className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">今月の売上</p>
+                                <div className="flex items-baseline gap-2">
+                                    <h3 className="text-3xl md:text-4xl font-extrabold text-slate-900">¥{totalSales.toLocaleString()}</h3>
+                                    <span className="text-sm font-medium text-slate-500">({targetDate.getMonth() + 1}月)</span>
+                                </div>
+
+                                <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col gap-3">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-semibold text-slate-400">粗利額</span>
+                                        <span className="text-sm font-bold text-slate-700">¥{grossProfit.toLocaleString()}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-semibold text-slate-400">前月比</span>
+                                        <div className={`flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-lg ${diffSales >= 0 ? 'text-emerald-600 bg-emerald-50' : 'text-rose-600 bg-rose-50'}`}>
+                                            {diffSales >= 0 ? '+' : ''}{diffSales.toLocaleString()}
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </Link>
-
-                <Link href="/customers">
-                    <div className="bg-white rounded-2xl p-6 relative overflow-hidden group shadow-sm border border-slate-200 hover:shadow-md transition-shadow cursor-pointer h-full">
-                        <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                            <Users className="w-32 h-32 text-blue-500" />
-                        </div>
-                        <div>
-                            <p className="text-sm font-medium text-slate-500">アクティブ生徒数</p>
-                            <h3 className="text-2xl md:text-3xl font-bold text-slate-900 mt-1">{activeCoaches.length} <span className="text-base font-normal text-slate-500">コーチ</span></h3>
-                            <div className="flex items-center gap-2 mt-4 text-sm text-slate-500 bg-slate-100 w-fit px-2 py-1 rounded-lg">
-                                <span>全生徒数: {totalStudents?.toLocaleString() || '-'}名</span>
-                            </div>
-                        </div>
-                    </div>
-                </Link>
-
-                <Link href="/admin/reports">
-                    <div className="bg-white rounded-2xl p-6 relative overflow-hidden group shadow-sm border border-slate-200 hover:shadow-md transition-shadow cursor-pointer h-full">
-                        <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                            <CalendarIcon className="w-32 h-32 text-purple-500" />
-                        </div>
-                        <div>
-                            <p className="text-sm font-medium text-slate-500">レッスン数 (今月)</p>
-                            <h3 className="text-2xl md:text-3xl font-bold text-slate-900 mt-1">{thisMonthLessons.length}</h3>
-                            <div className={`flex items-center gap-2 mt-4 text-sm w-fit px-2 py-1 rounded-lg ${diffCount >= 0 ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'}`}>
-                                <span>{diffCount >= 0 ? '+' : ''}{diffCount}</span>
-                                <span className="text-slate-500">前月比</span>
-                            </div>
-                        </div>
-                    </div>
-                </Link>
-            </div>
-
-            {/* Revenue Chart & Activity Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 bg-white rounded-2xl p-6 flex flex-col shadow-sm border border-slate-200 h-[500px]">
-                    <div className="flex items-center justify-between mb-6">
-                        <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                            <History className="h-5 w-5 text-cyan-600" />
-                            事業売上推移 ({targetYear}年)
-                        </h3>
-                    </div>
-                    <div className="flex-1 w-full h-[300px] bg-white rounded-xl overflow-hidden">
-                        <RevenueChart data={yearlyRevenueData} />
-                    </div>
-                </div>
-
-                <div className="h-[500px]">
-                    {/* @ts-ignore */}
-                    <AdminActivityWidget schedules={formattedSchedules} reports={recentReports || []} />
-                </div>
-            </div>
-
-            {/* Dashboard Rankings Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <CoachRankingTable data={coachRanking} limit={5} title="コーチ別売上ランキング (TOP5)" />
-                <CustomerRankingTable data={topCustomers} limit={5} title="優良顧客ランキング (TOP5)" />
-            </div>
-
-
-            <div className="border-t pt-8">
-                <h3 className="mb-4 text-lg font-semibold flex items-center gap-2 text-slate-700">
-                    <Settings className="h-5 w-5" />
-                    システム管理
-                </h3>
-                <div className="grid gap-4 md:grid-cols-4">
-                    <Link href="/admin/masters">
-                        <Card className="hover:bg-slate-50 transition-colors cursor-pointer h-full border-slate-200 shadow-none hover:shadow-sm">
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium text-slate-700">マスタ管理</CardTitle>
-                                <Settings className="h-4 w-4 text-slate-400" />
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-xs text-muted-foreground">レッスンの種類・単価・会員区分</div>
-                            </CardContent>
-                        </Card>
                     </Link>
+
                     <Link href="/customers">
-                        <Card className="hover:bg-slate-50 transition-colors cursor-pointer h-full border-slate-200 shadow-none hover:shadow-sm">
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium text-slate-700">顧客管理</CardTitle>
-                                <Users className="h-4 w-4 text-slate-400" />
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-xs text-muted-foreground">生徒情報・カルテ・履歴</div>
-                            </CardContent>
-                        </Card>
+                        <div className="group relative bg-white rounded-3xl p-6 md:p-8 overflow-hidden border border-slate-200/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_50px_rgba(59,_130,_246,_0.07)] transition-all duration-500 cursor-pointer h-full ring-1 ring-slate-200/50 hover:ring-blue-200">
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-linear-to-bl from-blue-100/30 to-transparent rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110 duration-700" />
+                            <div className="relative z-10">
+                                <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500">
+                                    <Users className="w-6 h-6 text-blue-600" />
+                                </div>
+                                <p className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">稼働コーチ数</p>
+                                <div className="flex items-baseline gap-2">
+                                    <h3 className="text-3xl md:text-4xl font-extrabold text-slate-900">{activeCoaches.length}</h3>
+                                    <span className="text-base font-medium text-slate-500">名</span>
+                                </div>
+
+                                <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col gap-3">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-semibold text-slate-400">全生徒数</span>
+                                        <span className="text-sm font-bold text-slate-700">{totalStudents?.toLocaleString() || '-'} 名</span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-semibold text-slate-400">ステータス</span>
+                                        <span className="flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg">
+                                            <span className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-pulse"></span>
+                                            Active
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </Link>
-                    <Link href="/admin/coaches">
-                        <Card className="hover:bg-slate-50 transition-colors cursor-pointer h-full border-slate-200 shadow-none hover:shadow-sm">
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium text-slate-700">コーチ管理</CardTitle>
-                                <User className="h-4 w-4 text-slate-400" />
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-xs text-muted-foreground">担当生徒の確認・引継ぎ</div>
-                            </CardContent>
-                        </Card>
+
+                    <Link href="/admin/reports">
+                        <div className="group relative bg-white rounded-3xl p-6 md:p-8 overflow-hidden border border-slate-200/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_50px_rgba(168,_85,_247,_0.07)] transition-all duration-500 cursor-pointer h-full ring-1 ring-slate-200/50 hover:ring-purple-200">
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-linear-to-bl from-purple-100/30 to-transparent rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110 duration-700" />
+                            <div className="relative z-10">
+                                <div className="w-12 h-12 bg-purple-50 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500">
+                                    <CalendarIcon className="w-6 h-6 text-purple-600" />
+                                </div>
+                                <p className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">月間レッスン数</p>
+                                <div className="flex items-baseline gap-2">
+                                    <h3 className="text-3xl md:text-4xl font-extrabold text-slate-900">{thisMonthLessons.length}</h3>
+                                    <span className="text-base font-medium text-slate-500">回</span>
+                                </div>
+
+                                <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col gap-3">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-semibold text-slate-400">前月比</span>
+                                        <div className={`flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-lg ${diffCount >= 0 ? 'text-emerald-600 bg-emerald-50' : 'text-rose-600 bg-rose-50'}`}>
+                                            {diffCount >= 0 ? '+' : ''}{diffCount} 回
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-semibold text-slate-400">アサイン状況</span>
+                                        <span className="text-sm font-bold text-slate-700">順調</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </Link>
-                    <Link href="/admin/settings">
-                        <Card className="hover:bg-slate-50 transition-colors cursor-pointer h-full border-slate-200 shadow-none hover:shadow-sm">
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium text-slate-700">システム設定</CardTitle>
-                                <Settings className="h-4 w-4 text-slate-400" />
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-xs text-muted-foreground">メールテンプレート・環境設定</div>
-                            </CardContent>
-                        </Card>
-                    </Link>
+                </div>
+            </section>
+
+            {/* アクティビティ & トレンド セクション */}
+            <section className="space-y-6">
+                <div className="flex items-center gap-3">
+                    <h2 className="text-lg font-bold text-slate-700">現場の動きと売上トレンド</h2>
+                    <div className="h-px flex-1 bg-slate-100"></div>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
+                    <div className="lg:col-span-2 order-2 lg:order-1">
+                        <div className="min-h-[450px] md:h-[560px] bg-white rounded-3xl p-5 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-200 ring-1 ring-slate-200/50">
+                            {/* @ts-ignore */}
+                            <AdminActivityWidget schedules={formattedSchedules} reports={recentReports || []} />
+                        </div>
+                    </div>
+                    <div className="lg:col-span-1 order-1 lg:order-2">
+                        <div className="h-full bg-white rounded-3xl p-5 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-200 ring-1 ring-slate-200/50 flex flex-col">
+                            <div className="mb-6">
+                                <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
+                                    <div className="w-2 h-6 bg-blue-600 rounded-full" />
+                                    売上推移
+                                </h3>
+                                <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest">売上統計</p>
+                            </div>
+                            <div className="flex-1 min-h-[300px]">
+                                <RevenueChart data={yearlyRevenueData} />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            {/* 詳細分析セクション */}
+            <section className="space-y-6">
+                <div className="flex items-center gap-3">
+                    <h2 className="text-lg font-bold text-slate-700">パフォーマンス分析</h2>
+                    <div className="h-px flex-1 bg-slate-100"></div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+                    <div className="bg-white rounded-3xl overflow-hidden shadow-[0_4px_25px_rgba(0,0,0,0.03)] border border-slate-200/60 ring-1 ring-slate-100">
+                        <CoachRankingTable data={coachRanking} limit={5} title="コーチ別売上ランキング (TOP5)" />
+                    </div>
+                    <div className="bg-white rounded-3xl overflow-hidden shadow-[0_4px_25px_rgba(0,0,0,0.03)] border border-slate-200/60 ring-1 ring-slate-100">
+                        <CustomerRankingTable data={topCustomers} limit={5} title="優良顧客ランキング (TOP5)" />
+                    </div>
+                </div>
+            </section>
+
+            {/* Control Center Section */}
+            <div className="pt-12 border-t border-slate-200">
+                <div className="flex items-center gap-3 mb-8">
+                    <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center">
+                        <Settings className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                        <h3 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">コントロールセンター</h3>
+                        <p className="text-sm text-slate-500">システムの重要設定とリソース管理</p>
+                    </div>
+                </div>
+
+                <div className="grid gap-4 md:gap-6 grid-cols-2 md:grid-cols-4">
+                    {[
+                        { href: "/admin/masters", title: "マスタ管理", desc: "レッスンの種類・単価・会員区分", icon: Settings, color: "bg-blue-50 text-blue-600" },
+                        { href: "/customers", title: "顧客管理", desc: "生徒情報・カルテ・履歴", icon: Users, color: "bg-indigo-50 text-indigo-600" },
+                        { href: "/admin/coaches", title: "コーチ管理", desc: "担当生徒の確認・引継ぎ", icon: User, color: "bg-violet-50 text-violet-600" },
+                        { href: "/admin/settings", title: "システム設定", desc: "メールテンプレート・環境設定", icon: Settings, color: "bg-slate-50 text-slate-600" }
+                    ].map((item, i) => (
+                        <Link key={i} href={item.href}>
+                            <div className="group h-full bg-white rounded-2xl p-4 md:p-6 border border-slate-200 shadow-sm transition-all duration-300 hover:shadow-xl hover:-translate-y-1 hover:border-blue-200 cursor-pointer">
+                                <div className={`w-10 h-10 md:w-12 md:h-12 ${item.color} rounded-xl flex items-center justify-center mb-4 md:mb-6 group-hover:scale-110 transition-transform duration-300`}>
+                                    <item.icon className="h-5 w-5 md:h-6 md:w-6" />
+                                </div>
+                                <h4 className="text-sm md:text-base font-bold text-slate-900 mb-1 md:mb-2 truncate">{item.title}</h4>
+                                <p className="text-[10px] md:text-xs text-slate-500 leading-relaxed line-clamp-2 md:line-clamp-none">{item.desc}</p>
+                            </div>
+                        </Link>
+                    ))}
                 </div>
             </div>
         </div>

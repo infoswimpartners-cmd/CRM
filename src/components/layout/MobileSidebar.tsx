@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Menu, X, LayoutDashboard, Users, Calendar, DollarSign, Settings, LogOut, History, PlusCircle, Mail, FileCheck, Megaphone, MessageCircle, CreditCard } from 'lucide-react'
+import { Menu, X, LayoutDashboard, Users, Calendar, DollarSign, Settings, LogOut, History, PlusCircle, Mail, FileCheck, Megaphone, MessageCircle, CreditCard, BookOpen } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { usePathname } from 'next/navigation'
 import Image from 'next/image'
@@ -17,11 +17,11 @@ export function MobileSidebar({ userProfile }: { userProfile: any }) {
             href={href}
             onClick={() => setIsOpen(false)}
             className={`flex items-center gap-3 min-h-[44px] px-4 py-2.5 rounded-xl transition-all duration-300 group ${isActive
-                ? 'bg-cyan-100 text-cyan-900 border-l-4 border-cyan-500 font-bold shadow-sm'
-                : 'text-slate-500 hover:text-cyan-700 hover:bg-cyan-50 active:bg-cyan-100'
+                ? 'bg-blue-50 text-blue-600 border-l-4 border-blue-600 font-bold shadow-sm'
+                : 'text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 active:bg-blue-100'
                 }`}
         >
-            <Icon className={`h-5 w-5 flex-shrink-0 ${isActive ? 'text-cyan-600' : 'group-hover:text-cyan-600'}`} />
+            <Icon className={`h-5 w-5 flex-shrink-0 ${isActive ? 'text-blue-600' : 'group-hover:text-blue-600'}`} />
             <span className="font-medium tracking-wide">{label}</span>
         </Link>
     )
@@ -96,7 +96,7 @@ export function MobileSidebar({ userProfile }: { userProfile: any }) {
                 これにより ③ は絶対に ② と重ならない
             */}
             <div
-                className={`fixed top-0 left-0 h-full w-72 bg-white/97 backdrop-blur-xl border-r border-slate-200 z-[70] flex flex-col transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
+                className={`fixed top-0 left-0 h-full w-72 bg-white/95 backdrop-blur-xl border-r border-slate-200 z-[70] flex flex-col transform transition-transform duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] ${isOpen ? 'translate-x-0' : '-translate-x-full'} shadow-[20px_0_60px_rgba(0,0,0,0.1)]`}
                 style={{ willChange: 'transform' }}
             >
                 {/* ① ヘッダー */}
@@ -122,7 +122,7 @@ export function MobileSidebar({ userProfile }: { userProfile: any }) {
                             <NavHeading>分析・集計</NavHeading>
                             <NavItem href="/admin/analytics" icon={DollarSign} label="売上詳細" isActive={pathname?.startsWith('/admin/analytics')} />
                             <NavHeading>財務管理</NavHeading>
-                            <NavItem href="/admin/payments" icon={CreditCard} label="決済状況 (Payment)" isActive={pathname?.startsWith('/admin/payments')} />
+                            <NavItem href="/admin/payments" icon={CreditCard} label="決済状況" isActive={pathname?.startsWith('/admin/payments')} />
                             <NavItem href="/admin/approvals" icon={FileCheck} label="承認管理" isActive={pathname?.startsWith('/admin/approvals')} />
                             <NavItem href="/admin/reports" icon={Calendar} label="実施メモ一覧" isActive={pathname?.startsWith('/admin/reports')} />
 
@@ -145,12 +145,23 @@ export function MobileSidebar({ userProfile }: { userProfile: any }) {
                     ) : (
                         <>
                             <NavItem href="/coach" icon={LayoutDashboard} label="ダッシュボード" isActive={pathname === '/coach'} />
+
+                            <NavHeading>運営管理</NavHeading>
                             <NavItem href="/students" icon={Users} label="生徒管理" isActive={pathname?.startsWith('/students')} />
-                            <NavItem href="/coach/schedule" icon={Calendar} label="スケジュール" isActive={pathname === '/coach/schedule'} />
+
+                            <NavHeading>実務メニュー</NavHeading>
+                            <NavItem href="/coach/schedule" icon={Calendar} label="スケジュール管理" isActive={pathname === '/coach/schedule'} />
+                            <NavItem href="/coach/history" icon={History} label="レッスン履歴" isActive={pathname?.startsWith('/coach/history')} />
+                            <NavItem href="/coach/report" icon={PlusCircle} label="レッスン報告" isActive={pathname?.startsWith('/coach/report')} />
+
+                            <NavHeading>分析・集計</NavHeading>
                             <NavItem href="/finance" icon={DollarSign} label="支払い通知書一覧" isActive={pathname?.startsWith('/finance')} />
 
                             <NavHeading>設定</NavHeading>
                             <NavItem href="/settings" icon={Settings} label="アカウント設定" isActive={pathname?.startsWith('/settings')} />
+
+                            <NavHeading>ヘルプ</NavHeading>
+                            <NavItem href="/coach/manual" icon={BookOpen} label="コーチマニュアル" isActive={pathname?.startsWith('/coach/manual')} />
                         </>
                     )}
                 </nav>

@@ -17,8 +17,8 @@ export function DesktopSidebar({ role }: DesktopSidebarProps) {
             href={href}
             prefetch={true}
             className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group ${isActive
-                ? 'bg-cyan-100 text-cyan-900 border-l-4 border-cyan-500 font-bold shadow-sm'
-                : 'text-slate-500 hover:text-cyan-700 hover:bg-cyan-50'
+                ? 'bg-blue-50 text-blue-700 border-l-4 border-blue-600 font-bold shadow-sm'
+                : 'text-slate-500 hover:text-blue-700 hover:bg-blue-50'
                 }`}
         >
             <Icon className={`h-5 w-5 ${isActive ? 'text-primary drop-shadow-sm' : 'group-hover:text-primary'}`} />
@@ -56,7 +56,7 @@ export function DesktopSidebar({ role }: DesktopSidebarProps) {
                         <NavItem href="/admin/reports" icon={Calendar} label="全レッスン報告" isActive={pathname?.startsWith('/admin/reports')} />
 
                         <NavHeading>財務管理</NavHeading>
-                        <NavItem href="/admin/payments" icon={CreditCard} label="決済状況 " isActive={pathname?.startsWith('/admin/payments')} />
+                        <NavItem href="/admin/payments" icon={CreditCard} label="決済状況" isActive={pathname?.startsWith('/admin/payments')} />
                         <NavItem href="/admin/finance/payouts" icon={CreditCard} label="報酬支払管理" isActive={pathname?.startsWith('/admin/finance/payouts')} />
                         <NavItem href="/admin/approvals" icon={FileCheck} label="承認管理" isActive={pathname?.startsWith('/admin/approvals')} />
 
@@ -88,6 +88,7 @@ export function DesktopSidebar({ role }: DesktopSidebarProps) {
                         <NavItem href="/students" icon={Users} label="生徒一覧" isActive={pathname?.startsWith('/students')} />
 
                         <NavHeading>実務メニュー</NavHeading>
+                        <NavItem href="/coach/schedule" icon={Calendar} label="スケジュール管理" isActive={pathname === '/coach/schedule'} />
                         <NavItem href="/coach/history" icon={History} label="レッスン履歴" isActive={pathname?.startsWith('/coach/history')} />
                         <NavItem href="/coach/report" icon={PlusCircle} label="レッスン報告" isActive={pathname?.startsWith('/coach/report')} />
 

@@ -28,15 +28,30 @@ export function MonthSelector({ currentMonth }: MonthSelectorProps) {
     }
 
     return (
-        <div className="flex items-center gap-4 bg-white p-2 rounded-lg border shadow-sm">
-            <Button variant="ghost" size="icon" onClick={handlePrev}>
-                <ChevronLeft className="h-4 w-4" />
+        <div className="flex items-center gap-1 p-1 bg-white rounded-2xl border border-slate-200 shadow-[0_4px_20px_rgba(0,0,0,0.03)] ring-1 ring-slate-200/50">
+            <Button
+                variant="ghost"
+                size="icon"
+                onClick={handlePrev}
+                className="h-10 w-10 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-300"
+            >
+                <ChevronLeft className="h-5 w-5" />
             </Button>
-            <span className="text-lg font-bold min-w-[120px] text-center">
-                {format(date, 'yyyy年M月', { locale: ja })}
-            </span>
-            <Button variant="ghost" size="icon" onClick={handleNext}>
-                <ChevronRight className="h-4 w-4" />
+
+            <div className="flex flex-col items-center min-w-[130px] px-3">
+                <span className="text-[10px] font-bold text-blue-600/60 uppercase tracking-widest mb-0.5">Report Period</span>
+                <span className="text-base font-black text-slate-800 tracking-tight">
+                    {format(date, 'yyyy年 M月', { locale: ja })}
+                </span>
+            </div>
+
+            <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleNext}
+                className="h-10 w-10 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-300"
+            >
+                <ChevronRight className="h-5 w-5" />
             </Button>
         </div>
     )

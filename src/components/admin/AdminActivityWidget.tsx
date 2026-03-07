@@ -40,20 +40,30 @@ export function AdminActivityWidget({ schedules, reports }: AdminActivityWidgetP
     return (
         <div className="h-full flex flex-col">
             <Tabs defaultValue="schedule" className="h-full flex flex-col">
-                <div className="flex items-center justify-between mb-2">
-                    <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="schedule" className="whitespace-nowrap">今後の予定</TabsTrigger>
-                        <TabsTrigger value="report" className="whitespace-nowrap">最新の報告</TabsTrigger>
+                <div className="flex items-center justify-between mb-6">
+                    <TabsList className="bg-slate-100/80 p-1 rounded-xl border border-slate-200/50">
+                        <TabsTrigger
+                            value="schedule"
+                            className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-sm px-4 py-2 text-xs font-bold transition-all"
+                        >
+                            今後の予定
+                        </TabsTrigger>
+                        <TabsTrigger
+                            value="report"
+                            className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-orange-600 data-[state=active]:shadow-sm px-4 py-2 text-xs font-bold transition-all"
+                        >
+                            最新の報告
+                        </TabsTrigger>
                     </TabsList>
                 </div>
 
                 <div className="flex-1 overflow-hidden">
-                    <TabsContent value="schedule" className="h-full mt-0">
-                        <AllCoachesScheduleWidget schedules={schedules} />
+                    <TabsContent value="schedule" className="h-full mt-0 focus-visible:outline-none">
+                        <AllCoachesScheduleWidget schedules={schedules} hideCard />
                     </TabsContent>
 
-                    <TabsContent value="report" className="h-full mt-0">
-                        <RecentReportsWidget reports={reports} />
+                    <TabsContent value="report" className="h-full mt-0 focus-visible:outline-none">
+                        <RecentReportsWidget reports={reports} hideCard />
                     </TabsContent>
                 </div>
             </Tabs>

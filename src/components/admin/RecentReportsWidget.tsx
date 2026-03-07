@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { FileText, Calendar, User, Info, Video } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
+import { format } from 'date-fns'
 import {
     Dialog,
     DialogContent,
@@ -25,7 +26,7 @@ type RecentReport = {
     } | null
 }
 
-export function RecentReportsWidget({ reports: initialReports, coachId }: { reports: RecentReport[], coachId?: string }) {
+export function RecentReportsWidget({ reports: initialReports, coachId, hideCard = false }: { reports: RecentReport[], coachId?: string, hideCard?: boolean }) {
     const [reports, setReports] = useState<RecentReport[]>(initialReports)
     const [selectedReport, setSelectedReport] = useState<RecentReport | null>(null)
     const supabase = createClient()
@@ -106,114 +107,133 @@ export function RecentReportsWidget({ reports: initialReports, coachId }: { repo
         }
     }, [supabase, coachId])
 
+    const Wrapper = ({ children }: { children: React.ReactNode }) => {
+        if (hideCard) return <div className="flex flex-col h-full">{children}</div>
+        return (
+            <Card className="bg-white rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-200 ring-1 ring-slate-200/50 flex flex-col overflow-hidden h-full">
+                {children}
+            </Card>
+        )
+    }
+
     return (
-        <Card className="bg-white border-slate-200 shadow-sm h-full flex flex-col">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 md:pb-4 px-4 md:px-6">
-                <CardTitle className="text-base md:text-lg font-semibold flex items-center gap-2 text-slate-800 whitespace-nowrap min-w-0">
-                    <FileText className="h-4 w-4 md:h-5 md:w-5 text-orange-500 shrink-0" />
-                    <span className="truncate">最新のレッスン報告</span>
-                </CardTitle>
-                <Button variant="ghost" size="sm" className="h-8 text-[10px] md:text-xs text-slate-500 hover:text-orange-600 shrink-0" asChild>
-                    <Link href={coachId ? "/coach/history" : "/admin/reports"}>すべて見る</Link>
-                </Button>
-            </CardHeader>
-            <CardContent className="flex-1 p-3 md:p-4 overflow-y-auto">
-                <div className="space-y-3 md:space-y-4">
-                    {reports.length > 0 ? (
-                        reports.map((report) => (
-                            <div
-                                key={report.id}
-                                className="flex gap-3 md:gap-4 border-b border-slate-50 pb-3 md:pb-4 last:border-0 last:pb-0 cursor-pointer hover:bg-slate-50 transition-colors p-1 rounded-md"
-                                onClick={() => setSelectedReport(report)}
-                            >
-                                <Avatar className="h-8 w-8 md:h-9 md:w-9 border border-white shadow-sm flex-shrink-0">
-                                    <AvatarImage src={report.profiles?.avatar_url || undefined} />
-                                    <AvatarFallback className="bg-orange-100 text-orange-700 text-[10px] md:text-xs">
-                                        {report.profiles?.full_name?.slice(0, 1) || 'C'}
-                                    </AvatarFallback>
-                                </Avatar>
-                                <div className="space-y-0.5 md:space-y-1 min-w-0 flex-1">
-                                    <div className="flex items-center justify-between gap-1">
-                                        <p className="text-xs md:text-sm font-medium text-slate-900 truncate">
-                                            {report.profiles?.full_name || '不明なコーチ'}
-                                        </p>
-                                        <span className="text-[9px] md:text-xs text-slate-400 flex-shrink-0">
-                                            {new Date(report.lesson_date).toLocaleDateString()}
-                                        </span>
+        <>
+            <Wrapper>
+                {!hideCard && (
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4 px-6">
+                        <CardTitle className="text-lg font-bold flex items-center gap-2 text-slate-800">
+                            <FileText className="h-5 w-5 text-orange-500 shrink-0" />
+                            最新の報告
+                        </CardTitle>
+                        <Button variant="ghost" size="sm" className="h-8 text-xs text-slate-400 hover:text-orange-600 font-bold" asChild>
+                            <Link href={coachId ? "/coach/history" : "/admin/reports"}>すべて見る</Link>
+                        </Button>
+                    </CardHeader>
+                )}
+                <CardContent className={`flex-1 ${hideCard ? 'p-0' : 'p-6'} overflow-y-auto`}>
+                    <div className="space-y-4">
+                        {reports.length > 0 ? (
+                            reports.map((report) => (
+                                <div
+                                    key={report.id}
+                                    className="group flex gap-4 p-3 rounded-2xl bg-white hover:bg-slate-50 border border-slate-100 hover:border-orange-200 transition-all duration-300 cursor-pointer"
+                                    onClick={() => setSelectedReport(report)}
+                                >
+                                    <div className="relative shrink-0">
+                                        <Avatar className="h-10 w-10 ring-2 ring-white shadow-sm">
+                                            <AvatarImage src={report.profiles?.avatar_url || undefined} />
+                                            <AvatarFallback className="bg-slate-100 text-slate-400 text-xs font-bold">
+                                                {report.profiles?.full_name?.slice(0, 1) || 'C'}
+                                            </AvatarFallback>
+                                        </Avatar>
+                                        <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-orange-500 border-2 border-white rounded-full"></div>
                                     </div>
-                                    <p className="text-[10px] md:text-xs text-slate-500 truncate">
-                                        生徒: {report.student_name}
-                                    </p>
-                                    {report.menu_description && (
-                                        <div className="text-[10px] md:text-xs text-slate-600 bg-slate-50 p-1.5 md:p-2 rounded-md mt-1 truncate">
-                                            {report.menu_description}
+                                    <div className="space-y-1 min-w-0 flex-1">
+                                        <div className="flex items-center justify-between gap-1">
+                                            <p className="text-sm font-extrabold text-slate-900 truncate">
+                                                {report.profiles?.full_name || '不明なコーチ'}
+                                            </p>
+                                            <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">
+                                                {format(new Date(report.lesson_date), 'M月d日')}
+                                            </span>
                                         </div>
-                                    )}
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="text-[10px] items-center gap-1 flex text-slate-400 font-bold uppercase tracking-widest leading-none">生徒:</span>
+                                            <p className="text-xs font-bold text-slate-600 truncate leading-none">
+                                                {report.student_name}
+                                            </p>
+                                        </div>
+                                        {report.menu_description && (
+                                            <div className="text-[11px] font-medium text-slate-500 line-clamp-2 leading-relaxed bg-slate-50/50 p-2 rounded-lg mt-1 group-hover:bg-white transition-colors border border-transparent group-hover:border-orange-50">
+                                                {report.menu_description}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
+                            ))
+                        ) : (
+                            <div className="flex-1 flex flex-col items-center justify-center text-sm text-slate-400 py-12 gap-3">
+                                <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center">
+                                    <FileText className="h-6 w-6 text-slate-200" />
+                                </div>
+                                <p className="font-medium">まだ報告はありません</p>
                             </div>
-                        ))
-                    ) : (
-                        <div className="text-center py-8 text-slate-400 text-sm">
-                            まだ報告はありません
-                        </div>
-                    )}
-                </div>
-            </CardContent>
+                        )}
+                    </div>
+                </CardContent>
+            </Wrapper>
 
             <Dialog open={!!selectedReport} onOpenChange={(open) => !open && setSelectedReport(null)}>
-                <DialogContent className="max-w-[90vw] md:max-w-md rounded-xl">
+                <DialogContent className="max-w-[90vw] md:max-w-md rounded-3xl p-6">
                     <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2 text-base md:text-lg">
-                            <Info className="h-4 w-4 md:h-5 md:w-5 text-orange-500" />
+                        <DialogTitle className="flex items-center gap-2 text-lg font-black">
+                            <Info className="h-5 w-5 text-orange-500" />
                             レッスン報告詳細
                         </DialogTitle>
-                        <DialogDescription className="text-xs md:text-sm">
-                            コーチによって記入された報告内容です
-                        </DialogDescription>
                     </DialogHeader>
 
                     {selectedReport && (
-                        <div className="space-y-4 md:space-y-6 pt-2 md:pt-4">
-                            <div className="grid grid-cols-2 gap-3 md:gap-4 text-[11px] md:text-sm">
+                        <div className="space-y-6 pt-4">
+                            <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-1">
-                                    <span className="text-slate-500 flex items-center gap-1 text-[10px] md:text-xs">
+                                    <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest flex items-center gap-1">
                                         <Calendar className="h-3 w-3" /> 実施日
                                     </span>
-                                    <p className="font-medium">
-                                        {new Date(selectedReport.lesson_date).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}
+                                    <p className="text-sm font-bold text-slate-800">
+                                        {format(new Date(selectedReport.lesson_date), 'yyyy年 M月 d日')}
                                     </p>
                                 </div>
                                 <div className="space-y-1">
-                                    <span className="text-slate-500 flex items-center gap-1 text-[10px] md:text-xs">
+                                    <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest flex items-center gap-1">
                                         <User className="h-3 w-3" /> 担当コーチ
                                     </span>
-                                    <p className="font-medium truncate">
+                                    <p className="text-sm font-bold text-slate-800 truncate">
                                         {selectedReport.profiles?.full_name || '不明'}
                                     </p>
                                 </div>
                                 <div className="col-span-2 space-y-1">
-                                    <span className="text-slate-500 flex items-center gap-1 text-[10px] md:text-xs">
+                                    <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest flex items-center gap-1">
                                         <User className="h-3 w-3" /> 生徒
                                     </span>
-                                    <p className="font-medium">
+                                    <p className="text-sm font-bold text-slate-800">
                                         {selectedReport.student_name}
                                     </p>
                                 </div>
                             </div>
 
-                            <div className="space-y-1.5 md:space-y-2">
-                                <span className="text-[10px] md:text-xs text-slate-500 block font-semibold">報告・メニュー内容</span>
-                                <div className="bg-slate-50 p-3 md:p-4 rounded-lg border border-slate-100 text-xs md:text-sm leading-relaxed whitespace-pre-wrap min-h-[80px] md:min-h-[100px]">
+                            <div className="space-y-2">
+                                <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest block">報告・メニュー内容</span>
+                                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 text-sm font-medium text-slate-600 leading-relaxed whitespace-pre-wrap min-h-[120px]">
                                     {selectedReport.menu_description || '内容は入力されていません。'}
                                 </div>
                             </div>
 
                             {(!coachId || (coachId === selectedReport.coach_id)) && (
                                 <div className="pt-2">
-                                    <Button asChild className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl py-6">
+                                    <Button asChild className="w-full bg-slate-900 hover:bg-slate-800 text-white rounded-2xl py-6 font-bold shadow-lg shadow-slate-900/10">
                                         <Link href={`/coach/lessons/${selectedReport.id}/media`}>
                                             <Video className="w-4 h-4 mr-2" />
-                                            動画・写真を追加/管理
+                                            メディアを管理
                                         </Link>
                                     </Button>
                                 </div>
@@ -222,6 +242,6 @@ export function RecentReportsWidget({ reports: initialReports, coachId }: { repo
                     )}
                 </DialogContent>
             </Dialog>
-        </Card>
+        </>
     )
 }

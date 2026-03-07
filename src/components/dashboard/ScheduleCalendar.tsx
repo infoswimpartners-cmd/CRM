@@ -321,14 +321,13 @@ export function ScheduleCalendar({ adminView = false }: ScheduleCalendarProps) {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 md:gap-4">
                 {/* View Toggle */}
-                <div className="flex bg-gray-100 p-1 rounded-lg">
-                    {/* ... (existing toggle buttons) ... */}
+                <div className="flex bg-gray-100 p-1 rounded-xl w-full sm:w-auto">
                     <button
                         onClick={() => setViewMode('calendar')}
                         className={cn(
-                            "px-4 py-1.5 text-sm font-medium rounded-md transition-all",
+                            "flex-1 sm:flex-none px-4 py-1.5 text-xs md:text-sm font-bold rounded-lg transition-all",
                             viewMode === 'calendar' ? "bg-white shadow-sm text-blue-600" : "text-gray-500 hover:text-gray-900"
                         )}
                     >
@@ -337,7 +336,7 @@ export function ScheduleCalendar({ adminView = false }: ScheduleCalendarProps) {
                     <button
                         onClick={() => setViewMode('list')}
                         className={cn(
-                            "px-4 py-1.5 text-sm font-medium rounded-md transition-all",
+                            "flex-1 sm:flex-none px-4 py-1.5 text-xs md:text-sm font-bold rounded-lg transition-all",
                             viewMode === 'list' ? "bg-white shadow-sm text-blue-600" : "text-gray-500 hover:text-gray-900"
                         )}
                     >
@@ -345,32 +344,37 @@ export function ScheduleCalendar({ adminView = false }: ScheduleCalendarProps) {
                     </button>
                 </div>
 
-                {/* Admin: Coach Filter */}
-                {adminView && (
-                    <div className="w-[200px]">
-                        <Select value={selectedCoachFilter} onValueChange={setSelectedCoachFilter}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="コーチ絞り込み" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">全員を表示</SelectItem>
-                                {coaches.map(c => (
-                                    <SelectItem key={c.id} value={c.id}>{c.full_name}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                )}
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                    {/* Admin: Coach Filter */}
+                    {adminView && (
+                        <div className="flex-1 sm:w-[180px]">
+                            <Select value={selectedCoachFilter} onValueChange={setSelectedCoachFilter}>
+                                <SelectTrigger className="h-10 rounded-xl">
+                                    <SelectValue placeholder="コーチ絞り込み" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">全員を表示</SelectItem>
+                                    {coaches.map(c => (
+                                        <SelectItem key={c.id} value={c.id}>{c.full_name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )}
 
 
-                {/* Manual Add Button */}
-                <Button onClick={() => {
-                    setAddDialogDate(new Date())
-                    setIsAddOpen(true)
-                }}>
-                    <Clock className="mr-2 h-4 w-4" />
-                    予定を追加
-                </Button>
+                    {/* Manual Add Button */}
+                    <Button
+                        onClick={() => {
+                            setAddDialogDate(new Date())
+                            setIsAddOpen(true)
+                        }}
+                        className="h-10 rounded-xl bg-blue-600 hover:bg-blue-700 text-xs md:text-sm px-4 shadow-sm"
+                    >
+                        <Plus className="mr-1.5 h-4 w-4" />
+                        追加
+                    </Button>
+                </div>
             </div>
 
             {viewMode === 'calendar' ? (
@@ -413,24 +417,24 @@ export function ScheduleCalendar({ adminView = false }: ScheduleCalendarProps) {
                                         onClick={() => setSelectedDate(day)}
                                         onDoubleClick={() => handleDateDoubleClick(day)}
                                         className={cn(
-                                            "relative bg-white min-h-[60px] p-1 flex flex-col items-center justify-start hover:bg-gray-50 transition-colors",
+                                            "relative bg-white min-h-[50px] md:min-h-[60px] p-0.5 md:p-1 flex flex-col items-center justify-start hover:bg-gray-50 transition-colors",
                                             !isCurrentMonth && "bg-gray-50/50 text-gray-400",
                                             isSelected && "ring-2 ring-inset ring-blue-500 z-10"
                                         )}
                                     >
                                         <span className={cn(
-                                            "text-sm w-7 h-7 flex items-center justify-center rounded-full",
+                                            "text-xs md:text-sm w-6 h-6 md:w-7 md:h-7 flex items-center justify-center rounded-full",
                                             isSameDay(day, new Date()) && "bg-blue-600 text-white font-bold",
                                             !isSameDay(day, new Date()) && isSelected && "bg-blue-100 text-blue-700 font-bold"
                                         )}>
                                             {format(day, 'd')}
                                         </span>
 
-                                        <div className="mt-1 flex flex-wrap gap-0.5 justify-center">
+                                        <div className="mt-0.5 md:mt-1 flex flex-wrap gap-0.5 justify-center">
                                             {/* Dots for events */}
                                             {schedules.filter(s => isSameDay(new Date(s.start_time), day)).map((s, i) => (
                                                 <div key={s.id} className={cn(
-                                                    "w-1.5 h-1.5 rounded-full",
+                                                    "w-1 h-1 md:w-1.5 md:h-1.5 rounded-full",
                                                     getStatusColor(s.status)
                                                 )} />
                                             ))}
