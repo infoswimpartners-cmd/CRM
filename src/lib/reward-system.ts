@@ -13,6 +13,7 @@ export type LessonData = {
     students?: {
         full_name?: string
         is_two_person_lesson?: boolean
+        is_default_distant_option?: boolean
         membership_types?: {
             id: string
             // Junction table data, usually fetched as an array
@@ -21,6 +22,9 @@ export type LessonData = {
                 reward_price: number | null
             }[]
         }
+    }
+    profiles?: {
+        distant_reward_fee?: number
     }
 }
 
@@ -58,6 +62,11 @@ export function calculateLessonReward(lesson: LessonData, rate: number): number 
 
     let basePrice = master.unit_price
 
+    let facilityFee = 0;
+    if (typeof lesson.price === 'number' && lesson.price > master.unit_price) {
+        facilityFee = lesson.price - master.unit_price;
+    }
+
     // Check for custom reward price in membership configuration
     if (membership?.membership_type_lessons) {
         // Handle both array (joined) and object (if single object returned, though usually array)
@@ -71,6 +80,12 @@ export function calculateLessonReward(lesson: LessonData, rate: number): number 
         if (config && config.reward_price !== null && config.reward_price !== undefined) {
             basePrice = config.reward_price
         }
+    }
+
+    // Add distant_reward_fee if applicable
+    let distantFee = 0;
+    if (lesson.students?.is_default_distant_option && lesson.profiles?.distant_reward_fee) {
+        distantFee = lesson.profiles.distant_reward_fee;
     }
 
     // If 2-person simultaneous lesson, add +1000 JPY
@@ -98,24 +113,24 @@ export function calculateLessonReward(lesson: LessonData, rate: number): number 
             reward = Math.floor(basePrice * rate)
         }
 
-        return reward + 1000
+        return reward + 1000 + facilityFee + distantFee
     }
 
     if (master.is_trial) {
         // Admin Rate (100%) -> Return Full Price
         if (rate === 1.0) {
-            return basePrice
+            return basePrice + facilityFee + distantFee
         }
 
         // Special Exception Check: Use epsilon for float comparison safety
         // If rate is effectively SPECIAL_EXCEPTION_RATE (approx 0.7000001)
         if (Math.abs(rate - SPECIAL_EXCEPTION_RATE) < 0.00000001) {
-            return 5000
+            return 5000 + facilityFee + distantFee
         }
-        return 4500
+        return 4500 + facilityFee + distantFee
     }
 
-    return Math.floor(basePrice * rate)
+    return Math.floor(basePrice * rate) + facilityFee + distantFee
 }
 
 export function calculateMonthlyStats(coachId: string, monthLessons: LessonData[], rate: number) {
@@ -133,12 +148,19 @@ export function calculateMonthlyStats(coachId: string, monthLessons: LessonData[
         const price = l.price || 0
         const reward = calculateLessonReward(l, rate)
 
+        let title = l.lesson_masters?.is_trial ? '体験レッスン' : '通常レッスン';
+        if (l.lesson_masters && price > l.lesson_masters.unit_price) {
+            title += ' (施設利用料込)';
+        }
+        if (l.students?.is_default_distant_option) {
+            title += ' (遠方対応)';
+        }
+
         stats.totalSales += price
         stats.totalReward += reward
         stats.details.push({
             date: l.lesson_date,
-            // @ts-ignore
-            title: l.lesson_masters?.is_trial ? '体験レッスン' : '通常レッスン', // Simplified title
+            title: title, // Simplified title with facility fee indicator
             studentName: l.students?.full_name || '',
             price: price,
             reward: reward

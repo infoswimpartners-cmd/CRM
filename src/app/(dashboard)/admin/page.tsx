@@ -5,7 +5,7 @@ import { CoachRewardTable } from '@/components/admin/CoachRewardTable'
 import { startOfMonth, endOfMonth, subMonths } from 'date-fns'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Settings, Users, User, PlusCircle, Calendar as CalendarIcon, History, DollarSign } from 'lucide-react'
+import { Settings, Users, User, Calendar as CalendarIcon, History, DollarSign } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { AdminDashboardTabs } from '@/components/admin/AdminDashboardTabs'
 
@@ -64,12 +64,13 @@ export default async function AdminDashboard(props: {
         supabase.from('lessons')
             .select(`
                 *,
-                profiles ( full_name, email ),
+                profiles ( full_name, email, distant_reward_fee ),
                 lesson_masters ( unit_price, is_trial ),
                 students (
                     id,
                     full_name,
                     is_two_person_lesson,
+                    is_default_distant_option,
                     membership_types!students_membership_type_id_fkey (
                         reward_master:lesson_masters!reward_master_id ( unit_price ),
                         membership_type_lessons (
@@ -86,10 +87,12 @@ export default async function AdminDashboard(props: {
             .select(`
                 *,
                 lesson_masters ( is_trial, unit_price ),
+                profiles ( distant_reward_fee ),
                 students (
                     id,
                     full_name,
                     is_two_person_lesson,
+                    is_default_distant_option,
                     membership_types!students_membership_type_id_fkey (
                         reward_master:lesson_masters!reward_master_id ( unit_price ),
                         membership_type_lessons (
@@ -176,10 +179,29 @@ export default async function AdminDashboard(props: {
     // Filter active coaches (include admin)
     const activeCoaches = coaches?.filter(c => c.role === 'coach' || c.role === 'admin') || []
 
+    // Parse Tax Settings Early for KPI calculations
+    const taxMap = new Map<string, boolean>()
+    appConfigs?.forEach((c: any) => {
+        if (c.key.startsWith('coach_tax:')) {
+            const coachId = c.key.replace('coach_tax:', '')
+            try {
+                const val = JSON.parse(c.value)
+                taxMap.set(coachId, val.enabled !== false)
+            } catch {
+                taxMap.set(coachId, true)
+            }
+        }
+    })
+
     // Calcluate Financials using Shared Logic
     const coachFinancials = activeCoaches.map(coach => {
         const rate = coach.role === 'admin' ? 1.0 : calculateCoachRate(coach.id, lessons as any[], targetDate, coach.override_coach_rank)
         const stats = calculateMonthlyStats(coach.id, thisMonthLessons as any[], rate)
+
+        const taxEnabled = taxMap.has(coach.id) ? taxMap.get(coach.id) : true
+        // 報酬額から直接引く（課税標準 = 総報酬）
+        const withholdingTax = taxEnabled ? Math.floor(stats.totalReward * 0.1021) : 0
+        const netReward = stats.totalReward - withholdingTax
 
         return {
             coachId: coach.id,
@@ -189,28 +211,44 @@ export default async function AdminDashboard(props: {
             lessonCount: stats.lessonCount,
             totalSales: stats.totalSales,
             rate: rate,
-            totalReward: stats.totalReward
+            totalReward: netReward,
+            grossReward: stats.totalReward
         }
     })
 
     // Calculate Totals from the list
     const totalSales = coachFinancials.reduce((sum, c) => sum + c.totalSales, 0)
-    const totalGrossReward = coachFinancials.reduce((sum, c) => sum + c.totalReward, 0)
-    const totalProfit = totalSales - totalGrossReward
+    const totalNetReward = coachFinancials.reduce((sum, c) => sum + c.totalReward, 0)
 
-    // Last Month (Simplified for comparison - treating 'rate' as same for simplicity or re-calc)
-    // To be precise we should re-calc rate for last month but for "diff" usually approximation is ok or we duplicate logic.
-    // Let's simple-calc last month totals
+    // 管理者以外の総報酬（粗利計算用/原価）
+    const totalOthersGrossReward = coachFinancials.filter(c => c.role !== 'admin').reduce((sum, c) => sum + c.grossReward, 0)
+    const grossProfit = totalSales - totalOthersGrossReward
+
+    // Last Month (Simplified for comparison)
     const lastMonthFinancials = activeCoaches.map(coach => {
         const rate = coach.role === 'admin' ? 1.0 : calculateCoachRate(coach.id, lessons as any[], lastMonth)
-        return calculateMonthlyStats(coach.id, lastMonthLessons as any[], rate)
+        const stats = calculateMonthlyStats(coach.id, lastMonthLessons as any[], rate)
+
+        const taxEnabled = taxMap.has(coach.id) ? taxMap.get(coach.id) : true
+        const withholdingTax = taxEnabled ? Math.floor(stats.totalReward * 0.1021) : 0
+        const netReward = stats.totalReward - withholdingTax
+
+        return {
+            ...stats,
+            role: coach.role,
+            totalReward: netReward,
+            grossReward: stats.totalReward
+        }
     })
     const lastMonthSales = lastMonthFinancials.reduce((sum, c) => sum + c.totalSales, 0)
-    const lastMonthProfit = lastMonthSales - lastMonthFinancials.reduce((sum, c) => sum + c.totalReward, 0)
+    const lastMonthNetReward = lastMonthFinancials.reduce((sum, c) => sum + c.totalReward, 0)
+
+    const lastMonthOthersGrossReward = lastMonthFinancials.filter(c => c.role !== 'admin').reduce((sum, c) => sum + c.grossReward, 0)
+    const lastMonthGrossProfit = lastMonthSales - lastMonthOthersGrossReward
 
     // Calculate Diffs
     const diffSales = totalSales - lastMonthSales
-    const diffProfit = totalProfit - lastMonthProfit
+    const diffGrossProfit = grossProfit - lastMonthGrossProfit
     const diffCount = thisMonthLessons.length - lastMonthLessons.length
 
 
@@ -238,20 +276,6 @@ export default async function AdminDashboard(props: {
         const existing = coachRankingMap.get(l.coach_id) || []
         existing.push(l)
         coachRankingMap.set(l.coach_id, existing)
-    })
-
-    // Parse Tax Settings
-    const taxMap = new Map<string, boolean>()
-    appConfigs?.forEach((c: any) => {
-        if (c.key.startsWith('coach_tax:')) {
-            const coachId = c.key.replace('coach_tax:', '')
-            try {
-                const val = JSON.parse(c.value)
-                taxMap.set(coachId, val.enabled !== false)
-            } catch {
-                taxMap.set(coachId, true)
-            }
-        }
     })
 
     const coachRanking = []
@@ -322,9 +346,9 @@ export default async function AdminDashboard(props: {
         .sort((a, b) => b.total - a.total)
         .slice(0, 5) // Dashboard shows top 5
 
-    // Calculate admin's own sales for this month
-    const myThisMonthLessons = thisMonthLessons.filter(l => l.coach_id === user.id)
-    const myTotalSalesThisMonth = myThisMonthLessons.reduce((sum, l) => sum + (l.price || 0), 0)
+    // 削除された「マイ・コーチング活動」セクションで使われていた変数の未使用警告を回避
+    void myRecentLessons;
+    void myUpcomingSchedules;
 
     return (
         <div className="space-y-8 pb-8">
@@ -346,9 +370,14 @@ export default async function AdminDashboard(props: {
                         <div>
                             <p className="text-sm font-medium text-slate-500">全体売上 ({targetYear}年{targetDate.getMonth() + 1}月)</p>
                             <h3 className="text-2xl md:text-3xl font-bold text-slate-900 mt-1">¥{totalSales.toLocaleString()}</h3>
-                            <div className={`flex items-center gap-2 mt-4 text-sm w-fit px-2 py-1 rounded-lg ${diffSales >= 0 ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'}`}>
-                                <span>{diffSales >= 0 ? '+' : ''}{diffSales.toLocaleString()}</span>
-                                <span className="text-slate-500">前月比</span>
+                            <div className="flex flex-col gap-2 mt-4">
+                                <div className="flex items-center text-sm text-slate-500 bg-slate-100 w-fit px-2 py-1 rounded-lg">
+                                    <span>粗利額: ¥{grossProfit.toLocaleString()}</span>
+                                </div>
+                                <div className={`flex items-center gap-2 text-sm w-fit px-2 py-1 rounded-lg ${diffSales >= 0 ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'}`}>
+                                    <span>{diffSales >= 0 ? '+' : ''}{diffSales.toLocaleString()}</span>
+                                    <span className="text-slate-500">前月比(売上)</span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -411,122 +440,6 @@ export default async function AdminDashboard(props: {
                 <CoachRankingTable data={coachRanking} limit={5} title="コーチ別売上ランキング (TOP5)" />
                 <CustomerRankingTable data={topCustomers} limit={5} title="優良顧客ランキング (TOP5)" />
             </div>
-
-            <div className="py-6 border-t border-slate-200">
-                <h3 className="mb-4 text-lg font-semibold flex items-center gap-2 text-slate-700 whitespace-nowrap overflow-hidden text-ellipsis">
-                    <User className="h-5 w-5 shrink-0" />
-                    マイ・コーチング活動
-                </h3>
-                <div className="grid gap-4 md:gap-6 md:grid-cols-2 lg:grid-cols-3">
-                    {/* Combined Sales & History Card */}
-                    <Card className="bg-white border-slate-200 shadow-sm md:col-span-2">
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 p-4 md:p-6">
-                            <CardTitle className="flex items-center gap-2 text-slate-800 text-base md:text-lg whitespace-nowrap shrink-0">
-                                <History className="h-4 w-4 md:h-5 md:w-5 text-cyan-600 shrink-0" />
-                                今月の売上とレッスン履歴
-                            </CardTitle>
-                            <div className="text-right">
-                                <span className="text-[10px] md:text-xs text-slate-500 block">今月の個人売上</span>
-                                <span className="text-lg md:text-xl font-bold text-cyan-700">¥{myTotalSalesThisMonth.toLocaleString()}</span>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="p-4 md:p-6 pt-0 md:pt-0">
-                            {myRecentLessons && myRecentLessons.length > 0 ? (
-                                <div className="space-y-3">
-                                    {myRecentLessons.map((lesson) => (
-                                        <div key={lesson.id} className="flex items-center justify-between border-b border-slate-50 pb-2 last:border-0 last:pb-0">
-                                            <div className="flex items-center gap-2 md:gap-3 min-w-0">
-                                                <div className="w-8 md:w-10 text-[10px] md:text-xs text-slate-400 shrink-0">
-                                                    {format(new Date(lesson.lesson_date), 'MM/dd')}
-                                                </div>
-                                                <div className="min-w-0">
-                                                    <p className="font-medium text-xs md:text-sm text-slate-700 truncate">{lesson.student_name || '生徒不明'}</p>
-                                                    <p className="text-[9px] md:text-[10px] text-slate-400 capitalize truncate">{lesson.lesson_masters?.name || 'レッスン'}</p>
-                                                </div>
-                                            </div>
-                                            <div className="text-right shrink-0">
-                                                <p className="font-bold text-xs md:text-sm text-slate-800">
-                                                    ¥{(lesson.price || 0).toLocaleString()}
-                                                </p>
-                                                {lesson.lesson_masters?.is_trial && (
-                                                    <Badge className="bg-orange-50 text-orange-600 border-orange-100 text-[9px] md:text-[10px] h-3.5 md:h-4">体験</Badge>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))}
-                                    <Button variant="ghost" size="sm" className="w-full text-[10px] md:text-xs text-slate-500 hover:text-cyan-700 mt-2 h-8" asChild>
-                                        <Link href="/coach/history">すべての履歴を表示</Link>
-                                    </Button>
-                                </div>
-                            ) : (
-                                <div className="text-xs md:text-sm text-gray-500 text-center py-6">
-                                    今月のレッスン履歴はありません。
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-
-                    {/* Upcoming Lessons (Next 3) */}
-                    <Card className="bg-white border-slate-200 shadow-sm">
-                        <CardHeader className="p-4 md:p-6 pb-2 md:pb-4">
-                            <CardTitle className="flex items-center gap-2 text-slate-800 text-base md:text-lg whitespace-nowrap">
-                                <CalendarIcon className="h-4 w-4 md:h-5 md:w-5 text-purple-600 shrink-0" />
-                                今後のレッスン予定
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-4 md:p-6 pt-0 md:pt-0">
-                            <div className="space-y-3 md:space-y-4">
-                                {myUpcomingSchedules && myUpcomingSchedules.length > 0 ? (
-                                    myUpcomingSchedules.map((s: any) => (
-                                        <div key={s.id} className="flex flex-col gap-1 p-2 md:p-3 rounded-lg bg-slate-50 border border-slate-100">
-                                            <div className="flex justify-between items-start">
-                                                <span className="text-[10px] md:text-xs font-bold text-slate-500">
-                                                    {format(new Date(s.start_time), 'MM/dd (E) HH:mm', { locale: (require('date-fns/locale')).ja })}
-                                                </span>
-                                                <Badge className="bg-white text-slate-600 border-slate-200 text-[9px] md:text-[10px] h-3.5 md:h-4 px-1.5 md:px-2">{s.location || '場所未設定'}</Badge>
-                                            </div>
-                                            <div className="flex items-center gap-2 mt-1">
-                                                <span className="text-xs md:text-sm font-medium text-slate-700 truncate">{s.students?.full_name}</span>
-                                            </div>
-                                        </div>
-                                    ))
-                                ) : (
-                                    <div className="text-xs md:text-sm text-gray-500 text-center py-4 text-slate-400 italic">
-                                        予定されているレッスンはありません。
-                                    </div>
-                                )}
-                                <Button asChild variant="outline" size="sm" className="w-full text-[10px] md:text-xs border-slate-200 hover:bg-slate-50 h-8">
-                                    <Link href="/coach/schedule">カレンダーを表示</Link>
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-            </div>
-            <Card className="bg-white border-slate-200 shadow-sm group">
-                <CardHeader className="p-4 md:p-6 pb-2 md:pb-4">
-                    <CardTitle className="flex items-center gap-2 text-slate-800 text-base md:text-lg whitespace-nowrap">
-                        <PlusCircle className="h-4 w-4 md:h-5 md:w-5 text-green-600 shrink-0" />
-                        クイックアクション
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="p-4 md:p-6 pt-0 md:pt-0 flex flex-col sm:flex-row gap-3">
-                    <Button asChild className="w-full bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 hover:border-blue-300 justify-start h-10 md:h-12" size="lg">
-                        <Link href="/coach/report" className="flex items-center gap-2">
-                            <PlusCircle className="h-4 w-4 md:h-5 md:w-5" />
-                            <span className="text-sm md:text-base">新規レポート作成</span>
-                            <span className="ml-auto text-[10px] md:text-xs opacity-60 hidden xs:inline">完了報告</span>
-                        </Link>
-                    </Button>
-                    <Button asChild className="w-full bg-green-50 text-green-700 hover:bg-green-100 border border-green-200 hover:border-green-300 justify-start h-10 md:h-12" size="lg">
-                        <Link href="/coach/schedule" className="flex items-center gap-2">
-                            <CalendarIcon className="h-4 w-4 md:h-5 md:w-5" />
-                            <span className="text-sm md:text-base">スケジュール追加</span>
-                            <span className="ml-auto text-[10px] md:text-xs opacity-60 hidden xs:inline">予約管理</span>
-                        </Link>
-                    </Button>
-                </CardContent>
-            </Card>
 
 
             <div className="border-t pt-8">

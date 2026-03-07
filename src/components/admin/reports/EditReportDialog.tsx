@@ -22,6 +22,14 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { format } from 'date-fns'
+import { ja } from 'date-fns/locale'
+import { CalendarIcon, Loader2 } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { Calendar } from '@/components/ui/calendar'
+import { Badge } from '@/components/ui/badge'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { LocationSelect } from '@/components/forms/LocationSelect'
 import { updateLessonReport } from '@/actions/report'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -36,10 +44,15 @@ import {
 const formSchema = z.object({
     student_id: z.string().optional(),
     student_name: z.string().min(1, '生徒名は必須です'),
-    lesson_date: z.string(),
+    lesson_date: z.date({
+        message: 'レッスン日時は必須です',
+    }),
     lesson_master_id: z.string().min(1, 'レッスンの種類を選択してください'),
     location: z.string().min(1, '場所は必須です'),
     menu_description: z.string().optional(),
+    feedback_good: z.string().optional(),
+    feedback_next: z.string().optional(),
+    coach_comment: z.string().optional(),
     price: z.number().min(0),
     billing_price: z.number().min(0),
 })
@@ -61,10 +74,13 @@ export function EditReportDialog({ report, lessonMasters, open, onOpenChange, on
         defaultValues: {
             student_id: report.student_id || '',
             student_name: report.student_name,
-            lesson_date: new Date(report.lesson_date).toISOString().split('T')[0], // YYYY-MM-DD
+            lesson_date: new Date(report.lesson_date),
             lesson_master_id: report.lesson_master_id,
             location: report.location,
             menu_description: report.menu_description || '',
+            feedback_good: report.feedback_good || '',
+            feedback_next: report.feedback_next || '',
+            coach_comment: report.coach_comment || '',
             price: report.price,
             billing_price: report.billing_price !== null && report.billing_price !== undefined ? report.billing_price : report.price,
         },
@@ -79,8 +95,6 @@ export function EditReportDialog({ report, lessonMasters, open, onOpenChange, on
     }
 
     const onSubmit = async (values: z.infer<typeof formSchema>) => {
-        if (!confirm('変更内容を保存しますか？')) return
-
         setLoading(true)
         try {
             // Need to reconstruct full ISO string if time is missing or just use date?
@@ -94,12 +108,12 @@ export function EditReportDialog({ report, lessonMasters, open, onOpenChange, on
 
             // If they change date, time is lost unless we handle it. 
             // For now, let's just use what date picker gives + current time or 00:00.
-            const dateObj = new Date(values.lesson_date)
-            const isoString = dateObj.toISOString()
+            const dateObj = values.lesson_date
+            const dateString = format(dateObj, 'yyyy-MM-dd')
 
             const result = await updateLessonReport(report.id, {
                 ...values,
-                lesson_date: isoString
+                lesson_date: dateString
             })
 
             if (!result.success) {
@@ -119,7 +133,7 @@ export function EditReportDialog({ report, lessonMasters, open, onOpenChange, on
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[500px]">
+            <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>レッスン報告の編集</DialogTitle>
                 </DialogHeader>
@@ -176,11 +190,40 @@ export function EditReportDialog({ report, lessonMasters, open, onOpenChange, on
                                 control={form.control}
                                 name="lesson_date"
                                 render={({ field }) => (
-                                    <FormItem>
+                                    <FormItem className="flex flex-col">
                                         <FormLabel>実施日</FormLabel>
-                                        <FormControl>
-                                            <Input type="date" {...field} />
-                                        </FormControl>
+                                        <Popover>
+                                            <PopoverTrigger asChild>
+                                                <FormControl>
+                                                    <Button
+                                                        variant={"outline"}
+                                                        className={cn(
+                                                            "w-full pl-3 text-left font-normal",
+                                                            !field.value && "text-muted-foreground"
+                                                        )}
+                                                    >
+                                                        {field.value ? (
+                                                            format(field.value, "PPP", { locale: ja })
+                                                        ) : (
+                                                            <span>日付を選択</span>
+                                                        )}
+                                                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                                    </Button>
+                                                </FormControl>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-auto p-0" align="start">
+                                                <Calendar
+                                                    mode="single"
+                                                    selected={field.value}
+                                                    onSelect={field.onChange}
+                                                    disabled={(date) =>
+                                                        date > new Date() || date < new Date("1900-01-01")
+                                                    }
+                                                    initialFocus
+                                                    locale={ja}
+                                                />
+                                            </PopoverContent>
+                                        </Popover>
                                         <FormMessage />
                                     </FormItem>
                                 )}
@@ -230,13 +273,16 @@ export function EditReportDialog({ report, lessonMasters, open, onOpenChange, on
                         </div>
 
                         <FormField
-                            control={form.control}
+                            control={form.control as any}
                             name="location"
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>場所</FormLabel>
                                     <FormControl>
-                                        <Input {...field} />
+                                        <LocationSelect
+                                            value={field.value}
+                                            onChange={field.onChange}
+                                        />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -248,9 +294,75 @@ export function EditReportDialog({ report, lessonMasters, open, onOpenChange, on
                             name="menu_description"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>メモ・記録</FormLabel>
+                                    <FormLabel className="flex items-center gap-2">
+                                        メニュー内容 / メモ
+                                        <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-600 border-blue-100 font-normal">メンバーサイトに反映</Badge>
+                                    </FormLabel>
                                     <FormControl>
-                                        <Textarea {...field} rows={5} />
+                                        <Textarea
+                                            placeholder="実施したメニューや練習内容"
+                                            className="resize-none min-h-[100px]"
+                                            {...field}
+                                        />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
+                        {/* フィードバック良かった点 */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormField
+                                control={form.control}
+                                name="feedback_good"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel className="flex items-center gap-2">
+                                            良かった点
+                                            <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-600 border-blue-100 font-normal">メンバーサイトに反映</Badge>
+                                        </FormLabel>
+                                        <FormControl>
+                                            <Textarea
+                                                placeholder="以前より改善された点など"
+                                                className="resize-none min-h-[80px]"
+                                                {...field}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            {/* フィードバック次回の課題 */}
+                            <FormField
+                                control={form.control}
+                                name="feedback_next"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel className="flex items-center gap-2">
+                                            次回の課題
+                                            <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-600 border-blue-100 font-normal">メンバーサイトに反映</Badge>
+                                        </FormLabel>
+                                        <FormControl>
+                                            <Textarea
+                                                placeholder="次回意識すべきポイントなど"
+                                                className="resize-none min-h-[80px]"
+                                                {...field}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
+                        {/* コーチコメント */}
+                        <FormField
+                            control={form.control}
+                            name="coach_comment"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>コーチコメント</FormLabel>
+                                    <FormControl>
+                                        <Textarea {...field} placeholder="コーチからのコメント" />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>

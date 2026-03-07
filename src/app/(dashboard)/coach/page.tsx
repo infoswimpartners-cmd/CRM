@@ -50,11 +50,14 @@ export default async function CoachDashboard() {
         .select(`
             *,
             lesson_masters ( id, name, unit_price, is_trial ),
+            profiles ( full_name, avatar_url, distant_reward_fee ),
             students (
-                id, full_name,
-                membership_types!students_membership_type_id_fkey ( id )
-            ),
-            profiles ( full_name, avatar_url )
+                id, full_name, is_two_person_lesson, is_default_distant_option,
+                membership_types!students_membership_type_id_fkey (
+                    id,
+                    membership_type_lessons (lesson_master_id, reward_price)
+                )
+            )
         `)
 
     if (assignedIds.length > 0) {
@@ -167,14 +170,14 @@ export default async function CoachDashboard() {
     return (
         <div className="space-y-5 md:space-y-8 animate-fade-in-up pb-10 min-w-0">
             {/* Header / Welcome / Important Actions */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white/50 backdrop-blur-sm p-4 md:p-6 rounded-2xl border border-white/20 shadow-sm min-w-0">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm min-w-0">
                 <div className="min-w-0">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <h1 className="text-lg md:text-2xl font-bold text-slate-900">
-                            Welcome back, <span className="text-blue-600">{profile?.full_name || 'Coach'}</span>
+                            Welcome back, <span className="text-cyan-600">{profile?.full_name || 'Coach'}</span>
                         </h1>
                         {profile?.coach_number && (
-                            <Badge variant="outline" className="text-xs md:text-sm px-2.5 py-0.5 bg-blue-50 text-blue-700 border-blue-300 shadow-sm font-mono tracking-wide shrink-0">
+                            <Badge variant="outline" className="text-xs md:text-sm px-2.5 py-0.5 bg-cyan-50 text-cyan-700 border-cyan-300 shadow-sm font-mono tracking-wide shrink-0">
                                 ID: {profile.coach_number}
                             </Badge>
                         )}
@@ -188,7 +191,7 @@ export default async function CoachDashboard() {
                             予定を登録
                         </Link>
                     </Button>
-                    <Button asChild size="sm" className="bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-200 border-none text-xs md:text-sm">
+                    <Button asChild size="sm" className="bg-cyan-600 hover:bg-cyan-700 text-white shadow-md shadow-cyan-200 border-none text-xs md:text-sm">
                         <Link href="/coach/report">
                             <FileText className="mr-1.5 h-3.5 w-3.5" />
                             レッスン報告
@@ -200,98 +203,90 @@ export default async function CoachDashboard() {
             {/* Manual Banner (Highest Priority) */}
             <ManualBanner />
 
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                {/* Main Content (Center/Left) */}
-                <div className="xl:col-span-2 space-y-8">
+            <div className="space-y-8">
+                {/* Today's Schedule (Operational Priority) */}
+                <TodayScheduleWidget coachId={user.id} />
 
-                    {/* Today's Schedule (Operational Priority) */}
-                    <TodayScheduleWidget coachId={user.id} />
+                {/* Activity Timeline / Upcoming Schedule */}
+                <CoachActivityWidget
+                    // @ts-ignore
+                    schedules={upcomingSchedules || []}
+                    // @ts-ignore
+                    reports={recentLessons || []}
+                    coachId={user.id}
+                />
 
-                    {/* News (Informational Priority) */}
-                    <AnnouncementsWidget />
+                {/* News (Informational Priority) */}
+                <AnnouncementsWidget />
 
-                    {/* KPI Cards (Performance Info - Lower Priority) */}
-                    <div>
-                        <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                            <DollarSign className="h-5 w-5 text-slate-400" />
-                            今月の成績（見込）
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            {/* Reward Card */}
-                            <Card className="border-none shadow-md bg-gradient-to-br from-cyan-500 to-blue-600 text-white relative overflow-hidden group">
-                                <div className="absolute right-0 top-0 h-full w-24 bg-white/10 -skew-x-12 transform translate-x-12 transition-transform group-hover:translate-x-6" />
-                                <CardContent className="p-6 relative z-10">
-                                    <p className="text-blue-100 text-sm font-medium">報酬合計</p>
-                                    <h3 className="text-2xl md:text-3xl font-bold mt-2">¥{thisMonthStats.totalReward.toLocaleString()}</h3>
-                                    <p className="text-xs text-blue-100 mt-4 opacity-80">確定までお待ちください</p>
-                                </CardContent>
-                                <DollarSign className="absolute right-4 bottom-4 text-white/20 w-24 h-24 -mb-8 -mr-8" />
-                            </Card>
+                {/* KPI Cards (Performance Info - Lower Priority) */}
+                <div>
+                    <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                        <DollarSign className="h-5 w-5 text-slate-400" />
+                        今月の実績
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {/* Reward Card */}
+                        <Card className="border-none shadow-md bg-gradient-to-br from-cyan-500 to-blue-600 text-white relative overflow-hidden group">
+                            <div className="absolute right-0 top-0 h-full w-24 bg-white/10 -skew-x-12 transform translate-x-12 transition-transform group-hover:translate-x-6" />
+                            <CardContent className="p-6 relative z-10">
+                                <p className="text-blue-100 text-sm font-medium">報酬合計</p>
+                                <h3 className="text-2xl md:text-3xl font-bold mt-2">¥{thisMonthStats.totalReward.toLocaleString()}</h3>
+                                <p className="text-xs text-blue-100 mt-4 opacity-80">確定までお待ちください</p>
+                            </CardContent>
+                            <DollarSign className="absolute right-4 bottom-4 text-white/20 w-24 h-24 -mb-8 -mr-8" />
+                        </Card>
 
-                            {/* Lessons Card */}
-                            <Card className="group hover:shadow-lg transition-all duration-300 border-slate-200 bg-white">
+                        {/* Lessons Card */}
+                        <Card className="group hover:shadow-lg transition-all duration-300 border-slate-200 bg-white">
+                            <CardContent className="p-6">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <p className="text-sm font-medium text-slate-500">実施レッスン</p>
+                                        <h3 className="text-2xl md:text-3xl font-bold text-slate-900 mt-2">{thisMonthStats.lessonCount}</h3>
+                                    </div>
+                                    <div className="p-2 bg-purple-50 rounded-lg text-purple-600 group-hover:bg-purple-100 transition-colors">
+                                        <CalendarIcon className="w-5 h-5" />
+                                    </div>
+                                </div>
+                                <div className="mt-4 flex items-center gap-2 text-sm">
+                                    <span className={`${lessonDiff >= 0 ? 'text-green-600' : 'text-red-500'} font-medium`}>
+                                        {lessonDiff >= 0 ? '+' : ''}{lessonDiff}
+                                    </span>
+                                    <span className="text-slate-400">前月比</span>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Students Card */}
+                        <Link href="/students" className="block group">
+                            <Card className="h-full hover:shadow-lg transition-all duration-300 border-slate-200 bg-white cursor-pointer relative overflow-hidden">
+                                <div className="absolute top-0 right-0 p-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <div className="bg-slate-100 rounded-full p-1">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                                    </div>
+                                </div>
                                 <CardContent className="p-6">
                                     <div className="flex justify-between items-start">
                                         <div>
-                                            <p className="text-sm font-medium text-slate-500">実施レッスン</p>
-                                            <h3 className="text-2xl md:text-3xl font-bold text-slate-900 mt-2">{thisMonthStats.lessonCount}</h3>
+                                            <p className="text-sm font-medium text-slate-500">生徒数</p>
+                                            <h3 className="text-2xl md:text-3xl font-bold text-slate-900 mt-2">{studentCount || 0}</h3>
                                         </div>
-                                        <div className="p-2 bg-purple-50 rounded-lg text-purple-600 group-hover:bg-purple-100 transition-colors">
-                                            <CalendarIcon className="w-5 h-5" />
+                                        <div className="p-2 bg-blue-50 rounded-lg text-blue-600 group-hover:bg-blue-100 transition-colors">
+                                            <Users className="w-5 h-5" />
                                         </div>
                                     </div>
                                     <div className="mt-4 flex items-center gap-2 text-sm">
-                                        <span className={`${lessonDiff >= 0 ? 'text-green-600' : 'text-red-500'} font-medium`}>
-                                            {lessonDiff >= 0 ? '+' : ''}{lessonDiff}
-                                        </span>
-                                        <span className="text-slate-400">前月比</span>
+                                        {newStudentsCount > 0 && (
+                                            <span className="text-green-600 font-medium badge bg-green-50 px-2 py-0.5 rounded text-xs">
+                                                +{newStudentsCount} 新規
+                                            </span>
+                                        )}
+                                        <span className="text-slate-400 text-xs text-right ml-auto">登録生徒</span>
                                     </div>
                                 </CardContent>
                             </Card>
-
-                            {/* Students Card */}
-                            <Link href="/students" className="block group">
-                                <Card className="h-full hover:shadow-lg transition-all duration-300 border-slate-200 bg-white cursor-pointer relative overflow-hidden">
-                                    <div className="absolute top-0 right-0 p-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <div className="bg-slate-100 rounded-full p-1">
-                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-                                        </div>
-                                    </div>
-                                    <CardContent className="p-6">
-                                        <div className="flex justify-between items-start">
-                                            <div>
-                                                <p className="text-sm font-medium text-slate-500">生徒数</p>
-                                                <h3 className="text-2xl md:text-3xl font-bold text-slate-900 mt-2">{studentCount || 0}</h3>
-                                            </div>
-                                            <div className="p-2 bg-blue-50 rounded-lg text-blue-600 group-hover:bg-blue-100 transition-colors">
-                                                <Users className="w-5 h-5" />
-                                            </div>
-                                        </div>
-                                        <div className="mt-4 flex items-center gap-2 text-sm">
-                                            {newStudentsCount > 0 && (
-                                                <span className="text-green-600 font-medium badge bg-green-50 px-2 py-0.5 rounded text-xs">
-                                                    +{newStudentsCount} 新規
-                                                </span>
-                                            )}
-                                            <span className="text-slate-400 text-xs text-right ml-auto">登録生徒</span>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            </Link>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Right Column (Activity Timeline) */}
-                <div className="xl:col-span-1 space-y-6">
-                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm h-full max-h-[480px] xl:max-h-[800px] overflow-hidden xl:sticky xl:top-6">
-                        <CoachActivityWidget
-                            // @ts-ignore
-                            schedules={upcomingSchedules || []}
-                            // @ts-ignore
-                            reports={recentLessons || []}
-                            coachId={user.id}
-                        />
+                        </Link>
                     </div>
                 </div>
             </div>

@@ -47,12 +47,14 @@ export function UpcomingScheduleCard({ schedules }: UpcomingScheduleCardProps) {
                         追加
                     </Button>
                 </div>
-                <CardDescription className="text-slate-500">直近 {schedules.length} 件のレッスン</CardDescription>
+                <CardDescription className="text-slate-500">
+                    {schedules.length > 0 ? `直近 ${Math.min(schedules.length, 3)} 件のレッスン` : '予定なし'}
+                </CardDescription>
             </CardHeader>
-            <CardContent className="flex-1 flex flex-col gap-3 p-4 overflow-y-auto">
+            <CardContent className="flex flex-col gap-3 p-4">
                 {schedules.length > 0 ? (
                     <div className="space-y-3">
-                        {schedules.map((schedule) => (
+                        {schedules.slice(0, 3).map((schedule) => (
                             <div key={schedule.id} className="group relative flex items-center gap-4 p-3 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-100 hover:border-cyan-200 transition-all duration-300">
                                 {/* Time Column */}
                                 <div className="flex flex-col items-center justify-center w-14 h-14 rounded-lg bg-white border border-slate-200 group-hover:border-cyan-200 shadow-sm">
@@ -99,7 +101,7 @@ export function UpcomingScheduleCard({ schedules }: UpcomingScheduleCardProps) {
                     </div>
                 )}
 
-                <div className="mt-auto pt-2">
+                <div className="pt-2">
                     <Button asChild variant="ghost" className="w-full text-slate-500 hover:text-slate-900 hover:bg-slate-100 text-xs uppercase tracking-wider">
                         <Link href="/coach/schedule">カレンダー全体を見る</Link>
                     </Button>

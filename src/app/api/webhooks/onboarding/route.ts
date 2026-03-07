@@ -3,6 +3,31 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { z } from 'zod'
 import { emailService } from '@/lib/email'
 
+// ====================================================
+// 重複POSTリクエスト防止（冪等性チェック）
+// GASが同一フォーム送信で短時間に複数回POSTを送ることがある。
+// DBが並行して書き込まれる前に2つ目が来る場合に備え、
+// メモリ上で「処理中」フラグを管理する。
+// ====================================================
+const processingRequests = new Map<string, number>()
+const DEDUP_WINDOW_MS = 60_000 // 60秒以内の同一キーは重複とみなす
+
+function getDeduplicationKey(email: string, name: string): string {
+    return `${email.toLowerCase()}::${name.trim()}`
+}
+
+function isAlreadyProcessing(key: string): boolean {
+    const ts = processingRequests.get(key)
+    if (ts === undefined) return false
+    const elapsed = Date.now() - ts
+    if (elapsed > DEDUP_WINDOW_MS) {
+        // 期限切れエントリを掃除
+        processingRequests.delete(key)
+        return false
+    }
+    return true
+}
+
 // Validation Schema
 const onboardingSchema = z.object({
     name: z.string().min(1, "Name is required"),
@@ -91,6 +116,17 @@ export async function POST(req: NextRequest) {
 
         console.log(`[Onboarding] New Lead: ${name} (${email})`)
 
+        // ---- 冪等性チェック（並行POSTによる重複登録防止） ----
+        // GASが同一フォーム送信で短時間に複数回POSTすることがある。
+        // DB書き込み前にメモリ上でキーを確認し、処理中なら即スキップする。
+        const dedupKey = getDeduplicationKey(email, name)
+        if (isAlreadyProcessing(dedupKey)) {
+            console.log(`[Onboarding] Dedup: already processing ${dedupKey}, skipping.`)
+            return NextResponse.json({ message: 'Request already being processed' }, { status: 200 })
+        }
+        // 処理開始をマーク
+        processingRequests.set(dedupKey, Date.now())
+
         // 2. Extract Extra Fields for Notes
         const standardKeys = ['name', 'kana', 'email', 'phone', 'message', 'type', 'second_name', 'second_name_kana']
         const extraInfo = Object.entries(result.data)
@@ -113,13 +149,8 @@ export async function POST(req: NextRequest) {
 
         if (exactDuplicate) {
             console.log(`[Onboarding] Exact Duplicate (Email+Name): ${email} / ${name}`)
-            // Log exact duplicate cases
-            await createAdminClient().from('students').insert({
-                full_name: 'Webhook Duplicate',
-                contact_email: 'error@example.com',
-                notes: `Duplicate found: ${email} / ${name}\nPayload: ${JSON.stringify(rawBody, null, 2)}`,
-                status: 'inquiry'
-            });
+            // 重複があった場合はこれ以上処理しない
+            processingRequests.delete(dedupKey)
             return NextResponse.json({ message: 'Student already registered' }, { status: 200 })
         }
 
@@ -143,6 +174,8 @@ export async function POST(req: NextRequest) {
 
         if (dbError) {
             console.error('[Onboarding] DB Insert Error:', dbError)
+            // DB挿入失敗時もフラグ解除（再送できるように）
+            processingRequests.delete(dedupKey)
             return NextResponse.json({ error: 'Database Insert Failed' }, { status: 500 })
         }
 

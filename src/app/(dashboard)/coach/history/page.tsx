@@ -62,7 +62,7 @@ export default async function CoachHistoryPage({
     // Build query
     let query = supabase
         .from('lessons')
-        .select('*')
+        .select('*, lesson_masters ( unit_price )')
 
     // Filter by either direct coach_id or assigned students
     if (assignedStudentIds.length > 0) {

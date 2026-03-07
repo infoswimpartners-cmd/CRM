@@ -56,6 +56,7 @@ export function DesktopSidebar({ role }: DesktopSidebarProps) {
                         <NavItem href="/admin/reports" icon={Calendar} label="全レッスン報告" isActive={pathname?.startsWith('/admin/reports')} />
 
                         <NavHeading>財務管理</NavHeading>
+                        <NavItem href="/admin/payments" icon={CreditCard} label="決済状況 " isActive={pathname?.startsWith('/admin/payments')} />
                         <NavItem href="/admin/finance/payouts" icon={CreditCard} label="報酬支払管理" isActive={pathname?.startsWith('/admin/finance/payouts')} />
                         <NavItem href="/admin/approvals" icon={FileCheck} label="承認管理" isActive={pathname?.startsWith('/admin/approvals')} />
 
@@ -67,7 +68,6 @@ export function DesktopSidebar({ role }: DesktopSidebarProps) {
 
                         <NavHeading>実務メニュー</NavHeading>
                         <NavItem href="/coach/history" icon={History} label="レッスン履歴" isActive={pathname?.startsWith('/coach/history')} />
-                        <NavItem href="/coach/schedule" icon={Calendar} label="予定登録" isActive={pathname?.startsWith('/coach/schedule')} />
                         <NavItem href="/coach/report" icon={PlusCircle} label="レッスン報告" isActive={pathname?.startsWith('/coach/report')} />
 
                         <NavHeading>システム</NavHeading>
@@ -85,11 +85,10 @@ export function DesktopSidebar({ role }: DesktopSidebarProps) {
                         <NavItem href="/coach" icon={LayoutDashboard} label="ダッシュボード" isActive={pathname === '/coach'} />
 
                         <NavHeading>運営管理</NavHeading>
-                        <NavItem href="/students" icon={Users} label="生徒管理" isActive={pathname?.startsWith('/students')} />
+                        <NavItem href="/students" icon={Users} label="生徒一覧" isActive={pathname?.startsWith('/students')} />
 
                         <NavHeading>実務メニュー</NavHeading>
                         <NavItem href="/coach/history" icon={History} label="レッスン履歴" isActive={pathname?.startsWith('/coach/history')} />
-                        <NavItem href="/coach/schedule" icon={Calendar} label="予定登録" isActive={pathname?.startsWith('/coach/schedule')} />
                         <NavItem href="/coach/report" icon={PlusCircle} label="レッスン報告" isActive={pathname?.startsWith('/coach/report')} />
 
                         <NavHeading>分析・集計</NavHeading>

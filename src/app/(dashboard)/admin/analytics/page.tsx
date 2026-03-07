@@ -1,15 +1,12 @@
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { DollarSign, Users, TrendingUp, ArrowLeft, Activity } from 'lucide-react'
+import { DollarSign, Users, TrendingUp, ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { RevenueChart } from '@/components/dashboard/RevenueChart'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { calculateCoachRate, calculateLessonReward } from '@/lib/reward-system'
-import { CoachRankingTable } from '@/components/admin/analytics/CoachRankingTable'
-import { CustomerRankingTable } from '@/components/admin/analytics/CustomerRankingTable'
 import { CoachMonthlyPerformance } from '@/components/admin/analytics/CoachMonthlyPerformance'
-import { subMonths, format, startOfMonth, endOfMonth } from 'date-fns'
+import { AnalyticsFilters } from '@/components/admin/analytics/AnalyticsFilters'
+import { format } from 'date-fns'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -21,84 +18,57 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
     const currentYear = new Date().getFullYear()
     const selectedYear = selectedYearStr ? parseInt(selectedYearStr) : currentYear
 
-    // 1. Fetch KPI Data (Total Sales, Total Customers for LTV)
-    // ... (既存のKPI計算ロジックは変更なし)
-    let lessonsQuery = supabase.from('lessons').select('price, coach_id, lesson_date, student_id')
+    // 対象年度の期間
+    const yearStart = new Date(selectedYear, 0, 1)
+    const yearEnd = new Date(selectedYear, 11, 31, 23, 59, 59)
+
+    // 対象期間・対象コーチのレッスンデータ取得（LTV計算用）
+    let lessonsQuery = supabase
+        .from('lessons')
+        .select('price, coach_id, lesson_date, student_id')
+        .gte('lesson_date', yearStart.toISOString())
+        .lte('lesson_date', yearEnd.toISOString())
+
     if (selectedCoachId) {
         lessonsQuery = lessonsQuery.eq('coach_id', selectedCoachId)
     }
     const { data: allLessons } = await lessonsQuery
 
-    const { count: totalCustomers } = await supabase
-        .from('students')
-        .select('*', { count: 'exact', head: true })
-
+    // ---- 新LTV計算式 ----
+    // 総売上額：対象期間内の購入金額合計
     const totalRevenue = allLessons?.reduce((sum, l) => sum + (l.price || 0), 0) || 0
-    const totalLessons = allLessons?.length || 0
+    // 総注文件数（決済回数）：取引データの全件数
+    const totalOrders = allLessons?.length || 0
+    // 累計ユニーク顧客数：購入した顧客の頭数（重複除去）
+    const uniqueStudentIds = new Set(allLessons?.map(l => l.student_id).filter(Boolean))
+    const uniqueCustomerCount = uniqueStudentIds.size
 
-    // a. 1回あたりの平均利益
-    const avgProfitPerLesson = totalLessons ? Math.floor(totalRevenue / totalLessons) : 0
+    // A: 平均購買単価 = 総売上額 ÷ 総注文件数
+    const avgOrderValue = totalOrders > 0 ? Math.floor(totalRevenue / totalOrders) : 0
+    // B: 平均購買回数 = 総注文件数 ÷ 累計ユニーク顧客数
+    const avgPurchaseFrequency = uniqueCustomerCount > 0 ? totalOrders / uniqueCustomerCount : 0
+    // LTV = A × B
+    const ltv = Math.floor(avgOrderValue * avgPurchaseFrequency)
+    // ----------------------
 
-    // b. 年間の平均利用回数
-    let operationYears = 1
-    if (allLessons && allLessons.length > 0) {
-        const dates = allLessons.map(l => new Date(l.lesson_date).getTime())
-        const firstDate = Math.min(...dates)
-        const lastDate = Math.max(...dates)
-        const diffYears = (lastDate - firstDate) / (1000 * 60 * 60 * 24 * 365.25)
-        operationYears = Math.max(0.1, diffYears)
-    }
-    const avgUsagePerYear = (totalCustomers && operationYears) ? (totalLessons / totalCustomers / operationYears) : 0
-
-    // c. 平均継続年数
-    const studentRanges = new Map<string, { min: number, max: number }>()
-    allLessons?.forEach(l => {
-        if (!l.student_id) return
-        const time = new Date(l.lesson_date).getTime()
-        if (!studentRanges.has(l.student_id)) {
-            studentRanges.set(l.student_id, { min: time, max: time })
-        } else {
-            const range = studentRanges.get(l.student_id)!
-            range.min = Math.min(range.min, time)
-            range.max = Math.max(range.max, time)
-        }
-    })
-
-    const totalRetentionMs = Array.from(studentRanges.values()).reduce((sum, r) => sum + (r.max - r.min), 0)
-    const avgRetentionYears = studentRanges.size ? (totalRetentionMs / (1000 * 60 * 60 * 24 * 365.25) / studentRanges.size) : 0
-    const ltv = Math.floor(avgProfitPerLesson * avgUsagePerYear * Math.max(1, avgRetentionYears))
-
-    // 2. Fetch Data for the Selected Year (12 Months)
-    const yearStart = new Date(selectedYear, 0, 1)
-    const yearEnd = new Date(selectedYear, 11, 31, 23, 59, 59)
-
-    let yearlyQuery = supabase
+    // 利用可能な年度一覧（全データから取得）
+    const { data: allLessonsForYears } = await supabase
         .from('lessons')
-        .select('lesson_date, price, coach_id')
-        .gte('lesson_date', yearStart.toISOString())
-        .lte('lesson_date', yearEnd.toISOString())
+        .select('lesson_date')
 
-    if (selectedCoachId) {
-        yearlyQuery = yearlyQuery.eq('coach_id', selectedCoachId)
-    }
-    const { data: currentYearLessons } = await yearlyQuery
-
-    // Available Years for Filter (from all lessons)
     const availableYearsSet = new Set<number>()
     availableYearsSet.add(currentYear)
-    allLessons?.forEach(l => {
+    allLessonsForYears?.forEach(l => {
         availableYearsSet.add(new Date(l.lesson_date).getFullYear())
     })
     const availableYears = Array.from(availableYearsSet).sort((a, b) => b - a)
 
-    // Aggregate Revenue by Month for the selected year
+    // 月次売上グラフ用データ（対象年度）
     const monthlyRevenueMap = new Map<number, number>()
-    // Initialize 1-12 months
     for (let m = 1; m <= 12; m++) {
         monthlyRevenueMap.set(m, 0)
     }
-
-    currentYearLessons?.forEach(l => {
+    allLessons?.forEach(l => {
         const month = new Date(l.lesson_date).getMonth() + 1
         monthlyRevenueMap.set(month, (monthlyRevenueMap.get(month) || 0) + (l.price || 0))
     })
@@ -111,76 +81,17 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
         }
     })
 
-    // 3. Fetch Top Customers (Yearly filtered)
-    let customerLessonsQuery = supabase
-        .from('lessons')
-        .select(`
-            price,
-            student_id,
-            coach_id,
-            students (
-                id,
-                full_name,
-                sex,
-                avatar_url
-            )
-        `)
-        .gte('lesson_date', yearStart.toISOString())
-        .lte('lesson_date', yearEnd.toISOString())
-
-    if (selectedCoachId) {
-        customerLessonsQuery = customerLessonsQuery.eq('coach_id', selectedCoachId)
-    }
-    const { data: customerLessons } = await customerLessonsQuery
-
-    const customerSpendMap = new Map<string, { student: any, total: number, count: number }>()
-
-    customerLessons?.forEach(l => {
-        if (!l.students) return
-        // @ts-ignore
-        const student = Array.isArray(l.students) ? l.students[0] : l.students
-        if (!student) return
-
-        const sId = student.id
-        if (!customerSpendMap.has(sId)) {
-            customerSpendMap.set(sId, { student: student, total: 0, count: 0 })
-        }
-        const current = customerSpendMap.get(sId)!
-        current.total += (l.price || 0)
-        current.count += 1
-    })
-
-    const topCustomers = Array.from(customerSpendMap.values())
-        .sort((a, b) => b.total - a.total)
-        .slice(0, 10)
-
-    // 4. Fetch Coach Sales Data (Yearly filtered)
+    // コーチ別月次売上推移データ（シリアライズ可能な Record 形式）
     let coachLessonsQuery = supabase
         .from('lessons')
         .select(`
-            id,
             price,
             lesson_date,
             coach_id,
             profiles (
                 id,
                 full_name,
-                avatar_url,
-                override_coach_rank
-            ),
-            lesson_masters (
-                id,
-                unit_price,
-                is_trial
-            ),
-            students (
-                membership_types (
-                    id,
-                    membership_type_lessons (
-                        lesson_master_id,
-                        reward_price
-                    )
-                )
+                avatar_url
             )
         `)
         .gte('lesson_date', yearStart.toISOString())
@@ -191,12 +102,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
     }
     const { data: coachLessonsData } = await coachLessonsQuery
 
-    const { data: filterCoaches } = await supabase
-        .from('profiles')
-        .select('id, full_name')
-        .in('role', ['coach', 'admin', 'owner'])
-        .order('full_name')
-
+    // coachId ごとにレッスンをグループ化
     const coachLessonsMap = new Map<string, any[]>()
     coachLessonsData?.forEach(lesson => {
         if (!lesson.coach_id) return
@@ -205,47 +111,28 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
         coachLessonsMap.set(lesson.coach_id, existing)
     })
 
-    const coachRanking = []
-    for (const [coachId, lessons] of coachLessonsMap.entries()) {
+    // シリアライズ可能なコーチ月次データ（Map → Record<string, number>）
+    const coachMonthlyData = Array.from(coachLessonsMap.entries()).map(([coachId, lessons]) => {
         const profile = Array.isArray(lessons[0].profiles) ? lessons[0].profiles[0] : lessons[0].profiles
-        if (!profile) continue
-        // @ts-ignore
-        const currentRate = calculateCoachRate(coachId, lessons, new Date(), profile.override_coach_rank)
-        let totalSales = 0
-        let totalReward = 0
+        const monthlyRevenue: Record<string, number> = {}
         lessons.forEach(l => {
-            totalSales += (l.price || 0)
-            // @ts-ignore
-            totalReward += calculateLessonReward(l, currentRate)
+            const key = format(new Date(l.lesson_date), 'yyyy-MM')
+            monthlyRevenue[key] = (monthlyRevenue[key] || 0) + (l.price || 0)
         })
-        coachRanking.push({
-            id: coachId,
-            full_name: profile.full_name,
-            avatar_url: profile.avatar_url,
-            count: lessons.length,
-            totalSales,
-            totalReward,
-            withholdingTax: Math.floor(totalReward * 0.1021)
-        })
-    }
-    coachRanking.sort((a, b) => b.totalSales - a.totalSales)
+        return {
+            coachId,
+            coachName: profile?.full_name || '不明',
+            avatarUrl: profile?.avatar_url ?? null,
+            monthlyRevenue
+        }
+    })
 
-    const coachMonthlyData = coachLessonsMap.size > 0 ? (
-        Array.from(coachLessonsMap.entries()).map(([coachId, lessons]) => {
-            const profile = Array.isArray(lessons[0].profiles) ? lessons[0].profiles[0] : lessons[0].profiles
-            const monthlyRevenue = new Map<string, number>()
-            lessons.forEach(l => {
-                const key = format(new Date(l.lesson_date), 'yyyy-MM')
-                monthlyRevenue.set(key, (monthlyRevenue.get(key) || 0) + (l.price || 0))
-            })
-            return {
-                coachId,
-                coachName: profile?.full_name || '不明',
-                avatarUrl: profile?.avatar_url,
-                monthlyRevenue
-            }
-        })
-    ) : []
+    // コーチ一覧（フィルター用）
+    const { data: filterCoaches } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('role', ['coach', 'admin', 'owner'])
+        .order('full_name')
 
     return (
         <div className="space-y-8 pb-8">
@@ -261,101 +148,57 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
                 </div>
             </div>
 
-            {/* Coach Filter */}
-            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-4">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <Users className="h-5 w-5 text-slate-400" />
-                        <span className="text-sm font-medium text-slate-700">表示対象コーチ:</span>
-                        <div className="flex gap-2 flex-wrap">
-                            <Button
-                                variant={!selectedCoachId ? "default" : "outline"}
-                                size="sm"
-                                className="text-xs h-8"
-                                asChild
-                            >
-                                <Link href={`/admin/analytics${selectedYearStr ? `?year=${selectedYearStr}` : ''}`}>全員</Link>
-                            </Button>
-                            {filterCoaches?.map(coach => (
-                                <Button
-                                    key={coach.id}
-                                    variant={selectedCoachId === coach.id ? "default" : "outline"}
-                                    size="sm"
-                                    className="text-xs h-8"
-                                    asChild
-                                >
-                                    <Link href={`/admin/analytics?coach_id=${coach.id}${selectedYearStr ? `&year=${selectedYearStr}` : ''}`}>
-                                        {coach.full_name}
-                                    </Link>
-                                </Button>
-                            ))}
-                        </div>
-                    </div>
-                    {selectedCoachId && (
-                        <p className="text-xs text-slate-500">
-                            ※{filterCoaches?.find(c => c.id === selectedCoachId)?.full_name} コーチの担当分のみを表示中
-                        </p>
-                    )}
-                </div>
+            {/* フィルターパネル（プルダウン） */}
+            <AnalyticsFilters
+                coaches={filterCoaches || []}
+                selectedCoachId={selectedCoachId}
+                selectedYear={selectedYear}
+                availableYears={availableYears}
+            />
 
-                <div className="flex items-center gap-3 pt-2 border-t border-slate-100">
-                    <Activity className="h-5 w-5 text-slate-400" />
-                    <span className="text-sm font-medium text-slate-700">表示対象年度:</span>
-                    <div className="flex gap-2">
-                        {availableYears.map(yr => (
-                            <Button
-                                key={yr}
-                                variant={selectedYear === yr ? "default" : "outline"}
-                                size="sm"
-                                className="text-xs h-8"
-                                asChild
-                            >
-                                <Link href={`/admin/analytics?year=${yr}${selectedCoachId ? `&coach_id=${selectedCoachId}` : ''}`}>
-                                    {yr}年
-                                </Link>
-                            </Button>
-                        ))}
-                    </div>
-                </div>
-            </div>
-
-            {/* KPI Cards */}
+            {/* KPI カード */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <Card className="bg-white border-slate-200 shadow-sm">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-slate-500">累計総売上</CardTitle>
+                        <CardTitle className="text-sm font-medium text-slate-500">{selectedYear}年 総売上</CardTitle>
                         <DollarSign className="h-4 w-4 text-slate-400" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">¥{totalRevenue.toLocaleString()}</div>
-                        <p className="text-xs text-muted-foreground mt-1">サービス開始からの全売上</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                            対象期間合計 / {totalOrders.toLocaleString()}件
+                        </p>
                     </CardContent>
                 </Card>
                 <Card className="bg-white border-slate-200 shadow-sm">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-slate-500">平均LTV (顧客生涯価値)</CardTitle>
+                        <CardTitle className="text-sm font-medium text-slate-500">LTV（顧客生涯価値）</CardTitle>
                         <TrendingUp className="h-4 w-4 text-cyan-500" />
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold text-cyan-600">¥{ltv.toLocaleString()}</div>
-                        <div className="text-[10px] text-muted-foreground mt-1 leading-tight">
-                            利益/回: ¥{avgProfitPerLesson.toLocaleString()} × 年間頻度: {avgUsagePerYear.toFixed(1)}回 × 継続: {Math.max(1, avgRetentionYears).toFixed(1)}年
+                        <div className="text-[10px] text-muted-foreground mt-1 leading-relaxed">
+                            <div>平均購買単価(A)：¥{avgOrderValue.toLocaleString()}</div>
+                            <div>平均購買回数(B)：{avgPurchaseFrequency.toFixed(2)}回</div>
+                            <div className="text-slate-400 text-[9px]">LTV = A × B（{selectedYear}年データ）</div>
                         </div>
                     </CardContent>
                 </Card>
                 <Card className="bg-white border-slate-200 shadow-sm">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-slate-500">総顧客数</CardTitle>
+                        <CardTitle className="text-sm font-medium text-slate-500">ユニーク顧客数</CardTitle>
                         <Users className="h-4 w-4 text-slate-400" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">{totalCustomers}名</div>
-                        <p className="text-xs text-muted-foreground mt-1">登録生徒総数</p>
+                        <div className="text-2xl font-bold">{uniqueCustomerCount}名</div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                            {selectedYear}年 購入顧客（延べ{totalOrders}件）
+                        </p>
                     </CardContent>
                 </Card>
             </div>
 
-            {/* Revenue Chart */}
+            {/* 月次売上グラフ */}
             <Card className="bg-white border-slate-200 shadow-sm">
                 <CardHeader>
                     <CardTitle>{selectedYear}年 月次売上推移</CardTitle>
@@ -367,14 +210,8 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
                 </CardContent>
             </Card>
 
-            {/* Coach Monthly Performance */}
+            {/* コーチ別月次売上推移 */}
             <CoachMonthlyPerformance data={coachMonthlyData} year={selectedYear} />
-
-            {/* Rankings Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <CoachRankingTable data={coachRanking} />
-                <CustomerRankingTable data={topCustomers} />
-            </div>
         </div>
     )
 }

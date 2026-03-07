@@ -22,7 +22,7 @@ export default function CoachManualPage() {
                     <TabsTrigger value="dashboard" className="py-2.5">ダッシュボード</TabsTrigger>
                     <TabsTrigger value="schedule" className="py-2.5">予定管理</TabsTrigger>
                     <TabsTrigger value="report" className="py-2.5">レッスン報告</TabsTrigger>
-                    <TabsTrigger value="students" className="py-2.5">生徒管理</TabsTrigger>
+                    <TabsTrigger value="students" className="py-2.5">生徒一覧</TabsTrigger>
                     <TabsTrigger value="finance" className="py-2.5">売上・報酬</TabsTrigger>
                 </TabsList>
 

@@ -200,8 +200,13 @@ function calculateLessonReward(lesson: any, rate: number): number {
 
     if (!master) return 0
 
+    let facilityFee = 0;
+    if (typeof lesson.price === 'number' && lesson.price > master.unit_price) {
+        facilityFee = lesson.price - master.unit_price;
+    }
+
     if (master.is_trial) {
-        return 4500
+        return 4500 + facilityFee
     }
 
     let basePrice = master.unit_price
@@ -219,7 +224,7 @@ function calculateLessonReward(lesson: any, rate: number): number {
         }
     }
 
-    return Math.floor(basePrice * rate)
+    return Math.floor(basePrice * rate) + facilityFee
 }
 
 function calculateMonthlyStats(monthLessons: any[], rate: number) {
@@ -231,11 +236,16 @@ function calculateMonthlyStats(monthLessons: any[], rate: number) {
         const price = l.price || 0
         const reward = calculateLessonReward(l, rate)
 
+        let title = l.lesson_masters?.is_trial ? '体験レッスン' : '通常レッスン'
+        if (l.lesson_masters && price > l.lesson_masters.unit_price) {
+            title += ' (施設利用料込)'
+        }
+
         totalSales += price
         totalReward += reward
         details.push({
             date: l.lesson_date,
-            title: l.lesson_masters?.is_trial ? '体験レッスン' : '通常レッスン',
+            title: title,
             studentName: l.students?.full_name || '',
             price: price,
             reward: reward

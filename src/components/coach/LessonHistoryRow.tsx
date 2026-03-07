@@ -17,6 +17,7 @@ interface Lesson {
     location: string
     menu_description: string | null
     price: number
+    lesson_masters?: { unit_price: number }
 }
 
 interface Props {
@@ -49,7 +50,12 @@ export function LessonHistoryRow({ lesson, currentUserId, isAdmin }: Props) {
             <TableCell className="text-right">
                 <div className="flex flex-col items-end gap-1">
                     <span>¥{lesson.price.toLocaleString()}</span>
-                    <Badge variant="outline" className="text-[10px] px-1 py-0 h-5 font-normal">完了</Badge>
+                    <div className="flex gap-1">
+                        <Badge variant="outline" className="text-[10px] px-1 py-0 h-5 font-normal">完了</Badge>
+                        {(lesson.price && lesson.lesson_masters && lesson.price > lesson.lesson_masters.unit_price) && (
+                            <Badge variant="outline" className="text-[10px] px-1 py-0 h-5 font-normal text-orange-600 border-orange-200 bg-orange-50">施設</Badge>
+                        )}
+                    </div>
                 </div>
             </TableCell>
             <TableCell>

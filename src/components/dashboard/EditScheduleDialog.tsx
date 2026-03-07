@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { CalendarIcon, Loader2, Trash2 } from 'lucide-react'
 import { format } from 'date-fns'
+import { ja } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
 import { Calendar } from '@/components/ui/calendar'
 import {
@@ -41,6 +42,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { toast } from 'sonner'
+import { useRouter } from 'next/navigation'
 
 import { approveSchedule, getStudentsForCoach } from '@/actions/schedule'
 import { LocationSelect } from '@/components/forms/LocationSelect'
@@ -75,6 +77,7 @@ export function EditScheduleDialog({ schedule, open, onOpenChange, onSuccess }: 
     const [isDeleting, setIsDeleting] = useState(false)
     const [showDeleteAlert, setShowDeleteAlert] = useState(false)
     const [students, setStudents] = useState<Student[]>([])
+    const router = useRouter()
 
     // Admin & Coach State
     const [isAdmin, setIsAdmin] = useState(false)
@@ -91,6 +94,7 @@ export function EditScheduleDialog({ schedule, open, onOpenChange, onSuccess }: 
     const [location, setLocation] = useState('')
     const [notes, setNotes] = useState('')
     const [title, setTitle] = useState('')
+    const [duration, setDuration] = useState(60)
 
     // Initial Data Fetch (User Role, Coaches)
     useEffect(() => {
@@ -135,6 +139,7 @@ export function EditScheduleDialog({ schedule, open, onOpenChange, onSuccess }: 
             setDate(start)
             setStartTime(format(start, 'HH:mm'))
             setEndTime(format(end, 'HH:mm'))
+            setDuration(Math.round((end.getTime() - start.getTime()) / 60000))
             setTitle(schedule.title)
             setLocation(schedule.location || '')
             setNotes(schedule.notes || '')
@@ -224,12 +229,38 @@ export function EditScheduleDialog({ schedule, open, onOpenChange, onSuccess }: 
 
             toast.success('予約を確定しました')
             if (onSuccess) onSuccess()
+            router.refresh()
             onOpenChange(false)
         } catch (error: any) {
             console.error('Approve Error:', error)
             toast.error(error.message || '確定に失敗しました')
         } finally {
             setLoading(false)
+        }
+    }
+
+    const handleStartTimeChange = (newStartTime: string) => {
+        setStartTime(newStartTime)
+        if (date) {
+            const [sh, sm] = newStartTime.split(':').map(Number)
+            const startD = new Date(date)
+            startD.setHours(sh, sm, 0)
+            const endD = new Date(startD.getTime() + duration * 60000)
+
+            const eh = endD.getHours().toString().padStart(2, '0')
+            const em = endD.getMinutes().toString().padStart(2, '0')
+            setEndTime(`${eh}:${em}`)
+        }
+    }
+
+    const handleEndTimeChange = (newEndTime: string) => {
+        setEndTime(newEndTime)
+        if (date && startTime) {
+            const [sh, sm] = startTime.split(':').map(Number)
+            const [eh, em] = newEndTime.split(':').map(Number)
+            let diff = (eh * 60 + em) - (sh * 60 + sm)
+            if (diff < 0) diff += 24 * 60
+            setDuration(diff)
         }
     }
 
@@ -278,6 +309,7 @@ export function EditScheduleDialog({ schedule, open, onOpenChange, onSuccess }: 
 
             toast.success('スケジュールを更新しました')
             if (onSuccess) onSuccess()
+            router.refresh()
             onOpenChange(false)
 
         } catch (error: any) {
@@ -299,6 +331,7 @@ export function EditScheduleDialog({ schedule, open, onOpenChange, onSuccess }: 
 
             toast.success('スケジュールを削除しました')
             if (onSuccess) onSuccess()
+            router.refresh()
             setShowDeleteAlert(false)
             onOpenChange(false)
         } catch (error: any) {
@@ -339,18 +372,15 @@ export function EditScheduleDialog({ schedule, open, onOpenChange, onSuccess }: 
                         )}
 
                         <div className="grid gap-2">
-                            <Label>生徒 (任意)</Label>
-                            <Select value={studentId} onValueChange={setStudentId}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="生徒を選択" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="none">選択しない</SelectItem>
-                                    {students.map(s => (
-                                        <SelectItem key={s.id} value={s.id}>{s.full_name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <Label>生徒</Label>
+                            {/* 生徒の変更はできない仕様のため、テキスト表示のみにする */}
+                            <Input
+                                value={(schedule as any)?.student_name || (schedule as any)?.student?.full_name || '選択なし'}
+                                readOnly
+                                disabled
+                                className="bg-slate-50 text-slate-500 cursor-not-allowed"
+                            />
+                            <input type="hidden" name="studentId" value={studentId} />
                         </div>
 
                         <div className="grid gap-2">
@@ -370,7 +400,7 @@ export function EditScheduleDialog({ schedule, open, onOpenChange, onSuccess }: 
                                         )}
                                     >
                                         <CalendarIcon className="mr-2 h-4 w-4" />
-                                        {date ? format(date, "PPP") : <span>日付を選択</span>}
+                                        {date ? format(date, "yyyy年M月d日 (E)", { locale: ja }) : <span>日付を選択</span>}
                                     </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0">
@@ -387,43 +417,71 @@ export function EditScheduleDialog({ schedule, open, onOpenChange, onSuccess }: 
                         <div className="grid grid-cols-2 gap-4">
                             <div className="grid gap-2">
                                 <Label>開始時間</Label>
-                                <Select value={startTime} onValueChange={setStartTime}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="開始時間" />
-                                    </SelectTrigger>
-                                    <SelectContent className="h-[200px]">
-                                        {Array.from({ length: 24 * 6 }).map((_, i) => {
-                                            const h = Math.floor(i / 6)
-                                            const m = (i % 6) * 10
-                                            const time = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`
-                                            return (
-                                                <SelectItem key={time} value={time}>
-                                                    {time}
-                                                </SelectItem>
-                                            )
-                                        })}
-                                    </SelectContent>
-                                </Select>
+                                <div className="flex gap-2 items-center">
+                                    <Select
+                                        value={startTime.split(':')[0]}
+                                        onValueChange={(h) => handleStartTimeChange(`${h}:${startTime.split(':')[1]}`)}
+                                    >
+                                        <SelectTrigger className="w-full sm:w-[80px]">
+                                            <SelectValue placeholder="時" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {Array.from({ length: 24 }).map((_, i) => {
+                                                const h = i.toString().padStart(2, '0')
+                                                return <SelectItem key={h} value={h}>{h}</SelectItem>
+                                            })}
+                                        </SelectContent>
+                                    </Select>
+                                    <span className="text-sm font-bold">:</span>
+                                    <Select
+                                        value={startTime.split(':')[1]}
+                                        onValueChange={(m) => handleStartTimeChange(`${startTime.split(':')[0]}:${m}`)}
+                                    >
+                                        <SelectTrigger className="w-full sm:w-[80px]">
+                                            <SelectValue placeholder="分" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {Array.from({ length: 12 }).map((_, i) => {
+                                                const m = (i * 5).toString().padStart(2, '0')
+                                                return <SelectItem key={m} value={m}>{m}</SelectItem>
+                                            })}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
                             </div>
                             <div className="grid gap-2">
                                 <Label>終了時間</Label>
-                                <Select value={endTime} onValueChange={setEndTime}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="終了時間" />
-                                    </SelectTrigger>
-                                    <SelectContent className="h-[200px]">
-                                        {Array.from({ length: 24 * 6 }).map((_, i) => {
-                                            const h = Math.floor(i / 6)
-                                            const m = (i % 6) * 10
-                                            const time = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`
-                                            return (
-                                                <SelectItem key={time} value={time}>
-                                                    {time}
-                                                </SelectItem>
-                                            )
-                                        })}
-                                    </SelectContent>
-                                </Select>
+                                <div className="flex gap-2 items-center">
+                                    <Select
+                                        value={endTime.split(':')[0]}
+                                        onValueChange={(h) => handleEndTimeChange(`${h}:${endTime.split(':')[1]}`)}
+                                    >
+                                        <SelectTrigger className="w-full sm:w-[80px]">
+                                            <SelectValue placeholder="時" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {Array.from({ length: 24 }).map((_, i) => {
+                                                const h = i.toString().padStart(2, '0')
+                                                return <SelectItem key={h} value={h}>{h}</SelectItem>
+                                            })}
+                                        </SelectContent>
+                                    </Select>
+                                    <span className="text-sm font-bold">:</span>
+                                    <Select
+                                        value={endTime.split(':')[1]}
+                                        onValueChange={(m) => handleEndTimeChange(`${endTime.split(':')[0]}:${m}`)}
+                                    >
+                                        <SelectTrigger className="w-full sm:w-[80px]">
+                                            <SelectValue placeholder="分" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {Array.from({ length: 12 }).map((_, i) => {
+                                                const m = (i * 5).toString().padStart(2, '0')
+                                                return <SelectItem key={m} value={m}>{m}</SelectItem>
+                                            })}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
                             </div>
                         </div>
 

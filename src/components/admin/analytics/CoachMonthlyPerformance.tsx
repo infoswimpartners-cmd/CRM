@@ -3,13 +3,14 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { format, subMonths, startOfMonth } from 'date-fns'
+import { format } from 'date-fns'
 
 interface CoachMonthlyData {
     coachId: string
     coachName: string
     avatarUrl?: string | null
-    monthlyRevenue: Map<string, number> // key: yyyy-MM, value: revenue
+    // Map はシリアライズ不可のため Record に変更
+    monthlyRevenue: Record<string, number> // key: yyyy-MM, value: revenue
 }
 
 interface CoachMonthlyPerformanceProps {
@@ -27,6 +28,19 @@ export function CoachMonthlyPerformance({ data, year }: CoachMonthlyPerformanceP
             key: format(d, 'yyyy-MM'),
             label: format(d, 'M月')
         })
+    }
+
+    if (data.length === 0) {
+        return (
+            <div className="space-y-4">
+                <h2 className="text-xl font-bold text-slate-800 tracking-tight">コーチ別月次売上推移</h2>
+                <Card className="bg-white border-slate-200 shadow-sm">
+                    <CardContent className="py-10 text-center text-sm text-slate-400">
+                        対象期間のデータがありません
+                    </CardContent>
+                </Card>
+            </div>
+        )
     }
 
     return (
@@ -61,7 +75,8 @@ export function CoachMonthlyPerformance({ data, year }: CoachMonthlyPerformanceP
                                             </div>
                                         </TableCell>
                                         {months.map(m => {
-                                            const revenue = coach.monthlyRevenue.get(m.key) || 0
+                                            // Record から値を取得（Map.get() の代わりにブラケット記法）
+                                            const revenue = coach.monthlyRevenue[m.key] || 0
                                             total += revenue
                                             return (
                                                 <TableCell key={m.key} className="text-right py-2 px-1 whitespace-nowrap text-[11px]">

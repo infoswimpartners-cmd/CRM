@@ -25,8 +25,11 @@ export default async function FinancePage() {
         .select(`
             *,
             lesson_masters ( is_trial, unit_price ),
+            profiles ( distant_reward_fee ),
             students (
                 full_name,
+                is_two_person_lesson,
+                is_default_distant_option,
                 membership_types!students_membership_type_id_fkey (
                     reward_master:lesson_masters!reward_master_id ( unit_price ),
                     membership_type_lessons ( lesson_master_id, reward_price )
@@ -36,6 +39,11 @@ export default async function FinancePage() {
         .eq('coach_id', user.id)
         .gte('lesson_date', nineMonthsAgo.toISOString())
         .order('lesson_date', { ascending: false })
+
+    const { data: payouts } = await supabase
+        .from('payouts')
+        .select('target_month, status')
+        .eq('coach_id', user.id)
 
     // Calculate Reports
     const monthlyReports = []
@@ -71,6 +79,10 @@ export default async function FinancePage() {
 
     const currentMonthStats = monthlyReports[0] || { reward: 0 }
 
+    const paidReports = monthlyReports.filter(report =>
+        payouts?.some(p => p.target_month === report.monthKey && p.status === 'paid')
+    )
+
     return (
         <div className="p-8 space-y-8 animate-fade-in-up">
             <div className="flex items-center gap-4 mb-4">
@@ -94,7 +106,13 @@ export default async function FinancePage() {
             {/* Monthly Reports (Migrated from Dashboard) */}
             <section>
                 <h3 className="text-lg font-bold text-slate-900 mb-4">月次報酬履歴</h3>
-                <MonthlyFinancialsWidget reports={monthlyReports} />
+                {paidReports.length > 0 ? (
+                    <MonthlyFinancialsWidget reports={paidReports} />
+                ) : (
+                    <div className="text-slate-500 text-sm p-8 bg-slate-50 border border-slate-100 rounded-xl text-center">
+                        支払い完了済みの月次報酬履歴はありません。
+                    </div>
+                )}
             </section>
 
             {/* Payment History (Mock) - Keep for now as Payout Slips */}

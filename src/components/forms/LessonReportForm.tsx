@@ -233,7 +233,7 @@ export function LessonReportForm() {
             // Convert date to ISO string for server action
             const payload = {
                 ...values,
-                lesson_date: values.lesson_date.toISOString(),
+                lesson_date: format(values.lesson_date, 'yyyy-MM-dd'),
             }
 
             const result = await submitLessonReport(payload)

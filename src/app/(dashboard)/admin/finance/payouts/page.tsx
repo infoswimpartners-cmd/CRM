@@ -54,7 +54,8 @@ export default async function PayoutsPage({ searchParams }: { searchParams: Prom
         .select(`
             id, price, lesson_date, coach_id,
             lesson_masters (id, unit_price, is_trial),
-            students (membership_types!students_membership_type_id_fkey (id, membership_type_lessons (lesson_master_id, reward_price)))
+            profiles ( distant_reward_fee ),
+            students (full_name, is_two_person_lesson, is_default_distant_option, membership_types!students_membership_type_id_fkey (id, membership_type_lessons (lesson_master_id, reward_price)))
         `)
         .gte('lesson_date', twelveMonthsAgo.toISOString())
 

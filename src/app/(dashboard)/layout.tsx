@@ -118,16 +118,16 @@ export default async function DashboardLayout({
                                     </AvatarFallback>
                                 </Avatar>
                                 <div className="hidden md:block text-left">
-                                    <p className="text-sm font-medium text-white leading-none">{safeProfile.full_name}</p>
+                                    <p className="text-sm font-bold text-slate-900 leading-none">{safeProfile.full_name}</p>
                                     <div className="flex flex-col mt-1 gap-1">
-                                        <p className="text-xs text-slate-400 capitalize">{safeProfile.role}</p>
+                                        <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">{safeProfile.role}</p>
                                         {safeProfile.role === 'coach' ? (
-                                            <p className="text-[11px] font-medium text-blue-300 font-mono bg-blue-500/10 px-1.5 py-0.5 rounded inline-flex w-fit items-center border border-blue-500/20">
+                                            <p className="text-[11px] font-bold text-cyan-700 font-mono bg-cyan-50 px-1.5 py-0.5 rounded inline-flex w-fit items-center border border-cyan-200">
                                                 ID: {safeProfile.coach_number || safeProfile.id.slice(0, 8)}
                                             </p>
                                         ) : (
-                                            <p className="text-[10px] text-slate-500 font-mono opacity-70">
-                                                ID: {safeProfile.coach_number || safeProfile.id.slice(0, 8)}
+                                            <p className="text-[10px] text-slate-400 font-mono">
+                                                ID: {safeProfile.id.slice(0, 8)}
                                             </p>
                                         )}
                                     </div>

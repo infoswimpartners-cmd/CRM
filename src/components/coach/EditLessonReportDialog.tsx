@@ -6,12 +6,15 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
 import * as z from 'zod'
 import { format } from 'date-fns'
+import { ja } from 'date-fns/locale'
 import { CalendarIcon, Loader2 } from 'lucide-react'
 
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
+import { Badge } from '@/components/ui/badge'
+import { LocationSelect } from '@/components/forms/LocationSelect'
 import {
     Dialog,
     DialogContent,
@@ -50,6 +53,9 @@ const formSchema = z.object({
     location: z.string().min(1, '場所は必須です'),
     menu_description: z.string().optional(),
     price: z.coerce.number().min(0, '金額は0円以上である必要があります'),
+    feedback_good: z.string().optional(),
+    feedback_next: z.string().optional(),
+    coach_comment: z.string().optional(),
 })
 
 interface LessonMaster {
@@ -70,6 +76,9 @@ interface EditLessonReportDialogProps {
         location: string
         menu_description: string | null
         price: number
+        feedback_good?: string
+        feedback_next?: string
+        coach_comment?: string
     }
     open: boolean
     onOpenChange: (open: boolean) => void
@@ -104,7 +113,10 @@ export function EditLessonReportDialog({ lesson, open, onOpenChange }: EditLesso
             location: lesson.location,
             menu_description: lesson.menu_description || '',
             price: lesson.price,
-            student_key: lesson.student_name // Just using name for display/validation consistency for now
+            student_key: lesson.student_name,
+            feedback_good: lesson.feedback_good || '',
+            feedback_next: lesson.feedback_next || '',
+            coach_comment: lesson.coach_comment || ''
         },
     })
 
@@ -118,7 +130,10 @@ export function EditLessonReportDialog({ lesson, open, onOpenChange }: EditLesso
                 location: lesson.location,
                 menu_description: lesson.menu_description || '',
                 price: lesson.price,
-                student_key: lesson.student_name
+                student_key: lesson.student_name,
+                feedback_good: lesson.feedback_good || '',
+                feedback_next: lesson.feedback_next || '',
+                coach_comment: lesson.coach_comment || '',
             })
         }
     }, [open, lesson, form])
@@ -145,15 +160,28 @@ export function EditLessonReportDialog({ lesson, open, onOpenChange }: EditLesso
         const supabase = createClient()
 
         try {
+            const { data: facility } = await supabase
+                .from('facilities')
+                .select('is_facility_fee_applied')
+                .eq('name', values.location)
+                .single()
+
+            const facilityFee = facility?.is_facility_fee_applied ? 1500 : 0
+            const master = lessonMasters.find(m => m.id === values.lesson_master_id)
+            const finalPrice = (master?.unit_price ?? values.price) + facilityFee
+
             const { error } = await supabase
                 .from('lessons')
                 .update({
                     student_name: values.student_name,
                     lesson_master_id: values.lesson_master_id,
-                    lesson_date: values.lesson_date.toISOString(),
+                    lesson_date: format(values.lesson_date, 'yyyy-MM-dd'),
                     location: values.location,
                     menu_description: values.menu_description || '',
-                    price: values.price,
+                    price: finalPrice,
+                    feedback_good: values.feedback_good || '',
+                    feedback_next: values.feedback_next || '',
+                    coach_comment: values.coach_comment || '',
                 })
                 .eq('id', lesson.id)
 
@@ -161,10 +189,10 @@ export function EditLessonReportDialog({ lesson, open, onOpenChange }: EditLesso
 
             toast.success('レッスン報告を更新しました')
             onOpenChange(false)
-            router.refresh()
-        } catch (error) {
+            window.location.reload()
+        } catch (error: any) {
             console.error('Error updating report:', error)
-            toast.error('更新に失敗しました')
+            toast.error(error?.message || '更新に失敗しました')
         } finally {
             setIsSubmitting(false)
         }
@@ -250,7 +278,7 @@ export function EditLessonReportDialog({ lesson, open, onOpenChange }: EditLesso
                                                     )}
                                                 >
                                                     {field.value ? (
-                                                        format(field.value, "PPP")
+                                                        format(field.value, "PPP", { locale: ja })
                                                     ) : (
                                                         <span>日付を選択</span>
                                                     )}
@@ -267,6 +295,7 @@ export function EditLessonReportDialog({ lesson, open, onOpenChange }: EditLesso
                                                     date > new Date() || date < new Date("1900-01-01")
                                                 }
                                                 initialFocus
+                                                locale={ja}
                                             />
                                         </PopoverContent>
                                     </Popover>
@@ -282,7 +311,10 @@ export function EditLessonReportDialog({ lesson, open, onOpenChange }: EditLesso
                                 <FormItem>
                                     <FormLabel>場所</FormLabel>
                                     <FormControl>
-                                        <Input {...field} />
+                                        <LocationSelect
+                                            value={field.value}
+                                            onChange={field.onChange}
+                                        />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -294,10 +326,14 @@ export function EditLessonReportDialog({ lesson, open, onOpenChange }: EditLesso
                             name="menu_description"
                             render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>メニュー / 内容</FormLabel>
+                                    <FormLabel className="flex items-center gap-2">
+                                        メニュー内容 / メモ
+                                        <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-600 border-blue-100 font-normal">メンバーサイトに反映</Badge>
+                                    </FormLabel>
                                     <FormControl>
                                         <Textarea
-                                            className="resize-none h-20"
+                                            placeholder="実施したメニューや練習内容"
+                                            className="resize-none min-h-[100px]"
                                             {...field}
                                         />
                                     </FormControl>
@@ -306,6 +342,65 @@ export function EditLessonReportDialog({ lesson, open, onOpenChange }: EditLesso
                             )}
                         />
 
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormField
+                                control={form.control as any}
+                                name="feedback_good"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel className="flex items-center gap-2">
+                                            良かった点
+                                            <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-600 border-blue-100 font-normal">メンバーサイトに反映</Badge>
+                                        </FormLabel>
+                                        <FormControl>
+                                            <Textarea
+                                                placeholder="以前より改善された点など"
+                                                className="resize-none min-h-[80px]"
+                                                {...field}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            <FormField
+                                control={form.control as any}
+                                name="feedback_next"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel className="flex items-center gap-2">
+                                            次回の課題
+                                            <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-600 border-blue-100 font-normal">メンバーサイトに反映</Badge>
+                                        </FormLabel>
+                                        <FormControl>
+                                            <Textarea
+                                                placeholder="次回意識すべきポイントなど"
+                                                className="resize-none min-h-[80px]"
+                                                {...field}
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        </div>
+
+                        {/* コーチコメント */}
+                        <FormField
+                            control={form.control as any}
+                            name="coach_comment"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>コーチコメント</FormLabel>
+                                    <FormControl>
+                                        <Textarea {...field} placeholder="コーチからのコメント" />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        {/* 金額 (自動計算) */}
                         <FormField
                             control={form.control as any}
                             name="price"

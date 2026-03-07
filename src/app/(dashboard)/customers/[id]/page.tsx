@@ -19,6 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Label } from '@/components/ui/label'
 import { calculateAge } from '@/lib/utils'
 import { StudentScheduleButton } from '@/components/students/StudentScheduleButton'
+import { StudentScheduleSection } from '@/components/customers/StudentScheduleSection'
 
 export default async function StudentDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params
@@ -79,6 +80,31 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
             )
         `)
         .eq('student_id', student.id)
+
+    // Fetch Student Schedules (予定一覧)
+    const { data: schedules } = await supabase
+        .from('lesson_schedules')
+        .select(`
+            id,
+            title,
+            start_time,
+            end_time,
+            location,
+            status,
+            notes,
+            profiles (
+                full_name
+            )
+        `)
+        .eq('student_id', student.id)
+        .order('start_time', { ascending: false })
+        .limit(30)
+
+    // プロフィール名をフラット化
+    const formattedSchedules = (schedules || []).map((s: any) => ({
+        ...s,
+        coach_full_name: Array.isArray(s.profiles) ? s.profiles[0]?.full_name : s.profiles?.full_name,
+    }))
 
     return (
         <div className="space-y-6">
@@ -330,9 +356,10 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
             </div>
 
             <Tabs defaultValue="chart" className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
+                <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="chart">カルテ・カウンセリング</TabsTrigger>
                     <TabsTrigger value="history">レッスン履歴</TabsTrigger>
+                    <TabsTrigger value="schedule">予定</TabsTrigger>
                 </TabsList>
                 <TabsContent value="chart" className="mt-4 space-y-8">
                     <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
@@ -353,6 +380,20 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
                 </TabsContent>
                 <TabsContent value="history" className="mt-4">
                     <StudentLessonHistory lessons={lessons || []} />
+                </TabsContent>
+                <TabsContent value="schedule" className="mt-4">
+                    <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-bold flex items-center gap-2">
+                                <span className="w-1.5 h-6 bg-purple-500 rounded-full"></span>
+                                登録された予定
+                            </h3>
+                            {isAdmin && (
+                                <StudentScheduleButton studentId={student.id} />
+                            )}
+                        </div>
+                        <StudentScheduleSection schedules={formattedSchedules} />
+                    </div>
                 </TabsContent>
             </Tabs>
         </div >

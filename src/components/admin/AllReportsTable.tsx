@@ -44,7 +44,8 @@ export async function AllReportsTable() {
             ),
             lesson_masters (
                 name,
-                is_trial
+                is_trial,
+                unit_price
             )
         `)
 
@@ -110,12 +111,18 @@ export async function AllReportsTable() {
                                 </p>
                             </TableCell>
                             <TableCell>
-                                {/* @ts-ignore */}
-                                {report.lesson_masters?.is_trial ? (
-                                    <Badge variant="outline" className="border-cyan-200 text-cyan-700 bg-cyan-50">体験</Badge>
-                                ) : (
-                                    <Badge variant="outline" className="text-slate-500 bg-slate-50">通常</Badge>
-                                )}
+                                <div className="flex gap-1 items-center flex-wrap">
+                                    {/* @ts-ignore */}
+                                    {report.lesson_masters?.is_trial ? (
+                                        <Badge variant="outline" className="border-cyan-200 text-cyan-700 bg-cyan-50">体験</Badge>
+                                    ) : (
+                                        <Badge variant="outline" className="text-slate-500 bg-slate-50">通常</Badge>
+                                    )}
+                                    {/* @ts-ignore */}
+                                    {(report.price && report.lesson_masters && report.price > report.lesson_masters.unit_price) && (
+                                        <Badge variant="outline" className="text-orange-600 border-orange-200 bg-orange-50">施設利用料</Badge>
+                                    )}
+                                </div>
                             </TableCell>
                             <TableCell>
                                 <ReportActions report={report} lessonMasters={lessonMasters || []} />

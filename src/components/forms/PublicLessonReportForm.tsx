@@ -222,7 +222,7 @@ export function PublicLessonReportForm() {
             // Server Action
             const result = await submitPublicLessonReport({
                 ...values,
-                lesson_date: values.lesson_date.toISOString() as any,
+                lesson_date: format(values.lesson_date, 'yyyy-MM-dd') as any,
             })
 
             if (!result.success) {

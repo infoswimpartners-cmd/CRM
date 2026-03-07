@@ -42,6 +42,16 @@ export async function submitLessonReport(values: FormValues) {
     }
     const data = parsed.data
 
+    // 2.2 Add Facility Fee based on location
+    const { data: facility } = await supabase
+        .from('facilities')
+        .select('is_facility_fee_applied')
+        .eq('name', data.location)
+        .single()
+
+    const facilityFee = facility?.is_facility_fee_applied ? 1500 : 0
+    data.price = data.price + facilityFee
+
     // 2.5 Determine Billing Price
     let billingPrice = data.price
     if (data.student_id) {
@@ -55,9 +65,9 @@ export async function submitLessonReport(values: FormValues) {
             ? student.membership_types[0]
             : student?.membership_types
 
-        // If Monthly Member (Fee > 0), Billing Price is 0 (Included in Sub)
+        // If Monthly Member (Fee > 0), Billing Price is 0 (Included in Sub) plus facility fee
         if (membership && membership.fee > 0) {
-            billingPrice = 0
+            billingPrice = facilityFee
         }
     }
 
@@ -140,6 +150,8 @@ export async function submitLessonReport(values: FormValues) {
 
 export async function deleteLessonReport(lessonId: string) {
     const supabase = await createClient()
+    const { createAdminClient } = await import('@/lib/supabase/admin')
+    const supabaseAdmin = createAdminClient()
 
     const { data: authData } = await supabase.auth.getUser()
     const user = authData?.user
@@ -153,7 +165,7 @@ export async function deleteLessonReport(lessonId: string) {
 
     try {
         // 1. Check for Stripe Invoice Item
-        const { data: lesson } = await supabase
+        const { data: lesson } = await supabaseAdmin
             .from('lessons')
             .select('stripe_invoice_item_id')
             .eq('id', lessonId)
@@ -164,15 +176,13 @@ export async function deleteLessonReport(lessonId: string) {
                 await stripe.invoiceItems.del(lesson.stripe_invoice_item_id)
             } catch (stripeError: any) {
                 console.error('Stripe Delete Error:', stripeError)
-                // If it's not "resource_missing", it might be important (e.g. frozen invoice).
-                // Throwing ensures we don't delete the local record if we can't delete the charge.
                 if (stripeError.code !== 'resource_missing') {
                     throw new Error('Stripe請求項目の削除に失敗しました（すでに請求書が確定している可能性があります）')
                 }
             }
         }
 
-        const { error } = await supabase.from('lessons').delete().eq('id', lessonId)
+        const { error } = await supabaseAdmin.from('lessons').delete().eq('id', lessonId)
         if (error) throw error
 
         revalidatePath('/admin/reports')
@@ -186,20 +196,49 @@ export async function deleteLessonReport(lessonId: string) {
 
 export async function updateLessonReport(lessonId: string, values: FormValues) {
     const supabase = await createClient()
+    const { createAdminClient } = await import('@/lib/supabase/admin')
+    const supabaseAdmin = createAdminClient()
 
     const { data: authData } = await supabase.auth.getUser()
     const user = authData?.user
     if (!user) return { success: false, error: 'Unauthorized' }
 
-    // Admin Check
+    // Admin or Owner Check
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-    if (profile?.role !== 'admin') {
+    const isAdmin = profile?.role === 'admin'
+
+    // Fetch the lesson to check ownership
+    const { data: lesson } = await supabaseAdmin
+        .from('lessons')
+        .select('coach_id')
+        .eq('id', lessonId)
+        .single()
+
+    if (!isAdmin && lesson?.coach_id !== user.id) {
         return { success: false, error: '権限がありません' }
     }
 
     const parsed = formSchema.safeParse(values)
-    if (!parsed.success) return { success: false, error: 'Invalid input' }
+    if (!parsed.success) {
+        console.error('Validation error:', parsed.error.flatten())
+        return { success: false, error: '入力内容に誤りがあります: ' + JSON.stringify(parsed.error.flatten().fieldErrors) }
+    }
     const data = parsed.data
+
+    const { data: master } = await supabaseAdmin
+        .from('lesson_masters')
+        .select('unit_price')
+        .eq('id', data.lesson_master_id)
+        .single()
+
+    const { data: facility } = await supabaseAdmin
+        .from('facilities')
+        .select('is_facility_fee_applied')
+        .eq('name', data.location)
+        .single()
+
+    const facilityFee = facility?.is_facility_fee_applied ? 1500 : 0
+    data.price = (master?.unit_price ?? data.price) + facilityFee
 
     // Recalculate billing price only if not provided
     let billingPrice = data.billing_price
@@ -207,7 +246,7 @@ export async function updateLessonReport(lessonId: string, values: FormValues) {
     if (billingPrice === undefined) {
         billingPrice = data.price
         if (data.student_id) {
-            const { data: student } = await supabase
+            const { data: student } = await supabaseAdmin
                 .from('students')
                 .select('membership_types ( fee )')
                 .eq('id', data.student_id)
@@ -218,7 +257,7 @@ export async function updateLessonReport(lessonId: string, values: FormValues) {
                 : student?.membership_types
 
             if (membership && membership.fee > 0) {
-                billingPrice = 0
+                billingPrice = facilityFee
             }
         }
     }
@@ -230,7 +269,7 @@ export async function updateLessonReport(lessonId: string, values: FormValues) {
             billing_price: billingPrice
         })
 
-        const { error } = await supabase.from('lessons').update({
+        const { error } = await supabaseAdmin.from('lessons').update({
             student_id: data.student_id || null,
             student_name: data.student_name,
             lesson_master_id: data.lesson_master_id,
@@ -239,20 +278,21 @@ export async function updateLessonReport(lessonId: string, values: FormValues) {
             menu_description: data.menu_description || '',
             feedback_good: data.feedback_good || '',
             feedback_next: data.feedback_next || '',
+            coach_comment: data.coach_comment || '',
             price: data.price,
             billing_price: billingPrice
         }).eq('id', lessonId)
 
         if (error) {
             console.error('Supabase Update Error:', error)
-            throw error
+            return { success: false, error: 'DBエラー: ' + error.message }
         }
 
         revalidatePath('/admin/reports')
         return { success: true }
     } catch (error: any) {
         console.error('Update Error:', error)
-        return { success: false, error: '更新に失敗しました' }
+        return { success: false, error: error.message || '予期せぬエラーが発生しました' }
     }
 }
 
@@ -280,6 +320,15 @@ export async function submitPublicLessonReport(values: PublicFormValues) {
         return { success: false, error: '入力内容が正しくありません', details: parsed.error.flatten() }
     }
     const data = parsed.data
+
+    const { data: facility } = await supabase
+        .from('facilities')
+        .select('is_facility_fee_applied')
+        .eq('name', data.location)
+        .single()
+
+    const facilityFee = facility?.is_facility_fee_applied ? 1500 : 0
+    data.price = data.price + facilityFee
 
     try {
         // 2. Insert into Supabase using Public RPC
@@ -405,3 +454,105 @@ export async function getStudentsForCoachPublicAction(coachId: string) {
     return { success: true, data: combined }
 }
 
+
+// ── 管理者代理レッスン報告作成 ──────────────────────────────────────────
+// RLS をバイパスするため Admin Client を使用（管理者のみ実行可能）
+
+const adminProxySchema = z.object({
+    coach_id: z.string().min(1, 'コーチを選択してください'),
+    student_id: z.string().optional(),
+    student_name: z.string().min(1, '生徒名は必須です'),
+    lesson_date: z.string().min(1, 'レッスン日は必須です'),
+    lesson_master_id: z.string().min(1, 'レッスンの種類を選択してください'),
+    location: z.string().min(1, '場所は必須です'),
+    menu_description: z.string().optional(),
+    feedback_good: z.string().optional(),
+    feedback_next: z.string().optional(),
+    coach_comment: z.string().optional(),
+    price: z.number().min(0),
+})
+
+type AdminProxyValues = z.infer<typeof adminProxySchema>
+
+export async function submitAdminProxyReport(values: AdminProxyValues) {
+    const supabase = await createClient()
+    const { createAdminClient } = await import('@/lib/supabase/admin')
+    const supabaseAdmin = createAdminClient()
+
+    // 1. 認証チェック
+    const { data: authData } = await supabase.auth.getUser()
+    const user = authData?.user
+    if (!user) return { success: false, error: 'Unauthorized' }
+
+    // 2. 管理者権限チェック
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+    if (profile?.role !== 'admin') {
+        return { success: false, error: '管理者のみが代理報告を作成できます' }
+    }
+
+    // 3. バリデーション
+    const parsed = adminProxySchema.safeParse(values)
+    if (!parsed.success) {
+        const firstError = Object.values(parsed.error.flatten().fieldErrors).flat()[0]
+        return { success: false, error: firstError || '入力内容が正しくありません' }
+    }
+    const data = parsed.data
+
+    // 4. 施設利用料チェック
+    const { data: facility } = await supabaseAdmin
+        .from('facilities')
+        .select('is_facility_fee_applied')
+        .eq('name', data.location)
+        .single()
+    const facilityFee = facility?.is_facility_fee_applied ? 1500 : 0
+
+    // 5. レッスン単価を取得して最終金額を計算
+    const { data: master } = await supabaseAdmin
+        .from('lesson_masters')
+        .select('unit_price')
+        .eq('id', data.lesson_master_id)
+        .single()
+    const finalPrice = (master?.unit_price ?? data.price) + facilityFee
+
+    // 6. 請求金額計算（月会員は施設利用料のみ）
+    let billingPrice = finalPrice
+    if (data.student_id) {
+        const { data: student } = await supabaseAdmin
+            .from('students')
+            .select('membership_types ( fee )')
+            .eq('id', data.student_id)
+            .single()
+        const membership = Array.isArray((student as any)?.membership_types)
+            ? (student as any).membership_types[0]
+            : (student as any)?.membership_types
+        if (membership && membership.fee > 0) {
+            billingPrice = facilityFee
+        }
+    }
+
+    try {
+        // 7. Admin Client で RLS バイパスして INSERT
+        const { error } = await supabaseAdmin.from('lessons').insert({
+            coach_id: data.coach_id,
+            student_id: data.student_id || null,
+            student_name: data.student_name,
+            lesson_master_id: data.lesson_master_id,
+            lesson_date: data.lesson_date,
+            location: data.location,
+            menu_description: data.menu_description || '',
+            feedback_good: data.feedback_good || '',
+            feedback_next: data.feedback_next || '',
+            coach_comment: data.coach_comment || '',
+            price: finalPrice,
+            billing_price: billingPrice,
+        })
+
+        if (error) throw new Error(error.message)
+
+        revalidatePath('/admin/reports')
+        return { success: true }
+    } catch (error: any) {
+        console.error('[AdminProxyReport] Error:', error)
+        return { success: false, error: error.message || '作成に失敗しました' }
+    }
+}
