@@ -10,7 +10,7 @@ import { revalidatePath } from 'next/cache'
  * Processes the billing for a given lesson schedule.
  * Creates Invoice Item, Invoice, Finalizes it, Updates DB, and Sends Email.
  */
-export async function processLessonBilling(scheduleId: string) {
+export async function processLessonBilling(scheduleId: string, forceManualEmail: boolean = false) {
     const supabaseAdmin = createAdminClient()
 
     try {
@@ -89,6 +89,26 @@ export async function processLessonBilling(scheduleId: string) {
 
         const itemDescription = `追加レッスン料 (${format(new Date(data.start_time), 'yyyy/MM/dd')}): ${data.title}`
 
+        // Check for saved payment methods
+        const paymentMethods = await stripe.paymentMethods.list({
+            customer: stripeCustomerId,
+            type: 'card',
+            limit: 1,
+        })
+        const hasPaymentMethod = paymentMethods.data.length > 0
+
+        const shouldChargeAutomatically = hasPaymentMethod && !forceManualEmail
+
+        if (shouldChargeAutomatically) {
+            // Ensure default payment method is set for the customer
+            const customerRetrieved = await stripe.customers.retrieve(stripeCustomerId)
+            if (!(customerRetrieved as any).invoice_settings?.default_payment_method) {
+                await stripe.customers.update(stripeCustomerId, {
+                    invoice_settings: { default_payment_method: paymentMethods.data[0].id }
+                })
+            }
+        }
+
         // A. Invoice Item
         const invoiceItem = await stripe.invoiceItems.create({
             customer: stripeCustomerId,
@@ -104,8 +124,8 @@ export async function processLessonBilling(scheduleId: string) {
         // B. Create Invoice
         const invoice = await stripe.invoices.create({
             customer: stripeCustomerId,
-            collection_method: 'send_invoice',
-            days_until_due: 1,
+            collection_method: shouldChargeAutomatically ? 'charge_automatically' : 'send_invoice',
+            days_until_due: shouldChargeAutomatically ? undefined : 1,
             auto_advance: true,
             metadata: {
                 schedule_id: data.id
@@ -114,23 +134,35 @@ export async function processLessonBilling(scheduleId: string) {
         console.log('[Billing] Invoice created:', invoice.id)
 
         // C. Finalize Invoice
-        const finalized = await stripe.invoices.finalizeInvoice(invoice.id)
+        let finalized = await stripe.invoices.finalizeInvoice(invoice.id)
+
+        if (shouldChargeAutomatically) {
+            try {
+                finalized = await stripe.invoices.pay(invoice.id)
+                console.log('[Billing] Auto-charge execution attempted.')
+            } catch (payError: any) {
+                console.warn('[Billing] Auto-charge failed:', payError.message)
+                // In case it fails, we keep going, status will probably remain 'open'
+            }
+        }
+
         console.log('[Billing] Invoice finalized. Status:', finalized.status)
 
+        const isPaid = finalized.status === 'paid'
         const paymentUrl = finalized.hosted_invoice_url
         const paymentIntentId = typeof (finalized as any).payment_intent === 'string'
             ? (finalized as any).payment_intent
             : ((finalized as any).payment_intent as any)?.id // Safe access
 
         // 3. Update Schedule
-        // Status becomes 'awaiting_payment'
+        // Status becomes 'awaiting_payment' or 'paid'
         const { error: updateError } = await supabaseAdmin
             .from('lesson_schedules')
             .update({
-                billing_status: 'awaiting_payment',
+                billing_status: isPaid ? 'paid' : 'awaiting_payment',
                 stripe_invoice_item_id: invoiceItem.id,
                 payment_intent_id: paymentIntentId ?? null,
-                notification_sent_at: new Date().toISOString() // Track when we sent it
+                notification_sent_at: isPaid ? null : new Date().toISOString() // Track when we sent it if not paid
             })
             .eq('id', scheduleId)
 
@@ -140,7 +172,7 @@ export async function processLessonBilling(scheduleId: string) {
         }
 
         // 4. Send Email
-        if (student.contact_email && paymentUrl) {
+        if (!isPaid && student.contact_email && paymentUrl) {
             console.log('[Billing] Sending email to:', student.contact_email)
 
             const lessonDate = new Date(data.start_time)

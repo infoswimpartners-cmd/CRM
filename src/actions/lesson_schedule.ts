@@ -362,7 +362,7 @@ export async function createLessonSchedule(params: CreateLessonScheduleParams) {
     }
 }
 
-export async function approveLessonSchedule(scheduleId: string) {
+export async function approveLessonSchedule(scheduleId: string, forceManualEmail: boolean = false) {
     const supabase = await createClient()
     const supabaseAdmin = createAdminClient()
 
@@ -428,81 +428,47 @@ export async function approveLessonSchedule(scheduleId: string) {
             ...scheduleRaw,
             student
         }
-        // 2. Check Timing
 
-        // [NEW] If student has NO membership (New/Waiting), Force Immediate Billing
-        // UNLESS they have a reservation (next_membership_type_id), then Deferred Billing
-        if (!student.membership_type_id) {
-            // [MODIFIED] If no membership but has reservation OR if it's before start date
-            // The is_overage flag should already be true from createLessonSchedule.
-            // Here we ensure it goes to Deferred Billing if they have a next plan.
-            if (student.next_membership_type_id) {
-                console.log('[ApproveLesson] User has reservation. Creating Deferred Invoice Item.')
-                const billingResult = await createStripeInvoiceItemOnly(schedule.id)
-                if (!billingResult.success) {
-                    return { success: false, error: billingResult.error }
+        // --- 3. Billing Logic (Plan A: 次月合算モデル) ---
+        // デフォルトは次月のサブスクリプション請求への合算（Invoice Item）
+        let shouldDeferBilling = false;
+        let deferMessage = '承認完了：次回の月会費と合算して請求されます';
+
+        if (student.membership_type_id) {
+            shouldDeferBilling = true;
+            // 入会前のレッスンの場合
+            if (student.membership_started_at) {
+                const startDate = new Date(student.membership_started_at)
+                const lessonDate = new Date(schedule.start_time)
+                if (lessonDate < startDate) {
+                    deferMessage = '承認完了：入会初月の月会費と合算して請求されます';
                 }
-                return { success: true, message: '承認完了：次月の月会費と合算して請求されます' }
             }
+        } else if (student.next_membership_type_id) {
+            // アクティブなプランがないが、入会（予約）はしている場合
+            shouldDeferBilling = true;
+            deferMessage = '承認完了：入会初月の月会費と合算して請求されます';
+        }
 
-            console.log('[ApproveLesson] User has no active membership and no reservation. Forcing Immediate Billing.')
-            const billingResult = await processLessonBilling(schedule.id)
+        if (shouldDeferBilling && !forceManualEmail) {
+            console.log(`[ApproveLesson] Deferring billing for Schedule ${scheduleId}. User has membership.`);
+            // 次回の請求に含めるだけの Invoice Item を作成
+            const billingResult = await createStripeInvoiceItemOnly(schedule.id)
             if (!billingResult.success) {
                 return { success: false, error: billingResult.error }
             }
-            return { success: true }
-        }
-
-        // [NEW] Also handle case where they HAVE membership_type_id but the lesson is BEFORE membership_started_at
-        if (student.membership_started_at) {
-            const startDate = new Date(student.membership_started_at)
-            const lessonDate = new Date(schedule.start_time)
-            if (lessonDate < startDate) {
-                console.log('[ApproveLesson] Lesson is before membership start. Creating Deferred Invoice Item.')
-                const billingResult = await createStripeInvoiceItemOnly(schedule.id)
-                if (!billingResult.success) {
-                    return { success: false, error: billingResult.error }
-                }
-                return { success: true, message: '承認完了：入会初月の月会費と合算して請求されます' }
-            }
-        }
-
-        // Deadline: Day before lesson at 12:00 JST
-        // Convert start_time (UTC) to a Date object
-        const lessonDate = new Date(schedule.start_time)
-
-        // Calculate "Day Before"
-        const billingDeadline = new Date(lessonDate)
-        billingDeadline.setDate(billingDeadline.getDate() - 1)
-
-        // Set to 12:00 JST. 
-        // Logic: 12:00 JST is 03:00 UTC.
-        billingDeadline.setUTCHours(3, 0, 0, 0)
-
-        const now = new Date()
-
-        console.log('[ApproveLesson] Now (UTC):', now.toISOString())
-        console.log('[ApproveLesson] Deadline (UTC):', billingDeadline.toISOString())
-
-        if (now >= billingDeadline) {
-            // Late: Bill Immediately
-            console.log('[ApproveLesson] Deadline passed. Executing immediate billing.')
-            return await processLessonBilling(scheduleId)
-        } else {
-            // Early: Set to 'approved' (Future Billing)
-            console.log('[ApproveLesson] Before deadline. Setting status to approved (future billing).')
-
-            const { error: updateError } = await supabaseAdmin
-                .from('lesson_schedules')
-                .update({
-                    billing_status: 'approved', // Waiting for Cron
-                })
-                .eq('id', scheduleId)
-
-            if (updateError) throw updateError
-
+            // 画面を更新して完了を返す
             revalidatePath('/admin/billing')
-            return { success: true, message: '承認完了：請求は前日12時に自動実行されます' }
+            return { success: true, message: deferMessage }
+        } else {
+            console.log(`[ApproveLesson] User has NO active or future membership (or manual forced). Forcing Immediate Billing for Schedule ${scheduleId}.`);
+            // 体験利用やビジター利用（完全な単発）の場合は予約承認と同時に即時で決済案内メールを送る (自動課金可なら自動課金)
+            const billingResult = await processLessonBilling(schedule.id, forceManualEmail)
+            if (!billingResult.success) {
+                return { success: false, error: billingResult.error }
+            }
+            revalidatePath('/admin/billing')
+            return { success: true, message: '承認および決済処理が完了しました' }
         }
 
     } catch (error: any) {

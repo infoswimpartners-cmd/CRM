@@ -106,22 +106,23 @@ export function BillingSystemGuide() {
                                 <ol className="list-decimal ml-5 space-y-1">
                                     <li>生徒またはコーチが「追加レッスン」枠で予定登録</li>
                                     <li>管理画面の「請求・決済管理」に「承認待ち」として表示</li>
-                                    <li>管理者が<strong>承認</strong>すると、請求予約状態になる</li>
-                                    <li>レッスンの7日前（または承認直後）にシステムが自動でStripeに請求項目(Invoice Item)を作成</li>
+                                    <li>管理者が<strong>承認</strong>すると、生徒の会員状況（プランの有無）に基づいて以下のいずれかが実行されます。</li>
+                                    <ul className="list-disc ml-5 space-y-1 mt-1 text-slate-600">
+                                        <li><strong>プランあり（または来月入会予定）の場合：</strong> 即時の請求メールは送信されず、Stripe上に「次月の月謝引き落としと合算する未請求金額（Invoice Item）」として留保されます。</li>
+                                        <li><strong>プランなし（体験・都度利用など）でカード登録なしの場合：</strong> 承認と同時に、Stripeの決済リンク付きのご案内メールがお客様へ自動送信されます。</li>
+                                        <li><strong>プランなし（体験・都度利用など）でカード登録ありの場合：</strong> 登録済みのクレジットカードに対し、自動で即時決済（引き落とし）が実行されます。</li>
+                                    </ul>
                                 </ol>
                             </div>
                             <div className="bg-green-50 p-3 rounded-lg border border-green-100">
                                 <div className="flex items-start gap-2">
                                     <AlertTriangle className="h-4 w-4 text-green-700 mt-0.5" />
                                     <div>
-                                        <h4 className="font-bold text-green-800 mb-1">重要ポイント:</h4>
+                                        <h4 className="font-bold text-green-800 mb-1">重要ポイント (次月合算):</h4>
                                         <p className="text-green-900 mb-2">
-                                            このフローで作成された請求は、即座にメール請求されるわけではありません。
+                                            既存の月謝会員が追加レッスンを予約した場合は、「次月合算」として処理され、その都度細かく決済メールが飛ぶことはありません。
                                             <br />
-                                            次回（翌月1日）の定期請求と合算して決済されます。
-                                        </p>
-                                        <p className="text-xs text-green-700">
-                                            ※キャンセル規定（前日正午まで無料）もシステムが自動判定し、必要に応じて請求の無効化（Void）を行います。
+                                            すべて翌月の月会費引き落とし時に自動的に合算して請求されます。
                                         </p>
                                     </div>
                                 </div>

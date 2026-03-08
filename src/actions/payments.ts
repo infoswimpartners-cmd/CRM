@@ -147,7 +147,7 @@ export async function fetchPaymentDashboardData(month: string): Promise<PaymentD
                 if (ls.billing_status === 'error') {
                     paymentState = 'error'
                     errorMessage = '決済エラー（追加・体験等）'
-                } else if (ls.billing_status === 'awaiting_payment' || ls.billing_status === 'awaiting_approval') {
+                } else if (ls.billing_status === 'awaiting_payment' || ls.billing_status === 'awaiting_approval' || ls.billing_status === 'ready_to_invoice') {
                     if (paymentState !== 'error') paymentState = 'pending'
                     expectedMonthlyLanding += ls.price
 
