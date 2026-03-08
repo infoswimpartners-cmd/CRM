@@ -23,12 +23,64 @@ import { CoachRankingTable } from '@/components/admin/analytics/CoachRankingTabl
 import { CustomerRankingTable } from '@/components/admin/analytics/CustomerRankingTable'
 import { calculateCoachRate, calculateMonthlyStats, calculateLessonReward } from '@/lib/reward-system'
 
+import { Suspense } from 'react'
+
 export default async function AdminDashboard(props: {
     searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
     const searchParams = await props.searchParams
     const monthParam = typeof searchParams.month === 'string' ? searchParams.month : format(new Date(), 'yyyy-MM')
 
+    return (
+        <div className="relative space-y-6 md:space-y-10 pb-12 overflow-hidden px-4 md:px-0">
+            {/* 装飾用背景要素 */}
+            <div className="absolute top-0 right-0 -z-10 w-[600px] h-[600px] bg-linear-to-bl from-blue-500/5 to-transparent rounded-full blur-3xl" />
+            <div className="absolute top-[-100px] left-[-100px] -z-10 w-[500px] h-[500px] bg-linear-to-tr from-cyan-400/5 to-transparent rounded-full blur-3xl" />
+
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-2">
+                        <span className="h-1.5 w-8 bg-blue-600 rounded-full"></span>
+                        <span className="text-xs font-black text-blue-600 tracking-widest uppercase">Overview</span>
+                    </div>
+                    <h1 className="text-2xl md:text-3xl font-black tracking-tight text-slate-900 leading-tight">
+                        管理者ダッシュボード
+                    </h1>
+                    <p className="text-slate-400 text-sm md:text-base font-medium">ビジネスの現在地をリアルタイムに把握</p>
+                </div>
+                <div className="mx-auto md:mx-0">
+                    <MonthSelector currentMonth={monthParam} />
+                </div>
+            </div>
+
+            <Suspense fallback={<AdminDashboardSkeleton />}>
+                <AdminDashboardContent monthParam={monthParam} />
+            </Suspense>
+        </div>
+    )
+}
+
+function AdminDashboardSkeleton() {
+    return (
+        <div className="space-y-6 animate-pulse mt-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[...Array(3)].map((_, i) => (
+                    <div key={i} className="bg-white rounded-3xl p-6 md:p-8 h-48 border border-slate-200">
+                        <div className="h-12 w-12 bg-slate-100 rounded-2xl mb-6"></div>
+                        <div className="h-4 w-24 bg-slate-100 rounded mb-2"></div>
+                        <div className="h-8 w-32 bg-slate-100 rounded"></div>
+                    </div>
+                ))}
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 mt-6">
+                <div className="lg:col-span-2 bg-white rounded-3xl h-[560px] border border-slate-200"></div>
+                <div className="lg:col-span-1 bg-white rounded-3xl h-[560px] border border-slate-200"></div>
+            </div>
+        </div>
+    )
+}
+
+async function AdminDashboardContent({ monthParam }: { monthParam: string }) {
     // Parse target date (default to 1st of the month)
     const targetDate = new Date(monthParam + '-01')
 
@@ -351,27 +403,7 @@ export default async function AdminDashboard(props: {
     void myUpcomingSchedules;
 
     return (
-        <div className="relative space-y-6 md:space-y-10 pb-12 overflow-hidden px-4 md:px-0">
-            {/* 装飾用背景要素 */}
-            <div className="absolute top-0 right-0 -z-10 w-[600px] h-[600px] bg-linear-to-bl from-blue-500/5 to-transparent rounded-full blur-3xl" />
-            <div className="absolute top-[-100px] left-[-100px] -z-10 w-[500px] h-[500px] bg-linear-to-tr from-cyan-400/5 to-transparent rounded-full blur-3xl" />
-
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                <div className="flex flex-col gap-2">
-                    <div className="flex items-center gap-2">
-                        <span className="h-1.5 w-8 bg-blue-600 rounded-full"></span>
-                        <span className="text-xs font-black text-blue-600 tracking-widest uppercase">Overview</span>
-                    </div>
-                    <h1 className="text-2xl md:text-3xl font-black tracking-tight text-slate-900 leading-tight">
-                        管理者ダッシュボード
-                    </h1>
-                    <p className="text-slate-400 text-sm md:text-base font-medium">ビジネスの現在地をリアルタイムに把握</p>
-                </div>
-                <div className="mx-auto md:mx-0">
-                    <MonthSelector currentMonth={monthParam} />
-                </div>
-            </div>
-
+        <div className="space-y-6 md:space-y-10 animate-fade-in-up">
             {/* ビジネス概要セクション */}
             <section className="space-y-6">
                 <div className="flex items-center gap-3">
