@@ -68,8 +68,11 @@ export async function updateStudent(id: string, formData: any) {
         const newMembership = updates.membership_type_id
         const startTiming = formData.start_timing // 'current' | 'next'
 
-        if (newMembership && newMembership !== oldMembership && !updates.is_bank_transfer) {
-            console.log(`[UpdateStudent] Membership Changed: ${oldMembership} -> ${newMembership}`)
+        const isMembershipChange = newMembership !== oldMembership
+        const needsStripeSubscription = !currentStudent.stripe_subscription_id
+
+        if (newMembership && (isMembershipChange || needsStripeSubscription) && !updates.is_bank_transfer) {
+            console.log(`[UpdateStudent] Processing Subscription. Change: ${isMembershipChange}, Needs Stripe: ${needsStripeSubscription}`)
             updates.status = 'active'
 
             // 1. Get Plan Details (Price ID, Name, Fee)

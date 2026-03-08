@@ -375,7 +375,7 @@ export function EditScheduleDialog({ schedule, open, onOpenChange, onSuccess }: 
                             <Label>生徒</Label>
                             {/* 生徒の変更はできない仕様のため、テキスト表示のみにする */}
                             <Input
-                                value={(schedule as any)?.student_name || (schedule as any)?.student?.full_name || '選択なし'}
+                                value={students.find(s => s.id === studentId)?.full_name || (schedule as any)?.students?.full_name || (schedule as any)?.student?.full_name || (schedule as any)?.student_name || '選択なし'}
                                 readOnly
                                 disabled
                                 className="bg-slate-50 text-slate-500 cursor-not-allowed"

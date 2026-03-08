@@ -16,6 +16,13 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table'
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select'
 import { approveLessonSchedule, rejectLessonSchedule, approveLessonScheduleManually } from '@/actions/lesson_schedule'
 import { formatCurrency } from '@/lib/utils'
 import { useSearchParams, useRouter } from 'next/navigation'
@@ -45,6 +52,7 @@ interface BillingApprovalListProps {
 
 export function BillingApprovalList({ unpaidSchedules, paidSchedules }: BillingApprovalListProps) {
     const [processingId, setProcessingId] = useState<string | null>(null)
+    const [unpaidFilter, setUnpaidFilter] = useState<string>('awaiting_approval')
     const searchParams = useSearchParams()
     const router = useRouter()
     const approveId = searchParams.get('approve_id')
@@ -98,6 +106,11 @@ export function BillingApprovalList({ unpaidSchedules, paidSchedules }: BillingA
             setProcessingId(null)
         }
     }
+
+    const filteredUnpaidSchedules = unpaidSchedules.filter(schedule => {
+        if (unpaidFilter === 'all') return true;
+        return schedule.billing_status === unpaidFilter;
+    });
 
     const handleApprove = async (id: string, name: string) => {
         if (!confirm(`${name}様の追加レッスンを承認し、請求を行いますか？`)) return
@@ -299,13 +312,24 @@ export function BillingApprovalList({ unpaidSchedules, paidSchedules }: BillingA
                     </div>
 
                     <TabsContent value="unpaid" className="m-0">
-                        <div className="p-4 bg-orange-50/30 border-b border-orange-100 mb-0">
+                        <div className="p-4 bg-orange-50/30 border-b border-orange-100 mb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             <p className="text-xs text-orange-800 flex items-center gap-2">
-                                <AlertCircle className="h-4 w-4" />
+                                <AlertCircle className="h-4 w-4 shrink-0" />
                                 承認待ちのレッスンは「承認」ボタンを押すと請求書が送信されます。
                             </p>
+                            <Select value={unpaidFilter} onValueChange={setUnpaidFilter}>
+                                <SelectTrigger className="w-[180px] bg-white text-xs h-8">
+                                    <SelectValue placeholder="絞り込み" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">すべて表示</SelectItem>
+                                    <SelectItem value="awaiting_approval">承認待ち</SelectItem>
+                                    <SelectItem value="approved">請求予約済み</SelectItem>
+                                    <SelectItem value="awaiting_payment">支払待ち</SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
-                        <TableContent schedules={unpaidSchedules} isPaid={false} />
+                        <TableContent schedules={filteredUnpaidSchedules} isPaid={false} />
                     </TabsContent>
 
                     <TabsContent value="paid" className="m-0">
