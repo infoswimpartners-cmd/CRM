@@ -118,6 +118,12 @@ export async function updateStudent(id: string, formData: any) {
                     stripeCustomerId = customer.id
                     updates.stripe_customer_id = stripeCustomerId
                     console.log(`[UpdateStudent] Created Stripe Customer: ${stripeCustomerId}`)
+
+                    // 顧客IDが作成された時点で、一度DBを更新しておく（後の処理でエラーになってもIDだけは残すため）
+                    await supabase
+                        .from('students')
+                        .update({ stripe_customer_id: stripeCustomerId })
+                        .eq('id', id)
                 }
 
                 // Determine Start Date & Trial End

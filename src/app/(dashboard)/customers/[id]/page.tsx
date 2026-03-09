@@ -20,6 +20,7 @@ import { Label } from '@/components/ui/label'
 import { calculateAge } from '@/lib/utils'
 import { StudentScheduleButton } from '@/components/students/StudentScheduleButton'
 import { StudentScheduleSection } from '@/components/customers/StudentScheduleSection'
+import { StudentMembershipAssigner } from '@/components/admin/StudentMembershipAssigner'
 
 export default async function StudentDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params
@@ -311,10 +312,19 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
                         <CardContent className="space-y-4">
                             <div>
                                 <Label className="text-xs text-slate-500">現在のプラン</Label>
-                                <div className="font-bold text-lg text-slate-800">
-                                    {/* @ts-ignore relationship */}
-                                    {student.membership_types?.name || '未選択'}
-                                </div>
+                                {isAdmin ? (
+                                    <div className="mt-1">
+                                        <StudentMembershipAssigner
+                                            studentId={student.id}
+                                            currentMembershipTypeId={student.membership_type_id}
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className="font-bold text-lg text-slate-800">
+                                        {/* @ts-ignore relationship */}
+                                        {student.membership_types?.name || '未選択'}
+                                    </div>
+                                )}
                             </div>
 
                             <div className="flex flex-col gap-2">

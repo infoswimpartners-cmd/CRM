@@ -11,7 +11,7 @@ export async function GlobalSearchContainer({ isAdmin }: GlobalSearchContainerPr
     // Data fetching
     const { data: students } = await supabase
         .from('students')
-        .select('id, full_name, avatar_url')
+        .select('id, full_name, avatar_url, student_number')
         .order('full_name')
 
     let coaches: any[] = []
@@ -19,8 +19,9 @@ export async function GlobalSearchContainer({ isAdmin }: GlobalSearchContainerPr
     if (isAdmin) {
         const { data: fetchedCoaches } = await supabase
             .from('profiles')
-            .select('id, full_name, avatar_url')
-            .eq('role', 'coach')
+            .select('id, full_name, avatar_url, coach_number')
+            .in('role', ['coach', 'admin', 'owner'])
+            .order('full_name')
         coaches = fetchedCoaches || []
     }
 

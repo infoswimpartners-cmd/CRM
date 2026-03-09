@@ -152,15 +152,32 @@ export function StripeManager({ studentId, stripeCustomerId, paymentMethodStatus
                             </p>
                         </div>
 
-                        <div className="text-xs text-slate-400 font-mono text-center flex justify-center items-center gap-2 group">
-                            ID: {stripeCustomerId}
-                            <button
-                                onClick={() => setIsManualMode(true)}
-                                className="text-slate-400 hover:text-indigo-600 transition-all p-1"
-                                title="IDを手動編集"
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 bg-slate-50/50 border border-slate-100 rounded-xl">
+                            <div className="flex flex-col gap-1 items-center sm:items-start overflow-hidden">
+                                <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400">Stripe Customer ID</span>
+                                <div className="flex items-center gap-1.5 group">
+                                    <span className="text-xs font-mono text-slate-600 truncate max-w-[140px] sm:max-w-none">
+                                        {stripeCustomerId}
+                                    </span>
+                                    <button
+                                        onClick={() => setIsManualMode(true)}
+                                        className="text-slate-300 hover:text-indigo-600 transition-all p-1 rounded-full hover:bg-white"
+                                        title="IDを手動編集"
+                                    >
+                                        <Pencil className="w-3 h-3" />
+                                    </button>
+                                </div>
+                            </div>
+
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 px-3 text-xs text-slate-600 border-slate-200 hover:bg-white hover:text-indigo-600 hover:border-indigo-200 shadow-sm transition-all"
+                                onClick={() => window.open(`https://dashboard.stripe.com/customers/${stripeCustomerId}`, '_blank')}
                             >
-                                <Pencil className="w-4 h-4" />
-                            </button>
+                                <ExternalLink className="w-3 h-3 mr-1.5" />
+                                管理画面
+                            </Button>
                         </div>
                     </div >
                 )
