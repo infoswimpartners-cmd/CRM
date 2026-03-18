@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { createClient } from '@/lib/supabase/client'
 import { ChevronDownIcon, AlertTriangle } from 'lucide-react'
 import {
     Select,
@@ -29,23 +30,8 @@ interface StudentStatusSelectProps {
     currentStatus: string
 }
 
-export const statusLabels: Record<string, string> = {
-    trial_pending: '体験予定',
-    trial_confirmed: '体験確定',
-    trial_done: '体験受講済',
-    active: '会員',
-    resting: '休会中',
-    withdrawn: '退会'
-}
+// statusLabels and statusColors are now handled dynamically via state fetched from DB
 
-export const statusColors: Record<string, string> = {
-    trial_pending: 'bg-gray-100 text-gray-800',
-    trial_confirmed: 'bg-blue-100 text-blue-800',
-    trial_done: 'bg-purple-100 text-purple-800',
-    active: 'bg-green-100 text-green-800',
-    resting: 'bg-gray-200 text-gray-600',
-    withdrawn: 'bg-red-100 text-red-800'
-}
 
 export function StudentStatusSelect({ studentId, currentStatus }: StudentStatusSelectProps) {
     const [status, setStatus] = useState(currentStatus || 'trial_pending')
@@ -53,11 +39,26 @@ export function StudentStatusSelect({ studentId, currentStatus }: StudentStatusS
     const [mounted, setMounted] = useState(false)
     const [isDialogOpen, setIsDialogOpen] = useState(false)
     const [pendingStatus, setPendingStatus] = useState<string | null>(null)
+    const [statuses, setStatuses] = useState<any[]>([])
     const router = useRouter()
+    const supabase = createClient()
 
     useEffect(() => {
         setMounted(true)
+        fetchStatuses()
     }, [])
+
+    const fetchStatuses = async () => {
+        const { data } = await supabase
+            .from('student_statuses')
+            .select('*')
+            .order('display_order', { ascending: true })
+        if (data) setStatuses(data)
+    }
+
+    const getStatusLabel = (id: string) => statuses.find(s => s.id === id)?.name || id
+    const getStatusColor = (id: string) => statuses.find(s => s.id === id)?.color_class || 'bg-gray-100 text-gray-800'
+
 
     const handleSelectChange = (newStatus: string) => {
         if (newStatus === status) return
@@ -77,7 +78,7 @@ export function StudentStatusSelect({ studentId, currentStatus }: StudentStatusS
             if (!result.success) throw new Error(result.error)
 
             setStatus(newStatus)
-            const label = statusLabels[newStatus] || newStatus
+            const label = getStatusLabel(newStatus)
 
             if (newStatus === 'withdrawn') {
                 toast.warning(`ステータスを「${label}」に変更しました。課金は停止されました。`)
@@ -94,21 +95,21 @@ export function StudentStatusSelect({ studentId, currentStatus }: StudentStatusS
         }
     }
 
-    if (!mounted) {
+    if (!mounted || statuses.length === 0) {
         return (
             <div
                 className={cn(
                     "w-[140px] h-7 text-xs font-medium border-0 shadow-none focus:ring-0 flex items-center justify-between px-3 rounded-md pointer-events-none opacity-50",
-                    statusColors[status] || 'bg-gray-100'
+                    getStatusColor(status)
                 )}
             >
-                <span className="truncate">{statusLabels[status]}</span>
+                <span className="truncate">{getStatusLabel(status)}</span>
                 <ChevronDownIcon className="size-4 opacity-50" />
             </div>
         )
     }
 
-    const pendingLabel = pendingStatus ? statusLabels[pendingStatus] : ''
+    const pendingLabel = pendingStatus ? getStatusLabel(pendingStatus) : ''
 
     return (
         <>
@@ -120,15 +121,15 @@ export function StudentStatusSelect({ studentId, currentStatus }: StudentStatusS
                 <SelectTrigger
                     className={cn(
                         "w-[140px] h-7 text-xs font-medium border-0 shadow-none focus:ring-0",
-                        statusColors[status] || 'bg-gray-100'
+                        getStatusColor(status)
                     )}
                 >
                     <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                    {Object.entries(statusLabels).map(([key, label]) => (
-                        <SelectItem key={key} value={key}>
-                            {label}
+                    {statuses.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                            {s.name}
                         </SelectItem>
                     ))}
                 </SelectContent>
@@ -144,7 +145,7 @@ export function StudentStatusSelect({ studentId, currentStatus }: StudentStatusS
                         <AlertDialogDescription asChild>
                             <div className="space-y-3 text-sm text-muted-foreground">
                                 <p>
-                                    生徒のステータスを <span className="font-bold text-slate-900">「{statusLabels[status]}」</span> から
+                                    生徒のステータスを <span className="font-bold text-slate-900">「{getStatusLabel(status)}」</span> から
                                     <span className="font-bold text-indigo-600">「{pendingLabel}」</span> に変更しますか？
                                 </p>
                                 {pendingStatus === 'withdrawn' && (

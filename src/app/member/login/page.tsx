@@ -5,45 +5,30 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import Link from 'next/link';
 import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { Loader2, KeyRound, Mail, UserPlus, Eye, EyeOff } from 'lucide-react';
+import { login } from './actions';
+import { useActionState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+
+const initialState = {
+    error: '',
+};
 
 export default function MemberLoginPage() {
-    const [loading, setLoading] = useState(false);
+    const [state, formAction, isPending] = useActionState(login, initialState);
     const [showPassword, setShowPassword] = useState(false);
+    const router = useRouter();
 
-    const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-        setLoading(true);
-        const formData = new FormData(e.currentTarget);
-        const email = formData.get('email') as string;
-        const password = formData.get('password') as string;
-
-        try {
-            const supabase = createClient();
-            const { error } = await supabase.auth.signInWithPassword({
-                email,
-                password,
-            });
-
-            if (error) {
-                if (error.message === 'Invalid login credentials') {
-                    throw new Error('メールアドレスまたはパスワードが正しくありません');
-                }
-                throw error;
-            }
-
-            // ログイン成功
-            window.location.href = '/member/dashboard';
-        } catch (error: any) {
-            console.error('Login error:', error);
-            toast.error(error.message || 'ログインに失敗しました');
-            setLoading(false);
+    useEffect(() => {
+        if (state?.error) {
+            toast.error(state.error);
         }
-    };
+    }, [state?.error]);
 
     return (
         <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center p-4">
@@ -64,7 +49,7 @@ export default function MemberLoginPage() {
                     </div>
                 </CardHeader>
                 <CardContent className="px-8 pb-10 space-y-8">
-                    <form onSubmit={handleLogin} className="space-y-5">
+                    <form action={formAction} className="space-y-5">
                         <div className="space-y-2">
                             <Label htmlFor="email" className="text-xs font-bold text-blue-900/40 ml-1 uppercase tracking-widest">メールアドレス</Label>
                             <div className="relative">
@@ -104,8 +89,23 @@ export default function MemberLoginPage() {
                             </div>
                         </div>
 
-                        <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black h-14 rounded-2xl text-lg shadow-lg shadow-blue-200 active:scale-[0.98] transition-all mt-4" disabled={loading}>
-                            {loading ? <Loader2 className="animate-spin h-6 w-6" /> : "ログインする"}
+                        <div className="flex items-center space-x-2 ml-1">
+                            <Checkbox
+                                id="remember"
+                                name="remember"
+                                value="true"
+                                className="border-blue-100 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                            />
+                            <Label
+                                htmlFor="remember"
+                                className="text-sm font-medium text-blue-900/60 cursor-pointer"
+                            >
+                                ログイン状態を維持する
+                            </Label>
+                        </div>
+
+                        <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black h-14 rounded-2xl text-lg shadow-lg shadow-blue-200 active:scale-[0.98] transition-all mt-2" disabled={isPending}>
+                            {isPending ? <Loader2 className="animate-spin h-6 w-6" /> : "ログインする"}
                         </Button>
                     </form>
 

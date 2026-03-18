@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback, startTransition } from 'react'
-import { EmailTemplate, EmailTrigger, updateEmailTemplate, deleteEmailTemplate, addEmailTemplate, reorderEmailTemplates, updateEmailTrigger } from '@/actions/email-template'
+import { EmailTemplate, EmailTrigger, updateEmailTemplate, deleteEmailTemplate, addEmailTemplate, reorderEmailTemplates, updateEmailTrigger, updateLessonMasterEmailTemplate, duplicateEmailTemplate } from '@/actions/email-template'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -9,11 +9,12 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
-import { Loader2, Mail, Save, Trash2, SlidersHorizontal, Settings2, GripVertical, MessageSquare, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react'
+import { Loader2, Mail, Save, Trash2, SlidersHorizontal, Settings2, GripVertical, MessageSquare, ChevronDown, ChevronUp, ExternalLink, Copy } from 'lucide-react'
 import { TestEmailDialog } from './TestEmailDialog'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
 
 // Dnd Kit Imports
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core'
@@ -120,12 +121,17 @@ const TRIGGER_VARIABLES: Record<string, { key: string; label: string }[]> = {
     ],
 }
 
-export function EmailTemplateManager({ templates, triggers }: { templates: EmailTemplate[], triggers: EmailTrigger[] }) {
+export interface TrialMaster { id: string; name: string; email_template_id: string | null }
+
+export function EmailTemplateManager({ templates, triggers, trialMasters = [] }: { templates: EmailTemplate[], triggers: EmailTrigger[], trialMasters?: TrialMaster[] }) {
     const [templatesList, setTemplatesList] = useState(templates)
     useEffect(() => { setTemplatesList(templates) }, [templates])
 
     const [triggersList, setTriggersList] = useState(triggers)
     useEffect(() => { setTriggersList(triggers) }, [triggers])
+
+    const [trialMastersList, setTrialMastersList] = useState(trialMasters)
+    useEffect(() => { setTrialMastersList(trialMasters) }, [trialMasters])
 
     // SSR/クライアントのハイドレーション不一致を防ぐためのフラグ（dnd-kit用）
     const [isMounted, setIsMounted] = useState(false)
@@ -150,10 +156,14 @@ export function EmailTemplateManager({ templates, triggers }: { templates: Email
     const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate | null>(templates[0] || null)
     const [subject, setSubject] = useState(templates[0]?.subject || '')
     const [body, setBody] = useState(templates[0]?.body || '')
+    const [templateKey, setTemplateKey] = useState(templates[0]?.key || '')
+    const [description, setDescription] = useState(templates[0]?.description || '')
     const [isApprovalRequired, setIsApprovalRequired] = useState(templates[0]?.is_approval_required || false)
     const [isAutoSendEnabled, setIsAutoSendEnabled] = useState(templates[0]?.is_auto_send_enabled ?? true)
     const [isSaving, setIsSaving] = useState(false)
     const [isDeleting, setIsDeleting] = useState(false)
+    const [isDuplicating, setIsDuplicating] = useState(false)
+    const [isHeaderEditOpen, setIsHeaderEditOpen] = useState(false)
 
     // 新規作成
     const [isCreating, setIsCreating] = useState(false)
@@ -222,6 +232,8 @@ export function EmailTemplateManager({ templates, triggers }: { templates: Email
         setSelectedTemplate(tmpl)
         setSubject(tmpl.subject)
         setBody(tmpl.body)
+        setTemplateKey(tmpl.key)
+        setDescription(tmpl.description || '')
         setIsApprovalRequired(tmpl.is_approval_required || false)
         setIsAutoSendEnabled(tmpl.is_auto_send_enabled ?? true)
         savedSelection.current = { field: 'body', start: 0, end: 0 }
@@ -231,10 +243,10 @@ export function EmailTemplateManager({ templates, triggers }: { templates: Email
         if (!selectedTemplate) return
         setIsSaving(true)
         try {
-            await updateEmailTemplate(selectedTemplate.id, subject, body, isApprovalRequired, isAutoSendEnabled)
+            await updateEmailTemplate(selectedTemplate.id, subject, body, isApprovalRequired, isAutoSendEnabled, templateKey, description)
             toast({ title: '保存しました', description: 'メールテンプレートを更新しました。' })
             setTemplatesList(prev => prev.map(t => t.id === selectedTemplate.id
-                ? { ...t, subject, body, is_approval_required: isApprovalRequired, is_auto_send_enabled: isAutoSendEnabled }
+                ? { ...t, subject, body, is_approval_required: isApprovalRequired, is_auto_send_enabled: isAutoSendEnabled, key: templateKey, description }
                 : t))
         } catch {
             toast({ title: 'エラー', description: '保存に失敗しました。', variant: 'destructive' })
@@ -256,6 +268,31 @@ export function EmailTemplateManager({ templates, triggers }: { templates: Email
             toast({ title: 'エラー', description: '削除に失敗しました。', variant: 'destructive' })
         } finally {
             setIsDeleting(false)
+        }
+    }
+
+    const handleDuplicate = async () => {
+        if (!selectedTemplate) return
+        setIsDuplicating(true)
+        try {
+            const newTemplate = await duplicateEmailTemplate(selectedTemplate.id)
+            toast({ title: '複製しました', description: 'テンプレートをコピーしました。' })
+            setTemplatesList(prev => [...prev, newTemplate])
+            setSelectedTemplate(newTemplate)
+            setSubject(newTemplate.subject)
+            setBody(newTemplate.body)
+            setTemplateKey(newTemplate.key)
+            setDescription(newTemplate.description || '')
+            setIsApprovalRequired(newTemplate.is_approval_required || false)
+            setIsAutoSendEnabled(newTemplate.is_auto_send_enabled ?? true)
+        } catch (error: any) {
+            toast({
+                title: '複製エラー',
+                description: error.message,
+                variant: 'destructive',
+            })
+        } finally {
+            setIsDuplicating(false)
         }
     }
 
@@ -300,6 +337,16 @@ export function EmailTemplateManager({ templates, triggers }: { templates: Email
             await updateEmailTrigger(id, template_id, is_enabled)
             setTriggersList(prev => prev.map(t => t.id === id ? { ...t, template_id, is_enabled } : t))
             toast({ title: '保存しました', description: '自動送信ロジックを更新しました。' })
+        } catch {
+            toast({ title: 'エラー', description: '更新に失敗しました。', variant: 'destructive' })
+        }
+    }
+
+    const handleTrialMasterUpdate = async (id: string, email_template_id: string | null) => {
+        try {
+            await updateLessonMasterEmailTemplate(id, email_template_id)
+            setTrialMastersList(prev => prev.map(m => m.id === id ? { ...m, email_template_id } : m))
+            toast({ title: '保存しました', description: '体験レッスンプランのメール設定を更新しました。' })
         } catch {
             toast({ title: 'エラー', description: '更新に失敗しました。', variant: 'destructive' })
         }
@@ -460,14 +507,77 @@ export function EmailTemplateManager({ templates, triggers }: { templates: Email
                         {selectedTemplate ? (
                             <div className="flex flex-col h-full gap-3">
                                 {/* ヘッダー：テンプレート名・ボタン群 */}
-                                <div className="flex-none flex items-center justify-between bg-gray-50/70 border border-gray-200 rounded-lg px-4 py-2.5">
-                                    <div className="flex items-center gap-2 min-w-0">
-                                        <Settings2 className="w-4 h-4 text-gray-500 flex-none" />
-                                        <span className="font-semibold text-gray-800 truncate">{selectedTemplate.subject || 'テンプレート設定'}</span>
-                                        <code className="text-[11px] bg-gray-200 px-1.5 py-0.5 rounded text-gray-500 flex-none">{selectedTemplate.key}</code>
+                                <div className="flex-none flex flex-col lg:flex-row lg:items-center justify-between bg-gray-50/70 border border-gray-200 rounded-lg px-4 py-2 gap-3">
+                                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                                        <Mail className="w-4 h-4 text-cyan-600 flex-none" />
+
+                                        <Dialog open={isHeaderEditOpen} onOpenChange={setIsHeaderEditOpen}>
+                                            <DialogTrigger asChild>
+                                                <div className="flex items-center gap-1.5 flex-1 min-w-0 cursor-pointer hover:bg-white/50 p-1 rounded transition-colors group">
+                                                    <div className="h-7 text-[10px] font-mono px-2 py-0.5 w-auto max-w-[160px] bg-gray-100 border border-gray-200 rounded text-gray-500 truncate flex-none group-hover:border-cyan-200">
+                                                        {templateKey}
+                                                    </div>
+                                                    <span className="text-gray-300 flex-none">/</span>
+                                                    <div className="h-7 text-sm font-semibold truncate flex-1 min-w-0 group-hover:text-cyan-700">
+                                                        {subject || '名称未設定'}
+                                                    </div>
+                                                    <Settings2 className="w-3 h-3 text-gray-300 group-hover:text-cyan-500 flex-none ml-1" />
+                                                </div>
+                                            </DialogTrigger>
+                                            <DialogContent className="sm:max-w-[500px]">
+                                                <DialogHeader>
+                                                    <DialogTitle>テンプレート名の変更</DialogTitle>
+                                                    <DialogDescription>
+                                                        キー名と件名を編集できます。キー名はシステム識別子として使用されます。
+                                                    </DialogDescription>
+                                                </DialogHeader>
+                                                <div className="grid gap-4 py-4">
+                                                    <div className="grid gap-2">
+                                                        <Label htmlFor="key" className="text-xs text-gray-500">キー（システムID）</Label>
+                                                        <Input
+                                                            id="key"
+                                                            value={templateKey}
+                                                            onChange={e => setTemplateKey(e.target.value)}
+                                                            className="font-mono text-xs"
+                                                            placeholder="例: lesson_reminder"
+                                                        />
+                                                    </div>
+                                                    <div className="grid gap-2">
+                                                        <Label htmlFor="subject" className="text-xs text-gray-500">件名（タイトル）</Label>
+                                                        <Input
+                                                            id="subject"
+                                                            value={subject}
+                                                            onChange={e => setSubject(e.target.value)}
+                                                            placeholder="メールのタイトル"
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <DialogFooter>
+                                                    <Button variant="outline" onClick={() => setIsHeaderEditOpen(false)}>キャンセル</Button>
+                                                    <Button
+                                                        onClick={async () => {
+                                                            if (!selectedTemplate) return;
+                                                            try {
+                                                                await updateEmailTemplate(selectedTemplate.id, subject, body, isApprovalRequired, isAutoSendEnabled, templateKey, description);
+                                                                setTemplatesList(prev => prev.map(t => t.id === selectedTemplate.id
+                                                                    ? { ...t, key: templateKey, subject, description }
+                                                                    : t));
+                                                                toast({ title: '保存しました', description: 'テンプレート名を更新しました。' });
+                                                                setIsHeaderEditOpen(false);
+                                                            } catch (e: any) {
+                                                                toast({ title: 'エラー', description: e.message || '保存に失敗しました。', variant: 'destructive' });
+                                                            }
+                                                        }}
+                                                        className="bg-cyan-600 hover:bg-cyan-700"
+                                                    >
+                                                        変更を保存
+                                                    </Button>
+                                                </DialogFooter>
+                                            </DialogContent>
+                                        </Dialog>
                                     </div>
-                                    <div className="flex gap-2 flex-none">
-                                        <Button onClick={handleDelete} disabled={isDeleting} variant="destructive" size="icon" className="w-8 h-8">
+                                    <div className="flex items-center gap-1.5 flex-none overflow-x-auto pb-1 sm:pb-0">
+                                        <Button onClick={handleDelete} disabled={isDeleting} variant="destructive" size="icon" className="w-8 h-8 flex-none" title="削除">
                                             {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                                         </Button>
                                         <TestEmailDialog
@@ -477,28 +587,28 @@ export function EmailTemplateManager({ templates, triggers }: { templates: Email
                                             triggers={triggersList}
                                             templateId={selectedTemplate.id}
                                         />
-                                        <Button onClick={handleSave} disabled={isSaving} size="sm" className="bg-cyan-600 hover:bg-cyan-700">
-                                            {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <Save className="w-3.5 h-3.5 mr-1.5" />}
+                                        <Button onClick={handleDuplicate} disabled={isDuplicating} variant="outline" size="icon" className="w-8 h-8 flex-none" title="複製">
+                                            {isDuplicating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Copy className="w-3.5 h-3.5" />}
+                                        </Button>
+                                        <Button onClick={handleSave} disabled={isSaving} size="sm" className="bg-cyan-600 hover:bg-cyan-700 h-8 px-3 flex-none">
+                                            {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Save className="w-3.5 h-3.5 mr-1" />}
                                             保存
                                         </Button>
                                     </div>
                                 </div>
 
-                                {/* 件名 + トグル群 */}
+                                {/* 説明 + 件名 + トグル群 */}
                                 <div className="flex-none space-y-2.5">
-                                    <div className="flex items-center gap-3">
-                                        <Label className="w-10 flex-none text-sm">件名</Label>
-                                        <Input
-                                            ref={subjectRef}
-                                            value={subject}
-                                            onChange={e => setSubject(e.target.value)}
-                                            onFocus={saveSubjectSelection}
-                                            onKeyUp={saveSubjectSelection}
-                                            onMouseUp={saveSubjectSelection}
-                                            onClick={saveSubjectSelection}
-                                            className="flex-1 font-medium"
-                                            placeholder="件名を入力..."
-                                        />
+                                    <div className="space-y-1.5">
+                                        <div className="flex items-center gap-3">
+                                            <Label className="w-10 flex-none text-xs text-gray-500">説明</Label>
+                                            <Input
+                                                value={description}
+                                                onChange={e => setDescription(e.target.value)}
+                                                className="flex-1 h-8 text-sm bg-white"
+                                                placeholder="このテンプレートの用途（例：体験レッスン予約確定メール）"
+                                            />
+                                        </div>
                                     </div>
                                     {/* 自動送信 / 承認フロー */}
                                     <div className="flex gap-3">
@@ -706,6 +816,42 @@ export function EmailTemplateManager({ templates, triggers }: { templates: Email
                             </div>
                         )
                     })}
+
+                    {/* 体験レッスンプラン別設定 */}
+                    <div className="flex-none mb-4 mt-8 pt-6 border-t border-gray-200">
+                        <h2 className="text-lg font-semibold flex items-center gap-2">
+                            <SlidersHorizontal className="w-5 h-5 text-indigo-600" />
+                            体験レッスンプラン別メール設定
+                        </h2>
+                        <p className="text-sm text-gray-500 mt-1">
+                            各種体験レッスンの予約確定時に、個別のメールテンプレートを送信するように設定できます。未設定の場合は、標準の「体験レッスンが予約された時」のメールが送られます。
+                        </p>
+                    </div>
+                    {trialMastersList.map(master => (
+                        <div key={master.id} className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                                <span className="font-semibold text-gray-900 text-sm">{master.name}</span>
+                            </div>
+                            <div className="flex items-center gap-2 flex-wrap flex-none">
+                                <Select
+                                    value={master.email_template_id || 'none'}
+                                    onValueChange={val => handleTrialMasterUpdate(master.id, val === 'none' ? null : val)}
+                                >
+                                    <SelectTrigger className="w-[300px] bg-white border-gray-300 text-sm h-8">
+                                        <SelectValue placeholder="メールを選択..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none" className="text-gray-400 italic">-- 標準の予約自動返信を利用 --</SelectItem>
+                                        {templatesList.map(tmpl => (
+                                            <SelectItem key={tmpl.id} value={tmpl.id}>
+                                                {tmpl.subject} ({tmpl.key})
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                    ))}
                 </div>
             </TabsContent>
         </Tabs>

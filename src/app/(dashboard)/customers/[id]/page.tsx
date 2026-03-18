@@ -8,7 +8,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { ChevronLeft } from 'lucide-react'
 import { StudentCoachAssigner } from '@/components/admin/StudentCoachAssigner'
-import { StudentStatusSelect, statusLabels, statusColors } from '@/components/admin/StudentStatusSelect'
+import { StudentStatusSelect } from '@/components/admin/StudentStatusSelect'
 import { TrialConfirmButton } from '@/components/admin/TrialConfirmButton'
 import { StripeManager } from '@/components/admin/students/StripeManager'
 import { getStripeCustomerStatus } from '@/actions/stripe'
@@ -63,11 +63,30 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
         .in('role', ['coach', 'admin', 'owner'])
         .order('full_name')
 
+    // Fetch Trial Masters
+    const { data: trialMasters } = await supabase
+        .from('lesson_masters')
+        .select('id, name, unit_price, email_template_id')
+        .eq('is_trial', true)
+        .eq('active', true)
+        .order('display_order', { ascending: true })
+
     // Fetch Stripe Status
     let paymentMethodStatus = null
     if (student.stripe_customer_id) {
         paymentMethodStatus = await getStripeCustomerStatus(student.stripe_customer_id)
     }
+
+    // Fetch Student Status Master
+    const { data: studentStatusMasters } = await supabase
+        .from('student_statuses')
+        .select('id, name, color_class')
+    const statusLabels: Record<string, string> = {}
+    const statusColors: Record<string, string> = {}
+    studentStatusMasters?.forEach((s) => {
+        statusLabels[s.id] = s.name
+        statusColors[s.id] = s.color_class
+    })
 
     // Fetch All Assigned Coaches
     const { data: assignedCoaches } = await supabase
@@ -123,6 +142,7 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
                             studentName={student.full_name}
                             coaches={coaches || []}
                             assignedCoachId={student.coach_id}
+                            trialMasters={trialMasters || []}
                         />
                         <Button variant="outline" asChild>
                             <Link href={`/customers/${student.id}/edit`}>

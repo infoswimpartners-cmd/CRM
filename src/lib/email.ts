@@ -169,7 +169,7 @@ ${text}
             return false
         }
     }
-    async sendTriggerEmail(triggerId: string, to: string, variables: Record<string, string>): Promise<boolean> {
+    async sendTriggerEmail(triggerId: string, to: string, variables: Record<string, string>, overrideTemplate?: { subject: string, body: string }): Promise<boolean> {
         try {
             const supabase = createAdminClient()
             const { data: trigger, error: triggerError } = await supabase
@@ -193,7 +193,25 @@ ${text}
             let renderedSubject = ''
             let renderedBody = ''
 
-            if (trigger.template_id) {
+            if (overrideTemplate) {
+                renderedSubject = overrideTemplate.subject
+                renderedBody = overrideTemplate.body
+
+                // 変数を置換
+                for (const [k, v] of Object.entries(variables)) {
+                    const regex = new RegExp(`\\{\\{\\s*${k}\\s*\\}\\}`, 'g')
+                    renderedSubject = renderedSubject.replace(regex, v)
+                    renderedBody = renderedBody.replace(regex, v)
+                }
+
+                // メール送信
+                await this.sendEmail({
+                    to,
+                    subject: renderedSubject,
+                    text: renderedBody,
+                    requireApproval: false, // Overrideの場合は一旦falseで送信（必要に応じて変更）
+                })
+            } else if (trigger.template_id) {
                 const { data: template, error: templateError } = await supabase
                     .from('email_templates')
                     .select('*')

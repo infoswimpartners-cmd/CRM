@@ -48,7 +48,7 @@ export function SortableEmailItem({ tmpl, isSelected, onClick }: Props) {
             <div className="flex-1 cursor-pointer" onClick={onClick}>
                 <div className="font-semibold text-gray-800 break-all">{tmpl.subject}</div>
                 <div className="flex items-center gap-2 mt-1 flex-wrap">
-                    <div className="text-xs text-gray-400 font-mono">{tmpl.key}</div>
+                    <div className="text-xs text-gray-400 font-mono break-all">{tmpl.key}</div>
                     {tmpl.is_approval_required && (
                         <Badge variant="secondary" className="text-[10px] px-1 py-0 bg-orange-100 text-orange-800 border-none">承認必須</Badge>
                     )}

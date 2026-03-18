@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import Image from 'next/image'
+import { Checkbox } from '@/components/ui/checkbox'
 
 const initialState = {
     error: '',
@@ -88,6 +89,21 @@ export default function LoginPage() {
                                 </Button>
                             </div>
                         </div>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                        <Checkbox
+                            id="remember"
+                            name="remember"
+                            value="true"
+                            className="border-slate-300 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                        />
+                        <Label
+                            htmlFor="remember"
+                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-slate-500 cursor-pointer"
+                        >
+                            ログイン状態を維持する
+                        </Label>
                     </div>
 
                     {state?.error && (

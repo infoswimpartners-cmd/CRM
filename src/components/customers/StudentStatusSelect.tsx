@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
     Select,
@@ -18,28 +18,25 @@ interface Props {
     compact?: boolean
 }
 
-const statusLabels: Record<string, string> = {
-    inquiry: '問合せ対応中',
-    trial_pending: '体験予定',
-    trial_done: '体験受講済',
-    active: '会員',
-    resting: '休会中',
-    withdrawn: '退会'
-}
-
-const statusColors: Record<string, string> = {
-    inquiry: 'bg-orange-100 text-orange-800 hover:bg-orange-200',
-    trial_pending: 'bg-gray-100 text-gray-800 hover:bg-gray-200',
-    trial_done: 'bg-purple-100 text-purple-800 hover:bg-purple-200',
-    active: 'bg-green-100 text-green-800 hover:bg-green-200',
-    resting: 'bg-gray-200 text-gray-600 hover:bg-gray-300',
-    withdrawn: 'bg-red-100 text-red-800 hover:bg-red-200'
-}
-
 export function StudentStatusSelect({ studentId, initialStatus, compact = false }: Props) {
     const [status, setStatus] = useState(initialStatus || 'trial_pending')
     const [loading, setLoading] = useState(false)
+    const [statuses, setStatuses] = useState<any[]>([])
     const supabase = createClient()
+
+    useEffect(() => {
+        const fetchStatuses = async () => {
+            const { data } = await supabase
+                .from('student_statuses')
+                .select('*')
+                .order('display_order', { ascending: true })
+            if (data) setStatuses(data)
+        }
+        fetchStatuses()
+    }, [])
+
+    const currentStatusConfig = statuses.find(s => s.id === status)
+    const displayColor = currentStatusConfig?.color_class || 'bg-gray-100 text-gray-800'
 
     const handleStatusChange = async (newStatus: string) => {
         setLoading(true)
@@ -72,7 +69,7 @@ export function StudentStatusSelect({ studentId, initialStatus, compact = false 
             <SelectTrigger
                 className={cn(
                     "h-7 text-xs border-0 rounded-full font-medium transition-colors focus:ring-0 focus:ring-offset-0 px-3",
-                    statusColors[status],
+                    displayColor,
                     compact && "h-6 px-2"
                 )}
             >
@@ -81,9 +78,9 @@ export function StudentStatusSelect({ studentId, initialStatus, compact = false 
                 </div>
             </SelectTrigger>
             <SelectContent>
-                {Object.entries(statusLabels).map(([key, label]) => (
-                    <SelectItem key={key} value={key}>
-                        {label}
+                {statuses.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                        {s.name}
                     </SelectItem>
                 ))}
             </SelectContent>

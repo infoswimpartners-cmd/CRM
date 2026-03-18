@@ -3,7 +3,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { stripe } from '@/lib/stripe'
 import { emailService } from '@/lib/email'
-import { format } from 'date-fns'
+import { format, addMinutes } from 'date-fns'
 import { revalidatePath } from 'next/cache'
 
 /**
@@ -191,7 +191,7 @@ export async function processLessonBilling(scheduleId: string, forceManualEmail:
                     student.contact_email,
                     {
                         name: student.full_name,
-                        lesson_date: format(lessonDate, 'yyyy/MM/dd HH:mm'),
+                        lesson_date: format(lessonDate, 'yyyy/MM/dd HH:mm') + '〜' + format(addMinutes(lessonDate, 60), 'HH:mm'),
                         amount: price.toLocaleString(),
                         payment_link: paymentUrl
                     }

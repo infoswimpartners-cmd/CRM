@@ -44,7 +44,9 @@ export async function updateEmailTemplate(
     subject: string,
     body: string,
     is_approval_required?: boolean,
-    is_auto_send_enabled?: boolean
+    is_auto_send_enabled?: boolean,
+    key?: string,
+    description?: string
 ) {
     const supabase = createAdminClient()
 
@@ -59,6 +61,12 @@ export async function updateEmailTemplate(
     }
     if (is_auto_send_enabled !== undefined) {
         updateData.is_auto_send_enabled = is_auto_send_enabled
+    }
+    if (key !== undefined) {
+        updateData.key = key
+    }
+    if (description !== undefined) {
+        updateData.description = description
     }
 
     const { error } = await supabase
@@ -105,10 +113,48 @@ export async function deleteEmailTemplate(id: string) {
         .delete()
         .eq('id', id)
 
-    if (error) throw new Error(error.message)
-
     revalidatePath('/admin/email-templates')
     return { success: true }
+}
+
+export async function duplicateEmailTemplate(id: string) {
+    const supabase = createAdminClient()
+
+    // 元のテンプレートを取得
+    const { data: original, error: fetchError } = await supabase
+        .from('email_templates')
+        .select('*')
+        .eq('id', id)
+        .single()
+
+    if (fetchError || !original) throw new Error('Original template not found')
+
+    // 複製データを作成
+    // keyは一意である必要があるため、タイムスタンプを付与するなどの工夫が必要
+    const newKey = `${original.key}_copy_${Date.now().toString().slice(-4)}`
+    const { error: insertError } = await supabase
+        .from('email_templates')
+        .insert({
+            key: newKey,
+            subject: `${original.subject} (コピー)`,
+            body: original.body,
+            description: original.description || '',
+            variables: original.variables || [],
+            is_auto_send_enabled: original.is_auto_send_enabled,
+            is_approval_required: original.is_approval_required,
+            sort_order: (original.sort_order || 0) + 1
+        })
+
+    const { data: newTemplate, error: selectError } = await supabase
+        .from('email_templates')
+        .select('*')
+        .eq('key', newKey)
+        .single()
+
+    if (selectError || !newTemplate) throw new Error('Failed to retrieve duplicated template')
+
+    revalidatePath('/admin/email-templates')
+    return newTemplate as EmailTemplate
 }
 
 export async function reorderEmailTemplates(updates: { id: string; sort_order: number }[]) {
@@ -189,6 +235,18 @@ export async function updateEmailTrigger(
     const { error } = await supabase
         .from('email_triggers')
         .update(updateData)
+        .eq('id', id)
+
+    if (error) throw new Error(error.message)
+    revalidatePath('/admin/email-templates')
+    return { success: true }
+}
+
+export async function updateLessonMasterEmailTemplate(id: string, email_template_id: string | null) {
+    const supabase = createAdminClient()
+    const { error } = await supabase
+        .from('lesson_masters')
+        .update({ email_template_id })
         .eq('id', id)
 
     if (error) throw new Error(error.message)

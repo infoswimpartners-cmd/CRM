@@ -219,6 +219,25 @@ async function CoachDashboardContent({ userId, profile }: { userId: string, prof
     // Calculate Lesson Diff
     const lessonDiff = thisMonthStats.lessonCount - lastMonthStats.lessonCount
 
+    // 6. Fetch Tax Settings for this coach
+    const { data: taxConfig } = await supabase
+        .from('app_configs')
+        .select('value')
+        .eq('key', `coach_tax:${userId}`)
+        .single()
+
+    let taxEnabled = true
+    if (taxConfig) {
+        try {
+            const taxInfo = JSON.parse(taxConfig.value)
+            if (taxInfo.enabled === false) taxEnabled = false
+        } catch { }
+    }
+
+    // 確定までお待ちください の表示はそのままに、源泉徴収分を差し引いた額を計算
+    const withholdingTax = taxEnabled ? Math.floor(thisMonthStats.totalReward * 0.1021) : 0
+    const netReward = thisMonthStats.totalReward - withholdingTax
+
     // Recent Lessons for Activity Widget
     const recentLessons = allLessons?.slice(0, 5) || []
 
@@ -250,9 +269,9 @@ async function CoachDashboardContent({ userId, profile }: { userId: string, prof
                     <Card className="border-none shadow-md bg-gradient-to-br from-cyan-500 to-blue-600 text-white relative overflow-hidden group">
                         <div className="absolute right-0 top-0 h-full w-24 bg-white/10 -skew-x-12 transform translate-x-12 transition-transform group-hover:translate-x-6" />
                         <CardContent className="p-6 relative z-10">
-                            <p className="text-blue-100 text-sm font-medium">報酬合計</p>
-                            <h3 className="text-2xl md:text-3xl font-bold mt-2">¥{thisMonthStats.totalReward.toLocaleString()}</h3>
-                            <p className="text-xs text-blue-100 mt-4 opacity-80">確定までお待ちください</p>
+                            <p className="text-blue-100 text-sm font-medium">報酬合計 (振込予定額)</p>
+                            <h3 className="text-2xl md:text-3xl font-bold mt-2">¥{netReward.toLocaleString()}</h3>
+                            <p className="text-xs text-blue-100 mt-4 opacity-80">確定までお待ちください (源泉徴収税引き後)</p>
                         </CardContent>
                         <DollarSign className="absolute right-4 bottom-4 text-white/20 w-24 h-24 -mb-8 -mr-8" />
                     </Card>

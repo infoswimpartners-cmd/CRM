@@ -14,7 +14,6 @@ import { StudentCounseling } from '@/components/customers/StudentCounseling'
 import { StudentLessonHistory } from '@/components/customers/StudentLessonHistory'
 import { createClient } from '@/lib/supabase/client'
 import { Loader2 } from 'lucide-react'
-import { statusLabels, statusColors } from '@/components/admin/StudentStatusSelect'
 import { cn } from '@/lib/utils'
 
 interface StudentDetailModalProps {
@@ -26,6 +25,26 @@ interface StudentDetailModalProps {
 export function StudentDetailModal({ student, isOpen, onOpenChange }: StudentDetailModalProps) {
     const [lessons, setLessons] = useState<any[]>([])
     const [loading, setLoading] = useState(false)
+    const [statusLabels, setStatusLabels] = useState<Record<string, string>>({})
+    const [statusColors, setStatusColors] = useState<Record<string, string>>({})
+
+    useEffect(() => {
+        const fetchStatuses = async () => {
+            const supabase = createClient()
+            const { data } = await supabase.from('student_statuses').select('id, name, color_class').order('display_order', { ascending: true })
+            if (data) {
+                const labels: Record<string, string> = {}
+                const colors: Record<string, string> = {}
+                data.forEach(s => {
+                    labels[s.id] = s.name
+                    colors[s.id] = s.color_class
+                })
+                setStatusLabels(labels)
+                setStatusColors(colors)
+            }
+        }
+        fetchStatuses()
+    }, [])
 
     useEffect(() => {
         if (isOpen && student) {

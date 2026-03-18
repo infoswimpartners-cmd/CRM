@@ -21,7 +21,7 @@ export async function login(prevState: any, formData: FormData) {
     const validation = loginSchema.safeParse({ email, password })
 
     if (!validation.success) {
-        return { error: 'Invalid inputs' }
+        return { error: '入力内容が正しくありません' }
     }
 
     const { data: { user }, error } = await supabase.auth.signInWithPassword({
@@ -30,31 +30,18 @@ export async function login(prevState: any, formData: FormData) {
     })
 
     if (error) {
+        if (error.message === 'Invalid login credentials') {
+            return { error: 'メールアドレスまたはパスワードが正しくありません' }
+        }
         return { error: error.message }
     }
 
-    // User is already available from signInWithPassword response
-
     if (!user) {
-        return redirect('/login')
+        return { error: 'ログインに失敗しました' }
     }
 
-    const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single()
-
-    const role = profile?.role || 'coach'
-
-    // Clear cache specifically for dashboard layouts to ensure fresh profile data
-    revalidatePath('/admin', 'layout')
-    revalidatePath('/coach', 'layout')
+    // Clear cache specifically for layouts to ensure fresh data
     revalidatePath('/member', 'layout')
 
-    if (role === 'admin') {
-        redirect('/admin')
-    } else {
-        redirect('/coach')
-    }
+    redirect('/member/dashboard')
 }

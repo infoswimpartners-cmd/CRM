@@ -21,6 +21,9 @@ export async function updateSession(request: NextRequest) {
                     return request.cookies.getAll()
                 },
                 setAll(cookiesToSet) {
+                    const rememberMeCookie = request.cookies.get('sb-remember-me')
+                    const isRememberMe = rememberMeCookie ? rememberMeCookie.value === 'true' : true
+
                     cookiesToSet.forEach(({ name, value, options }) =>
                         request.cookies.set(name, value)
                     )
@@ -29,9 +32,10 @@ export async function updateSession(request: NextRequest) {
                             headers: requestHeaders,
                         },
                     })
-                    cookiesToSet.forEach(({ name, value, options }) =>
-                        supabaseResponse.cookies.set(name, value, options)
-                    )
+                    cookiesToSet.forEach(({ name, value, options }) => {
+                        const finalOptions = isRememberMe ? options : { ...options, maxAge: undefined, expires: undefined };
+                        supabaseResponse.cookies.set(name, value, finalOptions)
+                    })
                 },
             },
         }

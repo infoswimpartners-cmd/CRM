@@ -45,6 +45,20 @@ export default async function FinancePage() {
         .select('target_month, status')
         .eq('coach_id', user.id)
 
+    const { data: taxConfig } = await supabase
+        .from('app_configs')
+        .select('value')
+        .eq('key', `coach_tax:${user.id}`)
+        .single()
+
+    let taxEnabled = true
+    if (taxConfig) {
+        try {
+            const taxInfo = JSON.parse(taxConfig.value)
+            if (taxInfo.enabled === false) taxEnabled = false
+        } catch { }
+    }
+
     // Calculate Reports
     const monthlyReports = []
     for (let i = 0; i < 9; i++) { // Fetch 9 months for finance page
@@ -67,10 +81,15 @@ export default async function FinancePage() {
 
         const stats = calculateMonthlyStats(user.id, monthLessons as any[], monthRate)
 
+        // Sync with admin dashboard (Net Reward calculation)
+        const withholdingTax = taxEnabled ? Math.floor(stats.totalReward * 0.1021) : 0
+        const netReward = stats.totalReward - withholdingTax
+
         monthlyReports.push({
             monthKey: format(d, 'yyyy-MM'),
             sales: stats.totalSales,
-            reward: stats.totalReward,
+            reward: netReward, // Show Net Reward to match admin/payments
+            grossReward: stats.totalReward,
             count: stats.lessonCount,
             rate: monthRate,
             details: stats.details

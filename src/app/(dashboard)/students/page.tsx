@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { MoreHorizontal, Filter, Search, Loader2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
-import { statusLabels, statusColors } from '@/components/admin/StudentStatusSelect'
+
 import { cn, calculateSchoolGrade } from '@/lib/utils'
 import { StudentDetailModal } from '@/components/students/StudentDetailModal'
 
@@ -20,6 +20,8 @@ export default function StudentsPage() {
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [user, setUser] = useState<any>(null)
     const [isCoach, setIsCoach] = useState(false)
+    const [statusLabels, setStatusLabels] = useState<Record<string, string>>({})
+    const [statusColors, setStatusColors] = useState<Record<string, string>>({})
 
     useEffect(() => {
         const init = async () => {
@@ -33,6 +35,19 @@ export default function StudentsPage() {
             const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
             const coachRole = profile?.role === 'coach'
             setIsCoach(coachRole)
+
+            // ステータスマスタ取得
+            const { data: statusData } = await supabase.from('student_statuses').select('id, name, color_class').order('display_order', { ascending: true })
+            if (statusData) {
+                const labels: Record<string, string> = {}
+                const colors: Record<string, string> = {}
+                statusData.forEach(s => {
+                    labels[s.id] = s.name
+                    colors[s.id] = s.color_class
+                })
+                setStatusLabels(labels)
+                setStatusColors(colors)
+            }
 
             await fetchStudents(user.id, coachRole)
         }

@@ -27,15 +27,7 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 
-const statusLabels: Record<string, string> = {
-    inquiry: '問合せ対応中',
-    trial_pending: '体験予定',
-    trial_confirmed: '体験確定',
-    trial_done: '体験受講済',
-    active: '会員',
-    resting: '休会中',
-    withdrawn: '退会'
-}
+// Dynamic status mapping is now handled in the component state
 
 interface Student {
     id: string
@@ -65,11 +57,25 @@ export default function StudentListPage() {
     const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'created_at', direction: 'desc' })
     const [loading, setLoading] = useState(true)
     const [isAdmin, setIsAdmin] = useState(false)
+    const [statusLabels, setStatusLabels] = useState<Record<string, string>>({})
 
     useEffect(() => {
         checkUserRole()
+        fetchStatuses()
         fetchStudents()
     }, [])
+
+    const fetchStatuses = async () => {
+        const supabase = createClient()
+        const { data } = await supabase.from('student_statuses').select('id, name').order('display_order', { ascending: true })
+        if (data) {
+            const labels = data.reduce((acc, s) => {
+                acc[s.id] = s.name
+                return acc
+            }, {} as Record<string, string>)
+            setStatusLabels(labels)
+        }
+    }
 
     const checkUserRole = async () => {
         const supabase = createClient()

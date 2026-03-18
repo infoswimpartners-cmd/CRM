@@ -1,13 +1,14 @@
 
 import { SupabaseClient } from '@supabase/supabase-js'
 import { startOfMonth, subMonths, format, endOfMonth } from 'date-fns'
+import { calculateCoachRate, calculateLessonReward, LessonData } from './reward-system'
 
 // Types for calculation
 export interface MonthlyRewardStats {
     month: string
     totalSales: number
     totalReward: number
-    baseAmount: number // 税抜
+    baseAmount: number // 税付（現在の仕様では総報酬額と同じ）
     consumptionTax: number // 消費税
     withholdingTax: number // 源泉徴収
     systemFee: number // システム手数料
@@ -30,17 +31,16 @@ interface LessonRewardDetail {
 }
 
 // Constants
-const RATE_TAX = 0 // 0.10 -> 0 (Internal Tax)
 const RATE_WITHHOLDING = 0.1021
-const SYSTEM_FEE_RATE = 0 // 0.05 -> 0
-const TRANSFER_FEE = 0 // 220 -> 0
+const SYSTEM_FEE_RATE = 0
+const TRANSFER_FEE = 0
 
 export async function calculateHistoricalPayments(
     supabase: SupabaseClient,
     coachId: string,
     monthsToLookBack: number = 12
 ): Promise<MonthlyRewardStats[]> {
-    // 1. Fetch Profile for created_at and invoice status (if added later)
+    // 1. Fetch Profile for created_at, override rank, etc.
     const { data: profile } = await supabase
         .from('profiles')
         .select('*')
@@ -48,12 +48,8 @@ export async function calculateHistoricalPayments(
         .single()
 
     const coachCreatedAt = profile?.created_at ? new Date(profile.created_at) : null
-    // Assuming invoices are registered if not specified, or we can add a flag later.
-    // For now, let's assume registered = true for calculation as per request?
-    // User request said "numbers are weird".
-    // In PaymentDetailDialog: `isInvoiceRegistered ? 10% : 0`
-    // Let's assume true for now or fetch from profile if we add that column.
-    const isInvoiceRegistered = true
+    const overrideRate = profile?.override_coach_rank
+    const isInvoiceRegistered = true // デフォルトでインボイス登録ありとして扱う（旧仕様との互換性）
 
     // 1.5 Fetch Tax Settings
     const { data: taxConfig } = await supabase
@@ -70,15 +66,25 @@ export async function calculateHistoricalPayments(
         } catch { }
     }
 
-    // 2. Fetch Lessons
-    const startDate = startOfMonth(subMonths(new Date(), monthsToLookBack + 3)) // +3 for rate calculation buffer
+    // 2. Fetch Lessons with all necessary fields for correct reward calculation
+    const startDate = startOfMonth(subMonths(new Date(), monthsToLookBack + 3))
 
     const { data: allLessons, error } = await supabase
         .from('lessons')
         .select(`
             id, price, lesson_date, coach_id,
             lesson_masters (id, unit_price, is_trial),
-            students (id, full_name, is_two_person_lesson, membership_types!students_membership_type_id_fkey (id, membership_type_lessons (lesson_master_id, reward_price)))
+            profiles ( distant_reward_fee ),
+            students (
+                id,
+                full_name,
+                is_two_person_lesson,
+                is_default_distant_option,
+                membership_types!students_membership_type_id_fkey (
+                    id,
+                    membership_type_lessons (lesson_master_id, reward_price)
+                )
+            )
         `)
         .gte('lesson_date', startDate.toISOString())
         .eq('coach_id', coachId)
@@ -87,6 +93,11 @@ export async function calculateHistoricalPayments(
         console.error('Error fetching lessons:', error)
         return []
     }
+
+    const { data: payouts } = await supabase
+        .from('payouts')
+        .select('target_month, status')
+        .eq('coach_id', coachId)
 
     const history: MonthlyRewardStats[] = []
     const today = new Date()
@@ -100,157 +111,102 @@ export async function calculateHistoricalPayments(
         }
 
         const monthEnd = endOfMonth(d)
-        const monthKey = format(d, 'yyyy-MM') // '2024-02'
-
-        // Display format: '2024年2月分'
+        const monthKey = format(d, 'yyyy-MM')
         const displayMonth = `${format(d, 'yyyy')}年${format(d, 'M')}月分`
 
-        // Calculate Rate
-        const rate = calculateCoachRate(coachId, allLessons || [], d)
+        // 1. Calculate Rate (Using reward-system.ts logic)
+        const rate = calculateCoachRate(coachId, (allLessons as any) as LessonData[] || [], d, overrideRate)
 
-        // Filter lessons for this month
+        // 2. Filter lessons for this month
         const monthLessons = (allLessons || []).filter(l => {
             const ld = new Date(l.lesson_date)
             return ld >= monthStart && ld <= monthEnd
         })
 
-        if (monthLessons.length === 0 && i > 0) continue // Skip empty past months
+        if (monthLessons.length === 0 && i > 0) continue
 
-        const stats = calculateMonthlyStats(monthLessons, rate)
+        // 3. Calculate Stats using correct lesson reward logic
+        let totalSales = 0
+        let totalReward = 0
+        const details: LessonRewardDetail[] = []
 
-        // Calculate final amounts
-        // Logic: Total Reward is Tax Inclusive
-        const totalTaxIncluded = stats.totalReward
+        monthLessons.forEach((rawL: any) => {
+            // Fix Supabase array-like join result to single objects
+            const l = {
+                ...rawL,
+                lesson_masters: Array.isArray(rawL.lesson_masters) ? rawL.lesson_masters[0] : rawL.lesson_masters,
+                students: Array.isArray(rawL.students) ? rawL.students[0] : rawL.students,
+                profiles: Array.isArray(rawL.profiles) ? rawL.profiles[0] : rawL.profiles
+            }
 
-        // 1. Separate Taxable and Non-Taxable
-        // Currently assuming all rewards are Taxable (Service). 
-        // Future: If we have separate travel expenses, separate them here.
+            // Also ensure membership_types inside students is handled if it's an array
+            if (l.students && Array.isArray(l.students.membership_types)) {
+                l.students.membership_types = l.students.membership_types[0]
+            }
+
+            const price = l.price || 0
+            const reward = calculateLessonReward(l, rate)
+
+            let title = l.lesson_masters?.is_trial ? '体験レッスン' : '通常レッスン'
+            if (l.lesson_masters && price > l.lesson_masters.unit_price) {
+                title += ' (施設利用料込)'
+            }
+            if (l.students?.is_default_distant_option) {
+                title += ' (遠方対応)'
+            }
+
+            totalSales += price
+            totalReward += reward
+            details.push({
+                date: l.lesson_date,
+                title: title,
+                studentName: l.students?.full_name || '',
+                price: price,
+                reward: reward
+            })
+        })
+
+        // 4. Tax Calculation (Synced with Admin View)
+        const totalTaxIncluded = totalReward
         const nonTaxableAmount = 0
         const taxableAmountIncluded = totalTaxIncluded - nonTaxableAmount
 
-        // 2. Extract Consumption Tax (Internal)
-        const taxRate = 0.10
-        // Base = Inclusive / 1.10
-        const taxableBase = isInvoiceRegistered ? Math.floor(taxableAmountIncluded / (1 + taxRate)) : taxableAmountIncluded
-        const consumptionTax = taxableAmountIncluded - taxableBase
+        // Logic Change: Taxable Base is now the full amount (no division by 1.1)
+        const taxableBase = taxableAmountIncluded
+        const consumptionTax = 0 // Admin view separates this as 0 when using gross as base
 
-        // 3. Withholding Tax
-        // Calculated on Tax Base (Excluding Consumption Tax)
         const withholdingTax = taxEnabled ? Math.floor(taxableBase * RATE_WITHHOLDING) : 0
-
         const systemFee = Math.floor(totalTaxIncluded * SYSTEM_FEE_RATE)
-
-        // Only apply transfer fee if there is a payment
         const transferFee = totalTaxIncluded > 0 ? TRANSFER_FEE : 0
 
         const finalAmount = totalTaxIncluded - withholdingTax - systemFee - transferFee
 
-        // Determine status and date
-        // Payment date is usually 25th of next month
+        // 5. Payment Date and Status
         const nextMonth = new Date(d.getFullYear(), d.getMonth() + 1, 25)
         const paymentDateStr = format(nextMonth, 'yyyy/MM/dd')
 
-        // Status: if next month 25th has passed, it is paid. Else processing.
-        const isPaid = today >= nextMonth || (today.getDate() >= 25 && today.getMonth() === nextMonth.getMonth() && today.getFullYear() === nextMonth.getFullYear())
-        const status = isPaid ? 'paid' : 'processing'
+        // Fetch actual status from payouts table if it exists
+        const payoutRecord = payouts?.find(p => p.target_month === monthKey)
+        const status = payoutRecord?.status === 'paid' ? 'paid' : (today >= nextMonth ? 'paid' : 'processing')
 
         history.push({
-            month: displayMonth, // or monthKey if client formats it
-            totalSales: stats.totalSales,
-            totalReward: stats.totalReward,
-            baseAmount: taxableBase, // This is now Taxable Base (Excluding Tax)
+            month: displayMonth,
+            totalSales,
+            totalReward,
+            baseAmount: taxableBase,
             consumptionTax,
             withholdingTax,
             systemFee,
             transferFee,
             finalAmount,
             rate,
-            lessonCount: stats.lessonCount,
-            details: stats.details,
-            status,
-            paymentDate: paymentDateStr,
+            lessonCount: monthLessons.length,
+            details,
+            status: status as 'paid' | 'processing',
+            paymentDate: payoutRecord?.status === 'paid' ? paymentDateStr : paymentDateStr, // Keep date as estimated for now
             invoiceRegistered: isInvoiceRegistered
         })
     }
 
     return history
-}
-
-function calculateCoachRate(coachId: string, allLessons: any[], referenceDate: Date): number {
-    const rankStart = startOfMonth(subMonths(referenceDate, 3))
-    const rankEnd = endOfMonth(subMonths(referenceDate, 1))
-
-    const pastLessons = allLessons.filter(l =>
-        new Date(l.lesson_date) >= rankStart &&
-        new Date(l.lesson_date) <= rankEnd
-    )
-
-    const average = pastLessons.length / 3
-
-    if (average >= 30) return 0.70
-    else if (average >= 25) return 0.65
-    else if (average >= 20) return 0.60
-    else if (average >= 15) return 0.55
-    else return 0.50
-}
-
-function calculateLessonReward(lesson: any, rate: number): number {
-    const master = lesson.lesson_masters
-    const membership = lesson.students?.membership_types
-
-    if (!master) return 0
-
-    let facilityFee = 0;
-    if (typeof lesson.price === 'number' && lesson.price > master.unit_price) {
-        facilityFee = lesson.price - master.unit_price;
-    }
-
-    if (master.is_trial) {
-        return 4500 + facilityFee
-    }
-
-    let basePrice = master.unit_price
-
-    if (membership?.membership_type_lessons) {
-        const configs = Array.isArray(membership.membership_type_lessons)
-            ? membership.membership_type_lessons
-            : [membership.membership_type_lessons]
-
-        const config = configs.find(
-            (l: any) => l.lesson_master_id === master.id
-        )
-        if (config && config.reward_price !== null && config.reward_price !== undefined) {
-            basePrice = config.reward_price
-        }
-    }
-
-    return Math.floor(basePrice * rate) + facilityFee
-}
-
-function calculateMonthlyStats(monthLessons: any[], rate: number) {
-    let totalSales = 0
-    let totalReward = 0
-    const details: LessonRewardDetail[] = []
-
-    monthLessons.forEach(l => {
-        const price = l.price || 0
-        const reward = calculateLessonReward(l, rate)
-
-        let title = l.lesson_masters?.is_trial ? '体験レッスン' : '通常レッスン'
-        if (l.lesson_masters && price > l.lesson_masters.unit_price) {
-            title += ' (施設利用料込)'
-        }
-
-        totalSales += price
-        totalReward += reward
-        details.push({
-            date: l.lesson_date,
-            title: title,
-            studentName: l.students?.full_name || '',
-            price: price,
-            reward: reward
-        })
-    })
-
-    return { totalSales, totalReward, lessonCount: monthLessons.length, details }
 }
