@@ -144,7 +144,18 @@ export function calculateMonthlyStats(coachId: string, monthLessons: LessonData[
     const myLessons = monthLessons.filter(l => l.coach_id === coachId)
     stats.lessonCount = myLessons.length
 
-    myLessons.forEach(l => {
+    myLessons.forEach((rawL: any) => {
+        // Supabaseのarray-likeなJOIN結果をオブジェクトに正規化（コーチ側と同じ処理）
+        const l: any = {
+            ...rawL,
+            lesson_masters: Array.isArray(rawL.lesson_masters) ? rawL.lesson_masters[0] : rawL.lesson_masters,
+            students: Array.isArray(rawL.students) ? rawL.students[0] : rawL.students,
+            profiles: Array.isArray(rawL.profiles) ? rawL.profiles[0] : rawL.profiles,
+        }
+        if (l.students && Array.isArray(l.students.membership_types)) {
+            l.students = { ...l.students, membership_types: l.students.membership_types[0] }
+        }
+
         const price = l.price || 0
         const reward = calculateLessonReward(l, rate)
 

@@ -1,0 +1,7 @@
+[2026-03-09T00:22:02.607Z] [AssignMembership] Creating Sub: {"customer":"cus_TtK6m51VAipyi7","items":[{"price":"price_1SwKVdP0UQGtpYXmjXxiPSK6"}],"payment_behavior":"default_incomplete","expand":["latest_invoice.payment_intent"],"billing_cycle_anchor":1774969200,"proration_behavior":"none"}
+[2026-03-09T00:22:03.327Z] [AssignMembership] Created Sub ID: sub_1T8raAP0UQGtpYXmM60SDxso
+[2026-03-09T00:22:29.535Z] [AssignMembership] Creating Sub: {"customer":"cus_TtK6m51VAipyi7","items":[{"price":"price_1SwKVdP0UQGtpYXmjXxiPSK6"}],"payment_behavior":"default_incomplete","expand":["latest_invoice.payment_intent"],"billing_cycle_anchor":1774969200,"proration_behavior":"none"}
+[2026-03-09T00:22:30.283Z] [AssignMembership] Created Sub ID: sub_1T8rabP0UQGtpYXm6XKVskqw
+[2026-03-09T00:24:10.695Z] [AssignMembership] Creating Sub: {"customer":"cus_TtK6m51VAipyi7","items":[{"price":"price_1SwKVdP0UQGtpYXmjXxiPSK6"}],"payment_behavior":"default_incomplete","expand":["latest_invoice.payment_intent"],"billing_cycle_anchor":1774969200,"proration_behavior":"none"}
+[2026-03-09T00:24:11.414Z] [AssignMembership] Created Sub ID: sub_1T8rcEP0UQGtpYXmhec1RE5O
+[2026-03-09T01:04:01.402Z] [AssignMembership] Creating Sub (isNextMonth=true): {"customer":"cus_TtK6m51VAipyi7","items":[{"price":"price_1SwKVcP0UQGtpYXmhnr0o5EF"}],"payment_behavior":"default_incomplete","expand":["latest_invoice.payment_intent"],"billing_cycle_anchor":1774969200,"proration_behavior":"none"}
