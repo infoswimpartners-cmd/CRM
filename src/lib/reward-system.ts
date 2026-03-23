@@ -88,49 +88,31 @@ export function calculateLessonReward(lesson: LessonData, rate: number): number 
         distantFee = lesson.profiles.distant_reward_fee;
     }
 
-    // If 2-person simultaneous lesson, add +1000 JPY
-    // Check if student has the flag
-    if (lesson.students?.is_two_person_lesson) {
-        // Only apply for normal lessons (usually). 
-        // Request says "2人同時レッスンの場合はコーチの報酬をプラス1000円にします". 
-        // It doesn't specify if it applies to trial or not, but usually trial is fixed reward.
-        // However, "通常の報酬に加えて1000円上乗せ" implies base reward + 1000.
-        // If trial reward is 4500, +1000 = 5500?
-        // Let's assume it applies to ALL lessons since the setting is on the student.
-        // Wait, trial lessons usually don't have a "student" record fully set up in the same way?
-        // Actually they do. So let's apply +1000 to the calculated reward.
-
-        let reward = 0
-        if (master.is_trial) {
-            if (rate === 1.0) {
-                reward = basePrice
-            } else if (Math.abs(rate - SPECIAL_EXCEPTION_RATE) < 0.00000001) {
-                reward = 5000
-            } else {
-                reward = 4500
-            }
-        } else {
-            reward = Math.floor(basePrice * rate)
-        }
-
-        return reward + 1000 + facilityFee + distantFee
-    }
-
+    // Calculate base reward
+    let reward = 0
     if (master.is_trial) {
         // Admin Rate (100%) -> Return Full Price
         if (rate === 1.0) {
-            return basePrice + facilityFee + distantFee
+            reward = basePrice
         }
-
         // Special Exception Check: Use epsilon for float comparison safety
         // If rate is effectively SPECIAL_EXCEPTION_RATE (approx 0.7000001)
-        if (Math.abs(rate - SPECIAL_EXCEPTION_RATE) < 0.00000001) {
-            return 5000 + facilityFee + distantFee
+        else if (Math.abs(rate - SPECIAL_EXCEPTION_RATE) < 0.00000001) {
+            reward = 5000
+        } else {
+            reward = 4500
         }
-        return 4500 + facilityFee + distantFee
+    } else {
+        reward = Math.floor(basePrice * rate)
     }
 
-    return Math.floor(basePrice * rate) + facilityFee + distantFee
+    // Add 2-person simultaneous lesson bonus (+1000 JPY) 
+    // Only apply for normal lessons, NOT for trial lessons.
+    if (lesson.students?.is_two_person_lesson && !master.is_trial) {
+        reward += 1000
+    }
+
+    return reward + facilityFee + distantFee
 }
 
 export function calculateMonthlyStats(coachId: string, monthLessons: LessonData[], rate: number) {
