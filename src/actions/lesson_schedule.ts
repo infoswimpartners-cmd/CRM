@@ -461,14 +461,28 @@ export async function approveLessonSchedule(scheduleId: string, forceManualEmail
             revalidatePath('/admin/billing')
             return { success: true, message: deferMessage }
         } else {
-            console.log(`[ApproveLesson] User has NO active or future membership (or manual forced). Forcing Immediate Billing for Schedule ${scheduleId}.`);
-            // 体験利用やビジター利用（完全な単発）の場合は予約承認と同時に即時で決済案内メールを送る (自動課金可なら自動課金)
-            const billingResult = await processLessonBilling(schedule.id, forceManualEmail)
-            if (!billingResult.success) {
-                return { success: false, error: billingResult.error }
+            // [MODIFIED] 体験以外の単発利用の場合は、前日18時の予約請求（Cron）に回すためにステータスを 'approved' に設定する
+            const isTrial = schedule.title && (schedule.title.includes('体験') || schedule.title.includes('トライアル'))
+
+            if (isTrial) {
+                console.log(`[ApproveLesson] Trial Lesson detected. Forcing Immediate Billing for Schedule ${scheduleId}.`);
+                const billingResult = await processLessonBilling(schedule.id, forceManualEmail)
+                if (!billingResult.success) {
+                    return { success: false, error: billingResult.error }
+                }
+                revalidatePath('/admin/billing')
+                return { success: true, message: '体験レッスンの承認および決済処理が完了しました' }
+            } else {
+                console.log(`[ApproveLesson] Single Lesson (non-trial) detected. Setting to 'approved' for delayed billing.`);
+                const { error: updateError } = await supabaseAdmin
+                    .from('lesson_schedules')
+                    .update({ billing_status: 'approved' })
+                    .eq('id', scheduleId)
+
+                if (updateError) throw updateError
+                revalidatePath('/admin/billing')
+                return { success: true, message: '単発レッスンの請求を予約しました（前日の18時に自動決済されます）' }
             }
-            revalidatePath('/admin/billing')
-            return { success: true, message: '承認および決済処理が完了しました' }
         }
 
     } catch (error: any) {

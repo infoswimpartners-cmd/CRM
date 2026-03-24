@@ -36,8 +36,8 @@ export async function GET(request: Request) {
                 const lessonDate = new Date(schedule.start_time)
                 const billingDeadline = new Date(lessonDate)
                 billingDeadline.setDate(billingDeadline.getDate() - 1)
-                // Set to 12:00 JST = 03:00 UTC
-                billingDeadline.setUTCHours(3, 0, 0, 0)
+                // Set to 18:00 JST = 09:00 UTC
+                billingDeadline.setUTCHours(9, 0, 0, 0)
 
                 // If Now >= Deadline, Process Billing
                 if (now >= billingDeadline) {
