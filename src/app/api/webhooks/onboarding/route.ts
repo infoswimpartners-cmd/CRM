@@ -38,6 +38,10 @@ const onboardingSchema = z.object({
     phone: z.string().optional(),
     message: z.string().optional(),
     type: z.enum(['trial', 'inquiry']).default('trial'),
+    birth_date: z.string().optional(),
+    second_student_birth_date: z.string().optional(),
+    gender: z.string().optional(),
+    second_student_gender: z.string().optional(),
 }).passthrough()
 
 export async function POST(req: NextRequest) {
@@ -87,7 +91,15 @@ export async function POST(req: NextRequest) {
             '電話': 'phone',
             'メッセージ': 'message',
             'お問い合わせ内容': 'message',
-            '種別': 'type'
+            '種別': 'type',
+            '生年月日': 'birth_date',
+            '生年月日（2人目）': 'second_student_birth_date',
+            '2人目の生年月日': 'second_student_birth_date',
+            '生年月日2': 'second_student_birth_date',
+            '性別': 'gender',
+            '性別（2人目）': 'second_student_gender',
+            '2人目の性別': 'second_student_gender',
+            '性別2': 'second_student_gender'
         }
 
         Object.keys(rawBody).forEach(k => {
@@ -111,7 +123,7 @@ export async function POST(req: NextRequest) {
             )
         }
 
-        const { name, kana, email, phone, message, second_name, second_name_kana } = result.data as any // Type assertion for dynamic second_name
+        const { name, kana, email, phone, message, second_name, second_name_kana, birth_date, second_student_birth_date, gender, second_student_gender } = result.data as any // Type assertion for dynamic second_name
         const supabaseAdmin = createAdminClient()
 
         console.log(`[Onboarding] New Lead: ${name} (${email})`)
@@ -128,7 +140,7 @@ export async function POST(req: NextRequest) {
         processingRequests.set(dedupKey, Date.now())
 
         // 2. Extract Extra Fields for Notes
-        const standardKeys = ['name', 'kana', 'email', 'phone', 'message', 'type', 'second_name', 'second_name_kana']
+        const standardKeys = ['name', 'kana', 'email', 'phone', 'message', 'type', 'second_name', 'second_name_kana', 'birth_date', 'second_student_birth_date', 'gender', 'second_student_gender']
         const extraInfo = Object.entries(result.data)
             .filter(([key]) => !standardKeys.includes(key))
             .map(([key, value]) => `【${key}】: ${value}`)
@@ -163,6 +175,10 @@ export async function POST(req: NextRequest) {
                 full_name_kana: kana,
                 second_student_name: second_name || null,
                 second_student_name_kana: second_name_kana || null,
+                birth_date: birth_date || null,
+                second_student_birth_date: second_student_birth_date || null,
+                gender: gender || null,
+                second_student_gender: second_student_gender || null,
                 contact_email: email,
                 contact_phone: phone,
                 notes: notes || null,
@@ -196,6 +212,21 @@ export async function POST(req: NextRequest) {
                 // Translate standard keys for better readability if needed, or just use keys
                 const label = translateKey(key) || key
                 inputLines.push(`【${label}】: ${strValue}`)
+
+                if (key === 'birth_date') {
+                    const age = calculateAge(strValue)
+                    if (age !== null) {
+                        variables['age'] = String(age)
+                        inputLines.push(`【年齢】: ${age}歳`)
+                    }
+                }
+                if (key === 'second_student_birth_date') {
+                    const age = calculateAge(strValue)
+                    if (age !== null) {
+                        variables['second_student_age'] = String(age)
+                        inputLines.push(`【年齢（2人目）】: ${age}歳`)
+                    }
+                }
             }
         }
 
@@ -244,7 +275,30 @@ function translateKey(key: string): string {
         message: 'メッセージ',
         type: '種別',
         second_name: 'お名前（2人目）',
-        second_name_kana: 'フリガナ（2人目）'
+        second_name_kana: 'フリガナ（2人目）',
+        birth_date: '生年月日',
+        second_student_birth_date: '生年月日（2人目）',
+        gender: '性別',
+        second_student_gender: '性別（2人目）'
     }
     return map[key] || key
+}
+
+function calculateAge(birthDateStr: string | undefined | null): number | null {
+    if (!birthDateStr) return null;
+    try {
+        let cleaned = birthDateStr.replace(/[年月]/g, '-').replace(/日/g, '').replace(/\//g, '-');
+        const dob = new Date(cleaned);
+        if (isNaN(dob.getTime())) return null;
+
+        const today = new Date();
+        let age = today.getFullYear() - dob.getFullYear();
+        const m = today.getMonth() - dob.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+            age--;
+        }
+        return age;
+    } catch {
+        return null;
+    }
 }
