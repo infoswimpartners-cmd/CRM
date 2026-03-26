@@ -21,6 +21,7 @@ import { calculateAge } from '@/lib/utils'
 import { StudentScheduleButton } from '@/components/students/StudentScheduleButton'
 import { StudentScheduleSection } from '@/components/customers/StudentScheduleSection'
 import { StudentMembershipAssigner } from '@/components/admin/StudentMembershipAssigner'
+import { checkStudentLessonStatus } from '@/actions/lesson_schedule'
 
 export default async function StudentDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params
@@ -51,6 +52,10 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
     if (lessonsError) {
         console.error('Error fetching student lesson history via RPC:', lessonsError.message, lessonsError)
     }
+
+    // Fetch Usage Status for Current Month
+    const statusRes = await checkStudentLessonStatus(student.id, new Date().toISOString())
+    const usageData = statusRes.success ? statusRes : null
 
     // Fetch User Role
     const { data: { user } } = await supabase.auth.getUser()
@@ -367,6 +372,25 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
                                         <Badge className="bg-blue-600 text-white border-none">
                                             2人同時レッスン適用
                                         </Badge>
+                                    </div>
+                                )}
+
+                                {/* 当月の利用状況 (Usage Count) */}
+                                {usageData && (
+                                    <div className="flex items-center justify-between p-2 rounded border border-indigo-100 bg-indigo-50">
+                                        <span className="text-sm font-medium text-indigo-800">当月の利用状況</span>
+                                        <div className="text-sm font-bold text-indigo-900">
+                                            {usageData.baseLimit && usageData.baseLimit > 0 ? (
+                                                <span>
+                                                    {usageData.count} / {usageData.limit} 回
+                                                    <span className="text-xs font-normal text-indigo-600 ml-1">
+                                                        (基本{usageData.baseLimit}回 + 繰越{usageData.rollover}回)
+                                                    </span>
+                                                </span>
+                                            ) : (
+                                                <span>{usageData.count} 回</span>
+                                            )}
+                                        </div>
                                     </div>
                                 )}
                             </div>

@@ -64,26 +64,18 @@ async function calculateMonthlyUsage(
         }
     }
 
-    // 2. Current Month Usage
+    // 2. Current Month Usage (Scheduled frames only)
     const start = startOfMonth(targetDate).toISOString()
     const end = endOfMonth(targetDate).toISOString()
-
-    const { count: completed } = await supabaseAdmin
-        .from('lessons')
-        .select('*', { count: 'exact', head: true })
-        .eq('student_id', studentId)
-        .gte('lesson_date', start)
-        .lte('lesson_date', end)
 
     const { count: scheduled } = await supabaseAdmin
         .from('lesson_schedules')
         .select('*', { count: 'exact', head: true })
         .eq('student_id', studentId)
-        .eq('is_reported', false)
         .gte('start_time', start)
         .lte('start_time', end)
 
-    const currentTotal = (completed || 0) + (scheduled || 0)
+    const currentTotal = scheduled || 0
 
     // 3. Previous Month Rollover calculation
     let rollover = 0
@@ -126,22 +118,14 @@ async function calculateMonthlyUsage(
         console.log(`[CalcUsage] canHaveRollover: ${canHaveRollover}, StartedAt: ${membershipStartedAt}`)
 
         if (canHaveRollover) {
-            const { count: prevCompleted } = await supabaseAdmin
-                .from('lessons')
-                .select('*', { count: 'exact', head: true })
-                .eq('student_id', studentId)
-                .gte('lesson_date', prevStart)
-                .lte('lesson_date', prevEnd)
-
             const { count: prevScheduled } = await supabaseAdmin
                 .from('lesson_schedules')
                 .select('*', { count: 'exact', head: true })
                 .eq('student_id', studentId)
-                .eq('is_reported', false)
                 .gte('start_time', prevStart)
                 .lte('start_time', prevEnd)
 
-            const prevTotal = (prevCompleted || 0) + (prevScheduled || 0)
+            const prevTotal = prevScheduled || 0
 
             const unused = Math.max(0, monthlyLimit - prevTotal)
             rollover = Math.min(unused, appliedMaxRollover)
