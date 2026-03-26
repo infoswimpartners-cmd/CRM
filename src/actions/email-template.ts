@@ -391,8 +391,12 @@ function getMockVariables(key: string): Record<string, string> {
                 goal: 'クロールで25m泳げるようになりたい',
                 frequency: '週1回',
                 second_name: '',
+                birth_date: '2010年4月1日',
+                age: '14',                      // 生年月日から自動計算されるサンプル値
+                second_student_birth_date: '',
+                second_student_age: '',         // 2人目未入力の場合は空
                 type_label: '体験申し込み',
-                all_inputs: '【お名前】: テスト 太郎\n【最寄り駅】: 渋谷駅\n【第一希望】: 2024年1月10日 10:00\n【泳力・目標】: クロールで25m泳げるようになりたい'
+                all_inputs: '【お名前】: テスト 太郎\n【最寄り駅】: 渋谷駅\n【第一希望】: 2024年1月10日 10:00\n【生年月日】: 2010年4月1日\n【年齢】: 14歳\n【泳力・目標】: クロールで25m泳げるようになりたい'
             }
 
         case 'trial_payment_request':
