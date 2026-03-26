@@ -159,7 +159,7 @@ export async function getStripeCustomerStatus(stripeCustomerId: string) {
     }
 }
 
-export async function assignMembership(studentId: string, membershipTypeId: string | null, isNextMonth: boolean = false) {
+export async function assignMembership(studentId: string, membershipTypeId: string | null, startTiming: 'immediate' | 'next' | 'next_next' = 'immediate') {
     const supabase = await createClient()
 
     // 1. Auth Check
@@ -179,8 +179,18 @@ export async function assignMembership(studentId: string, membershipTypeId: stri
 
         // --- CASE: Unassign (Remove Membership) ---
         if (!membershipTypeId) {
-            if (isNextMonth) {
-                // 就来月からの予約を解除
+            if (startTiming === 'next_next') {
+                // 再来月からの予約を解除
+                await supabase.from('students').update({
+                    next_next_membership_type_id: null
+                }).eq('id', studentId)
+
+                revalidatePath(`/customers/${studentId}`)
+                return { success: true }
+            }
+
+            if (startTiming === 'next') {
+                // 来月からの予約を解除
                 await supabase.from('students').update({
                     next_membership_type_id: null
                 }).eq('id', studentId)
@@ -210,6 +220,18 @@ export async function assignMembership(studentId: string, membershipTypeId: stri
         // --- CASE: Assign/Change Membership ---
         if (!student.stripe_customer_id) {
             return { success: false, error: '支払い方法が登録されていません。先にカード登録を完了してください。' }
+        }
+
+        if (startTiming === 'next_next') {
+            // 再来月の場合はStripeには触らずデータベースのみ更新
+            const { error: dbError } = await supabase.from('students')
+                .update({ next_next_membership_type_id: membershipTypeId })
+                .eq('id', studentId)
+
+            if (dbError) throw dbError
+
+            revalidatePath(`/customers/${studentId}`)
+            return { success: true }
         }
 
         const { data: membership } = await supabase
@@ -247,7 +269,7 @@ export async function assignMembership(studentId: string, membershipTypeId: stri
                     price: membership.stripe_price_id
                 }],
                 // 来月からの場合は案分なし（次期から適用）、今すぐの場合は即時適用（差額あり）
-                proration_behavior: isNextMonth ? 'none' : 'always_invoice'
+                proration_behavior: startTiming === 'next' ? 'none' : 'always_invoice'
             })
         } else {
             // Create new subscription
@@ -263,7 +285,7 @@ export async function assignMembership(studentId: string, membershipTypeId: stri
             }
 
             // 「来月から」または「月途中」の場合は、来月1日を起点にする
-            if (isNextMonth || !isFirstOfMonth) {
+            if (startTiming === 'next' || !isFirstOfMonth) {
                 const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
                 const nextMonthTimestamp = Math.floor(nextMonth.getTime() / 1000)
 
@@ -271,7 +293,7 @@ export async function assignMembership(studentId: string, membershipTypeId: stri
                 subscriptionParams.proration_behavior = 'none'
 
                 // 「今すぐ変更」かつ「月途中」の場合のみ、当月分の料金を別途請求
-                if (!isNextMonth && membership.fee > 0) {
+                if (startTiming === 'immediate' && membership.fee > 0) {
                     try {
                         await stripe.invoiceItems.create({
                             customer: student.stripe_customer_id,
@@ -285,7 +307,7 @@ export async function assignMembership(studentId: string, membershipTypeId: stri
                 }
             }
 
-            debugLog(`[AssignMembership] Creating Sub (isNextMonth=${isNextMonth}): ${JSON.stringify(subscriptionParams)}`)
+            debugLog(`[AssignMembership] Creating Sub (startTiming=${startTiming}): ${JSON.stringify(subscriptionParams)}`)
             const subscription = await stripe.subscriptions.create(subscriptionParams)
             subscriptionId = subscription.id
         }
@@ -295,11 +317,13 @@ export async function assignMembership(studentId: string, membershipTypeId: stri
             stripe_subscription_id: subscriptionId,
         }
 
-        if (isNextMonth) {
+        if (startTiming === 'next') {
             updates.next_membership_type_id = membershipTypeId
+            updates.next_next_membership_type_id = null
         } else {
             updates.membership_type_id = membershipTypeId
             updates.next_membership_type_id = null
+            updates.next_next_membership_type_id = null
         }
 
         const { error: dbError } = await supabase.from('students')

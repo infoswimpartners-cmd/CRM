@@ -15,11 +15,11 @@ export async function GET(req: NextRequest) {
     log.push(`Starting Monthly Membership Update: ${new Date().toISOString()}`)
 
     try {
-        // 1. Fetch reservations
+        // 1. Fetch reservations for this month and next month
         const { data: students, error } = await supabase
             .from('students')
-            .select('id, full_name, next_membership_type_id')
-            .not('next_membership_type_id', 'is', null)
+            .select('id, full_name, next_membership_type_id, next_next_membership_type_id')
+            .or('next_membership_type_id.not.is.null,next_next_membership_type_id.not.is.null')
 
         if (error) throw error
 
@@ -32,20 +32,35 @@ export async function GET(req: NextRequest) {
 
         // 2. Process each
         for (const student of students) {
-            log.push(`Processing: ${student.full_name} -> Type: ${student.next_membership_type_id}`)
+            if (student.next_membership_type_id) {
+                log.push(`Processing (Immediate): ${student.full_name} -> Type: ${student.next_membership_type_id}`)
 
-            // Call assignMembership (Immediate mode)
-            // This will:
-            // - Create/Update Stripe Subscription
-            // - Clear next_membership_type_id
-            // - Update membership_type_id
+                // Call assignMembership (Immediate mode)
+                // This will:
+                // - Create/Update Stripe Subscription
+                // - Clear next_membership_type_id
+                // - Update membership_type_id
+                const result = await assignMembership(student.id, student.next_membership_type_id, 'immediate')
 
-            const result = await assignMembership(student.id, student.next_membership_type_id, false)
+                if (result.success) {
+                    log.push(`  - Success (Immediate)`)
+                } else {
+                    log.push(`  - Failed (Immediate): ${result.error}`)
+                }
+            }
 
-            if (result.success) {
-                log.push(`  - Success`)
-            } else {
-                log.push(`  - Failed: ${result.error}`)
+            if (student.next_next_membership_type_id) {
+                log.push(`Processing (Shift Next): ${student.full_name} -> Type: ${student.next_next_membership_type_id}`)
+
+                // Call assignMembership (Next mode)
+                // This will shift next_next to next, and reserve Stripe for next cycle
+                const result = await assignMembership(student.id, student.next_next_membership_type_id, 'next')
+
+                if (result.success) {
+                    log.push(`  - Success (Shift Next)`)
+                } else {
+                    log.push(`  - Failed (Shift Next): ${result.error}`)
+                }
             }
         }
 

@@ -128,6 +128,8 @@ export interface Database {
           coach_id: string | null
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
+          next_membership_type_id: string | null
+          next_next_membership_type_id: string | null
         }
         Insert: {
           id?: string
@@ -149,6 +151,8 @@ export interface Database {
           coach_id?: string | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
+          next_membership_type_id?: string | null
+          next_next_membership_type_id?: string | null
         }
         Update: {
           id?: string
@@ -170,6 +174,8 @@ export interface Database {
           coach_id?: string | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
+          next_membership_type_id?: string | null
+          next_next_membership_type_id?: string | null
         }
         Relationships: [
           {

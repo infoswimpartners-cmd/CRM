@@ -52,6 +52,7 @@ const formSchema = z.object({
     feedback_good: z.string().optional(),
     feedback_next: z.string().optional(),
     price: z.coerce.number().min(0, '金額は0円以上である必要があります'),
+    schedule_id: z.string().optional(),
 })
 
 interface LessonMaster {
@@ -234,6 +235,7 @@ export function LessonReportForm() {
             const payload = {
                 ...values,
                 lesson_date: format(values.lesson_date, 'yyyy-MM-dd'),
+                schedule_id: scheduleId || undefined,
             }
 
             const result = await submitLessonReport(payload)

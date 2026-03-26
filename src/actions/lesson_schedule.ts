@@ -79,6 +79,7 @@ async function calculateMonthlyUsage(
         .from('lesson_schedules')
         .select('*', { count: 'exact', head: true })
         .eq('student_id', studentId)
+        .eq('is_reported', false)
         .gte('start_time', start)
         .lte('start_time', end)
 
@@ -136,6 +137,7 @@ async function calculateMonthlyUsage(
                 .from('lesson_schedules')
                 .select('*', { count: 'exact', head: true })
                 .eq('student_id', studentId)
+                .eq('is_reported', false)
                 .gte('start_time', prevStart)
                 .lte('start_time', prevEnd)
 
@@ -409,7 +411,7 @@ export async function approveLessonSchedule(scheduleId: string, forceManualEmail
         // We know student_id exists on scheduleRaw
         const { data: student, error: studentError } = await supabaseAdmin
             .from('students')
-            .select('id, stripe_customer_id, contact_email, full_name, second_student_name, membership_type_id, next_membership_type_id, membership_started_at')
+            .select('id, stripe_customer_id, contact_email, full_name, second_student_name, membership_type_id, next_membership_type_id, next_next_membership_type_id, membership_started_at')
             .eq('id', scheduleRaw.student_id)
             .single()
 
@@ -444,7 +446,7 @@ export async function approveLessonSchedule(scheduleId: string, forceManualEmail
                     deferMessage = '承認完了：入会初月の月会費と合算して請求されます';
                 }
             }
-        } else if (student.next_membership_type_id) {
+        } else if (student.next_membership_type_id || student.next_next_membership_type_id) {
             // アクティブなプランがないが、入会（予約）はしている場合
             shouldDeferBilling = true;
             deferMessage = '承認完了：入会初月の月会費と合算して請求されます';

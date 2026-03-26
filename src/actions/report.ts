@@ -19,6 +19,7 @@ const formSchema = z.object({
     coach_comment: z.string().optional(),
     price: z.number().min(0),
     billing_price: z.number().min(0).optional(),
+    schedule_id: z.string().optional(),
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -95,6 +96,12 @@ export async function submitLessonReport(values: FormValues) {
 
         const newLessonId = insertedLesson?.id
 
+        // Mark the original schedule as reported
+        if (data.schedule_id) {
+            const { createAdminClient } = await import('@/lib/supabase/admin')
+            const supabaseAdmin = createAdminClient()
+            await supabaseAdmin.from('lesson_schedules').update({ is_reported: true }).eq('id', data.schedule_id)
+        }
 
         // 4. 管理者通知（メール設定のlesson_report_sentトリガー経由）
         try {
