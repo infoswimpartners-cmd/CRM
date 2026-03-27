@@ -72,6 +72,19 @@ export function StudentMembershipAssigner({ studentId, currentMembershipTypeId }
     const executeChange = async (startTiming: 'immediate' | 'next' | 'next_next') => {
         if (pendingTypeId === null) return
 
+        let confirmMsg = '';
+        if (startTiming === 'next_next') {
+            confirmMsg = '再来月からのプラン変更を予約します。よろしいですか？';
+        } else if (startTiming === 'next') {
+            confirmMsg = '来月からのプラン変更を予約します。よろしいですか？';
+        } else {
+            confirmMsg = '今すぐプランを変更します。当月分の決済（初期費用等）が即時発生する場合があります。\n本当によろしいですか？';
+        }
+
+        if (!window.confirm(confirmMsg)) {
+            return;
+        }
+
         setIsDialogOpen(false)
         setLoading(true)
 

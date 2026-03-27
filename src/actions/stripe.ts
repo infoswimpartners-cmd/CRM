@@ -274,36 +274,48 @@ export async function assignMembership(studentId: string, membershipTypeId: stri
         } else {
             // Create new subscription
             // Calculate Billing Anchor
-            const now = new Date()
-            const isFirstOfMonth = now.getDate() === 1
+            const nowUtc = new Date();
+            const nowJst = new Date(nowUtc.getTime() + 9 * 60 * 60 * 1000);
+            const nextMonthJst = new Date(Date.UTC(
+                nowJst.getUTCFullYear(),
+                nowJst.getUTCMonth() + 1, // 翌月
+                1,                        // 1日
+                -9, 0, 0                  // UTC基準で -9時間 = JSTの0時
+            ));
+            const anchorTimestamp = Math.floor(nextMonthJst.getTime() / 1000);
 
             const subscriptionParams: any = {
                 customer: student.stripe_customer_id,
                 items: [{ price: membership.stripe_price_id }],
+                billing_cycle_anchor: anchorTimestamp,
+                proration_behavior: 'none',
                 payment_behavior: 'default_incomplete',
+                payment_settings: { save_default_payment_method: 'on_subscription' },
                 expand: ['latest_invoice.payment_intent'],
             }
 
-            // 「来月から」または「月途中」の場合は、来月1日を起点にする
-            if (startTiming === 'next' || !isFirstOfMonth) {
-                const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
-                const nextMonthTimestamp = Math.floor(nextMonth.getTime() / 1000)
+            // 「今すぐ変更（即時決済）」かつ初期費用が発生する場合のみ、当月分の料金を別途請求
+            // （サブスクリプション自体はproration_behavior: noneにより当月分が0円になるため）
+            // pending状態のままサブスクリプションを作成すると次月に合算されてしまうため、即時Invoiceを発行して決済する
+            if (startTiming === 'immediate' && membership.fee > 0) {
+                try {
+                    await stripe.invoiceItems.create({
+                        customer: student.stripe_customer_id,
+                        amount: membership.fee,
+                        currency: 'jpy',
+                        description: `初期費用（初月分分会費）: ${membership.name}`
+                    })
 
-                subscriptionParams.billing_cycle_anchor = nextMonthTimestamp
-                subscriptionParams.proration_behavior = 'none'
+                    const invoice = await stripe.invoices.create({
+                        customer: student.stripe_customer_id,
+                        auto_advance: true,
+                        collection_method: 'charge_automatically',
+                        description: `初期費用（初月分分会費）: ${membership.name}`
+                    })
 
-                // 「今すぐ変更」かつ「月途中」の場合のみ、当月分の料金を別途請求
-                if (startTiming === 'immediate' && membership.fee > 0) {
-                    try {
-                        await stripe.invoiceItems.create({
-                            customer: student.stripe_customer_id,
-                            amount: membership.fee,
-                            currency: 'jpy',
-                            description: `初期費用（初月分分会費）: ${membership.name}`
-                        })
-                    } catch (e) {
-                        console.error('Invoice Item Error:', e)
-                    }
+                    await stripe.invoices.pay(invoice.id)
+                } catch (e) {
+                    console.error('Immediate Charge Invoice Error:', e)
                 }
             }
 
