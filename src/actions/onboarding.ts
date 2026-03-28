@@ -139,12 +139,27 @@ export async function confirmTrialAndBill(studentId: string, lessonDate: Date, c
         const endTime = new Date(lessonDate)
         endTime.setHours(endTime.getHours() + 1)
 
+        // Fetch Coach Name
+        let coachName = '担当コーチ'
+        if (coachId) {
+            const { data: coachProfile } = await supabaseAdmin
+                .from('profiles')
+                .select('full_name')
+                .eq('id', coachId)
+                .single()
+            if (coachProfile?.full_name) {
+                coachName = coachProfile.full_name
+            }
+        }
+
+        const scheduleTitle = `${student.full_name}様　担当：${coachName}`
+
         const { error: scheduleError } = await supabaseAdmin
             .from('lesson_schedules')
             .insert({
                 coach_id: coachId,
                 student_id: studentId,
-                title: `${student.full_name}様 体験レッスン`,
+                title: scheduleTitle,
                 start_time: startTime.toISOString(),
                 end_time: endTime.toISOString(),
                 location: location, // Use provided location
@@ -171,7 +186,7 @@ export async function confirmTrialAndBill(studentId: string, lessonDate: Date, c
 
                 if (newSchedule) {
                     const eventId = await createCalendarEvent(adminRefreshToken, {
-                        summary: `${student.full_name}様 体験レッスン`,
+                        summary: scheduleTitle,
                         description: `体験レッスン予約確定\n場所: ${location}`,
                         location: location,
                         start: startTime.toISOString(),

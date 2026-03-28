@@ -63,6 +63,7 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
     const [coaches, setCoaches] = useState<{ id: string, full_name: string | null }[]>([])
     const [selectedCoachId, setSelectedCoachId] = useState<string>('')
     const [currentUser, setCurrentUser] = useState<any>(null)
+    const [currentUserName, setCurrentUserName] = useState<string>('')
 
     // Form State
     const [studentId, setStudentId] = useState<string>('none')
@@ -123,9 +124,13 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
             // Check Role
             const { data: profile } = await supabase
                 .from('profiles')
-                .select('role')
+                .select('role, full_name')
                 .eq('id', user.id)
                 .single()
+
+            if (profile?.full_name) {
+                setCurrentUserName(profile.full_name)
+            }
 
             if (profile?.role === 'admin') {
                 setIsAdmin(true)
@@ -228,7 +233,8 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
             // Title Auto-generation
             const student = students.find(s => s.id === studentId)
             if (student) {
-                setTitle(`${student.full_name}様 レッスン`)
+                const coachName = coaches.find(c => c.id === selectedCoachId)?.full_name || currentUserName || '担当コーチ'
+                setTitle(`${student.full_name}様　担当：${coachName}`)
                 // Trial check ...
                 if (student.status === 'trial_pending' || student.status === 'trial_confirmed') {
                     setIsTrialMode(true)
