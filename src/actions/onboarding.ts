@@ -34,7 +34,7 @@ export async function confirmTrialAndBill(studentId: string, lessonDate: Date, c
             trialMaster = data
         }
 
-        const { error: lessonError } = await supabaseAdmin
+        const { data: newLesson, error: lessonError } = await supabaseAdmin
             .from('lessons')
             .insert({
                 student_id: studentId,
@@ -46,8 +46,10 @@ export async function confirmTrialAndBill(studentId: string, lessonDate: Date, c
                 price: trialMaster.unit_price,
                 billing_price: trialMaster.unit_price
             })
+            .select('id')
+            .single()
 
-        if (lessonError) throw new Error(`Lesson Creation Failed: ${lessonError.message}`)
+        if (lessonError || !newLesson) throw new Error(`Lesson Creation Failed: ${lessonError?.message}`)
 
         // 3. Update Student Coach in Profile (Optional but good practice to sync)
         await supabaseAdmin
@@ -71,33 +73,8 @@ export async function confirmTrialAndBill(studentId: string, lessonDate: Date, c
                 .eq('id', studentId)
         }
 
-        // 5. Create Checkout Session
-        const session = await stripe.checkout.sessions.create({
-            customer: stripeCustomerId,
-            payment_method_types: ['card'],
-            mode: 'payment',
-            line_items: [{
-                price_data: {
-                    currency: 'jpy',
-                    product_data: {
-                        name: trialMaster.name || '体験レッスン',
-                    },
-                    unit_amount: trialMaster.unit_price,
-                },
-                quantity: 1,
-            }],
-            success_url: `${process.env.NEXT_PUBLIC_APP_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
-            cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/cancel`,
-            metadata: {
-                studentId: studentId,
-                type: 'trial_fee',
-                lessonDate: lessonDate.toISOString(),
-                location: location
-            },
-            payment_intent_data: {
-                setup_future_usage: 'off_session',
-            }
-        })
+        // 5. Generate Payment Link Endpoint URL
+        const paymentLink = `${process.env.NEXT_PUBLIC_APP_URL}/pay/trial/${newLesson.id}`
 
         if (!student.contact_email) {
             throw new Error('学生の連絡先メールアドレスが設定されていません。')
@@ -109,9 +86,9 @@ export async function confirmTrialAndBill(studentId: string, lessonDate: Date, c
         // カスタムメール本文がある場合は、プレースホルダーを実際のURLに置換する（ユーザーが削除した場合は末尾に自動追加）
         if (customEmail) {
             if (customEmail.body.includes('【実際の決済URLがここに挿入されます】')) {
-                customEmail.body = customEmail.body.replace('【実際の決済URLがここに挿入されます】', session.url || '')
+                customEmail.body = customEmail.body.replace('【実際の決済URLがここに挿入されます】', paymentLink)
             } else {
-                customEmail.body += `\n\n【決済リンク】\n${session.url || ''}`
+                customEmail.body += `\n\n【決済リンク】\n${paymentLink}`
             }
         }
 
@@ -123,7 +100,7 @@ export async function confirmTrialAndBill(studentId: string, lessonDate: Date, c
             name: student.full_name,
             lesson_date: lessonDateStr,
             amount: trialMaster.unit_price.toLocaleString(),
-            payment_link: session.url || ''
+            payment_link: paymentLink
         }, customEmail)
 
         if (!emailSent) {
