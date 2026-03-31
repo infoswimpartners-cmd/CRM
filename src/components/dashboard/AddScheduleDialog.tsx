@@ -702,19 +702,7 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
                             <p className="text-sm text-green-700">
                                 {isTrialMode
                                     ? '体験レッスンを登録しました。請求管理から承認を行ってください。'
-                                    : 'スケジュールを保存しました。'}
-                            </p>
-                        </div>
-
-                        <div className="space-y-2">
-                            <Button asChild className="w-full bg-[#4285F4] hover:bg-[#3367D6] text-white" size="lg">
-                                <Link href={createdEventUrl} target="_blank" rel="noopener noreferrer">
-                                    <ExternalLink className="mr-2 h-5 w-5" />
-                                    Googleカレンダーに追加
-                                </Link>
-                            </Button>
-                            <p className="text-xs text-center text-muted-foreground">
-                                新しいタブでGoogleカレンダーが開きます
+                                    : 'スケジュールを保存し、Googleカレンダーに自動同期しました。'}
                             </p>
                         </div>
 

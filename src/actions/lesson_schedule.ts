@@ -304,6 +304,30 @@ export async function createLessonSchedule(params: CreateLessonScheduleParams) {
 
                 if (insertError) throw insertError
 
+                // 5. Google Calendar Sync
+                try {
+                    const { createCalendarEvent, getAdminRefreshToken } = await import('@/lib/google-calendar')
+                    const adminRefreshToken = await getAdminRefreshToken(supabaseAdmin)
+
+                    if (adminRefreshToken) {
+                        const newEventId = await createCalendarEvent(adminRefreshToken, {
+                            summary: params.title,
+                            description: params.notes || '',
+                            location: params.location || '',
+                            start: params.start_time,
+                            end: params.end_time,
+                        })
+                        if (newEventId) {
+                            await supabaseAdmin
+                                .from('lesson_schedules')
+                                .update({ google_event_id: newEventId })
+                                .eq('id', inserted.id)
+                        }
+                    }
+                } catch (calErr) {
+                    console.error('[createLessonSchedule] Googleカレンダー同期失敗:', calErr)
+                }
+
                 revalidatePath('/coach/schedule')
                 revalidatePath('/admin/schedule')
                 revalidatePath('/admin/billing')
@@ -340,6 +364,30 @@ export async function createLessonSchedule(params: CreateLessonScheduleParams) {
                 .single()
 
             if (insertError) throw insertError
+
+            // Google Calendar Sync
+            try {
+                const { createCalendarEvent, getAdminRefreshToken } = await import('@/lib/google-calendar')
+                const adminRefreshToken = await getAdminRefreshToken(supabaseAdmin)
+
+                if (adminRefreshToken) {
+                    const newEventId = await createCalendarEvent(adminRefreshToken, {
+                        summary: params.title,
+                        description: params.notes || '',
+                        location: params.location || '',
+                        start: params.start_time,
+                        end: params.end_time,
+                    })
+                    if (newEventId) {
+                        await supabaseAdmin
+                            .from('lesson_schedules')
+                            .update({ google_event_id: newEventId })
+                            .eq('id', inserted.id)
+                    }
+                }
+            } catch (calErr) {
+                console.error('[createLessonSchedule] Googleカレンダー同期失敗:', calErr)
+            }
 
             revalidatePath('/coach/schedule')
             revalidatePath('/admin/schedule')
@@ -497,7 +545,26 @@ export async function rejectLessonSchedule(scheduleId: string) {
     }
 
     try {
-        // [MODIFIED] User requested to DELETE the schedule if rejected.
+        // [MODIFIED] Delete from Google Calendar first
+        const { data: existing } = await supabaseAdmin
+            .from('lesson_schedules')
+            .select('google_event_id')
+            .eq('id', scheduleId)
+            .single()
+
+        if (existing?.google_event_id) {
+            try {
+                const { deleteCalendarEvent, getAdminRefreshToken } = await import('@/lib/google-calendar')
+                const adminRefreshToken = await getAdminRefreshToken(supabaseAdmin)
+                if (adminRefreshToken) {
+                    await deleteCalendarEvent(adminRefreshToken, existing.google_event_id)
+                }
+            } catch (calErr) {
+                console.error('[rejectLessonSchedule] Googleカレンダー削除失敗:', calErr)
+            }
+        }
+
+        // User requested to DELETE the schedule if rejected.
         const { error } = await supabaseAdmin
             .from('lesson_schedules')
             .delete()

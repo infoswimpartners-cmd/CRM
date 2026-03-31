@@ -11,10 +11,10 @@ export async function cancelSchedule(scheduleId: string) {
     const supabaseAdmin = createAdminClient()
 
     try {
-        // 1. Fetch Schedule to check for Stripe ID
+        // 1. Fetch Schedule to check for Stripe ID and Google Event ID
         const { data: schedule, error: fetchError } = await supabaseAdmin
             .from('lesson_schedules')
-            .select('stripe_invoice_item_id, student_id')
+            .select('stripe_invoice_item_id, student_id, google_event_id')
             .eq('id', scheduleId)
             .single()
 
@@ -27,6 +27,19 @@ export async function cancelSchedule(scheduleId: string) {
                 console.log(`[CancelSchedule] Deleted Stripe Invoice Item: ${schedule.stripe_invoice_item_id}`)
             } catch (stripeError: any) {
                 console.error(`[CancelSchedule] Failed to delete Stripe Item (${schedule.stripe_invoice_item_id}):`, stripeError)
+            }
+        }
+
+        // 3. Delete from Google Calendar if exists
+        if (schedule.google_event_id) {
+            try {
+                const { deleteCalendarEvent, getAdminRefreshToken } = await import('@/lib/google-calendar')
+                const adminRefreshToken = await getAdminRefreshToken(supabaseAdmin)
+                if (adminRefreshToken) {
+                    await deleteCalendarEvent(adminRefreshToken, schedule.google_event_id)
+                }
+            } catch (calErr) {
+                console.error(`[CancelSchedule] Failed to delete Google Calendar Event (${schedule.google_event_id}):`, calErr)
             }
         }
 
