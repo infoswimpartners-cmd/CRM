@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { exchangeCodeForTokens } from '@/lib/google-calendar';
-import { redirect } from 'next/navigation';
 
 export async function GET(req: NextRequest) {
     const searchParams = req.nextUrl.searchParams;
@@ -9,11 +8,11 @@ export async function GET(req: NextRequest) {
     const error = searchParams.get('error');
 
     if (error) {
-        return NextResponse.redirect(new URL('/settings?error=google_auth_failed', req.url));
+        return NextResponse.redirect(new URL('/admin/settings?error=google_auth_failed', req.url));
     }
 
     if (!code) {
-        return NextResponse.redirect(new URL('/settings?error=no_code', req.url));
+        return NextResponse.redirect(new URL('/admin/settings?error=no_code', req.url));
     }
 
     try {
@@ -21,8 +20,6 @@ export async function GET(req: NextRequest) {
         const refreshToken = tokens.refresh_token;
 
         if (!refreshToken) {
-            // If the user has already authorized, Google doesn't send refresh_token again unless we revoke access or use prompt=consent.
-            // My helper uses prompt='consent', so it should be there.
             console.warn('No refresh token returned from Google');
         }
 
@@ -33,25 +30,29 @@ export async function GET(req: NextRequest) {
             return NextResponse.redirect(new URL('/login', req.url));
         }
 
-        // Store refresh token
-        // Use service role if RLS prevents update, but user should be able to update own profile
-        const { error: updateError } = await supabase
-            .from('profiles')
-            .update({
-                google_refresh_token: refreshToken || undefined, // Only update if we got one, or handle logic
-                // We might want to store email too if available in id_token, but let's keep it simple
-            })
-            .eq('id', user.id);
+        if (refreshToken) {
+            // Store refresh token
+            const { error: updateError } = await supabase
+                .from('profiles')
+                .update({
+                    google_refresh_token: refreshToken
+                })
+                .eq('id', user.id);
 
-        if (updateError) {
-            console.error('Failed to update profile tokens:', updateError);
-            return NextResponse.redirect(new URL('/settings?error=db_update_failed', req.url));
+            if (updateError) {
+                console.error('Failed to update profile tokens:', updateError);
+                return NextResponse.redirect(new URL('/admin/settings?error=db_update_failed', req.url));
+            }
+        } else {
+             // If they already linked and clicked again without prompt=consent forcing a new one, 
+             // we just consider it success as it's already linked.
+             console.log('No refresh token to update (already linked).')
         }
 
-        return NextResponse.redirect(new URL('/settings?success=google_connected', req.url));
+        return NextResponse.redirect(new URL('/admin/settings?success=google_connected', req.url));
 
     } catch (err) {
         console.error('Google Auth Callback Error:', err);
-        return NextResponse.redirect(new URL('/settings?error=exception', req.url));
+        return NextResponse.redirect(new URL('/admin/settings?error=exception', req.url));
     }
 }
