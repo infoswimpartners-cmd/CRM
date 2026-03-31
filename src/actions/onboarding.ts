@@ -94,7 +94,10 @@ export async function confirmTrialAndBill(studentId: string, lessonDate: Date, c
 
         const endDateTime = new Date(lessonDate)
         endDateTime.setMinutes(endDateTime.getMinutes() + 60)
-        const lessonDateStr = `${lessonDate.toLocaleDateString('ja-JP')} ${lessonDate.getHours().toString().padStart(2, '0')}:${lessonDate.getMinutes().toString().padStart(2, '0')}〜${endDateTime.getHours().toString().padStart(2, '0')}:${endDateTime.getMinutes().toString().padStart(2, '0')}`
+        const dateStr = lessonDate.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })
+        const startTimeStr = lessonDate.toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' })
+        const endTimeStr = endDateTime.toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' })
+        const lessonDateStr = `${dateStr} ${startTimeStr}〜${endTimeStr}`
 
         const emailSent = await emailService.sendTriggerEmail('trial_lesson_reserved', student.contact_email, {
             name: student.full_name,
@@ -218,7 +221,10 @@ export async function getTrialEmailPreview(studentId: string, lessonDate: Date, 
 
         const endDateTime = new Date(lessonDate)
         endDateTime.setMinutes(endDateTime.getMinutes() + 60)
-        const lessonDateStr = `${lessonDate.toLocaleDateString('ja-JP')} ${lessonDate.getHours().toString().padStart(2, '0')}:${lessonDate.getMinutes().toString().padStart(2, '0')}〜${endDateTime.getHours().toString().padStart(2, '0')}:${endDateTime.getMinutes().toString().padStart(2, '0')}`
+        const dateStr = lessonDate.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })
+        const startTimeStr = lessonDate.toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' })
+        const endTimeStr = endDateTime.toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' })
+        const lessonDateStr = `${dateStr} ${startTimeStr}〜${endTimeStr}`
 
         const variables = {
             name: student.full_name,
