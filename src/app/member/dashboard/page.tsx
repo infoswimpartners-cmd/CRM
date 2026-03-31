@@ -7,6 +7,7 @@ import LastReportCard from '@/components/member/LastReportCard';
 import LessonHistoryWidget from '@/components/member/LessonHistoryWidget';
 import MemberAnnouncementsCard from '@/components/member/MemberAnnouncementsCard';
 import MemberQuickActions from '@/components/member/MemberQuickActions';
+import { StudentScheduleSection } from '@/components/customers/StudentScheduleSection';
 import { linkStudentData, syncLineId, memberSignOut } from '@/actions/member/auth';
 import { MessageCircle, BellRing, Settings } from 'lucide-react';
 import Link from 'next/link';
@@ -36,11 +37,13 @@ export default async function MemberDashboard({
     let nextLesson = null;
     let lastReport = null;
     let historyLessons: any[] = [];
+    let schedules: any[] = [];
     let unreadCount = 0;
     let notifications: any[] = [];
     let membershipType = initialStudent?.membership_types || null;
 
     const supabase = await createClient();
+    const supabaseAdmin = createAdminClient();
 
     // 1. 生徒データがまだない場合は自動リンクを試行
     if (!student) {
@@ -88,7 +91,7 @@ export default async function MemberDashboard({
     if (student) {
         const now = new Date().toISOString();
 
-        const [nextLessonRes, pastLessonsRes, notificationsRes] = await Promise.all([
+        const [nextLessonRes, pastLessonsRes, notificationsRes, schedulesRes] = await Promise.all([
             // 次回のレッスン
             supabase
                 .from('lessons')
@@ -116,13 +119,33 @@ export default async function MemberDashboard({
                 .eq('student_id', student.id)
                 .eq('is_read', false)
                 .order('created_at', { ascending: false })
-                .limit(5)
+                .limit(5),
+
+            // 登録された予定 (lesson_schedules)
+            supabaseAdmin
+                .from('lesson_schedules')
+                .select(`
+                    id,
+                    title,
+                    start_time,
+                    end_time,
+                    location,
+                    status:billing_status,
+                    notes,
+                    profiles (
+                        full_name
+                    )
+                `)
+                .eq('student_id', student.id)
+                .order('start_time', { ascending: false })
+                .limit(50)
         ]);
 
         nextLesson = nextLessonRes.data;
         historyLessons = pastLessonsRes.data || [];
         lastReport = historyLessons.length > 0 ? historyLessons[0] : null;
         notifications = notificationsRes.data || [];
+        schedules = schedulesRes?.data || [];
         unreadCount = notifications.length;
         membershipType = student.membership_types;
     }
@@ -191,6 +214,20 @@ export default async function MemberDashboard({
             <div className="space-y-6">
                 <LastReportCard report={lastReport} />
                 <LessonHistoryWidget lessons={historyLessons.slice(1, 4)} />
+            </div>
+
+            {/* 登録された予定 */}
+            <div className="bg-white p-6 rounded-[2rem] shadow-xl shadow-slate-200/40 border border-slate-100">
+                <h3 className="text-lg font-bold flex items-center gap-2 mb-6 text-slate-800">
+                    <span className="w-1.5 h-6 bg-purple-500 rounded-full"></span>
+                    登録された予定
+                </h3>
+                <StudentScheduleSection schedules={
+                    schedules.map((s: any) => ({
+                        ...s,
+                        coach_full_name: Array.isArray(s.profiles) ? s.profiles[0]?.full_name : s.profiles?.full_name,
+                    }))
+                } />
             </div>
 
             {/* チケット */}

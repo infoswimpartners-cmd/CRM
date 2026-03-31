@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { CalendarPlus } from 'lucide-react'
 import { AddScheduleDialog } from '@/components/dashboard/AddScheduleDialog'
@@ -12,6 +13,7 @@ interface StudentScheduleButtonProps {
 // 生徒詳細ページから直接スケジュールを追加するボタン
 export function StudentScheduleButton({ studentId }: StudentScheduleButtonProps) {
     const [open, setOpen] = useState(false)
+    const router = useRouter()
 
     return (
         <>
@@ -29,7 +31,10 @@ export function StudentScheduleButton({ studentId }: StudentScheduleButtonProps)
                 open={open}
                 onOpenChange={setOpen}
                 initialStudentId={studentId}
-                onSuccess={() => setOpen(false)}
+                onSuccess={() => {
+                    setOpen(false)
+                    router.refresh()
+                }}
             />
         </>
     )

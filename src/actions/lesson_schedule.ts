@@ -307,6 +307,8 @@ export async function createLessonSchedule(params: CreateLessonScheduleParams) {
                 revalidatePath('/coach/schedule')
                 revalidatePath('/admin/schedule')
                 revalidatePath('/admin/billing')
+                revalidatePath(`/customers/${studentId}`)
+                revalidatePath('/customers')
 
                 const isTrial = (student.status === 'trial_pending' || student.status === 'trial_confirmed') && !membership
 
@@ -340,6 +342,8 @@ export async function createLessonSchedule(params: CreateLessonScheduleParams) {
             if (insertError) throw insertError
 
             revalidatePath('/coach/schedule')
+            revalidatePath('/admin/schedule')
+            revalidatePath('/customers')
             return { success: true, data: inserted }
         }
     } catch (error: any) {
@@ -505,6 +509,7 @@ export async function rejectLessonSchedule(scheduleId: string) {
         // Also revalidate schedule pages since it's gone
         revalidatePath('/admin/schedule')
         revalidatePath('/coach/schedule')
+        revalidatePath('/customers')
 
         return { success: true }
     } catch (error: any) {

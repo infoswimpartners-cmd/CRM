@@ -14,7 +14,7 @@ export async function cancelSchedule(scheduleId: string) {
         // 1. Fetch Schedule to check for Stripe ID
         const { data: schedule, error: fetchError } = await supabaseAdmin
             .from('lesson_schedules')
-            .select('stripe_invoice_item_id')
+            .select('stripe_invoice_item_id, student_id')
             .eq('id', scheduleId)
             .single()
 
@@ -39,6 +39,10 @@ export async function cancelSchedule(scheduleId: string) {
 
         revalidatePath('/coach/schedule')
         revalidatePath('/admin/schedule')
+        if (schedule.student_id) {
+            revalidatePath(`/customers/${schedule.student_id}`)
+        }
+        revalidatePath('/customers')
         return { success: true }
     } catch (error: any) {
         console.error('cancelSchedule Error:', error)
@@ -124,6 +128,10 @@ export async function updateScheduleWithCalendar(params: UpdateScheduleParams) {
 
         revalidatePath('/coach/schedule')
         revalidatePath('/admin/schedule')
+        if (params.studentId) {
+            revalidatePath(`/customers/${params.studentId}`)
+        }
+        revalidatePath('/customers')
         return { success: true }
 
     } catch (error: any) {

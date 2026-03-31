@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { notFound } from 'next/navigation'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { StudentChart } from '@/components/customers/StudentChart'
@@ -13,7 +14,7 @@ import { TrialConfirmButton } from '@/components/admin/TrialConfirmButton'
 import { StripeManager } from '@/components/admin/students/StripeManager'
 import { getStripeCustomerStatus } from '@/actions/stripe'
 import { Badge } from '@/components/ui/badge'
-import { Landmark, Users, MessageCircle } from 'lucide-react'
+import { Landmark, Users, MessageCircle, Calendar } from 'lucide-react'
 import { UnlinkLineButton } from '@/components/admin/UnlinkLineButton'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
@@ -22,6 +23,8 @@ import { StudentScheduleButton } from '@/components/students/StudentScheduleButt
 import { StudentScheduleSection } from '@/components/customers/StudentScheduleSection'
 import { StudentMembershipAssigner } from '@/components/admin/StudentMembershipAssigner'
 import { checkStudentLessonStatus } from '@/actions/lesson_schedule'
+
+export const dynamic = 'force-dynamic'
 
 export default async function StudentDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params
@@ -106,8 +109,10 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
         `)
         .eq('student_id', student.id)
 
+    const supabaseAdmin = createAdminClient()
+
     // Fetch Student Schedules (予定一覧)
-    const { data: schedules } = await supabase
+    const { data: schedules } = await supabaseAdmin
         .from('lesson_schedules')
         .select(`
             id,
@@ -115,7 +120,7 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
             start_time,
             end_time,
             location,
-            status,
+            status:billing_status,
             notes,
             profiles (
                 full_name
@@ -123,7 +128,7 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
         `)
         .eq('student_id', student.id)
         .order('start_time', { ascending: false })
-        .limit(30)
+        .limit(100)
 
     // プロフィール名をフラット化
     const formattedSchedules = (schedules || []).map((s: any) => ({
@@ -409,11 +414,23 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
                 </div>
             </div>
 
+            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-bold flex items-center gap-2">
+                        <span className="w-1.5 h-6 bg-purple-500 rounded-full"></span>
+                        登録された予定
+                    </h3>
+                    {isAdmin && (
+                        <StudentScheduleButton studentId={student.id} />
+                    )}
+                </div>
+                <StudentScheduleSection schedules={formattedSchedules} />
+            </div>
+
             <Tabs defaultValue="chart" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
+                <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="chart">カルテ・カウンセリング</TabsTrigger>
                     <TabsTrigger value="history">レッスン履歴</TabsTrigger>
-                    <TabsTrigger value="schedule">予定</TabsTrigger>
                 </TabsList>
                 <TabsContent value="chart" className="mt-4 space-y-8">
                     <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
@@ -435,21 +452,7 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
                 <TabsContent value="history" className="mt-4">
                     <StudentLessonHistory lessons={lessons || []} />
                 </TabsContent>
-                <TabsContent value="schedule" className="mt-4">
-                    <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-lg font-bold flex items-center gap-2">
-                                <span className="w-1.5 h-6 bg-purple-500 rounded-full"></span>
-                                登録された予定
-                            </h3>
-                            {isAdmin && (
-                                <StudentScheduleButton studentId={student.id} />
-                            )}
-                        </div>
-                        <StudentScheduleSection schedules={formattedSchedules} />
-                    </div>
-                </TabsContent>
             </Tabs>
-        </div >
+        </div>
     )
 }
