@@ -277,7 +277,6 @@ export function EditScheduleDialog({ schedule, open, onOpenChange, onSuccess }: 
                 return
             }
 
-            // 日付と時間を結合する
             const startDateTime = new Date(date)
             const [sh, sm] = startTime.split(':').map(Number)
             startDateTime.setHours(sh, sm, 0)
@@ -286,26 +285,20 @@ export function EditScheduleDialog({ schedule, open, onOpenChange, onSuccess }: 
             const [eh, em] = endTime.split(':').map(Number)
             endDateTime.setHours(eh, em, 0)
 
-            const updatePayload: any = {
-                student_id: studentId === 'none' ? null : studentId,
-                start_time: startDateTime.toISOString(),
-                end_time: endDateTime.toISOString(),
+            const { updateScheduleWithCalendar } = await import('@/actions/schedule')
+
+            const result = await updateScheduleWithCalendar({
+                scheduleId: schedule.id,
                 title: title,
+                startTime: startDateTime.toISOString(),
+                endTime: endDateTime.toISOString(),
                 location: location,
-                notes: notes
-            }
+                notes: notes,
+                studentId: studentId === 'none' ? null : studentId,
+                coachId: isAdmin && selectedCoachId ? selectedCoachId : undefined
+            })
 
-            // 管理者の場合のみ担当コーチを更新
-            if (isAdmin && selectedCoachId) {
-                updatePayload.coach_id = selectedCoachId
-            }
-
-            const { error } = await supabase
-                .from('lesson_schedules')
-                .update(updatePayload)
-                .eq('id', schedule.id)
-
-            if (error) throw error
+            if (!result.success) throw new Error(result.error)
 
             toast.success('スケジュールを更新しました')
             if (onSuccess) onSuccess()
