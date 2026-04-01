@@ -499,7 +499,7 @@ export async function approveLessonSchedule(scheduleId: string, forceManualEmail
             revalidatePath('/admin/billing')
             return { success: true, message: deferMessage }
         } else {
-            // [MODIFIED] 体験以外の単発利用の場合は、前日18時の予約請求（Cron）に回すためにステータスを 'approved' に設定する
+            // [MODIFIED] 体験以外の単発利用は、翌月1日のまとめ請求（Invoice Item作成）に変更
             const isTrial = schedule.title && (schedule.title.includes('体験') || schedule.title.includes('トライアル'))
 
             if (isTrial) {
@@ -511,15 +511,15 @@ export async function approveLessonSchedule(scheduleId: string, forceManualEmail
                 revalidatePath('/admin/billing')
                 return { success: true, message: '体験レッスンの承認および決済処理が完了しました' }
             } else {
-                console.log(`[ApproveLesson] Single Lesson (non-trial) detected. Setting to 'approved' for delayed billing.`);
-                const { error: updateError } = await supabaseAdmin
-                    .from('lesson_schedules')
-                    .update({ billing_status: 'approved' })
-                    .eq('id', scheduleId)
-
-                if (updateError) throw updateError
+                console.log(`[ApproveLesson] Single Lesson (non-trial) detected. Deferring to next month...`);
+                // 会員と同様、保留中項目を作成してステータスを ready_to_invoice に更新
+                const billingResult = await createStripeInvoiceItemOnly(schedule.id)
+                if (!billingResult.success) {
+                    return { success: false, error: billingResult.error }
+                }
+                
                 revalidatePath('/admin/billing')
-                return { success: true, message: '単発レッスンの請求を予約しました（前日の18時に自動決済されます）' }
+                return { success: true, message: '承認完了：翌月1日にまとめて請求されます' }
             }
         }
 
