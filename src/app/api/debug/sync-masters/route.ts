@@ -11,33 +11,41 @@ export async function GET() {
 
     try {
         // 1. Sync Lesson Masters
+        // Fetch items missing any of the Stripe IDs (Product, Price, or Pair Price if applicable)
         const { data: lessons, error: lessonError } = await supabase
             .from('lesson_masters')
             .select('*')
-            .is('stripe_price_id', null)
+            .or('stripe_price_id.is.null,stripe_product_id.is.null,stripe_pair_price_id.is.null')
 
         if (lessonError) throw lessonError
 
         if (lessons) {
             for (const lesson of lessons) {
                 try {
-                    const product = await stripe.products.create({
-                        name: lesson.name,
-                        type: 'service',
-                    })
+                    let productId = lesson.stripe_product_id
+                    if (!productId) {
+                        const product = await stripe.products.create({
+                            name: lesson.name,
+                            type: 'service',
+                        })
+                        productId = product.id
+                    }
 
-                    const price = await stripe.prices.create({
-                        product: product.id,
-                        unit_amount: lesson.unit_price,
-                        currency: 'jpy',
-                        // One-time
-                    })
+                    let priceId = lesson.stripe_price_id
+                    if (!priceId) {
+                        const price = await stripe.prices.create({
+                            product: productId,
+                            unit_amount: lesson.unit_price,
+                            currency: 'jpy',
+                        })
+                        priceId = price.id
+                    }
 
-                    // Create Pair Price if exists
-                    let pairPriceId = null
-                    if (lesson.pair_unit_price && lesson.pair_unit_price > 0) {
+                    // Create Pair Price if exists and not already synced
+                    let pairPriceId = lesson.stripe_pair_price_id
+                    if (!pairPriceId && lesson.pair_unit_price && lesson.pair_unit_price > 0) {
                         const pp = await stripe.prices.create({
-                            product: product.id,
+                            product: productId,
                             unit_amount: lesson.pair_unit_price,
                             currency: 'jpy',
                         })
@@ -47,8 +55,8 @@ export async function GET() {
                     const { error: updateError } = await supabase
                         .from('lesson_masters')
                         .update({
-                            stripe_product_id: product.id,
-                            stripe_price_id: price.id,
+                            stripe_product_id: productId,
+                            stripe_price_id: priceId,
                             stripe_pair_price_id: pairPriceId
                         })
                         .eq('id', lesson.id)
@@ -66,30 +74,38 @@ export async function GET() {
         const { data: memberships, error: membershipError } = await supabase
             .from('membership_types')
             .select('*')
-            .is('stripe_price_id', null)
+            .or('stripe_price_id.is.null,stripe_product_id.is.null')
 
         if (membershipError) throw membershipError
 
         if (memberships) {
             for (const membership of memberships) {
                 try {
-                    const product = await stripe.products.create({
-                        name: membership.name,
-                        type: 'service',
-                    })
+                    let productId = membership.stripe_product_id
+                    if (!productId) {
+                        const product = await stripe.products.create({
+                            name: membership.name,
+                            type: 'service',
+                        })
+                        productId = product.id
+                    }
 
-                    const price = await stripe.prices.create({
-                        product: product.id,
-                        unit_amount: membership.fee,
-                        currency: 'jpy',
-                        recurring: { interval: 'month' },
-                    })
+                    let priceId = membership.stripe_price_id
+                    if (!priceId) {
+                        const price = await stripe.prices.create({
+                            product: productId,
+                            unit_amount: membership.fee,
+                            currency: 'jpy',
+                            recurring: { interval: 'month' },
+                        })
+                        priceId = price.id
+                    }
 
                     const { error: updateError } = await supabase
                         .from('membership_types')
                         .update({
-                            stripe_product_id: product.id,
-                            stripe_price_id: price.id
+                            stripe_product_id: productId,
+                            stripe_price_id: priceId
                         })
                         .eq('id', membership.id)
 
