@@ -36,8 +36,8 @@ interface LessonMaster {
     id: string
     name: string
     active: boolean
-    unit_price: number
-    pair_unit_price: number
+    unit_price: number | null
+    pair_unit_price: number | null
 }
 
 export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembershipTypeDialogProps) {
@@ -261,7 +261,7 @@ export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembe
                                                     htmlFor={`edit-lesson-${master.id}`}
                                                     className="text-sm font-medium leading-none cursor-pointer flex-1"
                                                 >
-                                                    {master.name} <span className="text-gray-400 text-xs">(通常単価: ¥{master.unit_price.toLocaleString()})</span>
+                                                    {master.name} <span className="text-gray-400 text-xs">(通常単価: ¥{master.unit_price?.toLocaleString() ?? '—'})</span>
                                                 </label>
                                             </div>
 
@@ -276,14 +276,14 @@ export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembe
                                                             <Input
                                                                 id={`edit-reward-${master.id}`}
                                                                 type="number"
-                                                                placeholder={master.unit_price.toString()}
+                                                                placeholder={master.unit_price?.toString() ?? '0'}
                                                                 value={selectedLessons.get(master.id)?.reward || ''}
                                                                 onChange={(e) => handlePriceChange(master.id, 'reward', e.target.value)}
                                                                 className="h-8 text-sm border-orange-200 focus:border-orange-500"
                                                             />
                                                         </div>
                                                         <span className="text-xs text-gray-400">
-                                                            (空欄: {master.unit_price}円)
+                                                            (空欄: {master.unit_price ?? 0}円)
                                                         </span>
                                                     </div>
 
@@ -296,14 +296,14 @@ export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembe
                                                             <Input
                                                                 id={`edit-unit-${master.id}`}
                                                                 type="number"
-                                                                placeholder={master.unit_price.toString()}
+                                                                placeholder={master.unit_price?.toString() ?? '0'}
                                                                 value={selectedLessons.get(master.id)?.unit || ''}
                                                                 onChange={(e) => handlePriceChange(master.id, 'unit', e.target.value)}
                                                                 className="h-8 text-sm border-blue-200 focus:border-blue-500"
                                                             />
                                                         </div>
                                                         <span className="text-xs text-gray-400">
-                                                            (空欄: {master.unit_price}円)
+                                                            (空欄: {master.unit_price ?? 0}円)
                                                         </span>
                                                     </div>
 
@@ -316,14 +316,14 @@ export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembe
                                                             <Input
                                                                 id={`edit-pair-${master.id}`}
                                                                 type="number"
-                                                                placeholder={master.pair_unit_price.toString()}
+                                                                placeholder={master.pair_unit_price?.toString() ?? '0'}
                                                                 value={selectedLessons.get(master.id)?.pair || ''}
                                                                 onChange={(e) => handlePriceChange(master.id, 'pair', e.target.value)}
                                                                 className="h-8 text-sm border-green-200 focus:border-green-500"
                                                             />
                                                         </div>
                                                         <span className="text-xs text-gray-400">
-                                                            (空欄: {master.pair_unit_price}円)
+                                                            (空欄: {master.pair_unit_price ?? 0}円)
                                                         </span>
                                                     </div>
                                                 </div>
