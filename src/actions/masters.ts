@@ -136,11 +136,18 @@ export async function createLessonMasterAction(data: {
             metadata: { type: 'normal' }
         })
 
-        // Create Pair Price if provided and different from 0
+        // ペア料金は別商品として作成（名称に「（ペア）」を追加）
+        let pairProductId = null
         let pairPriceId = null
         if (data.pairPrice && data.pairPrice > 0) {
+            const pairProduct = await stripe.products.create({
+                name: `${data.name}（ペア）`,
+                type: 'service',
+            })
+            pairProductId = pairProduct.id
+
             const pairPrice = await stripe.prices.create({
-                product: product.id,
+                product: pairProduct.id,
                 unit_amount: data.pairPrice,
                 currency: 'jpy',
                 metadata: { type: 'pair' }
@@ -156,8 +163,9 @@ export async function createLessonMasterAction(data: {
                 unit_price: data.price,
                 pair_unit_price: data.pairPrice || null,
                 is_trial: data.isTrial,
-                stripe_product_id: product.id, // Store Product ID
+                stripe_product_id: product.id,
                 stripe_price_id: price.id,
+                stripe_pair_product_id: pairProductId,
                 stripe_pair_price_id: pairPriceId
             })
 

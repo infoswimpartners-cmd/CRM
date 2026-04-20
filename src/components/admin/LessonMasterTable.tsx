@@ -56,6 +56,7 @@ interface LessonMaster {
     is_single_ticket?: boolean
     stripe_product_id?: string | null
     stripe_price_id?: string | null
+    stripe_pair_product_id?: string | null
     stripe_pair_price_id?: string | null
     created_at: string
     display_order: number
@@ -112,16 +113,23 @@ function SortableRow({ master, toggleActive, setEditingMaster, setDeletingId }: 
                 </div>
             </TableCell>
             <TableCell>
-                <div className="flex flex-col gap-0.5 max-w-[120px]">
+                <div className="flex flex-col gap-0.5 max-w-[150px]">
                     <span className="text-[10px] text-gray-400 truncate" title={(master as any).stripe_product_id}>
-                        Prod: {(master as any).stripe_product_id || '-'}
+                        商品: {(master as any).stripe_product_id || '-'}
                     </span>
                     <span className="text-[10px] text-gray-400 truncate" title={(master as any).stripe_price_id}>
-                        Price: {(master as any).stripe_price_id || '-'}
+                        価格: {(master as any).stripe_price_id || '-'}
                     </span>
-                    <span className="text-[10px] text-gray-400 truncate" title={(master as any).stripe_pair_price_id}>
-                        Pair: {(master as any).stripe_pair_price_id || '-'}
-                    </span>
+                    {(master as any).stripe_pair_product_id && (
+                        <>
+                            <span className="text-[10px] text-blue-400 truncate" title={(master as any).stripe_pair_product_id}>
+                                ペア商品: {(master as any).stripe_pair_product_id}
+                            </span>
+                            <span className="text-[10px] text-blue-400 truncate" title={(master as any).stripe_pair_price_id}>
+                                ペア価格: {(master as any).stripe_pair_price_id || '-'}
+                            </span>
+                        </>
+                    )}
                 </div>
             </TableCell>
 
