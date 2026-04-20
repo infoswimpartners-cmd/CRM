@@ -167,7 +167,7 @@ export function EditLessonTypeDialog({ master, open, onOpenChange, onUpdate }: E
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
                             <Label htmlFor="stripe-price-id" className="text-right whitespace-nowrap text-xs">
-                                Stripe価格ID
+                                Stripe通常価格ID
                             </Label>
                             <Input
                                 id="stripe-price-id"

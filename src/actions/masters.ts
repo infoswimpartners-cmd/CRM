@@ -133,7 +133,7 @@ export async function createLessonMasterAction(data: {
             product: product.id,
             unit_amount: data.price,
             currency: 'jpy',
-            // No recurring for one-time
+            metadata: { type: 'normal' }
         })
 
         // Create Pair Price if provided and different from 0
@@ -143,6 +143,7 @@ export async function createLessonMasterAction(data: {
                 product: product.id,
                 unit_amount: data.pairPrice,
                 currency: 'jpy',
+                metadata: { type: 'pair' }
             })
             pairPriceId = pairPrice.id
         }

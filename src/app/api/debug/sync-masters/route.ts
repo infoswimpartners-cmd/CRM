@@ -32,22 +32,45 @@ export async function GET() {
                     }
 
                     let priceId = lesson.stripe_price_id
+                    if (priceId) {
+                        try {
+                            const p = await stripe.prices.retrieve(priceId)
+                            if (p.unit_amount !== lesson.unit_price) {
+                                priceId = null // Amount mismatch, recreate
+                            }
+                        } catch (e) {
+                            priceId = null // Retrieval failed
+                        }
+                    }
                     if (!priceId) {
                         const price = await stripe.prices.create({
                             product: productId,
                             unit_amount: lesson.unit_price,
                             currency: 'jpy',
+                            metadata: { type: 'normal' }
                         })
                         priceId = price.id
                     }
 
-                    // Create Pair Price if exists and not already synced
+                    // Create Pair Price if exists and not already synced (or mismatched)
                     let pairPriceId = lesson.stripe_pair_price_id
+                    if (pairPriceId) {
+                        try {
+                            const p = await stripe.prices.retrieve(pairPriceId)
+                            if (p.unit_amount !== lesson.pair_unit_price) {
+                                pairPriceId = null
+                            }
+                        } catch (e) {
+                            pairPriceId = null
+                        }
+                    }
+
                     if (!pairPriceId && lesson.pair_unit_price && lesson.pair_unit_price > 0) {
                         const pp = await stripe.prices.create({
                             product: productId,
                             unit_amount: lesson.pair_unit_price,
                             currency: 'jpy',
+                            metadata: { type: 'pair' }
                         })
                         pairPriceId = pp.id
                     }
