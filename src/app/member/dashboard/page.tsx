@@ -132,6 +132,8 @@ export default async function MemberDashboard({
                     location,
                     status:billing_status,
                     notes,
+                    student_id,
+                    coach_id,
                     profiles (
                         full_name
                     )

@@ -497,3 +497,55 @@ export async function createStripeInvoiceItemOnly(scheduleId: string) {
         return { success: false, error: error.message }
     }
 }
+
+// THE TRIO専用 チケット購入 (Checkout Session作成)
+export async function createTrioTicketCheckoutSession(studentId: string, ticketCount: number = 1) {
+    const supabase = await createClient()
+
+    try {
+        // 1. Fetch Student
+        const { data: student } = await supabase
+            .from('students')
+            .select('stripe_customer_id, contact_email, full_name')
+            .eq('id', studentId)
+            .single()
+
+        if (!student) return { success: false, error: 'Student not found' }
+        if (!student.stripe_customer_id) return { success: false, error: 'クレジットカードの登録がありません。マイページより登録を完了してください。' }
+
+        // 仮の決済価格 (本番はProduct/Price IDを用いるかDB設定から引く)
+        const TRIO_TICKET_PRICE = 5000;
+        const totalAmount = TRIO_TICKET_PRICE * ticketCount;
+
+        const session = await stripe.checkout.sessions.create({
+            customer: student.stripe_customer_id,
+            mode: 'payment',
+            currency: 'jpy',
+            line_items: [
+                {
+                    price_data: {
+                        currency: 'jpy',
+                        product_data: {
+                            name: 'THE TRIO レッスンチケット',
+                            description: '最大3名のマッチング・ファースト型プレミアム水泳教室参加チケット',
+                        },
+                        unit_amount: TRIO_TICKET_PRICE,
+                    },
+                    quantity: ticketCount,
+                }
+            ],
+            success_url: `${APP_URL}/trio/dashboard?ticket_purchase=success`,
+            cancel_url: `${APP_URL}/trio/dashboard?ticket_purchase=cancel`,
+            metadata: {
+                studentId: studentId,
+                type: 'trio_ticket_purchase',
+                ticketAmount: ticketCount.toString()
+            }
+        })
+
+        return { success: true, url: session.url }
+    } catch (error: any) {
+        console.error('Create Trio Ticket Checkout Session Error:', error)
+        return { success: false, error: error.message || 'チケット購入画面の生成に失敗しました' }
+    }
+}

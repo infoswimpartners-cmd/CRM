@@ -11,7 +11,9 @@ import { CalendarIcon, Loader2 } from 'lucide-react'
 
 import { createClient } from '@/lib/supabase/client'
 import { submitLessonReport } from '@/actions/report'
-import { cn } from '@/lib/utils'
+import { getCurrentCoachRewardRate } from '@/actions/coaches'
+import { getPendingSchedulesAction } from '@/actions/schedule'
+import { cn, formatCurrency } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
 import { Badge } from '@/components/ui/badge'
@@ -72,8 +74,16 @@ export function LessonReportForm() {
     const [restrictedLessonIds, setRestrictedLessonIds] = useState<string[] | null>(null)
     const [keepValues, setKeepValues] = useState(true)
     const [isCancellation, setIsCancellation] = useState(false)
+    const [coachRate, setCoachRate] = useState<number>(0.5)
+    const [isAdminRole, setIsAdminRole] = useState(false)
+    const [isTwoPersonLesson, setIsTwoPersonLesson] = useState(false)
+    const [isDefaultDistantOption, setIsDefaultDistantOption] = useState(false)
+    const [coachDistantFee, setCoachDistantFee] = useState(0)
+    const [isFacilityFeeApplied, setIsFacilityFeeApplied] = useState(false)
+    const [estimatedReward, setEstimatedReward] = useState<number>(0)
+    const [pendingSchedules, setPendingSchedules] = useState<any[]>([])
     const searchParams = useSearchParams()
-    const scheduleId = searchParams.get('scheduleId')
+    const scheduleIdFromUrl = searchParams.get('scheduleId')
 
     // Load lesson masters and current user on mount
     useEffect(() => {
@@ -90,7 +100,27 @@ export function LessonReportForm() {
 
             // Fetch current user (coach)
             const { data: { user } } = await supabase.auth.getUser()
-            if (user) setCoachId(user.id)
+            if (user) {
+                setCoachId(user.id)
+                // Fetch rate and profile info (distant fee)
+                const rateResult = await getCurrentCoachRewardRate(user.id)
+                if (rateResult.success) {
+                    setCoachRate(rateResult.rate)
+                    // @ts-ignore (isAdmin returned from action)
+                    setIsAdminRole(!!rateResult.isAdmin)
+                }
+
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('distant_reward_fee')
+                    .eq('id', user.id)
+                    .single()
+                if (profile) setCoachDistantFee(profile.distant_reward_fee || 0)
+
+                // Fetch pending schedules
+                const schedulesResult = await getPendingSchedulesAction(user.id)
+                if (schedulesResult.success) setPendingSchedules(schedulesResult.data || [])
+            }
         }
         fetchData()
     }, [])
@@ -109,12 +139,44 @@ export function LessonReportForm() {
             feedback_good: '',
             feedback_next: '',
             price: 0,
+            schedule_id: scheduleIdFromUrl || '',
         },
     })
 
-    // Load schedule data if scheduleId is provided
+    // Helper to fill form from schedule
+    const fillFormFromSchedule = (schedule: any) => {
+        if (!schedule) return
+
+        const studentsData: any = schedule.students
+        const student = Array.isArray(studentsData) ? studentsData[0] : studentsData
+
+        const studentId = student?.id
+        let studentName = student?.full_name
+
+        if (schedule.attendance_type === 'student2' && student?.second_student_name) {
+            studentName = student.second_student_name
+        } else if (schedule.attendance_type === 'both' && student?.second_student_name) {
+            studentName = `${student.full_name} & ${student.second_student_name}`
+        }
+
+        form.setValue('schedule_id', schedule.id)
+        if (studentId) form.setValue('student_id', studentId)
+        if (studentName) form.setValue('student_name', studentName)
+        if (schedule.lesson_master_id) form.setValue('lesson_master_id', schedule.lesson_master_id)
+        if (schedule.start_time) form.setValue('lesson_date', new Date(schedule.start_time))
+        if (schedule.location) {
+            form.setValue('location', schedule.location)
+            const supabase = createClient()
+            supabase.from('facilities').select('is_facility_fee_applied').eq('name', schedule.location).single()
+                .then(({ data }) => setIsFacilityFeeApplied(!!data?.is_facility_fee_applied))
+        }
+        setIsTwoPersonLesson(!!student?.is_two_person_lesson)
+        setIsDefaultDistantOption(!!student?.is_default_distant_option)
+    }
+
+    // Load schedule data if scheduleIdFromUrl is provided
     useEffect(() => {
-        if (!scheduleId || !coachId) return
+        if (!scheduleIdFromUrl || !coachId) return
 
         const fetchSchedule = async () => {
             const supabase = createClient()
@@ -124,29 +186,21 @@ export function LessonReportForm() {
                     *,
                     students (
                         id,
-                        full_name
+                        full_name,
+                        second_student_name,
+                        is_two_person_lesson,
+                        is_default_distant_option
                     )
                 `)
-                .eq('id', scheduleId)
+                .eq('id', scheduleIdFromUrl)
                 .single()
 
             if (schedule) {
-                // Handle students which could be an object or an array depending on Supabase query result
-                const studentsData: any = schedule.students
-                const student = Array.isArray(studentsData) ? studentsData[0] : studentsData
-
-                const studentId = student?.id
-                const studentName = student?.full_name
-
-                if (studentId) form.setValue('student_id', studentId)
-                if (studentName) form.setValue('student_name', studentName)
-                if (schedule.lesson_master_id) form.setValue('lesson_master_id', schedule.lesson_master_id)
-                if (schedule.start_time) form.setValue('lesson_date', new Date(schedule.start_time))
-                if (schedule.location) form.setValue('location', schedule.location)
+                fillFormFromSchedule(schedule)
             }
         }
         fetchSchedule()
-    }, [scheduleId, coachId, form])
+    }, [scheduleIdFromUrl, coachId])
 
     // Watch lesson_master_id to auto-update price
     const selectedMasterId = form.watch('lesson_master_id')
@@ -181,12 +235,17 @@ export function LessonReportForm() {
 
             const supabase = createClient()
 
-            // 1. Get Student's Membership Type ID
+            // 1. Get Student's Membership Type ID and Pair flag
             const { data: student } = await supabase
                 .from('students')
-                .select('membership_type_id')
+                .select('membership_type_id, is_two_person_lesson, is_default_distant_option')
                 .eq('id', selectedStudentId)
                 .single()
+
+            if (student) {
+                setIsTwoPersonLesson(!!student.is_two_person_lesson)
+                setIsDefaultDistantOption(!!student.is_default_distant_option)
+            }
 
             if (!student?.membership_type_id) {
                 setRestrictedLessonIds(null)
@@ -223,6 +282,66 @@ export function LessonReportForm() {
         fetchAllowedLessons()
     }, [selectedStudentId, form])
 
+    // Watch location to update facility fee flag
+    const selectedLocation = form.watch('location')
+    useEffect(() => {
+        if (!selectedLocation) {
+            setIsFacilityFeeApplied(false)
+            return
+        }
+        const fetchFacility = async () => {
+            const supabase = createClient()
+            const { data } = await supabase
+                .from('facilities')
+                .select('is_facility_fee_applied')
+                .eq('name', selectedLocation)
+                .single()
+            setIsFacilityFeeApplied(!!data?.is_facility_fee_applied)
+        }
+        fetchFacility()
+    }, [selectedLocation])
+
+    // Recalculate estimated reward
+    const currentPrice = form.watch('price')
+    useEffect(() => {
+        if (isCancellation) {
+            setEstimatedReward(0)
+            return
+        }
+
+        if (isAdminRole) {
+            // Admin gets 100% of sales price (including facility fee if applied)
+            const master = lessonMasters.find(m => m.id === selectedMasterId)
+            if (!master) {
+                setEstimatedReward(0)
+                return
+            }
+            const facilityFeeAdd = isFacilityFeeApplied ? 1500 : 0
+            setEstimatedReward(master.unit_price + facilityFeeAdd)
+            return
+        }
+
+        const master = lessonMasters.find(m => m.id === selectedMasterId)
+        if (!master) {
+            setEstimatedReward(0)
+            return
+        }
+
+        // Calculation Logic:
+        // Base Reward = master.unit_price * coachRate (not currentPrice because currentPrice might be overridden or empty)
+        // Pair Bonus = +1000
+        // Facility Fee = +1500 if applied
+        // Distant Fee = coachDistantFee if student is pair? Wait, distant fee logic is lesson.students?.is_default_distant_option
+        // For simplicity and based on current rewards.ts logic:
+        
+        const baseReward = Math.floor(master.unit_price * coachRate)
+        const pairBonus = isTwoPersonLesson ? 1000 : 0
+        const facilityFeeAdd = isFacilityFeeApplied ? 1500 : 0
+        const distantFeeAdd = isDefaultDistantOption ? coachDistantFee : 0
+        
+        setEstimatedReward(baseReward + pairBonus + facilityFeeAdd + distantFeeAdd)
+    }, [selectedMasterId, coachRate, isTwoPersonLesson, isFacilityFeeApplied, isDefaultDistantOption, coachDistantFee, isCancellation, lessonMasters])
+
     const displayMasters = restrictedLessonIds !== null
         ? lessonMasters.filter(m => restrictedLessonIds.includes(m.id))
         : lessonMasters
@@ -235,7 +354,7 @@ export function LessonReportForm() {
             const payload = {
                 ...values,
                 lesson_date: format(values.lesson_date, 'yyyy-MM-dd'),
-                schedule_id: scheduleId || undefined,
+                schedule_id: values.schedule_id || undefined,
             }
 
             const result = await submitLessonReport(payload)
@@ -266,7 +385,7 @@ export function LessonReportForm() {
                 }, { keepDefaultValues: false }) // Reset to these as new defaults
 
                 // Clear scheduleId from URL to prevent unwanted re-fills while staying on page
-                if (scheduleId) {
+                if (scheduleIdFromUrl) {
                     router.replace('/coach/report', { scroll: false })
                 }
 
@@ -290,6 +409,36 @@ export function LessonReportForm() {
         <Form {...form}>
             {/* @ts-ignore: Type mismatch in SubmitHandler */}
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 mb-6">
+                    <FormLabel className="text-slate-700 font-bold mb-2 block">登録済みのスケジュールから選択</FormLabel>
+                    <Select 
+                        onValueChange={(id) => {
+                            if (id === 'none') {
+                                form.setValue('schedule_id', '')
+                                return
+                            }
+                            const schedule = pendingSchedules.find(s => s.id === id)
+                            if (schedule) fillFormFromSchedule(schedule)
+                        }}
+                        value={form.watch('schedule_id') || 'none'}
+                    >
+                        <SelectTrigger className="bg-white">
+                            <SelectValue placeholder="未報告のスケジュールを選択（任意）" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="none" className="text-slate-400 italic">選択解除（手動入力）</SelectItem>
+                            {pendingSchedules.map((s) => (
+                                <SelectItem key={s.id} value={s.id}>
+                                    {format(new Date(s.start_time), 'MM/dd HH:mm')} - {s.students?.full_name || '名称未設定'} {s.title ? `(${s.title})` : ''}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <p className="text-[10px] text-slate-500 mt-2">
+                        ※スケジュールを選択すると、生徒名・日時・場所・レッスン種別が自動入力されます。
+                    </p>
+                </div>
+
                 <FormField
                     control={form.control as any}
                     name="student_name"
@@ -492,9 +641,6 @@ export function LessonReportForm() {
                         />
                     </div>
                 </div>
-
-
-
                 <FormField
                     control={form.control as any}
                     name="price"
@@ -516,6 +662,35 @@ export function LessonReportForm() {
                         </FormItem>
                     )}
                 />
+
+                <div className="bg-blue-50 border border-blue-100 p-4 rounded-lg flex justify-between items-center shadow-sm">
+                    <div>
+                        <p className="text-xs text-blue-600 font-bold mb-1">想定報酬単価（ランク計上分込）</p>
+                        <p className="text-xl font-black text-blue-900">
+                            {formatCurrency(estimatedReward)}
+                        </p>
+                    </div>
+                    <div className="text-right">
+                        <Badge variant="outline" className="bg-white text-blue-700 border-blue-200">
+                            適用レート: {isAdminRole ? '100% (管理者)' : `${(coachRate * 100).toFixed(0)}%`}
+                        </Badge>
+                        {!isAdminRole && isTwoPersonLesson && (
+                            <div className="text-[10px] text-blue-500 mt-1 font-bold">
+                                + ペア手当 (¥1,000) 適用中
+                            </div>
+                        )}
+                        {isDefaultDistantOption && (
+                            <div className="text-[10px] text-blue-500 mt-0.5 font-bold">
+                                + 遠方対応手当 (¥{coachDistantFee.toLocaleString()}) 適用中
+                            </div>
+                        )}
+                        {isFacilityFeeApplied && (
+                            <div className="text-[10px] text-blue-500 mt-0.5 font-bold">
+                                + 施設利用手当 (¥1,500) 適用中
+                            </div>
+                        )}
+                    </div>
+                </div>
 
                 <div className="flex items-center space-x-2 py-2 bg-slate-50 p-4 rounded-lg border border-slate-100">
                     <Checkbox

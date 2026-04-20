@@ -55,9 +55,10 @@ interface Schedule {
     location?: string
     notes?: string
     status?: string
-    student?: { full_name: string }
+    student?: { full_name: string, second_student_name?: string | null }
     student_id?: string
     coach_id?: string
+    attendance_type?: string
 }
 
 interface EditScheduleDialogProps {
@@ -70,6 +71,7 @@ interface EditScheduleDialogProps {
 interface Student {
     id: string
     full_name: string
+    second_student_name?: string | null
 }
 
 export function EditScheduleDialog({ schedule, open, onOpenChange, onSuccess }: EditScheduleDialogProps) {
@@ -95,6 +97,7 @@ export function EditScheduleDialog({ schedule, open, onOpenChange, onSuccess }: 
     const [notes, setNotes] = useState('')
     const [title, setTitle] = useState('')
     const [duration, setDuration] = useState(60)
+    const [attendanceType, setAttendanceType] = useState('both')
 
     // Initial Data Fetch (User Role, Coaches)
     useEffect(() => {
@@ -144,6 +147,7 @@ export function EditScheduleDialog({ schedule, open, onOpenChange, onSuccess }: 
             setLocation(schedule.location || '')
             setNotes(schedule.notes || '')
             setStudentId(schedule.student_id || 'none')
+            setAttendanceType((schedule as any).attendance_type || 'both')
 
             // Set initial selected coach from schedule. 
             // Note: schedule object needs to contain coach_id. The interface defined above doesn't have it explicitly yet?
@@ -214,10 +218,20 @@ export function EditScheduleDialog({ schedule, open, onOpenChange, onSuccess }: 
         if (title === '') {
             if (studentId && studentId !== 'none') {
                 const student = students.find(s => s.id === studentId)
-                if (student) setTitle(`${student.full_name}様 レッスン`)
+                if (student) {
+                    let displayName = student.full_name
+                    if (student.second_student_name) {
+                        if (attendanceType === 'both') {
+                            displayName = `${student.full_name} & ${student.second_student_name}`
+                        } else if (attendanceType === 'student2') {
+                            displayName = student.second_student_name
+                        }
+                    }
+                    setTitle(`${displayName}様 レッスン`)
+                }
             }
         }
-    }, [studentId, students, title, open])
+    }, [studentId, students, title, open, attendanceType])
 
 
     const handleApprove = async () => {
@@ -295,7 +309,8 @@ export function EditScheduleDialog({ schedule, open, onOpenChange, onSuccess }: 
                 location: location,
                 notes: notes,
                 studentId: studentId === 'none' ? null : studentId,
-                coachId: isAdmin && selectedCoachId ? selectedCoachId : undefined
+                coachId: isAdmin && selectedCoachId ? selectedCoachId : undefined,
+                attendance_type: attendanceType
             })
 
             if (!result.success) throw new Error(result.error)
@@ -366,13 +381,37 @@ export function EditScheduleDialog({ schedule, open, onOpenChange, onSuccess }: 
 
                         <div className="grid gap-2">
                             <Label>生徒</Label>
-                            {/* 生徒の変更はできない仕様のため、テキスト表示のみにする */}
-                            <Input
-                                value={students.find(s => s.id === studentId)?.full_name || (schedule as any)?.students?.full_name || (schedule as any)?.student?.full_name || (schedule as any)?.student_name || '選択なし'}
-                                readOnly
-                                disabled
-                                className="bg-slate-50 text-slate-500 cursor-not-allowed"
-                            />
+                            {/* 生徒の表示改善: 2人目の氏名も表示 */}
+                            <div className="flex flex-col gap-1">
+                                <Input
+                                    value={(() => {
+                                        const s = students.find(st => st.id === studentId) || (schedule as any)?.student;
+                                        if (s) {
+                                            return s.second_student_name ? `${s.full_name} & ${s.second_student_name}` : s.full_name;
+                                        }
+                                        return (schedule as any)?.student_name || '選択なし';
+                                    })()}
+                                    readOnly
+                                    disabled
+                                    className="bg-slate-50 text-slate-700 cursor-not-allowed font-medium"
+                                />
+                                {studentId !== 'none' && (students.find(s => s.id === studentId)?.second_student_name || (schedule as any)?.student?.second_student_name) && (
+                                    <div className="grid gap-2 mt-2 p-3 bg-blue-50 border border-blue-100 rounded-md">
+                                        <Label className="text-blue-800 font-bold text-xs">受講形式</Label>
+                                        <Select value={attendanceType} onValueChange={setAttendanceType}>
+                                            <SelectTrigger className="bg-white">
+                                                <SelectValue placeholder="形式を選択" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="both">ペア受講（2名同時）</SelectItem>
+                                                <SelectItem value="student1">個人受講（1人目のみ）</SelectItem>
+                                                <SelectItem value="student2">個人受講（2人目のみ）</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        <p className="text-[10px] text-blue-600">※個人受講を選択した場合は通常単価が適用されます。</p>
+                                    </div>
+                                )}
+                            </div>
                             <input type="hidden" name="studentId" value={studentId} />
                         </div>
 

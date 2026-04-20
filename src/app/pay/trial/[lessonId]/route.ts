@@ -12,9 +12,9 @@ export async function GET(
 
     try {
         console.log(`[Trial Payment] Generating dynamic session for lesson: ${lessonId}`)
-        // Fetch lesson detail
-        const { data: lesson, error: lessonError } = await supabaseAdmin
-            .from('lessons')
+        // Fetch schedule detail (instead of lesson)
+        const { data: schedule, error: scheduleError } = await supabaseAdmin
+            .from('lesson_schedules')
             .select(`
                 *,
                 students (
@@ -34,12 +34,13 @@ export async function GET(
             .eq('id', lessonId)
             .single()
 
-        if (lessonError || !lesson) {
-            return new NextResponse('Lesson not found', { status: 404 })
+        if (scheduleError || !schedule) {
+            console.error('[Trial Payment] Schedule not found:', lessonId, scheduleError)
+            return new NextResponse('Schedule not found', { status: 404 })
         }
 
-        const student = Array.isArray(lesson.students) ? lesson.students[0] : lesson.students;
-        const lessonMaster = Array.isArray(lesson.lesson_masters) ? lesson.lesson_masters[0] : lesson.lesson_masters;
+        const student = Array.isArray(schedule.students) ? schedule.students[0] : schedule.students;
+        const lessonMaster = Array.isArray(schedule.lesson_masters) ? schedule.lesson_masters[0] : schedule.lesson_masters;
 
         let stripeCustomerId = student?.stripe_customer_id
         if (!stripeCustomerId) {
@@ -57,7 +58,7 @@ export async function GET(
                     product_data: {
                         name: lessonMaster?.name || '体験レッスン',
                     },
-                    unit_amount: lesson.billing_price || lessonMaster?.unit_price || 0,
+                    unit_amount: schedule.price || lessonMaster?.unit_price || 0,
                 },
                 quantity: 1,
             }],
@@ -65,9 +66,10 @@ export async function GET(
             cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/cancel`,
             metadata: {
                 studentId: student.id,
+                scheduleId: schedule.id,
                 type: 'trial_fee',
-                lessonDate: lesson.lesson_date,
-                location: lesson.location || '未定'
+                lessonDate: schedule.start_time,
+                location: schedule.location || '未定'
             },
             payment_intent_data: {
                 setup_future_usage: 'off_session',

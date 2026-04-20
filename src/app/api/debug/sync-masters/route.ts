@@ -33,9 +33,24 @@ export async function GET() {
                         // One-time
                     })
 
+                    // Create Pair Price if exists
+                    let pairPriceId = null
+                    if (lesson.pair_unit_price && lesson.pair_unit_price > 0) {
+                        const pp = await stripe.prices.create({
+                            product: product.id,
+                            unit_amount: lesson.pair_unit_price,
+                            currency: 'jpy',
+                        })
+                        pairPriceId = pp.id
+                    }
+
                     const { error: updateError } = await supabase
                         .from('lesson_masters')
-                        .update({ stripe_price_id: price.id })
+                        .update({
+                            stripe_product_id: product.id,
+                            stripe_price_id: price.id,
+                            stripe_pair_price_id: pairPriceId
+                        })
                         .eq('id', lesson.id)
 
                     if (updateError) throw updateError
@@ -72,7 +87,10 @@ export async function GET() {
 
                     const { error: updateError } = await supabase
                         .from('membership_types')
-                        .update({ stripe_price_id: price.id })
+                        .update({
+                            stripe_product_id: product.id,
+                            stripe_price_id: price.id
+                        })
                         .eq('id', membership.id)
 
                     if (updateError) throw updateError

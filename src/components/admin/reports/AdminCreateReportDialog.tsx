@@ -117,10 +117,10 @@ export function AdminCreateReportDialog({ open, onOpenChange }: AdminCreateRepor
             const supabase = createClient()
             // junction テーブルから生徒を取得
             const [{ data: directStudents }, { data: junctionStudents }] = await Promise.all([
-                supabase.from('students').select('id, full_name').eq('coach_id', selectedCoachId).order('full_name'),
-                supabase.from('student_coaches').select('students(id, full_name)').eq('coach_id', selectedCoachId),
+                supabase.from('students').select('id, full_name, second_student_name').eq('coach_id', selectedCoachId).order('full_name'),
+                supabase.from('student_coaches').select('students(id, full_name, second_student_name)').eq('coach_id', selectedCoachId),
             ])
-            const combined: { id: string; full_name: string }[] = [...(directStudents || [])]
+            const combined: { id: string; full_name: string; second_student_name: string | null }[] = [...(directStudents || [])]
             junctionStudents?.forEach((j: any) => {
                 const s = j.students
                 if (s && !combined.find(c => c.id === s.id)) combined.push(s)
@@ -269,7 +269,10 @@ export function AdminCreateReportDialog({ open, onOpenChange }: AdminCreateRepor
                                                 } else {
                                                     const s = students.find(s => s.id === val)
                                                     form.setValue('student_id', val)
-                                                    form.setValue('student_name', s?.full_name || '')
+                                                    const displayName = s?.second_student_name 
+                                                        ? `${s.full_name} & ${s.second_student_name}`
+                                                        : s?.full_name || ''
+                                                    form.setValue('student_name', displayName)
                                                 }
                                             }}
                                             disabled={!selectedCoachId}
@@ -280,7 +283,10 @@ export function AdminCreateReportDialog({ open, onOpenChange }: AdminCreateRepor
                                             <SelectContent>
                                                 <SelectItem value="__manual__">手入力</SelectItem>
                                                 {students.map(s => (
-                                                    <SelectItem key={s.id} value={s.id}>{s.full_name}</SelectItem>
+                                                    <SelectItem key={s.id} value={s.id}>
+                                                        {s.full_name}
+                                                        {s.second_student_name && ` & ${s.second_student_name}`}
+                                                    </SelectItem>
                                                 ))}
                                             </SelectContent>
                                         </Select>

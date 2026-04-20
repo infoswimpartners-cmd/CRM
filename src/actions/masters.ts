@@ -115,6 +115,7 @@ export async function createMembershipTypeAction(data: {
 export async function createLessonMasterAction(data: {
     name: string
     price: number
+    pairPrice?: number
     isTrial: boolean
 }) {
     const supabase = await createClient()
@@ -135,15 +136,28 @@ export async function createLessonMasterAction(data: {
             // No recurring for one-time
         })
 
+        // Create Pair Price if provided and different from 0
+        let pairPriceId = null
+        if (data.pairPrice && data.pairPrice > 0) {
+            const pairPrice = await stripe.prices.create({
+                product: product.id,
+                unit_amount: data.pairPrice,
+                currency: 'jpy',
+            })
+            pairPriceId = pairPrice.id
+        }
+
         // 2. Insert into DB
         const { error } = await supabase
             .from('lesson_masters')
             .insert({
                 name: data.name,
                 unit_price: data.price,
+                pair_unit_price: data.pairPrice || null,
                 is_trial: data.isTrial,
                 stripe_product_id: product.id, // Store Product ID
-                stripe_price_id: price.id
+                stripe_price_id: price.id,
+                stripe_pair_price_id: pairPriceId
             })
 
         if (error) throw error

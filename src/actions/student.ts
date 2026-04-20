@@ -40,7 +40,8 @@ export async function updateStudent(id: string, formData: any) {
             membership_type_id: formData.membership_type_id === 'unassigned' ? null : (formData.membership_type_id || null),
             coach_id: formData.coach_id === 'unassigned' ? null : (formData.coach_id || null),
             is_bank_transfer: formData.is_bank_transfer || false,
-            is_two_person_lesson: formData.is_two_person_lesson || false
+            is_two_person_lesson: formData.is_two_person_lesson || false,
+            apply_pair_pricing: formData.apply_pair_pricing || false
         }
 
         // LINE連携解除（管理画面からチェックを外して空文字になった場合、null として保存）
@@ -347,6 +348,7 @@ export async function createStudent(formData: any) {
             coach_id: (!formData.coach_id || formData.coach_id === 'unassigned') ? null : formData.coach_id,
             is_bank_transfer: formData.is_bank_transfer || false,
             is_two_person_lesson: formData.is_two_person_lesson || false,
+            apply_pair_pricing: formData.apply_pair_pricing || false,
             birth_date: toNull(formData.birth_date),
             second_student_birth_date: toNull(formData.second_student_birth_date)
         }

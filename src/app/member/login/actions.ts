@@ -40,8 +40,26 @@ export async function login(prevState: any, formData: FormData) {
         return { error: 'ログインに失敗しました' }
     }
 
+    // Check if the user is a TRIO member
+    const { data: student } = await supabase
+        .from('students')
+        .select(`
+            membership_types!students_membership_type_id_fkey(name)
+        `)
+        .eq('auth_user_id', user.id)
+        .single();
+    
+    // @ts-ignore
+    const planName = student?.membership_types?.name || '';
+    const isTrioMember = planName.toLowerCase().includes('trio');
+
     // Clear cache specifically for layouts to ensure fresh data
     revalidatePath('/member', 'layout')
+    revalidatePath('/trio', 'layout')
 
-    redirect('/member/dashboard')
+    if (isTrioMember) {
+        redirect('/trio/dashboard')
+    } else {
+        redirect('/member/dashboard')
+    }
 }

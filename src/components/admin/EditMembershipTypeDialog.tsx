@@ -37,6 +37,7 @@ interface LessonMaster {
     name: string
     active: boolean
     unit_price: number
+    pair_unit_price: number
 }
 
 export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembershipTypeDialogProps) {
@@ -47,8 +48,8 @@ export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembe
     const [fee, setFee] = useState(type.fee.toString())
     const [stripeProductId, setStripeProductId] = useState((type as any).stripe_product_id || '')
     const [stripePriceId, setStripePriceId] = useState((type as any).stripe_price_id || '')
-    // Map of lesson_id -> custom reward price (null means use master price)
-    const [selectedLessons, setSelectedLessons] = useState<Map<string, string>>(new Map())
+    // Map of lesson_id -> { reward: string, unit: string, pair: string }
+    const [selectedLessons, setSelectedLessons] = useState<Map<string, { reward: string, unit: string, pair: string }>>(new Map())
     const [lessonMasters, setLessonMasters] = useState<LessonMaster[]>([])
 
     // Fetch Masters and Existing Relations
@@ -59,7 +60,7 @@ export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembe
             // 1. Fetch Masters
             const { data: masters } = await supabase
                 .from('lesson_masters')
-                .select('id, name, active, unit_price')
+                .select('id, name, active, unit_price, pair_unit_price')
                 .eq('active', true)
                 .order('name')
             if (masters) setLessonMasters(masters as any)
@@ -68,20 +69,24 @@ export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembe
             if (type.id) {
                 const { data: relations } = await supabase
                     .from('membership_type_lessons')
-                    .select('lesson_master_id, reward_price')
+                    .select('lesson_master_id, reward_price, unit_price, pair_unit_price')
                     .eq('membership_type_id', type.id)
 
                 if (relations && relations.length > 0) {
-                    const newMap = new Map<string, string>()
+                    const newMap = new Map<string, { reward: string, unit: string, pair: string }>()
                     relations.forEach((r: any) => {
-                        newMap.set(r.lesson_master_id, r.reward_price !== null ? String(r.reward_price) : '')
+                        newMap.set(r.lesson_master_id, {
+                            reward: r.reward_price !== null ? String(r.reward_price) : '',
+                            unit: r.unit_price !== null ? String(r.unit_price) : '',
+                            pair: r.pair_unit_price !== null ? String(r.pair_unit_price) : ''
+                        })
                     })
                     setSelectedLessons(newMap)
                 } else {
                     // Fallback to legacy field
                     if (type.default_lesson_master_id) {
-                        const newMap = new Map<string, string>()
-                        newMap.set(type.default_lesson_master_id, '')
+                        const newMap = new Map<string, { reward: string, unit: string, pair: string }>()
+                        newMap.set(type.default_lesson_master_id, { reward: '', unit: '', pair: '' })
                         setSelectedLessons(newMap)
                     } else {
                         setSelectedLessons(new Map())
@@ -105,14 +110,15 @@ export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembe
         if (newMap.has(id)) {
             newMap.delete(id)
         } else {
-            newMap.set(id, '')
+            newMap.set(id, { reward: '', unit: '', pair: '' })
         }
         setSelectedLessons(newMap)
     }
 
-    const handlePriceChange = (id: string, value: string) => {
+    const handlePriceChange = (id: string, field: 'reward' | 'unit' | 'pair', value: string) => {
         const newMap = new Map(selectedLessons)
-        newMap.set(id, value)
+        const current = newMap.get(id) || { reward: '', unit: '', pair: '' }
+        newMap.set(id, { ...current, [field]: value })
         setSelectedLessons(newMap)
     }
 
@@ -145,10 +151,12 @@ export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembe
             if (deleteError) throw deleteError
 
             if (selectedLessons.size > 0) {
-                const relations = Array.from(selectedLessons.entries()).map(([lessonId, priceStr]) => ({
+                const relations = Array.from(selectedLessons.entries()).map(([lessonId, prices]) => ({
                     membership_type_id: type.id,
                     lesson_master_id: lessonId,
-                    reward_price: priceStr && !isNaN(parseInt(priceStr)) ? parseInt(priceStr) : null
+                    reward_price: prices.reward && !isNaN(parseInt(prices.reward)) ? parseInt(prices.reward) : null,
+                    unit_price: prices.unit && !isNaN(parseInt(prices.unit)) ? parseInt(prices.unit) : null,
+                    pair_unit_price: prices.pair && !isNaN(parseInt(prices.pair)) ? parseInt(prices.pair) : null
                 }))
 
                 const { error: insertError } = await supabase
@@ -258,23 +266,66 @@ export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembe
                                             </div>
 
                                             {isChecked && (
-                                                <div className="flex items-center gap-2 pl-6 animate-in slide-in-from-top-1 duration-200">
-                                                    <Label htmlFor={`edit-price-${master.id}`} className="text-xs text-gray-500 whitespace-nowrap">
-                                                        報酬計算単価:
-                                                    </Label>
-                                                    <div className="relative w-32">
-                                                        <Input
-                                                            id={`edit-price-${master.id}`}
-                                                            type="number"
-                                                            placeholder={master.unit_price.toString()}
-                                                            value={selectedLessons.get(master.id) || ''}
-                                                            onChange={(e) => handlePriceChange(master.id, e.target.value)}
-                                                            className="h-8 text-sm"
-                                                        />
+                                                <div className="space-y-3 pl-6 pt-2 animate-in slide-in-from-top-1 duration-200">
+                                                    {/* 報酬計算単価 */}
+                                                    <div className="flex items-center gap-2">
+                                                        <Label htmlFor={`edit-reward-${master.id}`} className="text-xs text-orange-600 font-bold whitespace-nowrap w-20">
+                                                            コーチ報酬:
+                                                        </Label>
+                                                        <div className="relative w-32">
+                                                            <Input
+                                                                id={`edit-reward-${master.id}`}
+                                                                type="number"
+                                                                placeholder={master.unit_price.toString()}
+                                                                value={selectedLessons.get(master.id)?.reward || ''}
+                                                                onChange={(e) => handlePriceChange(master.id, 'reward', e.target.value)}
+                                                                className="h-8 text-sm border-orange-200 focus:border-orange-500"
+                                                            />
+                                                        </div>
+                                                        <span className="text-xs text-gray-400">
+                                                            (空欄: {master.unit_price}円)
+                                                        </span>
                                                     </div>
-                                                    <span className="text-xs text-gray-400">
-                                                        (空欄は {master.unit_price}円)
-                                                    </span>
+
+                                                    {/* 通常受講料 (単発用) */}
+                                                    <div className="flex items-center gap-2">
+                                                        <Label htmlFor={`edit-unit-${master.id}`} className="text-xs text-blue-600 font-bold whitespace-nowrap w-20">
+                                                            通常受講料:
+                                                        </Label>
+                                                        <div className="relative w-32">
+                                                            <Input
+                                                                id={`edit-unit-${master.id}`}
+                                                                type="number"
+                                                                placeholder={master.unit_price.toString()}
+                                                                value={selectedLessons.get(master.id)?.unit || ''}
+                                                                onChange={(e) => handlePriceChange(master.id, 'unit', e.target.value)}
+                                                                className="h-8 text-sm border-blue-200 focus:border-blue-500"
+                                                            />
+                                                        </div>
+                                                        <span className="text-xs text-gray-400">
+                                                            (空欄: {master.unit_price}円)
+                                                        </span>
+                                                    </div>
+
+                                                    {/* ペア受講料 (単発用) */}
+                                                    <div className="flex items-center gap-2">
+                                                        <Label htmlFor={`edit-pair-${master.id}`} className="text-xs text-green-600 font-bold whitespace-nowrap w-20">
+                                                            ペア受講料:
+                                                        </Label>
+                                                        <div className="relative w-32">
+                                                            <Input
+                                                                id={`edit-pair-${master.id}`}
+                                                                type="number"
+                                                                placeholder={master.pair_unit_price.toString()}
+                                                                value={selectedLessons.get(master.id)?.pair || ''}
+                                                                onChange={(e) => handlePriceChange(master.id, 'pair', e.target.value)}
+                                                                className="h-8 text-sm border-green-200 focus:border-green-500"
+                                                            />
+                                                        </div>
+                                                        <span className="text-xs text-gray-400">
+                                                            (空欄: {master.pair_unit_price}円)
+                                                        </span>
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>

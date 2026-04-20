@@ -78,6 +78,7 @@ interface Coach {
 interface Student {
     id: string
     full_name: string
+    second_student_name?: string | null
     default_master_id?: string
 }
 
@@ -357,8 +358,11 @@ export function PublicLessonReportForm() {
                                                         key={student.id}
                                                         className="py-3 text-base md:text-sm"
                                                         onSelect={() => {
+                                                            const displayName = student.second_student_name 
+                                                                ? `${student.full_name} & ${student.second_student_name}`
+                                                                : student.full_name
                                                             form.setValue("student_id", student.id)
-                                                            form.setValue("student_name", student.full_name)
+                                                            form.setValue("student_name", displayName)
 
                                                             // Auto-select and Restrict Default Lesson Master if exists
                                                             if (student.default_master_id) {
@@ -384,6 +388,7 @@ export function PublicLessonReportForm() {
                                                             )}
                                                         />
                                                         {student.full_name}
+                                                        {student.second_student_name && <span className="text-slate-400 ml-1">& {student.second_student_name}</span>}
                                                     </CommandItem>
                                                 ))}
                                             </CommandGroup>

@@ -10,7 +10,7 @@ export const getCachedMemberData = cache(async () => {
 
     // 1. Auth User
     const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) return { user: null, student: null };
+    if (authError || !user) return { user: null, student: null, isTrioMember: false };
 
     // 2. Student Data (Commonly used fields)
     const { data: student, error: studentError } = await supabase
@@ -25,9 +25,14 @@ export const getCachedMemberData = cache(async () => {
         .single();
 
     if (studentError) {
-        console.error('Error fetching cached student data:', studentError);
-        return { user, student: null };
+        if (studentError.code !== 'PGRST116') {
+            console.error('Error fetching cached student data:', studentError.message || studentError);
+        }
+        return { user, student: null, isTrioMember: false };
     }
 
-    return { user, student };
+    const planName = student.membership_types?.name || '';
+    const isTrioMember = planName.toLowerCase().includes('trio');
+
+    return { user, student, isTrioMember };
 });

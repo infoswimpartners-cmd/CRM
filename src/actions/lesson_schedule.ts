@@ -9,7 +9,7 @@ import { emailService } from '@/lib/email'
 import { processLessonBilling } from '@/actions/billing'
 import { createStripeInvoiceItemOnly } from '@/actions/stripe'
 
-import { formatStudentNames } from '@/lib/utils'
+import { formatStudentNames, calculateLessonPrice } from '@/lib/utils'
 
 
 interface CreateLessonScheduleParams {
@@ -21,6 +21,7 @@ interface CreateLessonScheduleParams {
     title: string
     location?: string
     notes?: string
+    attendance_type?: string
 }
 
 
@@ -176,20 +177,22 @@ export async function createLessonSchedule(params: CreateLessonScheduleParams) {
                     created_at,
                     full_name,
                     second_student_name,
+                    is_two_person_lesson,
+                    apply_pair_pricing,
                     status,
                     membership:membership_types!students_membership_type_id_fkey (
                         monthly_lesson_limit,
                         max_rollover_limit,
                         fee,
                         name,
-                        default_lesson:lesson_masters!default_lesson_master_id(unit_price)
+                        default_lesson:lesson_masters!default_lesson_master_id(unit_price, pair_unit_price)
                     ),
                     next_membership:membership_types!students_next_membership_type_id_fkey (
                         monthly_lesson_limit,
                         max_rollover_limit,
                         fee,
                         name,
-                        default_lesson:lesson_masters!default_lesson_master_id(unit_price)
+                        default_lesson:lesson_masters!default_lesson_master_id(unit_price, pair_unit_price)
                     )
                 `)
                 .eq('id', studentId)
@@ -246,14 +249,16 @@ export async function createLessonSchedule(params: CreateLessonScheduleParams) {
 
                     // 3. Billing Logic (Immediate)
                     // Calculate Price
+                    let pairUnitPrice: number | null = null
                     if (params.lesson_master_id) {
                         const { data: lm } = await supabaseAdmin
                             .from('lesson_masters')
-                            .select('unit_price')
+                            .select('unit_price, pair_unit_price')
                             .eq('id', params.lesson_master_id)
                             .single()
                         if (lm && lm.unit_price) {
                             overagePrice = lm.unit_price
+                            pairUnitPrice = lm.pair_unit_price
                         }
                     }
 
@@ -262,9 +267,12 @@ export async function createLessonSchedule(params: CreateLessonScheduleParams) {
                         // @ts-ignore
                         const defaultLesson = Array.isArray(membership?.default_lesson) ? membership.default_lesson[0] : membership?.default_lesson
                         const defaultUnitPrice = defaultLesson?.unit_price
+                        // @ts-ignore
+                        const defaultPairPrice = defaultLesson?.pair_unit_price
 
                         if (defaultUnitPrice) {
                             overagePrice = defaultUnitPrice
+                            pairUnitPrice = defaultPairPrice
                             console.log(`[CreateLesson] Using default lesson unit price: ${overagePrice}`)
                         } else if (membership?.fee && limit > 0) {
                             // Fallback to average if no default lesson price
@@ -275,9 +283,16 @@ export async function createLessonSchedule(params: CreateLessonScheduleParams) {
                         }
                     }
 
+                    // Link with master pair price manually managed by apply_pair_pricing flag
+                    // [MODIFIED] 受講形式によってペア単価を適用するか判定
+                    const applyPairPrice = !!student.apply_pair_pricing && (params.attendance_type === 'both' || !params.attendance_type)
+                    
+                    // @ts-ignore (pairUnitPrice defined above)
+                    overagePrice = calculateLessonPrice(overagePrice, applyPairPrice, pairUnitPrice)
+
                     // Determine Billing Status
                     billingStatus = 'awaiting_approval'
-                    console.log(`[CreateLesson] Overage Detected. Price: ${overagePrice}. Status: ${billingStatus}`)
+                    console.log(`[CreateLesson] Overage Detected. Price: ${overagePrice} (Attendance: ${params.attendance_type}). Status: ${billingStatus}`)
                 } // End if (checkOverage)
 
                 // 4. Insert Schedule (Always)
@@ -293,6 +308,7 @@ export async function createLessonSchedule(params: CreateLessonScheduleParams) {
                         location: params.location,
                         notes: params.notes,
                         is_overage: isOverage,
+                        attendance_type: params.attendance_type || 'both',
                         billing_status: billingStatus,
                         billing_scheduled_at: billingScheduledAt,
                         notification_sent_at: notificationSentAt,
@@ -603,23 +619,31 @@ export async function checkStudentLessonStatus(studentId: string, dateStr: strin
                 status,
                 membership_started_at,
                 created_at,
+                current_tickets,
+                second_student_name,
+                is_two_person_lesson,
+                apply_pair_pricing,
                 membership_types!students_membership_type_id_fkey (
                     name,
                     id,
                     default_lesson_master_id,
                     monthly_lesson_limit,
                     max_rollover_limit,
-                    default_lesson:lesson_masters!default_lesson_master_id (
+                    default_lesson: lesson_masters!default_lesson_master_id (
                         id,
                         name,
-                        unit_price
+                        unit_price,
+                        pair_unit_price
                     ),
                     membership_type_lessons (
                         lesson_master_id,
+                        unit_price,
+                        pair_unit_price,
                         lesson_masters (
                             id,
                             name,
-                            unit_price
+                            unit_price,
+                            pair_unit_price
                         )
                     )
                 )
@@ -658,7 +682,7 @@ export async function checkStudentLessonStatus(studentId: string, dateStr: strin
             // Fetch lessons with "体験" in name
             const { data: trialLessons, error: trialError } = await supabaseAdmin
                 .from('lesson_masters')
-                .select('id, name, unit_price')
+                .select('id, name, unit_price, pair_unit_price')
                 .ilike('name', '%体験%')
                 .eq('active', true)
 
@@ -700,13 +724,32 @@ export async function checkStudentLessonStatus(studentId: string, dateStr: strin
                 if (!membership || !limit || limit === 0 || (membershipName && membershipName.includes('単発'))) {
                     isOverage = true
                 } else if (limit > 0 && currentTotal >= effectiveLimit) {
-                    isOverage = true
+                    // プラン上限に達していても、振替チケットがあれば超過とはみなさない
+                    isOverage = (student.current_tickets || 0) <= 0
+                }
+            } else {
+                // すでに isOverage = true の場合（未入会期間など）も、チケットがあれば救済する
+                if (student.current_tickets && student.current_tickets > 0) {
+                    // 単発プラン以外の場合のみチケット救済を適用
+                    const isSinglePlan = !membership || !limit || limit === 0 || (membershipName && membershipName.includes('単発'))
+                    if (!isSinglePlan) {
+                        isOverage = false
+                        console.log(`[CheckStatus] Overage prevented by available tickets: ${student.current_tickets}`)
+                    }
                 }
             }
 
-            // Extract active lessons for this membership
+            // Extract active lessons for this membership, prioritizing custom prices defined in recruitment
             // @ts-ignore
-            const linkedLessons = membership?.membership_type_lessons?.map((mtl: any) => mtl.lesson_masters) || []
+            const linkedLessons = membership?.membership_type_lessons?.map((mtl: any) => {
+                if (!mtl.lesson_masters) return null
+                return {
+                    ...mtl.lesson_masters,
+                    // Override with custom prices if defined
+                    unit_price: mtl.unit_price !== null ? mtl.unit_price : mtl.lesson_masters.unit_price,
+                    pair_unit_price: mtl.pair_unit_price !== null ? mtl.pair_unit_price : mtl.lesson_masters.pair_unit_price
+                }
+            }) || []
 
             availableLessons = linkedLessons.filter((l: any) => l) // filter nulls
 
@@ -715,7 +758,7 @@ export async function checkStudentLessonStatus(studentId: string, dateStr: strin
                 console.log(`[CheckStatus] No membership found for student ${studentId}. Fetching all active lessons.`)
                 const { data: allLessons } = await supabaseAdmin
                     .from('lesson_masters')
-                    .select('id, name, unit_price')
+                    .select('id, name, unit_price, pair_unit_price')
                     .eq('active', true)
                     .order('display_order', { ascending: true })
 
@@ -729,18 +772,30 @@ export async function checkStudentLessonStatus(studentId: string, dateStr: strin
                     availableLessons.push(defaultLesson)
                 }
 
+                // [NEW] Use master pair price if it's a pair student flag is ON
+                const applyPairPrice = !!student.apply_pair_pricing
+                if (applyPairPrice) {
+                    availableLessons = availableLessons.map((l: any) => ({
+                        ...l,
+                        unit_price: calculateLessonPrice(l.unit_price, true, l.pair_unit_price)
+                    }))
+                }
+
                 // Sort by name for consistency
                 availableLessons.sort((a: any, b: any) => a.name.localeCompare(b.name))
             }
         }
 
+        const isSinglePlan = !membership || !limit || limit === 0 || (membershipName && membershipName.includes('単発'))
+
         return {
             success: true,
             isOverage,
-            limit: effectiveLimit,
-            baseLimit: limit,
-            rollover,
+            limit: isSinglePlan ? 0 : effectiveLimit,
+            baseLimit: isSinglePlan ? 0 : limit,
+            rollover: isSinglePlan ? 0 : rollover,
             count: currentTotal,
+            currentTickets: student.current_tickets || 0,
             membershipName,
             defaultLessonId: membership?.default_lesson_master_id,
             availableLessons

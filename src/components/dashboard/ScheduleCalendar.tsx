@@ -225,6 +225,14 @@ export function ScheduleCalendar({ adminView = false }: ScheduleCalendarProps) {
     const selectedDaySchedules = schedules.filter(s => isSameDay(new Date(s.start_time), selectedDate))
         .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
 
+    // 現在の月の登録レッスン本数（open以外）を集計
+    const monthLessonsCount = React.useMemo(() => {
+        return schedules.filter(s =>
+            isSameMonth(new Date(s.start_time), currentMonth) &&
+            s.status !== 'open'
+        ).length
+    }, [schedules, currentMonth])
+
     // Add Dialog State
     const [isAddOpen, setIsAddOpen] = React.useState(false)
     const [addDialogDate, setAddDialogDate] = React.useState<Date | undefined>(new Date())
@@ -382,9 +390,14 @@ export function ScheduleCalendar({ adminView = false }: ScheduleCalendarProps) {
                     <div className="flex flex-col space-y-4">
                         {/* Header */}
                         <div className="flex items-center justify-between">
-                            <h2 className="text-xl font-bold">
-                                {format(currentMonth, 'yyyy年 M月', { locale: ja })}
-                            </h2>
+                            <div className="flex items-center gap-3">
+                                <h2 className="text-xl font-bold">
+                                    {format(currentMonth, 'yyyy年 M月', { locale: ja })}
+                                </h2>
+                                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-bold px-3 py-1 rounded-full text-sm">
+                                    月間登録: {monthLessonsCount}本
+                                </Badge>
+                            </div>
                             {/* ... */}
                             <div className="flex items-center gap-1">
                                 <Button variant="outline" size="icon" onClick={prevMonth}>

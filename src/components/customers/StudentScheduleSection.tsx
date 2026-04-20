@@ -2,9 +2,12 @@
 
 import { format, isPast, isToday } from 'date-fns'
 import { ja } from 'date-fns/locale'
-import { Calendar, Clock, MapPin, User, CheckCircle2, XCircle, AlertCircle } from 'lucide-react'
+import { Calendar, Clock, MapPin, User, CheckCircle2, XCircle, AlertCircle, Edit2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { useState } from 'react'
+import { EditScheduleDialog } from '@/components/dashboard/EditScheduleDialog'
 
 interface Schedule {
     id: string
@@ -15,10 +18,13 @@ interface Schedule {
     status: string
     notes: string | null
     coach_full_name?: string
+    student_id?: string
+    coach_id?: string
 }
 
 interface StudentScheduleSectionProps {
     schedules: Schedule[]
+    isAdmin?: boolean
 }
 
 // ステータスの表示定義
@@ -40,7 +46,10 @@ const statusConfig: Record<string, { label: string; className: string; icon: any
     },
 }
 
-export function StudentScheduleSection({ schedules }: StudentScheduleSectionProps) {
+export function StudentScheduleSection({ schedules, isAdmin = false }: StudentScheduleSectionProps) {
+    const [editDialogOpen, setEditDialogOpen] = useState(false)
+    const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null)
+
     if (!schedules || schedules.length === 0) {
         return (
             <div className="text-center py-10 text-slate-400 border border-dashed rounded-xl bg-slate-50/50">
@@ -52,9 +61,18 @@ export function StudentScheduleSection({ schedules }: StudentScheduleSectionProp
     }
 
     // 過去・今後に分類してソート
-    const now = new Date()
-    const upcoming = schedules.filter(s => !isPast(new Date(s.end_time)) && s.status !== 'cancelled')
-    const past = schedules.filter(s => isPast(new Date(s.end_time)) || s.status === 'cancelled')
+    const upcoming = schedules
+        .filter(s => !isPast(new Date(s.end_time)) && s.status !== 'cancelled')
+        .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime()) // 日付順（近い順）
+
+    const past = schedules
+        .filter(s => isPast(new Date(s.end_time)) || s.status === 'cancelled')
+        .sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime()) // 降順（最新順）
+
+    const handleEditClick = (schedule: Schedule) => {
+        setSelectedSchedule(schedule)
+        setEditDialogOpen(true)
+    }
 
     return (
         <div className="space-y-6">
@@ -70,7 +88,13 @@ export function StudentScheduleSection({ schedules }: StudentScheduleSectionProp
                     </h4>
                     <div className="space-y-3">
                         {upcoming.map(schedule => (
-                            <ScheduleCard key={schedule.id} schedule={schedule} isUpcoming />
+                            <ScheduleCard
+                                key={schedule.id}
+                                schedule={schedule}
+                                isUpcoming
+                                isAdmin={isAdmin}
+                                onEdit={() => handleEditClick(schedule)}
+                            />
                         ))}
                     </div>
                 </div>
@@ -88,7 +112,13 @@ export function StudentScheduleSection({ schedules }: StudentScheduleSectionProp
                     </h4>
                     <div className="space-y-2">
                         {past.slice(0, 5).map(schedule => (
-                            <ScheduleCard key={schedule.id} schedule={schedule} isUpcoming={false} />
+                            <ScheduleCard
+                                key={schedule.id}
+                                schedule={schedule}
+                                isUpcoming={false}
+                                isAdmin={isAdmin}
+                                onEdit={() => handleEditClick(schedule)}
+                            />
                         ))}
                         {past.length > 5 && (
                             <p className="text-xs text-slate-400 text-center pt-1">
@@ -98,11 +128,31 @@ export function StudentScheduleSection({ schedules }: StudentScheduleSectionProp
                     </div>
                 </div>
             )}
+
+            {/* 編集ダイアログ */}
+            <EditScheduleDialog
+                open={editDialogOpen}
+                onOpenChange={setEditDialogOpen}
+                schedule={selectedSchedule as any}
+                onSuccess={() => {
+                    // router.refresh は親コンポーネントまたはダイアログ側で行われる
+                }}
+            />
         </div>
     )
 }
 
-function ScheduleCard({ schedule, isUpcoming }: { schedule: Schedule; isUpcoming: boolean }) {
+function ScheduleCard({
+    schedule,
+    isUpcoming,
+    isAdmin,
+    onEdit
+}: {
+    schedule: Schedule;
+    isUpcoming: boolean;
+    isAdmin: boolean;
+    onEdit: () => void;
+}) {
     const startDate = new Date(schedule.start_time)
     const endDate = new Date(schedule.end_time)
     const config = statusConfig[schedule.status] || statusConfig.pending
@@ -144,13 +194,25 @@ function ScheduleCard({ schedule, isUpcoming }: { schedule: Schedule; isUpcoming
             <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2 mb-1">
                     <p className="font-bold text-sm text-slate-800 truncate">{schedule.title}</p>
-                    <Badge
-                        variant="outline"
-                        className={cn("text-[10px] px-1.5 py-0.5 shrink-0 flex items-center gap-0.5", config.className)}
-                    >
-                        <StatusIcon className="h-3 w-3" />
-                        {config.label}
-                    </Badge>
+                    <div className="flex items-center gap-1.5 shink-0">
+                        {isAdmin && (
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+                                onClick={onEdit}
+                            >
+                                <Edit2 className="h-3.5 w-3.5" />
+                            </Button>
+                        )}
+                        <Badge
+                            variant="outline"
+                            className={cn("text-[10px] px-1.5 py-0.5 shrink-0 flex items-center gap-0.5", config.className)}
+                        >
+                            <StatusIcon className="h-3 w-3" />
+                            {config.label}
+                        </Badge>
+                    </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
                     <span className="flex items-center gap-1">

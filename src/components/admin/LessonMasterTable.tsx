@@ -50,8 +50,13 @@ interface LessonMaster {
     id: string
     name: string
     unit_price: number
+    pair_unit_price?: number | null
     active: boolean
+    is_trial?: boolean
     is_single_ticket?: boolean
+    stripe_product_id?: string | null
+    stripe_price_id?: string | null
+    stripe_pair_price_id?: string | null
     created_at: string
     display_order: number
 }
@@ -91,6 +96,11 @@ function SortableRow({ master, toggleActive, setEditingMaster, setDeletingId }: 
             </TableCell>
             <TableCell>¥{master.unit_price.toLocaleString()}</TableCell>
             <TableCell>
+                {master.pair_unit_price !== undefined && master.pair_unit_price !== null 
+                    ? `¥${master.pair_unit_price.toLocaleString()}` 
+                    : '-'}
+            </TableCell>
+            <TableCell>
                 <div className="flex items-center gap-2">
                     <Switch
                         checked={master.active}
@@ -104,10 +114,13 @@ function SortableRow({ master, toggleActive, setEditingMaster, setDeletingId }: 
             <TableCell>
                 <div className="flex flex-col gap-0.5 max-w-[120px]">
                     <span className="text-[10px] text-gray-400 truncate" title={(master as any).stripe_product_id}>
-                        {(master as any).stripe_product_id || '-'}
+                        Prod: {(master as any).stripe_product_id || '-'}
                     </span>
                     <span className="text-[10px] text-gray-400 truncate" title={(master as any).stripe_price_id}>
-                        {(master as any).stripe_price_id || '-'}
+                        Price: {(master as any).stripe_price_id || '-'}
+                    </span>
+                    <span className="text-[10px] text-gray-400 truncate" title={(master as any).stripe_pair_price_id}>
+                        Pair: {(master as any).stripe_pair_price_id || '-'}
                     </span>
                 </div>
             </TableCell>
@@ -197,8 +210,8 @@ export function LessonMasterTable({ masters }: { masters: LessonMaster[] }) {
         const valueB = b[key]
 
         if (valueA === undefined && valueB === undefined) return 0
-        if (valueA === undefined) return 1
-        if (valueB === undefined) return -1
+        if (valueA === undefined || valueA === null) return 1
+        if (valueB === undefined || valueB === null) return -1
 
         if (valueA < valueB) {
             return direction === 'asc' ? -1 : 1
@@ -214,6 +227,12 @@ export function LessonMasterTable({ masters }: { masters: LessonMaster[] }) {
         if (sortConfig.direction === 'asc') return <ArrowUp className="ml-2 h-4 w-4 text-primary" />
         return <ArrowDown className="ml-2 h-4 w-4 text-primary" />
     }
+
+    const handleUpdateMaster = (updated: LessonMaster) => {
+        setOptimisticMasters((prev) =>
+            prev.map((m) => (m.id === updated.id ? updated : m))
+        );
+    };
 
     const toggleActive = async (id: string, currentStatus: boolean) => {
         try {
@@ -283,8 +302,17 @@ export function LessonMasterTable({ masters }: { masters: LessonMaster[] }) {
                                 onClick={() => handleSort('unit_price')}
                             >
                                 <div className="flex items-center">
-                                    単価
+                                    通常単価
                                     <SortIcon column="unit_price" />
+                                </div>
+                            </TableHead>
+                            <TableHead
+                                className="cursor-pointer hover:bg-slate-50 transition-colors"
+                                onClick={() => handleSort('pair_unit_price')}
+                            >
+                                <div className="flex items-center">
+                                    ペア単価
+                                    <SortIcon column="pair_unit_price" />
                                 </div>
                             </TableHead>
                             <TableHead
@@ -332,6 +360,7 @@ export function LessonMasterTable({ masters }: { masters: LessonMaster[] }) {
                         master={editingMaster}
                         open={!!editingMaster}
                         onOpenChange={(open: boolean) => !open && setEditingMaster(null)}
+                        onUpdate={handleUpdateMaster}
                     />
                 )
             }

@@ -12,7 +12,8 @@ import {
     LogOut,
     ChevronRight,
     User,
-    Settings
+    Settings,
+    Crown
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { usePathname } from 'next/navigation'
@@ -23,6 +24,7 @@ interface MemberMobileSidebarProps {
     isOpen: boolean
     onClose: () => void
     studentName?: string
+    isTrioMember?: boolean
     handleLogout: () => Promise<void>
 }
 
@@ -30,6 +32,7 @@ export default function MemberMobileSidebar({
     isOpen,
     onClose,
     studentName,
+    isTrioMember = false,
     handleLogout
 }: MemberMobileSidebarProps) {
     const pathname = usePathname()
@@ -44,14 +47,24 @@ export default function MemberMobileSidebar({
         return () => { document.body.style.overflow = 'unset' }
     }, [isOpen])
 
-    const navItems = [
-        { href: '/member/dashboard', icon: Home, label: 'ホーム', subLabel: 'トップページ' },
-        { href: '/member/reservation', icon: Calendar, label: 'レッスン予約', subLabel: 'スケジュールリクエスト' },
-        { href: '/member/reports', icon: FileText, label: 'カルテ・レポート', subLabel: '成長の記録' },
-        { href: '/member/tickets', icon: Ticket, label: 'チケット管理', subLabel: '残高・購入履歴' },
+    const baseItems = [
         { href: '/member/profile', icon: Settings, label: 'アカウント設定', subLabel: '基本情報の確認・変更' },
         { href: 'https://lin.ee/placeholder', icon: MessageCircle, label: '公式LINE', subLabel: '運営へのお問い合わせ', external: true },
-    ]
+    ];
+
+    const navItems = isTrioMember 
+        ? [
+            { href: '/trio/dashboard', icon: Crown, label: 'THE TRIO ホーム', subLabel: 'プレミアム教室' },
+            { href: '/member/dashboard', icon: User, label: 'パーソナル', subLabel: '個人レッスン（メイン事業）' },
+            ...baseItems
+        ] 
+        : [
+            { href: '/member/dashboard', icon: Home, label: 'ホーム', subLabel: 'トップページ' },
+            { href: '/member/reservation', icon: Calendar, label: 'レッスン予約', subLabel: 'スケジュールリクエスト' },
+            { href: '/member/reports', icon: FileText, label: 'カルテ・レポート', subLabel: '成長の記録' },
+            { href: '/trio/dashboard', icon: Crown, label: 'THE TRIO', subLabel: 'プレミアム教室' },
+            ...baseItems
+        ];
 
     return (
         <>

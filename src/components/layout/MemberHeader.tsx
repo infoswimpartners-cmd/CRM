@@ -7,16 +7,21 @@ import { signOut as nextAuthSignOut } from "next-auth/react";
 import { LogOut, Bell, Menu } from "lucide-react";
 import Image from "next/image";
 import { useState } from "react";
+import { usePathname } from 'next/navigation';
 import MemberMobileSidebar from "./MemberMobileSidebar";
 
 interface MemberHeaderProps {
     unreadCount?: number;
     studentName?: string;
     planName?: string;
+    isTrioMember?: boolean;
 }
 
-export default function MemberHeader({ unreadCount = 0, studentName, planName }: MemberHeaderProps) {
+export default function MemberHeader({ unreadCount = 0, studentName, planName, isTrioMember = false }: MemberHeaderProps) {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const pathname = usePathname();
+
+    if (pathname === '/member/login') return null;
 
     const handleLogout = async () => {
         try {
@@ -46,7 +51,7 @@ export default function MemberHeader({ unreadCount = 0, studentName, planName }:
                         <span className="font-black text-gray-800 text-lg md:text-xl tracking-tight leading-none mt-0.5 flex items-center gap-2">
                             {studentName || 'ゲスト'}さん
                             {planName && (
-                                <span className="text-[10px] bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full font-bold tracking-wider relative -top-0.5">
+                                <span className="text-[10px] bg-blue-100 text-blue-700 px-2.5 py-0.5 rounded-full font-bold tracking-wider relative -top-0.5 truncate max-w-[150px]">
                                     {planName}
                                 </span>
                             )}
@@ -83,6 +88,7 @@ export default function MemberHeader({ unreadCount = 0, studentName, planName }:
                 isOpen={isSidebarOpen}
                 onClose={() => setIsSidebarOpen(false)}
                 studentName={studentName}
+                isTrioMember={isTrioMember}
                 handleLogout={handleLogout}
             />
         </>

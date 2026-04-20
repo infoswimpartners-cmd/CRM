@@ -14,7 +14,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { CalendarIcon, Loader2, ExternalLink } from 'lucide-react'
+import { CalendarIcon, Loader2, ExternalLink, Ticket } from 'lucide-react'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
 import { Calendar } from '@/components/ui/calendar'
@@ -42,6 +42,7 @@ import { LocationSelect } from '@/components/forms/LocationSelect'
 interface Student {
     id: string
     full_name: string
+    second_student_name?: string | null
     status?: string
     default_master_id?: string
 }
@@ -73,6 +74,7 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
     const [location, setLocation] = useState('')
     const [notes, setNotes] = useState('')
     const [title, setTitle] = useState('')
+    const [attendanceType, setAttendanceType] = useState('both') // both, student1, student2
 
     // Trial Logic
     const [isTrialMode, setIsTrialMode] = useState(false)
@@ -108,6 +110,7 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
     const [monthlyLimit, setMonthlyLimit] = useState<number | null>(null)
     const [currentCount, setCurrentCount] = useState<number>(0)
     const [rolloverCount, setRolloverCount] = useState<number>(0)
+    const [currentTickets, setCurrentTickets] = useState<number>(0)
     const [checkingStatus, setCheckingStatus] = useState(false)
 
     // Initial Data Fetch (User Role, Coaches, Lesson Masters)
@@ -200,6 +203,7 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
                     setMonthlyLimit(res.limit || 0)
                     setCurrentCount(res.count || 0)
                     setRolloverCount(res.rollover || 0)
+                    setCurrentTickets(res.currentTickets || 0)
                     setAvailableLessons(res.availableLessons || [])
 
                     const lessons = res.availableLessons || []
@@ -234,7 +238,17 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
             const student = students.find(s => s.id === studentId)
             if (student) {
                 const coachName = coaches.find(c => c.id === selectedCoachId)?.full_name || currentUserName || '担当コーチ'
-                setTitle(`${student.full_name}様　担当：${coachName}`)
+                
+                let displayName = student.full_name
+                if (student.second_student_name) {
+                    if (attendanceType === 'both') {
+                        displayName = `${student.full_name} & ${student.second_student_name}`
+                    } else if (attendanceType === 'student2') {
+                        displayName = student.second_student_name
+                    }
+                }
+                
+                setTitle(`${displayName}様　担当：${coachName}`)
                 // Trial check ...
                 if (student.status === 'trial_pending' || student.status === 'trial_confirmed') {
                     setIsTrialMode(true)
@@ -251,7 +265,7 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
                 setIsTrialMode(false)
             }
         }
-    }, [studentId, date, students, lessonMasters])
+    }, [studentId, date, students, lessonMasters, attendanceType, selectedCoachId])
 
     const generateGoogleCalendarUrl = (
         eventTitle: string,
@@ -388,7 +402,8 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
                 end_time: endDateTime.toISOString(),
                 title: title,
                 location: location,
-                notes: notes
+                notes: notes,
+                attendance_type: attendanceType
             })
 
             if (!result) throw new Error('処理結果が取得できませんでした')
@@ -435,6 +450,7 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
         setLocation('')
         setNotes('')
         setTitle('')
+        setAttendanceType('both')
         setIsTrialMode(false)
         // setSendTrialInvoice(false) // Removed
         setIsOverage(false)
@@ -502,6 +518,7 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
                                             <div className="flex flex-wrap items-center gap-2 py-0.5">
                                                 <span className="font-medium">
                                                     {s.full_name}
+                                                    {s.second_student_name && <span className="text-slate-400 ml-1">& {s.second_student_name}</span>}
                                                     {s.status === 'trial_pending' && <span className="text-orange-600 ml-1 font-normal">(体験予定)</span>}
                                                     {s.status === 'trial_confirmed' && <span className="text-green-600 ml-1 font-normal">(体験確定)</span>}
                                                 </span>
@@ -518,6 +535,24 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
                                     ))}
                                 </SelectContent>
                             </Select>
+
+                            {/* 受講形式選択 (ペアの場合のみ) */}
+                            {studentId !== 'none' && students.find(s => s.id === studentId)?.second_student_name && (
+                                <div className="grid gap-2 mt-4 p-3 bg-blue-50 border border-blue-100 rounded-md">
+                                    <Label className="text-blue-800 font-bold text-xs">受講形式</Label>
+                                    <Select value={attendanceType} onValueChange={setAttendanceType}>
+                                        <SelectTrigger className="bg-white">
+                                            <SelectValue placeholder="形式を選択" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="both">ペア受講（2名同時）</SelectItem>
+                                            <SelectItem value="student1">個人受講（1人目：{students.find(s => s.id === studentId)?.full_name}のみ）</SelectItem>
+                                            <SelectItem value="student2">個人受講（2人目：{students.find(s => s.id === studentId)?.second_student_name}のみ）</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <p className="text-[10px] text-blue-600">※個人受講を選択した場合は通常単価が適用されます。</p>
+                                </div>
+                            )}
                             {/* Membership Status Display (Separate Line) */}
                             {studentId !== 'none' && (
                                 <div className="text-xs text-blue-600 flex flex-wrap items-center gap-2 pt-1 leading-relaxed">
@@ -532,6 +567,13 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
                                                 <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs whitespace-nowrap">
                                                     利用状況: {currentCount} / {monthlyLimit} 回
                                                     {rolloverCount > 0 && <span className="ml-1 text-[10px]">(繰越 {rolloverCount}回含)</span>}
+                                                </span>
+                                            )}
+
+                                            {/* Ticket (Transfer) Display */}
+                                            {currentTickets > 0 && (
+                                                <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-xs whitespace-nowrap flex items-center gap-1">
+                                                    <Ticket className="w-3 h-3" /> 振替残: {currentTickets}枚
                                                 </span>
                                             )}
 

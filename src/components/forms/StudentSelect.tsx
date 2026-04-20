@@ -24,6 +24,8 @@ interface Student {
     id: string
     full_name: string
     full_name_kana: string | null
+    second_student_name: string | null
+    second_student_name_kana: string | null
 }
 
 interface StudentSelectProps {
@@ -45,13 +47,13 @@ export function StudentSelect({ onSelect, selectedName, coachId }: StudentSelect
                 // Fetch direct associations
                 const { data: directData, error: directError } = await supabase
                     .from('students')
-                    .select('id, full_name, full_name_kana')
+                    .select('id, full_name, full_name_kana, second_student_name, second_student_name_kana')
                     .eq('coach_id', coachId)
 
                 // Fetch associations via junction table
                 const { data: junctionData, error: junctionError } = await supabase
                     .from('student_coaches')
-                    .select('students(id, full_name, full_name_kana)')
+                    .select('students(id, full_name, full_name_kana, second_student_name, second_student_name_kana)')
                     .eq('coach_id', coachId)
 
                 if (directError || junctionError) {
@@ -78,7 +80,7 @@ export function StudentSelect({ onSelect, selectedName, coachId }: StudentSelect
             } else {
                 const { data, error } = await supabase
                     .from('students')
-                    .select('id, full_name, full_name_kana')
+                    .select('id, full_name, full_name_kana, second_student_name, second_student_name_kana')
                     .order('full_name')
 
                 if (error) {
@@ -131,19 +133,32 @@ export function StudentSelect({ onSelect, selectedName, coachId }: StudentSelect
                                     key={student.id}
                                     value={student.full_name}
                                     onSelect={() => {
-                                        onSelect(student.id, student.full_name)
+                                        const displayName = student.second_student_name 
+                                            ? `${student.full_name} & ${student.second_student_name}`
+                                            : student.full_name
+                                        onSelect(student.id, displayName)
                                         setOpen(false)
                                     }}
                                 >
                                     <Check
                                         className={cn(
                                             "mr-2 h-4 w-4",
-                                            selectedName === student.full_name ? "opacity-100" : "opacity-0"
+                                            selectedName === student.full_name || 
+                                            selectedName === `${student.full_name} & ${student.second_student_name}` 
+                                            ? "opacity-100" : "opacity-0"
                                         )}
                                     />
                                     <div className="flex flex-col">
-                                        <span>{student.full_name}</span>
-                                        {student.full_name_kana && <span className="text-xs text-muted-foreground">{student.full_name_kana}</span>}
+                                        <span>
+                                            {student.full_name}
+                                            {student.second_student_name && <span className="text-slate-400 ml-1">& {student.second_student_name}</span>}
+                                        </span>
+                                        {(student.full_name_kana || student.second_student_name_kana) && (
+                                            <span className="text-xs text-muted-foreground">
+                                                {student.full_name_kana}
+                                                {student.second_student_name_kana && ` & ${student.second_student_name_kana}`}
+                                            </span>
+                                        )}
                                     </div>
                                 </CommandItem>
                             ))}

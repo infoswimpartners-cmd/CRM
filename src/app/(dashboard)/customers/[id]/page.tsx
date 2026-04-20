@@ -14,15 +14,17 @@ import { TrialConfirmButton } from '@/components/admin/TrialConfirmButton'
 import { StripeManager } from '@/components/admin/students/StripeManager'
 import { getStripeCustomerStatus } from '@/actions/stripe'
 import { Badge } from '@/components/ui/badge'
-import { Landmark, Users, MessageCircle, Calendar } from 'lucide-react'
+import { Landmark, Users, MessageCircle, Calendar, Ticket } from 'lucide-react'
 import { UnlinkLineButton } from '@/components/admin/UnlinkLineButton'
+import { StudentAccountLinker } from '@/components/admin/StudentAccountLinker'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
-import { calculateAge } from '@/lib/utils'
+import { calculateAge, cn } from '@/lib/utils'
 import { StudentScheduleButton } from '@/components/students/StudentScheduleButton'
 import { StudentScheduleSection } from '@/components/customers/StudentScheduleSection'
 import { StudentMembershipAssigner } from '@/components/admin/StudentMembershipAssigner'
 import { checkStudentLessonStatus } from '@/actions/lesson_schedule'
+import { UsageStatusCard } from '@/components/customers/UsageStatusCard'
 
 export const dynamic = 'force-dynamic'
 
@@ -122,6 +124,8 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
             location,
             status:billing_status,
             notes,
+            student_id,
+            coach_id,
             profiles (
                 full_name
             )
@@ -191,8 +195,14 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
 
                         <div className="flex flex-col sm:flex-row sm:items-end gap-4">
                             <div>
-                                <h1 className="text-3xl font-bold tracking-tight">{student.full_name}</h1>
-                                <p className="text-gray-500 font-medium">{student.full_name_kana}</p>
+                                <h1 className="text-3xl font-bold tracking-tight">
+                                    {student.full_name}
+                                    {student.second_student_name && <span className="text-slate-400 font-medium ml-2">/ {student.second_student_name}</span>}
+                                </h1>
+                                <p className="text-gray-500 font-medium">
+                                    {student.full_name_kana}
+                                    {student.second_student_name_kana && ` / ${student.second_student_name_kana}`}
+                                </p>
                             </div>
                             <div className="flex gap-2 mb-1">
                                 {student.gender && (
@@ -249,6 +259,18 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
                                     </div>
                                 )}
                             </div>
+
+                            {/* システムアカウント連携 (手動) */}
+                            {isAdmin && (
+                                <div className="sm:col-span-2 mt-2">
+                                    <StudentAccountLinker 
+                                        studentId={student.id}
+                                        currentAuthUserId={student.auth_user_id}
+                                        studentEmail={student.contact_email}
+                                    />
+                                </div>
+                            )}
+
                             {student.notes && (
                                 <div className="sm:col-span-2 mt-2 pt-2 border-t border-slate-100">
                                     <Label className="text-xs text-slate-500">備考</Label>
@@ -380,24 +402,12 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
                                     </div>
                                 )}
 
-                                {/* 当月の利用状況 (Usage Count) */}
-                                {usageData && (
-                                    <div className="flex items-center justify-between p-2 rounded border border-indigo-100 bg-indigo-50">
-                                        <span className="text-sm font-medium text-indigo-800">当月の利用状況</span>
-                                        <div className="text-sm font-bold text-indigo-900">
-                                            {usageData.baseLimit && usageData.baseLimit > 0 ? (
-                                                <span>
-                                                    {usageData.count} / {usageData.limit} 回
-                                                    <span className="text-xs font-normal text-indigo-600 ml-1">
-                                                        (基本{usageData.baseLimit}回 + 繰越{usageData.rollover}回)
-                                                    </span>
-                                                </span>
-                                            ) : (
-                                                <span>{usageData.count} 回</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
+                                {/* 利用状況・チケット (Client Component for monthly switching) */}
+                                <UsageStatusCard 
+                                    studentId={student.id} 
+                                    initialUsageData={usageData} 
+                                    currentTickets={student.current_tickets || 0} 
+                                />
                             </div>
 
                             {isAdmin && (
@@ -424,7 +434,7 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
                         <StudentScheduleButton studentId={student.id} />
                     )}
                 </div>
-                <StudentScheduleSection schedules={formattedSchedules} />
+                <StudentScheduleSection schedules={formattedSchedules} isAdmin={isAdmin} />
             </div>
 
             <Tabs defaultValue="chart" className="w-full">

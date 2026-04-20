@@ -10,7 +10,8 @@ import {
     LogOut,
     ChevronRight,
     User,
-    Settings
+    Settings,
+    Crown
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { usePathname } from 'next/navigation'
@@ -20,10 +21,12 @@ import { cn } from '@/lib/utils'
 
 interface MemberDesktopSidebarProps {
     studentName?: string
+    isTrioMember?: boolean
 }
 
 export default function MemberDesktopSidebar({
-    studentName
+    studentName,
+    isTrioMember = false,
 }: MemberDesktopSidebarProps) {
     const pathname = usePathname()
 
@@ -41,14 +44,26 @@ export default function MemberDesktopSidebar({
         }
     };
 
-    const navItems = [
-        { href: '/member/dashboard', icon: Home, label: 'ホーム', subLabel: 'トップページ' },
-        { href: '/member/reservation', icon: Calendar, label: 'レッスン予約', subLabel: 'スケジュールリクエスト' },
-        { href: '/member/reports', icon: FileText, label: 'カルテ・レポート', subLabel: '成長の記録' },
-        { href: '/member/tickets', icon: Ticket, label: 'チケット管理', subLabel: '残高・購入履歴' },
+    const baseItems = [
         { href: '/member/profile', icon: Settings, label: 'アカウント設定', subLabel: '基本情報の確認・変更' },
         { href: 'https://lin.ee/placeholder', icon: MessageCircle, label: '公式LINE', subLabel: '運営へのお問い合わせ', external: true },
-    ]
+    ];
+
+    const navItems = isTrioMember 
+        ? [
+            { href: '/trio/dashboard', icon: Crown, label: 'THE TRIO ホーム', subLabel: 'プレミアム教室' },
+            { href: '/member/dashboard', icon: User, label: 'パーソナル', subLabel: '個人レッスン（メイン事業）' },
+            ...baseItems
+        ] 
+        : [
+            { href: '/member/dashboard', icon: Home, label: 'ホーム', subLabel: 'トップページ' },
+            { href: '/member/reservation', icon: Calendar, label: 'レッスン予約', subLabel: 'スケジュールリクエスト' },
+            { href: '/member/reports', icon: FileText, label: 'カルテ・レポート', subLabel: '成長の記録' },
+            { href: '/trio/dashboard', icon: Crown, label: 'THE TRIO', subLabel: 'プレミアム教室' },
+            ...baseItems
+        ];
+
+    if (pathname === '/member/login') return null;
 
     return (
         <aside className="sticky top-0 h-screen bg-white/50 backdrop-blur-2xl border-r border-blue-100 flex flex-col w-72 flex-shrink-0 z-40 hidden lg:flex">

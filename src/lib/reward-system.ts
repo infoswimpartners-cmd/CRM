@@ -25,6 +25,7 @@ export type LessonData = {
     }
     profiles?: {
         distant_reward_fee?: number
+        role?: string
     }
 }
 
@@ -57,6 +58,11 @@ export function calculateLessonReward(lesson: LessonData, rate: number): number 
     const master = lesson.lesson_masters
     // @ts-ignore
     const membership = lesson.students?.membership_types
+
+    // ADMIN EXCEPTION: If coach is admin/owner, reward = sales price
+    if (lesson.profiles?.role === 'admin' || lesson.profiles?.role === 'owner') {
+        return lesson.price || 0
+    }
 
     if (!master) return 0
 

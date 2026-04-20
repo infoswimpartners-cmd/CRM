@@ -74,7 +74,7 @@ export async function calculateHistoricalPayments(
         .select(`
             id, price, lesson_date, coach_id,
             lesson_masters (id, unit_price, is_trial),
-            profiles ( distant_reward_fee ),
+            profiles ( distant_reward_fee, role ),
             students (
                 id,
                 full_name,

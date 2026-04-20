@@ -36,7 +36,8 @@ export async function POST(req: NextRequest) {
                 const { studentId, type, lessonDate, location } = session.metadata || {}
 
                 if (type === 'trial_fee' && studentId) {
-                    console.log(`[Stripe Webhook] Processing Trial Confirmation for Student: ${studentId}`)
+                    const { scheduleId } = session.metadata || {}
+                    console.log(`[Stripe Webhook] Processing Trial Confirmation for Student: ${studentId}, Schedule: ${scheduleId}`)
 
                     // 1. Update Student Status
                     const { error: dbError } = await supabaseAdmin
@@ -45,12 +46,29 @@ export async function POST(req: NextRequest) {
                         .eq('id', studentId)
 
                     if (dbError) {
-                        console.error('[Stripe Webhook] DB Update Failed:', dbError)
-                        throw dbError
+                        console.error('[Stripe Webhook] Student Status Update Failed:', dbError)
+                    } else {
+                        console.log(`[Stripe Webhook] Student ${studentId} status updated to trial_confirmed`)
                     }
-                    console.log(`[Stripe Webhook] Student ${studentId} status updated to trial_confirmed`)
 
-                    // 2. Fetch Student Info for Email
+                    // 2. Update Lesson Schedule Status
+                    if (scheduleId) {
+                        const { error: schedError } = await supabaseAdmin
+                            .from('lesson_schedules')
+                            .update({ 
+                                billing_status: 'paid',
+                                payment_intent_id: session.payment_intent as string || null 
+                            })
+                            .eq('id', scheduleId)
+                        
+                        if (schedError) {
+                            console.error('[Stripe Webhook] Schedule Status Update Failed:', schedError)
+                        } else {
+                            console.log(`[Stripe Webhook] Schedule ${scheduleId} marked as paid`)
+                        }
+                    }
+
+                    // 3. Fetch Student Info for Email
                     const { data: student, error: fetchError } = await supabaseAdmin
                         .from('students')
                         .select('contact_email, full_name')
@@ -63,8 +81,8 @@ export async function POST(req: NextRequest) {
                             : '未定'
                         const lessonLocation = location || '未定'
 
-                        // 3. Send Customer Email (trial_lesson_reserved trigger)
-                        const studentEmailSent = await emailService.sendTriggerEmail(
+                        // 4. Send Customer Email (trial_lesson_reserved trigger)
+                        await emailService.sendTriggerEmail(
                             'trial_lesson_reserved',
                             student.contact_email,
                             {
@@ -128,6 +146,40 @@ export async function POST(req: NextRequest) {
                         }
 
                         console.log(`[Stripe Webhook] Successfully added ${amount} tickets to Student ${studentId}. New Balance: ${newBalance}`);
+                    }
+                } else if (type === 'trio_ticket_purchase' && studentId) {
+                    // --- THE TRIO TICKET PURCHASE LOGIC ---
+                    const amount = parseInt(session.metadata?.ticketAmount || '0', 10);
+                    console.log(`[Stripe Webhook] Processing THE TRIO Ticket Purchase for Student: ${studentId}, Amount: ${amount}`);
+
+                    if (amount > 0) {
+                        // 1. Fetch current TRIO tickets
+                        const { data: student, error: fetchError } = await supabaseAdmin
+                            .from('students')
+                            .select('trio_ticket_balance')
+                            .eq('id', studentId)
+                            .single();
+
+                        if (fetchError || !student) {
+                            console.error('[Stripe Webhook] Failed to fetch student for TRIO ticket update:', fetchError);
+                            throw fetchError;
+                        }
+
+                        const currentBalance = student.trio_ticket_balance || 0;
+                        const newBalance = currentBalance + amount;
+
+                        // 2. Update Student Balance
+                        const { error: updateError } = await supabaseAdmin
+                            .from('students')
+                            .update({ trio_ticket_balance: newBalance })
+                            .eq('id', studentId);
+
+                        if (updateError) {
+                            console.error('[Stripe Webhook] Failed to update TRIO ticket balance:', updateError);
+                            throw updateError;
+                        }
+
+                        console.log(`[Stripe Webhook] Successfully added ${amount} TRIO tickets to Student ${studentId}. New Balance: ${newBalance}`);
                     }
                 }
                 break

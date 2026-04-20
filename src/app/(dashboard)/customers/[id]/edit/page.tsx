@@ -48,6 +48,7 @@ export default function EditStudentPage({ params }: { params: Promise<{ id: stri
         coach_ids: [] as string[], // all assigned coaches
         is_bank_transfer: false,
         is_two_person_lesson: false,
+        apply_pair_pricing: false,
         start_timing: 'current', // 'current' | 'next'
         line_user_id: ''
     })
@@ -118,6 +119,7 @@ export default function EditStudentPage({ params }: { params: Promise<{ id: stri
                 coach_ids: [], // will fetch below
                 is_bank_transfer: data.is_bank_transfer || false,
                 is_two_person_lesson: data.is_two_person_lesson || false,
+                apply_pair_pricing: data.apply_pair_pricing || false,
                 start_timing: 'current',
                 line_user_id: data.line_user_id || ''
             })
@@ -140,7 +142,17 @@ export default function EditStudentPage({ params }: { params: Promise<{ id: stri
 
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        setFormData({ ...formData, [e.target.id]: e.target.value })
+        const { id, value } = e.target
+        let updates: any = { [id]: value }
+
+        // 2人目の名前が入力されたら、報酬・受講料フラグを自動的にオンにする
+        if (id === 'second_student_name') {
+            const hasName = value.trim().length > 0
+            updates.is_two_person_lesson = hasName
+            updates.apply_pair_pricing = hasName
+        }
+
+        setFormData({ ...formData, ...updates })
     }
 
     const ageInfo = formData.birth_date ? (() => {
@@ -402,8 +414,6 @@ export default function EditStudentPage({ params }: { params: Promise<{ id: stri
                             </div>
                         </div>
 
-
-
                         {/* 銀行振込対応フラグ */}
                         <div className="mt-6 flex items-center justify-between p-4 bg-orange-50 border border-orange-200 rounded-lg">
                             <div className="space-y-0.5">
@@ -416,15 +426,27 @@ export default function EditStudentPage({ params }: { params: Promise<{ id: stri
                             />
                         </div>
 
-                        {/* 2人同時レッスンフラグ */}
-                        <div className="mt-4 flex items-center justify-between p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                        {/* 2名同時レッスン（報酬）フラグ */}
+                        <div className="mt-4 flex items-center justify-between p-4 bg-orange-50 border border-orange-200 rounded-lg">
                             <div className="space-y-0.5">
-                                <Label className="text-base font-bold text-blue-900">2人同時レッスン (報酬+1000円)</Label>
-                                <p className="text-xs text-blue-700">有効にすると、この生徒のレッスン報酬が自動的に+1000円されます。</p>
+                                <Label className="text-base font-bold text-orange-900">コーチ報酬を2名分適用 (+1000円)</Label>
+                                <p className="text-xs text-orange-700">有効にすると、コーチへの支払い報酬が自動的に+1000円されます。</p>
                             </div>
                             <Switch
                                 checked={formData.is_two_person_lesson}
                                 onCheckedChange={(checked) => setFormData({ ...formData, is_two_person_lesson: checked })}
+                            />
+                        </div>
+
+                        {/* 2名同時レッスン（受講料）フラグ */}
+                        <div className="mt-4 flex items-center justify-between p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                            <div className="space-y-0.5">
+                                <Label className="text-base font-bold text-blue-900">受講料にペア単価を適用</Label>
+                                <p className="text-xs text-blue-700">有効にすると、マスタの「ペア単価」で受講料が計算されます（キャンペーン等の場合はオフにしてください）。</p>
+                            </div>
+                            <Switch
+                                checked={formData.apply_pair_pricing}
+                                onCheckedChange={(checked) => setFormData({ ...formData, apply_pair_pricing: checked })}
                             />
                         </div>
 

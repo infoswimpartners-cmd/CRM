@@ -27,6 +27,7 @@ export function AddLessonTypeDialog() {
 
     const [name, setName] = useState('')
     const [price, setPrice] = useState('0')
+    const [pairPrice, setPairPrice] = useState('0')
     const [isTrial, setIsTrial] = useState(false)
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -36,6 +37,7 @@ export function AddLessonTypeDialog() {
             const result = await createLessonMasterAction({
                 name,
                 price: parseInt(price),
+                pairPrice: parseInt(pairPrice),
                 isTrial
             })
 
@@ -45,6 +47,7 @@ export function AddLessonTypeDialog() {
             setOpen(false)
             setName('')
             setPrice('0')
+            setPairPrice('0')
             setIsTrial(false)
             router.refresh()
         } catch (error: any) {
@@ -86,13 +89,26 @@ export function AddLessonTypeDialog() {
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
                             <Label htmlFor="price" className="text-right">
-                                単価
+                                通常単価
                             </Label>
                             <Input
                                 id="price"
                                 type="number"
                                 value={price}
                                 onChange={(e) => setPrice(e.target.value)}
+                                className="col-span-3"
+                                required
+                            />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="pair-price" className="text-right">
+                                ペア単価
+                            </Label>
+                            <Input
+                                id="pair-price"
+                                type="number"
+                                value={pairPrice}
+                                onChange={(e) => setPairPrice(e.target.value)}
                                 className="col-span-3"
                                 required
                             />

@@ -86,3 +86,15 @@ export function isCancelPenalty(lessonDate: Date): boolean {
 
   return now >= deadline
 }
+
+/**
+ * レッスン料金を計算する
+ * applyPairPrice が true かつマスタにペア単価が設定されている場合はそれを使用し、
+ * それ以外の場合は通常単価を使用します。
+ */
+export function calculateLessonPrice(basePrice: number, applyPairPrice: boolean, pairPrice?: number | null): number {
+  if (applyPairPrice && pairPrice != null) {
+    return pairPrice
+  }
+  return basePrice
+}

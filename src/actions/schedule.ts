@@ -73,6 +73,7 @@ interface UpdateScheduleParams {
     notes?: string
     studentId?: string | null
     coachId?: string | null
+    attendance_type?: string
 }
 
 export async function updateScheduleWithCalendar(params: UpdateScheduleParams) {
@@ -96,6 +97,7 @@ export async function updateScheduleWithCalendar(params: UpdateScheduleParams) {
             location: params.location || null,
             notes: params.notes || null,
             student_id: params.studentId || null,
+            attendance_type: params.attendance_type || 'both',
         }
         if (params.coachId) updatePayload.coach_id = params.coachId
 
@@ -163,6 +165,7 @@ export async function getStudentsForCoach(coachId: string) {
             .select(`
                 id,
                 full_name,
+                second_student_name,
                 status,
                 coach_id,
                 student_coaches!inner(coach_id),
@@ -316,6 +319,35 @@ export async function approveSchedule(scheduleId: string) {
 
     } catch (error: any) {
         console.error('approveSchedule Error:', error)
+        return { success: false, error: error.message }
+    }
+}
+
+export async function getPendingSchedulesAction(coachId: string) {
+    const supabaseAdmin = createAdminClient()
+
+    try {
+        const { data, error } = await supabaseAdmin
+            .from('lesson_schedules')
+            .select(`
+                *,
+                students (
+                    id,
+                    full_name,
+                    second_student_name,
+                    is_two_person_lesson,
+                    is_default_distant_option
+                )
+            `)
+            .eq('coach_id', coachId)
+            .eq('is_reported', false)
+            .order('start_time', { ascending: false })
+
+        if (error) throw error
+
+        return { success: true, data }
+    } catch (error: any) {
+        console.error('getPendingSchedulesAction Error:', error)
         return { success: false, error: error.message }
     }
 }

@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { stripe } from '@/lib/stripe'
 import { emailService } from '@/lib/email'
 import { revalidatePath } from 'next/cache'
+import { calculateLessonPrice } from '@/lib/utils'
 
 export async function confirmTrialAndBill(studentId: string, lessonDate: Date, coachId: string, location: string = '未定', trialMasterId?: string, customEmail?: { subject: string, body: string }) {
     const supabaseAdmin = createAdminClient()
@@ -21,35 +22,8 @@ export async function confirmTrialAndBill(studentId: string, lessonDate: Date, c
 
         if (fetchError || !student) throw new Error('Student not found')
 
-        // 2. Schedule Lesson (Trial)
-        // Fetch 'Trial' Lesson Master
-        let trialMaster: any = null
-        if (trialMasterId) {
-            const { data, error: masterError } = await supabaseAdmin.from('lesson_masters').select('*').eq('id', trialMasterId).single()
-            if (masterError || !data) throw new Error('Trial Lesson Master not found')
-            trialMaster = data
-        } else {
-            const { data, error: masterError } = await supabaseAdmin.from('lesson_masters').select('*').eq('is_trial', true).single()
-            if (masterError || !data) throw new Error('Trial Lesson Master not found')
-            trialMaster = data
-        }
-
-        const { data: newLesson, error: lessonError } = await supabaseAdmin
-            .from('lessons')
-            .insert({
-                student_id: studentId,
-                coach_id: coachId, // Assigned Coach
-                student_name: student.full_name, // Required by Schema
-                lesson_date: lessonDate.toISOString(),
-                location: location, // Use provided location
-                lesson_master_id: trialMaster.id,
-                price: trialMaster.unit_price,
-                billing_price: trialMaster.unit_price
-            })
-            .select('id')
-            .single()
-
-        if (lessonError || !newLesson) throw new Error(`Lesson Creation Failed: ${lessonError?.message}`)
+        // 2. [REMOVED] Pre-registration of lesson result (lessons table)
+        // Lessons should only be registered via report after the lesson is completed.
 
         // 3. Update Student Coach in Profile (Optional but good practice to sync)
         await supabaseAdmin
@@ -73,8 +47,61 @@ export async function confirmTrialAndBill(studentId: string, lessonDate: Date, c
                 .eq('id', studentId)
         }
 
-        // 5. Generate Payment Link Endpoint URL
-        const paymentLink = `${process.env.NEXT_PUBLIC_APP_URL}/pay/trial/${newLesson.id}`
+        // 5. Generate Payment Link using Schedule ID
+        // Fetch 'Trial' Lesson Master
+        let trialMaster: any = null
+        if (trialMasterId) {
+            const { data, error: masterError } = await supabaseAdmin.from('lesson_masters').select('id, unit_price, pair_unit_price').eq('id', trialMasterId).single()
+            if (masterError || !data) throw new Error('Trial Lesson Master not found')
+            trialMaster = data
+        } else {
+            const { data, error: masterError } = await supabaseAdmin.from('lesson_masters').select('id, unit_price, pair_unit_price').eq('is_trial', true).single()
+            if (masterError || !data) throw new Error('Trial Lesson Master not found')
+            trialMaster = data
+        }
+
+        // 5.1 Create Schedule (Calendar & Billing Source)
+        const startTime = new Date(lessonDate)
+        const endTime = new Date(lessonDate)
+        endTime.setHours(endTime.getHours() + 1)
+
+        let coachName = '担当コーチ'
+        if (coachId) {
+            const { data: coachProfile } = await supabaseAdmin
+                .from('profiles')
+                .select('full_name')
+                .eq('id', coachId)
+                .single()
+            if (coachProfile?.full_name) {
+                coachName = coachProfile.full_name
+            }
+        }
+        const scheduleTitle = `${student.full_name}様　担当：${coachName}`
+
+        const { data: newSchedule, error: scheduleError } = await supabaseAdmin
+            .from('lesson_schedules')
+            .insert({
+                coach_id: coachId,
+                student_id: studentId,
+                lesson_master_id: trialMaster.id,
+                title: scheduleTitle,
+                start_time: startTime.toISOString(),
+                end_time: endTime.toISOString(),
+                location: location,
+                notes: '体験レッスン自動登録',
+                price: calculateLessonPrice(trialMaster.unit_price, !!student.apply_pair_pricing, trialMaster.pair_unit_price),
+                billing_status: 'awaiting_payment',
+                is_overage: true
+            })
+            .select('id')
+            .single()
+
+        if (scheduleError || !newSchedule) {
+            console.error('[Trial Confirm] Schedule Creation Failed:', scheduleError)
+            throw new Error(`Schedule creation failed: ${scheduleError?.message}`)
+        }
+
+        const paymentLink = `${process.env.NEXT_PUBLIC_APP_URL}/pay/trial/${newSchedule.id}`
 
         if (!student.contact_email) {
             throw new Error('学生の連絡先メールアドレスが設定されていません。')
@@ -113,73 +140,26 @@ export async function confirmTrialAndBill(studentId: string, lessonDate: Date, c
 
         console.log('[Trial Confirm] Email SENT successfully.')
 
-        // 7. Create Schedule (Calendar)
-        // Default duration: 60 mins
-        const startTime = new Date(lessonDate)
-        const endTime = new Date(lessonDate)
-        endTime.setHours(endTime.getHours() + 1)
-
-        // Fetch Coach Name
-        let coachName = '担当コーチ'
-        if (coachId) {
-            const { data: coachProfile } = await supabaseAdmin
-                .from('profiles')
-                .select('full_name')
-                .eq('id', coachId)
-                .single()
-            if (coachProfile?.full_name) {
-                coachName = coachProfile.full_name
-            }
-        }
-
-        const scheduleTitle = `${student.full_name}様　担当：${coachName}`
-
-        const { error: scheduleError } = await supabaseAdmin
-            .from('lesson_schedules')
-            .insert({
-                coach_id: coachId,
-                student_id: studentId,
-                title: scheduleTitle,
-                start_time: startTime.toISOString(),
-                end_time: endTime.toISOString(),
-                location: location, // Use provided location
-                notes: '体験レッスン自動登録'
-            })
-
-        if (scheduleError) {
-            console.error('[Trial Confirm] Schedule Creation Failed:', scheduleError)
-            throw new Error(`Schedule creation failed: ${scheduleError.message}`)
-        }
-
         // [MODIFIED] Google Calendar Sync
         try {
             const { createCalendarEvent, getAdminRefreshToken } = await import('@/lib/google-calendar')
             const adminRefreshToken = await getAdminRefreshToken(supabaseAdmin)
 
             if (adminRefreshToken) {
-                const { data: newSchedule } = await supabaseAdmin
-                    .from('lesson_schedules')
-                    .select('id')
-                    .eq('student_id', studentId)
-                    .eq('start_time', startTime.toISOString())
-                    .single()
+                const eventId = await createCalendarEvent(adminRefreshToken, {
+                    summary: scheduleTitle,
+                    description: `体験レッスン予約確定\n場所: ${location}`,
+                    location: location,
+                    start: startTime.toISOString(),
+                    end: endTime.toISOString()
+                })
 
-                if (newSchedule) {
-                    const eventId = await createCalendarEvent(adminRefreshToken, {
-                        summary: scheduleTitle,
-                        description: `体験レッスン予約確定\n場所: ${location}`,
-                        location: location,
-                        start: startTime.toISOString(),
-                        end: endTime.toISOString()
-                    })
-
-                    if (eventId) {
-                        await supabaseAdmin
-                            .from('lesson_schedules')
-                            .update({ google_event_id: eventId })
-                            .eq('id', newSchedule.id)
-                        console.log('[Trial Confirm] Google Calendar Sync Success:', eventId)
-                    }
+                if (eventId) {
+                    await supabaseAdmin
+                        .from('lesson_schedules')
+                        .update({ google_event_id: eventId })
+                        .eq('id', newSchedule.id)
+                    console.log('[Trial Confirm] Google Calendar Sync Success:', eventId)
                 }
             }
         } catch (calErr) {
@@ -212,10 +192,10 @@ export async function getTrialEmailPreview(studentId: string, lessonDate: Date, 
 
         let trialMaster: any = null
         if (trialMasterId) {
-            const { data } = await supabaseAdmin.from('lesson_masters').select('*').eq('id', trialMasterId).single()
+            const { data } = await supabaseAdmin.from('lesson_masters').select('id, unit_price, pair_unit_price, email_template_id').eq('id', trialMasterId).single()
             trialMaster = data
         } else {
-            const { data } = await supabaseAdmin.from('lesson_masters').select('*').eq('is_trial', true).single()
+            const { data } = await supabaseAdmin.from('lesson_masters').select('id, unit_price, pair_unit_price, email_template_id').eq('is_trial', true).single()
             trialMaster = data
         }
 
@@ -229,7 +209,7 @@ export async function getTrialEmailPreview(studentId: string, lessonDate: Date, 
         const variables = {
             name: student.full_name,
             lesson_date: lessonDateStr,
-            amount: (trialMaster?.unit_price || 0).toLocaleString(),
+            amount: calculateLessonPrice(trialMaster?.unit_price || 0, !!student.apply_pair_pricing, trialMaster?.pair_unit_price).toLocaleString(),
             payment_link: '【実際の決済URLがここに挿入されます】'
         }
 

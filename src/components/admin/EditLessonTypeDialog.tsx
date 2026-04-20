@@ -22,25 +22,34 @@ interface LessonMaster {
     id: string
     name: string
     unit_price: number
+    pair_unit_price?: number | null
     active: boolean
     is_trial?: boolean
+    stripe_product_id?: string | null
+    stripe_price_id?: string | null
+    stripe_pair_price_id?: string | null
+    created_at: string
+    display_order: number
 }
 
 interface EditLessonTypeDialogProps {
     master: LessonMaster
     open: boolean
     onOpenChange: (open: boolean) => void
+    onUpdate?: (updated: LessonMaster) => void
 }
 
-export function EditLessonTypeDialog({ master, open, onOpenChange }: EditLessonTypeDialogProps) {
+export function EditLessonTypeDialog({ master, open, onOpenChange, onUpdate }: EditLessonTypeDialogProps) {
     const [loading, setLoading] = useState(false)
     const router = useRouter()
 
     const [name, setName] = useState(master.name)
     const [price, setPrice] = useState(master.unit_price.toString())
+    const [pairPrice, setPairPrice] = useState(master.pair_unit_price?.toString() || '0')
     const [isTrial, setIsTrial] = useState(master.is_trial || false)
     const [stripeProductId, setStripeProductId] = useState((master as any).stripe_product_id || '')
     const [stripePriceId, setStripePriceId] = useState((master as any).stripe_price_id || '')
+    const [stripePairPriceId, setStripePairPriceId] = useState((master as any).stripe_pair_price_id || '')
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -48,18 +57,41 @@ export function EditLessonTypeDialog({ master, open, onOpenChange }: EditLessonT
         const supabase = createClient()
 
         try {
+            const parsedUnitPrice = parseInt(price)
+            const parsedPairPrice = pairPrice === '' ? null : parseInt(pairPrice)
+
+            if (isNaN(parsedUnitPrice)) {
+                throw new Error('通常単価を正しく入力してください')
+            }
+
             const { error } = await supabase
                 .from('lesson_masters')
                 .update({
                     name,
-                    unit_price: parseInt(price),
+                    unit_price: parsedUnitPrice,
+                    pair_unit_price: parsedPairPrice,
                     is_trial: isTrial,
                     stripe_product_id: stripeProductId || null,
                     stripe_price_id: stripePriceId || null,
+                    stripe_pair_price_id: stripePairPriceId || null,
                 })
                 .eq('id', master.id)
 
             if (error) throw error
+
+            // Update local state immediately for smooth UX
+            if (onUpdate) {
+                onUpdate({
+                    ...master,
+                    name,
+                    unit_price: parsedUnitPrice,
+                    pair_unit_price: parsedPairPrice,
+                    is_trial: isTrial,
+                    stripe_product_id: stripeProductId || null,
+                    stripe_price_id: stripePriceId || null,
+                    stripe_pair_price_id: stripePairPriceId || null,
+                })
+            }
 
             toast.success('レッスンタイプを更新しました')
             onOpenChange(false)
@@ -97,13 +129,26 @@ export function EditLessonTypeDialog({ master, open, onOpenChange }: EditLessonT
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
                             <Label htmlFor="edit-price" className="text-right">
-                                単価
+                                通常単価
                             </Label>
                             <Input
                                 id="edit-price"
                                 type="number"
                                 value={price}
                                 onChange={(e) => setPrice(e.target.value)}
+                                className="col-span-3"
+                                required
+                            />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="edit-pair-price" className="text-right">
+                                ペア単価
+                            </Label>
+                            <Input
+                                id="edit-pair-price"
+                                type="number"
+                                value={pairPrice}
+                                onChange={(e) => setPairPrice(e.target.value)}
                                 className="col-span-3"
                                 required
                             />
@@ -128,6 +173,18 @@ export function EditLessonTypeDialog({ master, open, onOpenChange }: EditLessonT
                                 id="stripe-price-id"
                                 value={stripePriceId}
                                 onChange={(e) => setStripePriceId(e.target.value)}
+                                className="col-span-3"
+                                placeholder="price_..."
+                            />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="stripe-pair-price-id" className="text-right whitespace-nowrap text-xs">
+                                Stripeペア価格ID
+                            </Label>
+                            <Input
+                                id="stripe-pair-price-id"
+                                value={stripePairPriceId}
+                                onChange={(e) => setStripePairPriceId(e.target.value)}
                                 className="col-span-3"
                                 placeholder="price_..."
                             />

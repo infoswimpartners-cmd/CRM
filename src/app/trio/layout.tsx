@@ -3,11 +3,9 @@ import MemberHeader from "@/components/layout/MemberHeader";
 import MemberBottomNav from "@/components/layout/MemberBottomNav";
 import MemberDesktopSidebar from "@/components/layout/MemberDesktopSidebar";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-
 import { getCachedMemberData } from "@/lib/member-data";
 
-export default async function MembersLayout({ children }: { children: ReactNode }) {
+export default async function TrioLayout({ children }: { children: ReactNode }) {
     const { user, student, isTrioMember } = await getCachedMemberData();
     const supabase = await createClient();
 
