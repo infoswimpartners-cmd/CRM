@@ -2,8 +2,6 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
-import { getServerSession } from "next-auth/next"
-import { authOptions } from "@/lib/auth"
 
 export default async function Home() {
   const supabase = await createClient()
