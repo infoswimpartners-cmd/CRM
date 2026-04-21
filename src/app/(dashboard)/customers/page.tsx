@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/table"
 import { StudentStatusSelect } from '@/components/customers/StudentStatusSelect'
 import { StudentMembershipSelect } from '@/components/customers/StudentMembershipSelect'
+import { StudentMultiCoachSelect } from '@/components/customers/StudentMultiCoachSelect'
 import { ReceptionEmailButton } from '@/components/customers/ReceptionEmailButton'
 import { calculateAge } from '@/lib/utils'
 import { ArrowUpDown } from 'lucide-react'
@@ -41,12 +42,20 @@ interface Student {
     membership_types?: {
         name: string
     }
+    coach_id: string | null
+    profiles?: {
+        full_name: string
+    }
+    student_coaches?: {
+        coach_id: string
+        role: 'main' | 'sub'
+    }[]
     contact_email?: string | null
     birth_date?: string | null
 }
 
 type SortConfig = {
-    key: keyof Student | 'age' | 'membership_name'
+    key: keyof Student | 'age' | 'membership_name' | 'coach_name'
     direction: 'asc' | 'desc'
 }
 
@@ -98,6 +107,13 @@ export default function StudentListPage() {
                 membership_types:membership_type_id (
                     name
                 ),
+                profiles:coach_id (
+                    full_name
+                ),
+                student_coaches (
+                    coach_id,
+                    role
+                ),
                 contact_email
             `)
             .neq('status', 'withdrawn')
@@ -134,6 +150,9 @@ export default function StudentListPage() {
             if (key === 'membership_name') {
                 aValue = a.membership_types?.name || ''
                 bValue = b.membership_types?.name || ''
+            } else if (key === 'coach_name') {
+                aValue = a.profiles?.full_name || ''
+                bValue = b.profiles?.full_name || ''
             } else if (key === 'age') {
                 aValue = a.birth_date ? calculateAge(new Date(a.birth_date)) : -1
                 bValue = b.birth_date ? calculateAge(new Date(b.birth_date)) : -1
@@ -214,6 +233,11 @@ export default function StudentListPage() {
                                     会員区分 <ArrowUpDown className="h-3 w-3" />
                                 </div>
                             </TableHead>
+                            <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('coach_name')}>
+                                <div className="flex items-center gap-1">
+                                    担当コーチ <ArrowUpDown className="h-3 w-3" />
+                                </div>
+                            </TableHead>
                             <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('age')}>
                                 <div className="flex items-center gap-1">
                                     年齢 <ArrowUpDown className="h-3 w-3" />
@@ -226,11 +250,11 @@ export default function StudentListPage() {
                     <TableBody>
                         {loading ? (
                             <TableRow>
-                                <TableCell colSpan={4} className="h-24 text-center">読み込み中...</TableCell>
+                                <TableCell colSpan={6} className="h-24 text-center">読み込み中...</TableCell>
                             </TableRow>
                         ) : filteredStudents.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={4} className="h-24 text-center">生徒が見つかりません</TableCell>
+                                <TableCell colSpan={6} className="h-24 text-center">生徒が見つかりません</TableCell>
                             </TableRow>
                         ) : (
                             filteredStudents.map((student) => (
@@ -255,10 +279,16 @@ export default function StudentListPage() {
                                         </div>
                                     </TableCell>
                                     <TableCell>
+                                        <div className="px-3 py-1 text-xs font-medium rounded-full bg-blue-50 text-blue-700 inline-block">
+                                            {student.membership_types?.name || '未設定'}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
                                         <div onClick={(e) => e.stopPropagation()}>
-                                            <StudentMembershipSelect
+                                            <StudentMultiCoachSelect
                                                 studentId={student.id}
-                                                initialMembershipTypeId={student.membership_type_id}
+                                                initialAssignedCoaches={student.student_coaches || []}
+                                                initialMainCoachId={student.coach_id}
                                             />
                                         </div>
                                     </TableCell>
