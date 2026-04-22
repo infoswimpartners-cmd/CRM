@@ -66,6 +66,20 @@ export async function calculateHistoricalPayments(
         } catch { }
     }
 
+    // 1.6 Fetch Reward Settings for correct historical calculation
+    const { data: rewardConfig } = await supabase
+        .from('app_configs')
+        .select('value')
+        .eq('key', 'reward_settings')
+        .single()
+    
+    let rewardSettings = undefined
+    if (rewardConfig) {
+        try {
+            rewardSettings = JSON.parse(rewardConfig.value)
+        } catch { }
+    }
+
     // 2. Fetch Lessons with all necessary fields for correct reward calculation
     const startDate = startOfMonth(subMonths(new Date(), monthsToLookBack + 3))
 
@@ -115,7 +129,7 @@ export async function calculateHistoricalPayments(
         const displayMonth = `${format(d, 'yyyy')}年${format(d, 'M')}月分`
 
         // 1. Calculate Rate (Using reward-system.ts logic)
-        const rate = calculateCoachRate(coachId, (allLessons as any) as LessonData[] || [], d, overrideRate)
+        const rate = calculateCoachRate(coachId, (allLessons as any) as LessonData[] || [], d, overrideRate, rewardSettings)
 
         // 2. Filter lessons for this month
         const monthLessons = (allLessons || []).filter(l => {
@@ -145,7 +159,7 @@ export async function calculateHistoricalPayments(
             }
 
             const price = l.price || 0
-            const reward = calculateLessonReward(l, rate)
+            const reward = calculateLessonReward(l, rate, rewardSettings)
 
             let title = l.lesson_masters?.is_trial ? '体験レッスン' : '通常レッスン'
             if (l.lesson_masters && price > l.lesson_masters.unit_price) {

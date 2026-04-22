@@ -49,9 +49,6 @@ const formSchema = z.object({
     }),
     lesson_master_id: z.string().min(1, 'レッスンの種類を選択してください'),
     location: z.string().min(1, '場所は必須です'),
-    menu_description: z.string().optional(),
-    feedback_good: z.string().optional(),
-    feedback_next: z.string().optional(),
     coach_comment: z.string().optional(),
     price: z.number().min(0),
     billing_price: z.number().min(0),
@@ -78,8 +75,6 @@ export function EditReportDialog({ report, lessonMasters, open, onOpenChange, on
             lesson_master_id: report.lesson_master_id,
             location: report.location,
             menu_description: report.menu_description || '',
-            feedback_good: report.feedback_good || '',
-            feedback_next: report.feedback_next || '',
             coach_comment: report.coach_comment || '',
             price: report.price,
             billing_price: report.billing_price !== null && report.billing_price !== undefined ? report.billing_price : report.price,
@@ -310,50 +305,6 @@ export function EditReportDialog({ report, lessonMasters, open, onOpenChange, on
                             )}
                         />
 
-                        {/* フィードバック良かった点 */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <FormField
-                                control={form.control}
-                                name="feedback_good"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel className="flex items-center gap-2">
-                                            良かった点
-                                            <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-600 border-blue-100 font-normal">メンバーサイトに反映</Badge>
-                                        </FormLabel>
-                                        <FormControl>
-                                            <Textarea
-                                                placeholder="以前より改善された点など"
-                                                className="resize-none min-h-[80px]"
-                                                {...field}
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            {/* フィードバック次回の課題 */}
-                            <FormField
-                                control={form.control}
-                                name="feedback_next"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel className="flex items-center gap-2">
-                                            次回の課題
-                                            <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-600 border-blue-100 font-normal">メンバーサイトに反映</Badge>
-                                        </FormLabel>
-                                        <FormControl>
-                                            <Textarea
-                                                placeholder="次回意識すべきポイントなど"
-                                                className="resize-none min-h-[80px]"
-                                                {...field}
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                        </div>
                         {/* コーチコメント */}
                         <FormField
                             control={form.control}

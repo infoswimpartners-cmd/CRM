@@ -600,7 +600,7 @@ export async function rejectLessonSchedule(scheduleId: string) {
     }
 }
 
-export async function checkStudentLessonStatus(studentId: string, dateStr: string) {
+export async function checkStudentLessonStatus(studentId: string, dateStr: string, attendanceType?: string) {
     const supabase = await createClient()
     const supabaseAdmin = createAdminClient()
     const { data: authData } = await supabase.auth.getUser()
@@ -772,8 +772,8 @@ export async function checkStudentLessonStatus(studentId: string, dateStr: strin
                     availableLessons.push(defaultLesson)
                 }
 
-                // [NEW] Use master pair price if it's a pair student flag is ON
-                const applyPairPrice = !!student.apply_pair_pricing
+                // [MODIFIED] 受講形式がペアの場合のみペア単価を適用
+                const applyPairPrice = !!student.apply_pair_pricing && (attendanceType === 'both' || !attendanceType)
                 if (applyPairPrice) {
                     availableLessons = availableLessons.map((l: any) => ({
                         ...l,

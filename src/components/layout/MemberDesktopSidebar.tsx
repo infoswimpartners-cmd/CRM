@@ -2,13 +2,13 @@
 
 import Link from 'next/link'
 import {
-    Home,
     Calendar,
     FileText,
     Ticket,
     MessageCircle,
     LogOut,
     ChevronRight,
+    LayoutGrid,
     User,
     Settings,
     Crown
@@ -46,20 +46,19 @@ export default function MemberDesktopSidebar({
 
     const baseItems = [
         { href: '/member/profile', icon: Settings, label: 'アカウント設定', subLabel: '基本情報の確認・変更' },
-        { href: 'https://lin.ee/placeholder', icon: MessageCircle, label: '公式LINE', subLabel: '運営へのお問い合わせ', external: true },
     ];
 
     const navItems = isTrioMember 
         ? [
-            { href: '/trio/dashboard', icon: Crown, label: 'THE TRIO ホーム', subLabel: 'プレミアム教室' },
-            { href: '/member/dashboard', icon: User, label: 'パーソナル', subLabel: '個人レッスン（メイン事業）' },
+            { href: '/trio/dashboard', icon: Crown, label: 'THE TRIO', subLabel: 'プレミアム教室・グループレッスン' },
+            { href: '/member/dashboard', icon: LayoutGrid, label: 'パーソナル', subLabel: '個人向けオーダーメイド指導' },
             ...baseItems
         ] 
         : [
-            { href: '/member/dashboard', icon: Home, label: 'ホーム', subLabel: 'トップページ' },
+            { href: '/member/dashboard', icon: LayoutGrid, label: 'パーソナル', subLabel: '個人向けオーダーメイド指導' },
             { href: '/member/reservation', icon: Calendar, label: 'レッスン予約', subLabel: 'スケジュールリクエスト' },
             { href: '/member/reports', icon: FileText, label: 'カルテ・レポート', subLabel: '成長の記録' },
-            { href: '/trio/dashboard', icon: Crown, label: 'THE TRIO', subLabel: 'プレミアム教室' },
+            { href: '/trio/dashboard', icon: Crown, label: 'THE TRIO', subLabel: 'プレミアム教室・グループレッスン' },
             ...baseItems
         ];
 

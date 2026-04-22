@@ -35,6 +35,12 @@ export function MastersNav() {
             >
                 <Link href="/admin/masters/statuses">顧客ステータス</Link>
             </Button>
+            <Button
+                variant={pathname.includes('/rewards') ? 'default' : 'outline'}
+                asChild
+            >
+                <Link href="/admin/masters/rewards">報酬設定</Link>
+            </Button>
         </div>
     )
 }

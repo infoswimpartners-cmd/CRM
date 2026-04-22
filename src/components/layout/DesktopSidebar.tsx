@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { LogOut, LayoutDashboard, Users, Calendar, DollarSign, Settings, User, History, PlusCircle, CreditCard, BookOpen, Mail, FileCheck, Megaphone, MessageCircle } from 'lucide-react'
+import { LogOut, LayoutDashboard, Users, Calendar, DollarSign, Settings, User, History, PlusCircle, CreditCard, BookOpen, Mail, FileCheck, Megaphone, MessageCircle, Crown, Timer } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 
 interface DesktopSidebarProps {
@@ -64,7 +64,7 @@ export function DesktopSidebar({ role }: DesktopSidebarProps) {
                         <NavItem href="/admin/inquiries" icon={MessageCircle} label="お問い合わせ" isActive={pathname?.startsWith('/admin/inquiries')} />
                         <NavItem href="/admin/schedule" icon={Calendar} label="全体スケジュール" isActive={pathname?.startsWith('/admin/schedule')} />
                         <NavItem href="/customers" icon={Users} label="会員管理" isActive={pathname?.startsWith('/customers')} />
-                        <NavItem href="/admin/trio/slots" icon={Calendar} label="THE TRIO管理" isActive={pathname?.startsWith('/admin/trio/slots')} />
+                        <NavItem href="/admin/trio" icon={Crown} label="TRIO管理" isActive={pathname?.startsWith('/admin/trio')} />
                         <NavItem href="/admin/coaches" icon={User} label="コーチ管理" isActive={pathname?.startsWith('/admin/coaches')} />
 
                         <NavHeading>実務メニュー</NavHeading>

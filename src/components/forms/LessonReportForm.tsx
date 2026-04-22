@@ -14,6 +14,7 @@ import { submitLessonReport } from '@/actions/report'
 import { getCurrentCoachRewardRate } from '@/actions/coaches'
 import { getPendingSchedulesAction } from '@/actions/schedule'
 import { cn, formatCurrency } from '@/lib/utils'
+import { calculateLessonReward, DEFAULT_REWARD_SETTINGS, RewardSettings } from '@/lib/reward-system'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
 import { Badge } from '@/components/ui/badge'
@@ -50,9 +51,6 @@ const formSchema = z.object({
     }),
     lesson_master_id: z.string().min(1, 'レッスンの種類を選択してください'),
     location: z.string().min(1, '場所は必須です'),
-    menu_description: z.string().optional(),
-    feedback_good: z.string().optional(),
-    feedback_next: z.string().optional(),
     price: z.coerce.number().min(0, '金額は0円以上である必要があります'),
     schedule_id: z.string().optional(),
 })
@@ -61,6 +59,7 @@ interface LessonMaster {
     id: string
     name: string
     unit_price: number
+    is_trial: boolean
 }
 
 // Define the form values type explicitly
@@ -80,6 +79,7 @@ export function LessonReportForm() {
     const [isDefaultDistantOption, setIsDefaultDistantOption] = useState(false)
     const [coachDistantFee, setCoachDistantFee] = useState(0)
     const [isFacilityFeeApplied, setIsFacilityFeeApplied] = useState(false)
+    const [rewardSettings, setRewardSettings] = useState<RewardSettings>(DEFAULT_REWARD_SETTINGS)
     const [estimatedReward, setEstimatedReward] = useState<number>(0)
     const [pendingSchedules, setPendingSchedules] = useState<any[]>([])
     const searchParams = useSearchParams()
@@ -93,10 +93,10 @@ export function LessonReportForm() {
             // Fetch masters
             const { data: masters } = await supabase
                 .from('lesson_masters')
-                .select('id, name, unit_price')
+                .select('id, name, unit_price, is_trial')
                 .eq('active', true)
 
-            if (masters) setLessonMasters(masters)
+            if (masters) setLessonMasters(masters as any)
 
             // Fetch current user (coach)
             const { data: { user } } = await supabase.auth.getUser()
@@ -116,6 +116,20 @@ export function LessonReportForm() {
                     .eq('id', user.id)
                     .single()
                 if (profile) setCoachDistantFee(profile.distant_reward_fee || 0)
+                
+                // Fetch Reward Settings
+                const { data: config } = await supabase
+                    .from('app_configs')
+                    .select('value')
+                    .eq('key', 'reward_settings')
+                    .single()
+                if (config) {
+                    try {
+                        setRewardSettings(JSON.parse(config.value))
+                    } catch (e) {
+                        console.error('Error parsing reward settings:', e)
+                    }
+                }
 
                 // Fetch pending schedules
                 const schedulesResult = await getPendingSchedulesAction(user.id)
@@ -135,9 +149,6 @@ export function LessonReportForm() {
             lesson_date: undefined,
             lesson_master_id: '',
             location: '',
-            menu_description: '',
-            feedback_good: '',
-            feedback_next: '',
             price: 0,
             schedule_id: scheduleIdFromUrl || '',
         },
@@ -309,38 +320,28 @@ export function LessonReportForm() {
             return
         }
 
-        if (isAdminRole) {
-            // Admin gets 100% of sales price (including facility fee if applied)
-            const master = lessonMasters.find(m => m.id === selectedMasterId)
-            if (!master) {
-                setEstimatedReward(0)
-                return
-            }
-            const facilityFeeAdd = isFacilityFeeApplied ? 1500 : 0
-            setEstimatedReward(master.unit_price + facilityFeeAdd)
-            return
-        }
-
-        const master = lessonMasters.find(m => m.id === selectedMasterId)
-        if (!master) {
+        const masterRaw = lessonMasters.find(m => m.id === selectedMasterId)
+        if (!masterRaw) {
             setEstimatedReward(0)
             return
         }
 
-        // Calculation Logic:
-        // Base Reward = master.unit_price * coachRate (not currentPrice because currentPrice might be overridden or empty)
-        // Pair Bonus = +1000
-        // Facility Fee = +1500 if applied
-        // Distant Fee = coachDistantFee if student is pair? Wait, distant fee logic is lesson.students?.is_default_distant_option
-        // For simplicity and based on current rewards.ts logic:
+        // Use core calculation logic to ensure consistency
+        const mockLesson: any = {
+            price: currentPrice,
+            lesson_masters: masterRaw,
+            students: {
+                is_two_person_lesson: isTwoPersonLesson,
+                is_default_distant_option: isDefaultDistantOption
+            },
+            profiles: {
+                role: isAdminRole ? 'admin' : 'coach',
+                distant_reward_fee: coachDistantFee
+            }
+        }
         
-        const baseReward = Math.floor(master.unit_price * coachRate)
-        const pairBonus = isTwoPersonLesson ? 1000 : 0
-        const facilityFeeAdd = isFacilityFeeApplied ? 1500 : 0
-        const distantFeeAdd = isDefaultDistantOption ? coachDistantFee : 0
-        
-        setEstimatedReward(baseReward + pairBonus + facilityFeeAdd + distantFeeAdd)
-    }, [selectedMasterId, coachRate, isTwoPersonLesson, isFacilityFeeApplied, isDefaultDistantOption, coachDistantFee, isCancellation, lessonMasters])
+        setEstimatedReward(calculateLessonReward(mockLesson, coachRate, rewardSettings))
+    }, [selectedMasterId, coachRate, isTwoPersonLesson, isFacilityFeeApplied, isDefaultDistantOption, coachDistantFee, isCancellation, lessonMasters, currentPrice, isAdminRole, rewardSettings])
 
     const displayMasters = restrictedLessonIds !== null
         ? lessonMasters.filter(m => restrictedLessonIds.includes(m.id))
@@ -380,8 +381,6 @@ export function LessonReportForm() {
                     ...currentValues,
                     student_id: '',
                     student_name: '',
-                    feedback_good: '',
-                    feedback_next: '',
                 }, { keepDefaultValues: false }) // Reset to these as new defaults
 
                 // Clear scheduleId from URL to prevent unwanted re-fills while staying on page
@@ -422,8 +421,10 @@ export function LessonReportForm() {
                         }}
                         value={form.watch('schedule_id') || 'none'}
                     >
-                        <SelectTrigger className="bg-white">
-                            <SelectValue placeholder="未報告のスケジュールを選択（任意）" />
+                        <SelectTrigger className="bg-white w-full overflow-hidden">
+                            <div className="truncate w-full text-left">
+                                <SelectValue placeholder="未報告のスケジュールを選択（任意）" />
+                            </div>
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="none" className="text-slate-400 italic">選択解除（手動入力）</SelectItem>
@@ -471,14 +472,19 @@ export function LessonReportForm() {
                             <FormLabel>レッスンの種類</FormLabel>
                             <Select onValueChange={field.onChange} value={field.value}>
                                 <FormControl>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="レッスンを選択" />
+                                    <SelectTrigger className="w-full overflow-hidden">
+                                        <div className="truncate w-full text-left">
+                                            <SelectValue placeholder="レッスンを選択" />
+                                        </div>
                                     </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
                                     {displayMasters.map((master) => (
                                         <SelectItem key={master.id} value={master.id}>
-                                            {master.name} (¥{master.unit_price.toLocaleString()})
+                                            <div className="flex justify-between w-full items-center gap-2 overflow-hidden">
+                                                <span className="truncate flex-1">{master.name}</span>
+                                                <span className="text-slate-400 text-[10px] shrink-0">¥{master.unit_price.toLocaleString()}</span>
+                                            </div>
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
@@ -597,49 +603,6 @@ export function LessonReportForm() {
                         )}
                     />
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <FormField
-                            control={form.control as any}
-                            name="feedback_good"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel className="flex items-center gap-2">
-                                        良かった点
-                                        <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-600 border-blue-100 font-normal">メンバーサイトに反映</Badge>
-                                    </FormLabel>
-                                    <FormControl>
-                                        <Textarea
-                                            placeholder="以前より改善された点など"
-                                            className="resize-none min-h-[80px]"
-                                            {...field}
-                                        />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-
-                        <FormField
-                            control={form.control as any}
-                            name="feedback_next"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel className="flex items-center gap-2">
-                                        次回の課題
-                                        <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-600 border-blue-100 font-normal">メンバーサイトに反映</Badge>
-                                    </FormLabel>
-                                    <FormControl>
-                                        <Textarea
-                                            placeholder="次回意識すべきポイントなど"
-                                            className="resize-none min-h-[80px]"
-                                            {...field}
-                                        />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                    </div>
                 </div>
                 <FormField
                     control={form.control as any}
@@ -663,30 +626,33 @@ export function LessonReportForm() {
                     )}
                 />
 
-                <div className="bg-blue-50 border border-blue-100 p-4 rounded-lg flex justify-between items-center shadow-sm">
+                <div className="bg-blue-50 border border-blue-100 p-4 rounded-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-sm">
                     <div>
-                        <p className="text-xs text-blue-600 font-bold mb-1">想定報酬単価（ランク計上分込）</p>
-                        <p className="text-xl font-black text-blue-900">
+                        <p className="text-xs text-blue-600 font-bold mb-1 italic">想定報酬単価（ランク計上分込）</p>
+                        <p className="text-2xl font-black text-blue-900 leading-none">
                             {formatCurrency(estimatedReward)}
                         </p>
                     </div>
-                    <div className="text-right">
-                        <Badge variant="outline" className="bg-white text-blue-700 border-blue-200">
+                    <div className="flex flex-col items-start sm:items-end gap-1 w-full sm:w-auto border-t sm:border-t-0 pt-3 sm:pt-0 border-blue-100">
+                        <Badge variant="outline" className="bg-white text-blue-700 border-blue-200 py-1">
                             適用レート: {isAdminRole ? '100% (管理者)' : `${(coachRate * 100).toFixed(0)}%`}
                         </Badge>
                         {!isAdminRole && isTwoPersonLesson && (
-                            <div className="text-[10px] text-blue-500 mt-1 font-bold">
-                                + ペア手当 (¥1,000) 適用中
+                            <div className="text-[10px] text-blue-500 font-bold flex items-center gap-1">
+                                <span className="w-1 h-1 bg-blue-400 rounded-full" />
+                                ペア手当 (¥1,000) 適用中
                             </div>
                         )}
                         {isDefaultDistantOption && (
-                            <div className="text-[10px] text-blue-500 mt-0.5 font-bold">
-                                + 遠方対応手当 (¥{coachDistantFee.toLocaleString()}) 適用中
+                            <div className="text-[10px] text-blue-500 font-bold flex items-center gap-1">
+                                <span className="w-1 h-1 bg-blue-400 rounded-full" />
+                                遠方対応手当 (¥{coachDistantFee.toLocaleString()}) 適用中
                             </div>
                         )}
                         {isFacilityFeeApplied && (
-                            <div className="text-[10px] text-blue-500 mt-0.5 font-bold">
-                                + 施設利用手当 (¥1,500) 適用中
+                            <div className="text-[10px] text-blue-500 font-bold flex items-center gap-1">
+                                <span className="w-1 h-1 bg-blue-400 rounded-full" />
+                                施設利用手当 (¥1,500) 適用中
                             </div>
                         )}
                     </div>

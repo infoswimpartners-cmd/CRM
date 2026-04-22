@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
 
-export default function RedirectToTrioAdmin() {
+export default function RedirectToTrioWaitlistAdmin() {
     redirect('/admin/trio');
 }

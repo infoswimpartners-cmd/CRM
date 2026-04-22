@@ -49,7 +49,6 @@ export default function MemberMobileSidebar({
 
     const baseItems = [
         { href: '/member/profile', icon: Settings, label: 'アカウント設定', subLabel: '基本情報の確認・変更' },
-        { href: 'https://lin.ee/placeholder', icon: MessageCircle, label: '公式LINE', subLabel: '運営へのお問い合わせ', external: true },
     ];
 
     const navItems = isTrioMember 

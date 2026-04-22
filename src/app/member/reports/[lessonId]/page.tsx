@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, MapPin, User, Clock, Play, Image as ImageIcon, MessageSquare, Star, Target } from 'lucide-react';
+import { ArrowLeft, MapPin, User, Clock, Play, Image as ImageIcon, MessageSquare } from 'lucide-react';
 import { LessonMediaGallery } from './_components/LessonMediaGallery';
 
 export default async function ReportDetailPage({ params }: { params: Promise<{ lessonId: string }> }) {
@@ -138,38 +138,10 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ l
                     </div>
                 )}
 
-                {/* 良かった点 */}
-                {lesson.feedback_good && (
-                    <div className="glass-card overflow-hidden">
-                        <div className="px-5 py-3 bg-green-500 text-white flex items-center gap-2">
-                            <Star className="w-4 h-4 fill-current" />
-                            <h3 className="text-sm font-black">良かった点</h3>
-                        </div>
-                        <div className="p-5">
-                            <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700">
-                                {lesson.feedback_good}
-                            </p>
-                        </div>
-                    </div>
-                )}
 
-                {/* 次回の課題 */}
-                {lesson.feedback_next && (
-                    <div className="glass-card overflow-hidden">
-                        <div className="px-5 py-3 bg-orange-500 text-white flex items-center gap-2">
-                            <Target className="w-4 h-4" />
-                            <h3 className="text-sm font-black">次回の課題</h3>
-                        </div>
-                        <div className="p-5">
-                            <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700">
-                                {lesson.feedback_next}
-                            </p>
-                        </div>
-                    </div>
-                )}
 
                 {/* フィードバックがない場合 */}
-                {!lesson.menu_description && !lesson.coach_comment && !lesson.feedback_good && !lesson.feedback_next && (
+                {!lesson.menu_description && !lesson.coach_comment && (
                     <div className="glass-card p-8 text-center">
                         <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
                             <MessageSquare className="w-6 h-6 text-gray-300" />

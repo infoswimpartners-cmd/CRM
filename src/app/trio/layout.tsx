@@ -4,6 +4,7 @@ import MemberBottomNav from "@/components/layout/MemberBottomNav";
 import MemberDesktopSidebar from "@/components/layout/MemberDesktopSidebar";
 import { createClient } from "@/lib/supabase/server";
 import { getCachedMemberData } from "@/lib/member-data";
+import TrioBottomNav from "@/components/trio/TrioBottomNav";
 
 export default async function TrioLayout({ children }: { children: ReactNode }) {
     const { user, student, isTrioMember } = await getCachedMemberData();
@@ -27,14 +28,19 @@ export default async function TrioLayout({ children }: { children: ReactNode }) 
     }
 
     return (
-        <div className="min-h-screen flex w-full bg-blue-50/10">
+        <div className="dark min-h-screen flex w-full bg-[#0A192F] text-slate-200">
             <MemberDesktopSidebar studentName={studentName} isTrioMember={isTrioMember} />
             <div className="flex-1 flex flex-col min-w-0">
-                <MemberHeader unreadCount={unreadCount} studentName={studentName} planName={planName} isTrioMember={isTrioMember} />
-                <main className="flex-1 container mx-auto px-4 py-8 max-w-5xl">
+                {/* TRIO専用のヘッダースタイル調整（ダークモード対応） */}
+                <div className="sticky top-0 z-50 w-full border-b border-white/5 bg-[#0A192F]/80 backdrop-blur-xl">
+                    <MemberHeader unreadCount={unreadCount} studentName={studentName} planName={planName} isTrioMember={isTrioMember} />
+                </div>
+                
+                <main className="flex-1 container mx-auto px-4 py-8 mb-24 max-w-5xl">
                     {children}
                 </main>
-                <MemberBottomNav isTrioMember={isTrioMember} />
+                
+                <TrioBottomNav />
             </div>
         </div>
     );

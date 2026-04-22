@@ -29,7 +29,36 @@ export type LessonData = {
     }
 }
 
-export function calculateCoachRate(coachId: string, allLessons: LessonData[], referenceDate: Date, overrideRate?: number | null): number {
+export type RewardSettings = {
+    rank_thresholds: { average: number; rate: number }[];
+    trial_standard: number;
+    trial_special: number;
+    special_rate: number;
+    pair_bonus: number;
+    facility_fee: number;
+}
+
+export const DEFAULT_REWARD_SETTINGS: RewardSettings = {
+    rank_thresholds: [
+        { average: 30, rate: 0.70 },
+        { average: 25, rate: 0.65 },
+        { average: 20, rate: 0.60 },
+        { average: 15, rate: 0.55 },
+    ],
+    trial_standard: 4500,
+    trial_special: 5000,
+    special_rate: 0.7000001,
+    pair_bonus: 1000,
+    facility_fee: 1500,
+}
+
+export function calculateCoachRate(
+    coachId: string, 
+    allLessons: LessonData[], 
+    referenceDate: Date, 
+    overrideRate?: number | null,
+    settings: RewardSettings = DEFAULT_REWARD_SETTINGS
+): number {
     if (overrideRate) return overrideRate;
 
     const rankStart = startOfMonth(subMonths(referenceDate, 3))
@@ -43,17 +72,20 @@ export function calculateCoachRate(coachId: string, allLessons: LessonData[], re
 
     const average = pastLessons.length / 3
 
-    if (average >= 30) return 0.70
-    else if (average >= 25) return 0.65
-    else if (average >= 20) return 0.60
-    else if (average >= 15) return 0.55
-    else return 0.50
+    // Sort thresholds descending to find the highest match
+    const sortedThresholds = [...settings.rank_thresholds].sort((a, b) => b.average - a.average)
+    for (const threshold of sortedThresholds) {
+        if (average >= threshold.average) return threshold.rate
+    }
+
+    return 0.50 // Default fallback
 }
 
-
-export const SPECIAL_EXCEPTION_RATE = 0.7000001
-
-export function calculateLessonReward(lesson: LessonData, rate: number): number {
+export function calculateLessonReward(
+    lesson: LessonData, 
+    rate: number,
+    settings: RewardSettings = DEFAULT_REWARD_SETTINGS
+): number {
     // @ts-ignore
     const master = lesson.lesson_masters
     // @ts-ignore
@@ -70,12 +102,14 @@ export function calculateLessonReward(lesson: LessonData, rate: number): number 
 
     let facilityFee = 0;
     if (typeof lesson.price === 'number' && lesson.price > master.unit_price) {
+        // If master has fixed price but lesson record says more, we assume facility fee is the difference 
+        // OR we use the predefined facility fee constant if it's a fixed amount system.
+        // Current logic assumes the difference is the fee.
         facilityFee = lesson.price - master.unit_price;
     }
 
     // Check for custom reward price in membership configuration
     if (membership?.membership_type_lessons) {
-        // Handle both array (joined) and object (if single object returned, though usually array)
         const configs = Array.isArray(membership.membership_type_lessons)
             ? membership.membership_type_lessons
             : [membership.membership_type_lessons]
@@ -101,27 +135,29 @@ export function calculateLessonReward(lesson: LessonData, rate: number): number 
         if (rate === 1.0) {
             reward = basePrice
         }
-        // Special Exception Check: Use epsilon for float comparison safety
-        // If rate is effectively SPECIAL_EXCEPTION_RATE (approx 0.7000001)
-        else if (Math.abs(rate - SPECIAL_EXCEPTION_RATE) < 0.00000001) {
-            reward = 5000
+        else if (Math.abs(rate - settings.special_rate) < 0.00000001) {
+            reward = settings.trial_special
         } else {
-            reward = 4500
+            reward = settings.trial_standard
         }
     } else {
         reward = Math.floor(basePrice * rate)
     }
 
-    // Add 2-person simultaneous lesson bonus (+1000 JPY) 
-    // Only apply for normal lessons, NOT for trial lessons.
+    // Add 2-person simultaneous lesson bonus
     if (lesson.students?.is_two_person_lesson && !master.is_trial) {
-        reward += 1000
+        reward += settings.pair_bonus
     }
 
     return reward + facilityFee + distantFee
 }
 
-export function calculateMonthlyStats(coachId: string, monthLessons: LessonData[], rate: number) {
+export function calculateMonthlyStats(
+    coachId: string, 
+    monthLessons: LessonData[], 
+    rate: number,
+    settings: RewardSettings = DEFAULT_REWARD_SETTINGS
+) {
     const stats = {
         totalSales: 0,
         totalReward: 0,
@@ -133,7 +169,6 @@ export function calculateMonthlyStats(coachId: string, monthLessons: LessonData[
     stats.lessonCount = myLessons.length
 
     myLessons.forEach((rawL: any) => {
-        // Supabaseのarray-likeなJOIN結果をオブジェクトに正規化（コーチ側と同じ処理）
         const l: any = {
             ...rawL,
             lesson_masters: Array.isArray(rawL.lesson_masters) ? rawL.lesson_masters[0] : rawL.lesson_masters,
@@ -145,7 +180,7 @@ export function calculateMonthlyStats(coachId: string, monthLessons: LessonData[
         }
 
         const price = l.price || 0
-        const reward = calculateLessonReward(l, rate)
+        const reward = calculateLessonReward(l, rate, settings)
 
         let title = l.lesson_masters?.is_trial ? '体験レッスン' : '通常レッスン';
         if (l.lesson_masters && price > l.lesson_masters.unit_price) {
@@ -159,7 +194,7 @@ export function calculateMonthlyStats(coachId: string, monthLessons: LessonData[
         stats.totalReward += reward
         stats.details.push({
             date: l.lesson_date,
-            title: title, // Simplified title with facility fee indicator
+            title: title,
             studentName: l.students?.full_name || '',
             price: price,
             reward: reward
@@ -169,13 +204,13 @@ export function calculateMonthlyStats(coachId: string, monthLessons: LessonData[
     return stats
 }
 
-// New: Calculate Historical Monthly Rewards with Correct Historical Rates
 export function calculateHistoricalMonthlyRewards(
     coachId: string,
     allLessons: LessonData[],
     monthsToLookBack: number = 12,
     coachCreatedAt?: string,
-    overrideRate?: number | null
+    overrideRate?: number | null,
+    settings: RewardSettings = DEFAULT_REWARD_SETTINGS
 ) {
     const today = new Date()
     const history = []
@@ -185,7 +220,6 @@ export function calculateHistoricalMonthlyRewards(
         const d = subMonths(today, i)
         const monthStart = startOfMonth(d)
 
-        // Skip months before registration
         if (registrationDate && monthStart < registrationDate) {
             continue
         }
@@ -193,22 +227,18 @@ export function calculateHistoricalMonthlyRewards(
         const monthEnd = endOfMonth(d)
         const monthKey = format(d, 'yyyy-MM')
 
-        // 1. Calculate Rate applicable for THIS month (based on 3 months prior to this month)
-        // Optionally apply override if provided
-        const historicalRate = calculateCoachRate(coachId, allLessons, d, overrideRate)
+        const historicalRate = calculateCoachRate(coachId, allLessons, d, overrideRate, settings)
 
-        // 2. Filter lessons for this month
         const monthLessons = allLessons.filter(l => {
             const ld = new Date(l.lesson_date)
             return ld >= monthStart && ld <= monthEnd
         })
 
-        // 3. Calculate Reward
-        const stats = calculateMonthlyStats(coachId, monthLessons, historicalRate)
+        const stats = calculateMonthlyStats(coachId, monthLessons, historicalRate, settings)
 
         history.push({
             month: monthKey,
-            yearMonth: format(d, 'yyyy年M月'), // Display Label
+            yearMonth: format(d, 'yyyy年M月'),
             totalSales: stats.totalSales,
             totalReward: stats.totalReward,
             rate: historicalRate,

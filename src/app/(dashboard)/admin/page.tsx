@@ -22,6 +22,9 @@ import { getMonthlyRevenue } from '@/actions/analytics'
 import { CoachRankingTable } from '@/components/admin/analytics/CoachRankingTable'
 import { CustomerRankingTable } from '@/components/admin/analytics/CustomerRankingTable'
 import { calculateCoachRate, calculateMonthlyStats, calculateLessonReward } from '@/lib/reward-system'
+import { getTrioOnboardingStatus } from '@/actions/trio_onboarding'
+import { Crown, Timer } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 import { Suspense } from 'react'
 
@@ -107,7 +110,7 @@ async function AdminDashboardContent({ monthParam }: { monthParam: string }) {
         { data: upcomingSchedules },
         { data: myUpcomingSchedules },
         { count: totalStudents },
-        { data: appConfigs }
+        { data: appConfigs },
     ] = await Promise.all([
         // 1. Fetch Coaches
         supabase.from('profiles').select('*'),
@@ -195,8 +198,19 @@ async function AdminDashboardContent({ monthParam }: { monthParam: string }) {
         // 9. Fetch Tax Settings
         supabase.from('app_configs')
             .select('key, value')
-            .like('key', 'coach_tax:%')
+            .like('key', 'coach_tax:%'),
     ])
+
+    // 10. THE TRIO Status (Fetch separately to avoid blocking other data if it fails)
+    let trioStatusRes = { activeCount: 0, waitlistCount: 0, isFull: false };
+    try {
+        const res = await getTrioOnboardingStatus();
+        if (!res.error) {
+            trioStatusRes = { ...res, isFull: res.isFull ?? false };
+        }
+    } catch (err) {
+        console.error('Failed to fetch TRIO status in admin dashboard:', err);
+    }
 
     // Calculate Reward Rate for current user (Admin is always 100% locally, but for display logic)
     // Actually Admin rate is fixed 1.0 in calculation, but let's reuse logic for display consistency if needed.
@@ -410,7 +424,41 @@ async function AdminDashboardContent({ monthParam }: { monthParam: string }) {
                     <h2 className="text-lg font-bold text-slate-700">ビジネス概況</h2>
                     <div className="h-px flex-1 bg-slate-100"></div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <Link href="/admin/trio/slots">
+                        <div className="group relative bg-white rounded-3xl p-6 md:p-8 overflow-hidden border border-slate-200/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_50px_rgba(99,_102,_241,_0.07)] transition-all duration-500 cursor-pointer h-full ring-1 ring-slate-200/50 hover:ring-indigo-200">
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-linear-to-bl from-indigo-100/30 to-transparent rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110 duration-700" />
+                            <div className="relative z-10">
+                                <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500">
+                                    <Crown className="w-6 h-6 text-indigo-600" />
+                                </div>
+                                <p className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">THE TRIO 稼働</p>
+                                <div className="flex items-baseline gap-2 flex-wrap min-w-0">
+                                    <h3 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tighter tabular-nums">{trioStatusRes.activeCount}</h3>
+                                    <span className="text-xs sm:text-base font-medium text-slate-500">/ 12 名</span>
+                                </div>
+
+                                <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col gap-3">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-semibold text-slate-400">キャンセル待ち</span>
+                                        <span className="flex items-center gap-1 text-sm font-bold text-amber-600">
+                                            <Timer className="w-3 h-3" />
+                                            {trioStatusRes.waitlistCount} 名
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-semibold text-slate-400">ステータス</span>
+                                        <Badge variant="outline" className={cn(
+                                            "text-[10px] uppercase font-black px-2 py-0.5",
+                                            trioStatusRes.isFull ? "bg-red-50 text-red-600 border-red-100" : "bg-emerald-50 text-emerald-600 border-emerald-100"
+                                        )}>
+                                            {trioStatusRes.isFull ? "満員" : "募集中"}
+                                        </Badge>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </Link>
                     <Link href="/admin/analytics">
                         <div className="group relative bg-white rounded-3xl p-6 md:p-8 overflow-hidden border border-slate-200/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_50px_rgba(8,_112,_184,_0.07)] transition-all duration-500 cursor-pointer h-full ring-1 ring-slate-200/50 hover:ring-blue-200">
                             <div className="absolute top-0 right-0 w-32 h-32 bg-linear-to-bl from-cyan-100/30 to-transparent rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110 duration-700" />
@@ -418,10 +466,10 @@ async function AdminDashboardContent({ monthParam }: { monthParam: string }) {
                                 <div className="w-12 h-12 bg-cyan-50 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500">
                                     <DollarSign className="w-6 h-6 text-cyan-600" />
                                 </div>
-                                <p className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">今月の売上</p>
-                                <div className="flex items-baseline gap-2">
-                                    <h3 className="text-3xl md:text-4xl font-extrabold text-slate-900">¥{totalSales.toLocaleString()}</h3>
-                                    <span className="text-sm font-medium text-slate-500">({targetDate.getMonth() + 1}月)</span>
+                                <p className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">今月の売上</p>
+                                <div className="flex items-baseline gap-2 flex-wrap min-w-0">
+                                    <h3 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tighter tabular-nums">¥{totalSales.toLocaleString()}</h3>
+                                    <span className="text-[10px] sm:text-sm font-medium text-slate-500">({targetDate.getMonth() + 1}月)</span>
                                 </div>
 
                                 <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col gap-3">
@@ -447,10 +495,10 @@ async function AdminDashboardContent({ monthParam }: { monthParam: string }) {
                                 <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500">
                                     <Users className="w-6 h-6 text-blue-600" />
                                 </div>
-                                <p className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">稼働コーチ数</p>
-                                <div className="flex items-baseline gap-2">
-                                    <h3 className="text-3xl md:text-4xl font-extrabold text-slate-900">{activeCoaches.length}</h3>
-                                    <span className="text-base font-medium text-slate-500">名</span>
+                                <p className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">稼働コーチ数</p>
+                                <div className="flex items-baseline gap-2 flex-wrap min-w-0">
+                                    <h3 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 tabular-nums">{activeCoaches.length}</h3>
+                                    <span className="text-xs sm:text-base font-medium text-slate-500">名</span>
                                 </div>
 
                                 <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col gap-3">
@@ -477,10 +525,10 @@ async function AdminDashboardContent({ monthParam }: { monthParam: string }) {
                                 <div className="w-12 h-12 bg-purple-50 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500">
                                     <CalendarIcon className="w-6 h-6 text-purple-600" />
                                 </div>
-                                <p className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">月間レッスン数</p>
-                                <div className="flex items-baseline gap-2">
-                                    <h3 className="text-3xl md:text-4xl font-extrabold text-slate-900">{thisMonthLessons.length}</h3>
-                                    <span className="text-base font-medium text-slate-500">回</span>
+                                <p className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">月間レッスン数</p>
+                                <div className="flex items-baseline gap-2 flex-wrap min-w-0">
+                                    <h3 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 tabular-nums">{thisMonthLessons.length}</h3>
+                                    <span className="text-xs sm:text-base font-medium text-slate-500">回</span>
                                 </div>
 
                                 <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col gap-3">
@@ -567,12 +615,12 @@ async function AdminDashboardContent({ monthParam }: { monthParam: string }) {
                         { href: "/admin/settings", title: "システム設定", desc: "メールテンプレート・環境設定", icon: Settings, color: "bg-slate-50 text-slate-600" }
                     ].map((item, i) => (
                         <Link key={i} href={item.href}>
-                            <div className="group h-full bg-white rounded-2xl p-4 md:p-6 border border-slate-200 shadow-sm transition-all duration-300 hover:shadow-xl hover:-translate-y-1 hover:border-blue-200 cursor-pointer">
-                                <div className={`w-10 h-10 md:w-12 md:h-12 ${item.color} rounded-xl flex items-center justify-center mb-4 md:mb-6 group-hover:scale-110 transition-transform duration-300`}>
+                            <div className="group h-full bg-white rounded-2xl p-4 sm:p-6 border border-slate-200 shadow-sm transition-all duration-300 hover:shadow-xl hover:-translate-y-1 hover:border-blue-200 cursor-pointer flex flex-col">
+                                <div className={`w-10 h-10 md:w-12 md:h-12 ${item.color} rounded-xl flex items-center justify-center mb-4 md:mb-6 group-hover:scale-110 transition-transform duration-300 shrink-0`}>
                                     <item.icon className="h-5 w-5 md:h-6 md:w-6" />
                                 </div>
-                                <h4 className="text-sm md:text-base font-bold text-slate-900 mb-1 md:mb-2 truncate">{item.title}</h4>
-                                <p className="text-[10px] md:text-xs text-slate-500 leading-relaxed line-clamp-2 md:line-clamp-none">{item.desc}</p>
+                                <h4 className="text-xs sm:text-sm md:text-base font-black text-slate-900 mb-1 md:mb-2 leading-tight">{item.title}</h4>
+                                <p className="text-[9px] sm:text-[10px] md:text-xs text-slate-400 font-medium leading-relaxed line-clamp-2">{item.desc}</p>
                             </div>
                         </Link>
                     ))}

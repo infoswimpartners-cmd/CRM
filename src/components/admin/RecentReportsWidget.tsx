@@ -148,23 +148,25 @@ export function RecentReportsWidget({ reports: initialReports, coachId, hideCard
                                         </Avatar>
                                         <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-orange-500 border-2 border-white rounded-full"></div>
                                     </div>
-                                    <div className="space-y-1 min-w-0 flex-1">
-                                        <div className="flex items-center justify-between gap-1">
-                                            <p className="text-sm font-extrabold text-slate-900 truncate">
+                                    <div className="space-y-1.5 min-w-0 flex-1">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <p className="text-sm font-black text-slate-800 truncate">
                                                 {report.profiles?.full_name || '不明なコーチ'}
                                             </p>
-                                            <span className="text-[10px] font-bold text-slate-300 uppercase tracking-wider">
-                                                {format(new Date(report.lesson_date), 'M月d日')}
+                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest shrink-0 tabular-nums">
+                                                {format(new Date(report.lesson_date), 'MM/dd')}
                                             </span>
                                         </div>
-                                        <div className="flex items-center gap-1.5">
-                                            <span className="text-[10px] items-center gap-1 flex text-slate-400 font-bold uppercase tracking-widest leading-none">生徒:</span>
-                                            <p className="text-xs font-bold text-slate-600 truncate leading-none">
-                                                {report.student_name}
-                                            </p>
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex items-center gap-1 min-w-0 shrink">
+                                                <span className="text-[9px] text-slate-400 font-extrabold uppercase tracking-tighter leading-none shrink-0">STUDENT:</span>
+                                                <p className="text-[11px] font-bold text-slate-600 truncate leading-none">
+                                                    {report.student_name}
+                                                </p>
+                                            </div>
                                         </div>
                                         {report.menu_description && (
-                                            <div className="text-[11px] font-medium text-slate-500 line-clamp-2 leading-relaxed bg-slate-50/50 p-2 rounded-lg mt-1 group-hover:bg-white transition-colors border border-transparent group-hover:border-orange-50">
+                                            <div className="text-[10px] md:text-[11px] font-medium text-slate-500 line-clamp-2 leading-relaxed bg-slate-50/80 p-2.5 rounded-xl mt-1.5 group-hover:bg-white transition-colors border border-slate-100/50 group-hover:border-orange-100">
                                                 {report.menu_description}
                                             </div>
                                         )}

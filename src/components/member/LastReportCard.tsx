@@ -10,8 +10,6 @@ interface LastReportCardProps {
         lesson_date: string
         coach_comment?: string | null
         menu_description?: string | null
-        feedback_good?: string | null
-        feedback_next?: string | null
         profiles?: { full_name: string | null } | null // joined coach profile
     } | null
 }

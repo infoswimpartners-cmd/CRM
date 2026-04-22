@@ -14,8 +14,6 @@ const formSchema = z.object({
     lesson_master_id: z.string().min(1, 'レッスンの種類を選択してください'),
     location: z.string().min(1, '場所は必須です'),
     menu_description: z.string().optional(),
-    feedback_good: z.string().optional(),
-    feedback_next: z.string().optional(),
     coach_comment: z.string().optional(),
     price: z.number().min(0),
     billing_price: z.number().min(0).optional(),
@@ -74,9 +72,8 @@ export async function submitLessonReport(values: FormValues) {
 
     try {
         // 3. Insert into Supabase (Base columns only to match current DB schema)
-        // Note: feedback_good, feedback_next, coach_comment, and billing_price 
-        // seem to be missing from the current database schema cache.
-        // We only include columns that are confirmed to exist.
+        // Note: coach_comment and billing_price 
+        // are only editable by Admin/Coach.
         const { data: insertedLesson, error: dbError } = await supabase.from('lessons').insert({
             coach_id: user.id,
             student_id: data.student_id || null,
@@ -283,8 +280,6 @@ export async function updateLessonReport(lessonId: string, values: FormValues) {
             lesson_date: data.lesson_date,
             location: data.location,
             menu_description: data.menu_description || '',
-            feedback_good: data.feedback_good || '',
-            feedback_next: data.feedback_next || '',
             coach_comment: data.coach_comment || '',
             price: data.price,
             billing_price: billingPrice
@@ -311,8 +306,6 @@ const publicFormSchema = z.object({
     lesson_master_id: z.string().min(1, 'レッスンの種類を選択してください'),
     location: z.string().min(1, '場所は必須です'),
     menu_description: z.string().optional(),
-    feedback_good: z.string().optional(),
-    feedback_next: z.string().optional(),
     price: z.number().min(0),
 })
 
@@ -348,8 +341,6 @@ export async function submitPublicLessonReport(values: PublicFormValues) {
             p_lesson_master_id: data.lesson_master_id,
             p_price: data.price,
             p_location: data.location,
-            p_feedback_good: data.feedback_good || '',
-            p_feedback_next: data.feedback_next || '',
             p_coach_comment: ''
         })
 
@@ -477,8 +468,6 @@ const adminProxySchema = z.object({
     lesson_master_id: z.string().min(1, 'レッスンの種類を選択してください'),
     location: z.string().min(1, '場所は必須です'),
     menu_description: z.string().optional(),
-    feedback_good: z.string().optional(),
-    feedback_next: z.string().optional(),
     coach_comment: z.string().optional(),
     price: z.number().min(0),
 })
@@ -551,8 +540,6 @@ export async function submitAdminProxyReport(values: AdminProxyValues) {
             lesson_date: data.lesson_date,
             location: data.location,
             menu_description: data.menu_description || '',
-            feedback_good: data.feedback_good || '',
-            feedback_next: data.feedback_next || '',
             coach_comment: data.coach_comment || '',
             price: finalPrice,
             billing_price: billingPrice,

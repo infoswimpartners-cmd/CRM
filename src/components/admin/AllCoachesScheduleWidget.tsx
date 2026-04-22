@@ -163,45 +163,53 @@ export function AllCoachesScheduleWidget({ schedules: initialSchedules, title = 
                                     </div>
 
                                     {/* Info Column */}
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-1.5 mb-1">
-                                            <Avatar className="h-4 w-4 ring-1 ring-slate-200">
-                                                <AvatarImage src={schedule.coach.avatar_url || undefined} />
-                                                <AvatarFallback className="text-[8px] bg-slate-100 text-slate-400">{schedule.coach.full_name[0]}</AvatarFallback>
-                                            </Avatar>
-                                            <span className="text-[10px] text-slate-400 font-bold truncate">{schedule.coach.full_name}</span>
+                                    <div className="flex-1 min-w-0 py-1">
+                                        <div className="flex items-center gap-2 mb-1.5">
+                                            <div className="flex items-center gap-1 min-w-0 shrink">
+                                                <Avatar className="h-4 w-4 ring-1 ring-slate-100 shrink-0">
+                                                    <AvatarImage src={schedule.coach.avatar_url || undefined} />
+                                                    <AvatarFallback className="text-[8px] bg-slate-50 text-slate-400 font-black">{schedule.coach.full_name[0]}</AvatarFallback>
+                                                </Avatar>
+                                                <span className="text-[10px] text-slate-400 font-black truncate tracking-tighter">{schedule.coach.full_name}</span>
+                                            </div>
+                                            <div className="h-1 w-1 bg-slate-200 rounded-full shrink-0" />
+                                            <div className="flex items-center gap-1 shrink-0 text-slate-400">
+                                                <Clock className="w-3 h-3" />
+                                                <span className="text-[10px] font-bold tabular-nums">{format(new Date(schedule.start_time), 'HH:mm')}</span>
+                                            </div>
                                         </div>
 
-                                        <h4 className="font-bold text-slate-800 truncate text-sm leading-tight text-left">
+                                        <h4 className="font-black text-slate-800 text-sm leading-tight text-left mb-1 line-clamp-1">
                                             {schedule.student_id ? (
                                                 <button
                                                     onClick={() => handleStudentClick(schedule.student_id!, schedule.student_name!)}
-                                                    className="hover:text-blue-600 transition-colors"
+                                                    className="hover:text-blue-600 transition-colors text-left"
                                                 >
                                                     {schedule.student_name}
                                                 </button>
                                             ) : (
-                                                schedule.student_name || schedule.title
+                                                <span className="truncate">{schedule.student_name || schedule.title}</span>
                                             )}
                                         </h4>
 
-                                        <div className="flex flex-wrap items-center gap-x-3 mt-1 text-[10px] text-slate-400 font-medium">
-                                            <div className="flex items-center gap-1">
-                                                <Clock className="w-3 h-3" />
-                                                {format(new Date(schedule.start_time), 'HH:mm')} - {format(new Date(schedule.end_time), 'HH:mm')}
-                                            </div>
-                                        </div>
+                                        {schedule.location && (
+                                            <p className="text-[10px] font-medium text-slate-400 truncate flex items-center gap-1">
+                                                <span className="w-1 h-1 bg-slate-300 rounded-full" /> {schedule.location}
+                                            </p>
+                                        )}
                                     </div>
 
                                     {/* Edit Button */}
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-8 w-8 shrink-0 text-slate-300 hover:text-blue-600 hover:bg-blue-50 opacity-0 group-hover:opacity-100 transition-all rounded-lg"
-                                        onClick={() => handleEditClick(schedule)}
-                                    >
-                                        <Edit2 className="h-4 w-4" />
-                                    </Button>
+                                    <div className="shrink-0 ml-1">
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-9 w-9 text-slate-300 hover:text-blue-600 hover:bg-blue-50 sm:opacity-0 group-hover:opacity-100 transition-all rounded-xl"
+                                            onClick={() => handleEditClick(schedule)}
+                                        >
+                                            <Edit2 className="h-4.5 w-4.5" />
+                                        </Button>
+                                    </div>
                                 </div>
                             ))}
                         </div>

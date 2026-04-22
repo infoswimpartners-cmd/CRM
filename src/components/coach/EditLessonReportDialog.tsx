@@ -53,8 +53,6 @@ const formSchema = z.object({
     location: z.string().min(1, '場所は必須です'),
     menu_description: z.string().optional(),
     price: z.coerce.number().min(0, '金額は0円以上である必要があります'),
-    feedback_good: z.string().optional(),
-    feedback_next: z.string().optional(),
     coach_comment: z.string().optional(),
 })
 
@@ -76,8 +74,6 @@ interface EditLessonReportDialogProps {
         location: string
         menu_description: string | null
         price: number
-        feedback_good?: string
-        feedback_next?: string
         coach_comment?: string
     }
     open: boolean
@@ -114,8 +110,6 @@ export function EditLessonReportDialog({ lesson, open, onOpenChange }: EditLesso
             menu_description: lesson.menu_description || '',
             price: lesson.price,
             student_key: lesson.student_name,
-            feedback_good: lesson.feedback_good || '',
-            feedback_next: lesson.feedback_next || '',
             coach_comment: lesson.coach_comment || ''
         },
     })
@@ -131,8 +125,6 @@ export function EditLessonReportDialog({ lesson, open, onOpenChange }: EditLesso
                 menu_description: lesson.menu_description || '',
                 price: lesson.price,
                 student_key: lesson.student_name,
-                feedback_good: lesson.feedback_good || '',
-                feedback_next: lesson.feedback_next || '',
                 coach_comment: lesson.coach_comment || '',
             })
         }
@@ -179,8 +171,6 @@ export function EditLessonReportDialog({ lesson, open, onOpenChange }: EditLesso
                     location: values.location,
                     menu_description: values.menu_description || '',
                     price: finalPrice,
-                    feedback_good: values.feedback_good || '',
-                    feedback_next: values.feedback_next || '',
                     coach_comment: values.coach_comment || '',
                 })
                 .eq('id', lesson.id)
@@ -341,50 +331,6 @@ export function EditLessonReportDialog({ lesson, open, onOpenChange }: EditLesso
                                 </FormItem>
                             )}
                         />
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <FormField
-                                control={form.control as any}
-                                name="feedback_good"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel className="flex items-center gap-2">
-                                            良かった点
-                                            <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-600 border-blue-100 font-normal">メンバーサイトに反映</Badge>
-                                        </FormLabel>
-                                        <FormControl>
-                                            <Textarea
-                                                placeholder="以前より改善された点など"
-                                                className="resize-none min-h-[80px]"
-                                                {...field}
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-
-                            <FormField
-                                control={form.control as any}
-                                name="feedback_next"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel className="flex items-center gap-2">
-                                            次回の課題
-                                            <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-600 border-blue-100 font-normal">メンバーサイトに反映</Badge>
-                                        </FormLabel>
-                                        <FormControl>
-                                            <Textarea
-                                                placeholder="次回意識すべきポイントなど"
-                                                className="resize-none min-h-[80px]"
-                                                {...field}
-                                            />
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                        </div>
 
                         {/* コーチコメント */}
                         <FormField

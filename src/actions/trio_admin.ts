@@ -43,7 +43,7 @@ export async function createTrioSlot(startAt: string, endAt: string): Promise<{ 
       return { success: false, error: 'スロットの作成に失敗しました。' };
     }
 
-    revalidatePath('/admin/trio/slots');
+    revalidatePath('/admin/trio');
     revalidatePath('/trio/dashboard');
     return { success: true };
   } catch (err: any) {
@@ -67,7 +67,7 @@ export async function deleteTrioSlot(slotId: string): Promise<{ success: boolean
       return { success: false, error: 'スロットの削除に失敗しました。' };
     }
 
-    revalidatePath('/admin/trio/slots');
+    revalidatePath('/admin/trio');
     revalidatePath('/trio/dashboard');
     return { success: true };
   } catch (err: any) {
@@ -91,9 +91,26 @@ export async function toggleFacilityBooked(slotId: string, isBooked: boolean): P
       return { success: false, error: '状態の更新に失敗しました。' };
     }
 
+    revalidatePath('/admin/trio');
     revalidatePath('/admin/trio/slots');
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message };
+  }
+}
+
+// 4. キャンセル待ちリスト取得
+export async function getTrioWaitlist(): Promise<{ waitlist: any[]; error?: string }> {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from('trio_waitlists')
+      .select('*')
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+    return { waitlist: data || [] };
+  } catch (err: any) {
+    return { waitlist: [], error: err.message };
   }
 }

@@ -195,7 +195,7 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
             const check = async () => {
                 setCheckingStatus(true)
                 const { checkStudentLessonStatus } = await import('@/actions/lesson_schedule')
-                const res = await checkStudentLessonStatus(studentId, date.toISOString())
+                const res = await checkStudentLessonStatus(studentId, date.toISOString(), attendanceType)
 
                 if (res.success) {
                     setIsOverage(!!res.isOverage)
