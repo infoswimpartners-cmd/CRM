@@ -6,7 +6,8 @@ import Link from 'next/link'
 import { RevenueChart } from '@/components/dashboard/RevenueChart'
 import { CoachMonthlyPerformance } from '@/components/admin/analytics/CoachMonthlyPerformance'
 import { AnalyticsFilters } from '@/components/admin/analytics/AnalyticsFilters'
-import { format } from 'date-fns'
+import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns'
+import { calculateCoachRate, calculateLessonReward, LessonData } from '@/lib/reward-system'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -18,29 +19,73 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
     const currentYear = new Date().getFullYear()
     const selectedYear = selectedYearStr ? parseInt(selectedYearStr) : currentYear
 
+    // 報酬設定の取得
+    const { data: rewardConfig } = await supabase
+        .from('app_configs')
+        .select('value')
+        .eq('key', 'reward_settings')
+        .single()
+    const rewardSettings = rewardConfig ? JSON.parse(rewardConfig.value) : undefined
+
     // 対象年度の期間
     const yearStart = new Date(selectedYear, 0, 1)
     const yearEnd = new Date(selectedYear, 11, 31, 23, 59, 59)
+    // ランク計算のために3ヶ月前からのデータを取得
+    const fetchStart = subMonths(yearStart, 3)
 
-    // 対象期間・対象コーチのレッスンデータ取得（LTV計算用）
+    // 対象期間・対象コーチのレッスンデータ取得（詳細な報酬計算用）
     let lessonsQuery = supabase
         .from('lessons')
-        .select('price, coach_id, lesson_date, student_id')
-        .gte('lesson_date', yearStart.toISOString())
+        .select(`
+            id,
+            price,
+            coach_id,
+            lesson_date,
+            student_id,
+            lesson_masters (id, unit_price, is_trial),
+            profiles (id, role, distant_reward_fee),
+            students (
+                id,
+                full_name,
+                is_two_person_lesson,
+                is_default_distant_option,
+                membership_types!students_membership_type_id_fkey (
+                    id,
+                    membership_type_lessons (lesson_master_id, reward_price)
+                )
+            )
+        `)
+        .gte('lesson_date', fetchStart.toISOString())
         .lte('lesson_date', yearEnd.toISOString())
 
     if (selectedCoachId) {
         lessonsQuery = lessonsQuery.eq('coach_id', selectedCoachId)
     }
-    const { data: allLessons } = await lessonsQuery
+    const { data: allLessonsRaw } = await lessonsQuery
+    
+    // Supabaseの結合データをLessonData型に変換
+    const allLessons: LessonData[] = (allLessonsRaw || []).map((rawL: any) => ({
+        ...rawL,
+        lesson_masters: Array.isArray(rawL.lesson_masters) ? rawL.lesson_masters[0] : rawL.lesson_masters,
+        profiles: Array.isArray(rawL.profiles) ? rawL.profiles[0] : rawL.profiles,
+        students: Array.isArray(rawL.students) ? rawL.students[0] : rawL.students,
+    })).map((l: any) => {
+        if (l.students && Array.isArray(l.students.membership_types)) {
+            l.students.membership_types = l.students.membership_types[0]
+        }
+        return l
+    })
+
+    // 対象年度のみのレッスン（表示用）
+    const yearLessons = allLessons.filter(l => new Date(l.lesson_date) >= yearStart)
 
     // ---- 新LTV計算式 ----
     // 総売上額：対象期間内の購入金額合計
-    const totalRevenue = allLessons?.reduce((sum, l) => sum + (l.price || 0), 0) || 0
+    const totalRevenue = yearLessons.reduce((sum, l) => sum + (l.price || 0), 0)
     // 総注文件数（決済回数）：取引データの全件数
-    const totalOrders = allLessons?.length || 0
+    const totalOrders = yearLessons.length
     // 累計ユニーク顧客数：購入した顧客の頭数（重複除去）
-    const uniqueStudentIds = new Set(allLessons?.map(l => l.student_id).filter(Boolean))
+    const uniqueStudentIds = new Set(yearLessons.map(l => l.student_id).filter(Boolean))
     const uniqueCustomerCount = uniqueStudentIds.size
 
     // A: 平均購買単価 = 総売上額 ÷ 総注文件数
@@ -63,21 +108,54 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
     })
     const availableYears = Array.from(availableYearsSet).sort((a, b) => b - a)
 
-    // 月次売上グラフ用データ（対象年度）
+    // 月次売上・粗利グラフ用データ（対象年度）
     const monthlyRevenueMap = new Map<number, number>()
+    const monthlyProfitMap = new Map<number, number>()
     for (let m = 1; m <= 12; m++) {
         monthlyRevenueMap.set(m, 0)
+        monthlyProfitMap.set(m, 0)
     }
-    allLessons?.forEach(l => {
-        const month = new Date(l.lesson_date).getMonth() + 1
-        monthlyRevenueMap.set(month, (monthlyRevenueMap.get(month) || 0) + (l.price || 0))
+
+    // 各月の報酬レートをコーチごとに計算してキャッシュ
+    // コーチ一覧を取得
+    const { data: coaches } = await supabase.from('profiles').select('id, override_coach_rank').in('role', ['coach', 'admin', 'owner'])
+    
+    // 月ごとの各コーチのレートを計算
+    const coachMonthlyRateCache = new Map<string, number>() // key: coachId_yearMonth
+
+    for (let m = 1; m <= 12; m++) {
+        const referenceDate = new Date(selectedYear, m - 1, 1)
+        const monthKey = format(referenceDate, 'yyyy-MM')
+        
+        coaches?.forEach(coach => {
+            const rate = calculateCoachRate(coach.id, allLessons, referenceDate, coach.override_coach_rank, rewardSettings)
+            coachMonthlyRateCache.set(`${coach.id}_${monthKey}`, rate)
+        })
+    }
+
+    yearLessons.forEach(l => {
+        const date = new Date(l.lesson_date)
+        const month = date.getMonth() + 1
+        const monthKey = format(date, 'yyyy-MM')
+        
+        const price = l.price || 0
+        const rate = coachMonthlyRateCache.get(`${l.coach_id}_${monthKey}`) || 0.5
+        
+        // 管理者・オーナーの場合は報酬原価を0（＝全額粗利）として扱う
+        const isStaff = l.profiles?.role === 'admin' || l.profiles?.role === 'owner'
+        const reward = isStaff ? 0 : calculateLessonReward(l, rate, rewardSettings)
+        const profit = price - reward
+
+        monthlyRevenueMap.set(month, (monthlyRevenueMap.get(month) || 0) + price)
+        monthlyProfitMap.set(month, (monthlyProfitMap.get(month) || 0) + profit)
     })
 
     const finalGraphData = Array.from({ length: 12 }, (_, i) => {
         const month = i + 1
         return {
             name: `${month}月`,
-            revenue: monthlyRevenueMap.get(month) || 0
+            revenue: monthlyRevenueMap.get(month) || 0,
+            grossProfit: Math.max(0, monthlyProfitMap.get(month) || 0)
         }
     })
 

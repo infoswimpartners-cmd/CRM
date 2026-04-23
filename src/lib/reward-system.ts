@@ -5,12 +5,14 @@ export type LessonData = {
     lesson_date: string
     price: number
     coach_id: string
+    student_id?: string
     lesson_masters?: {
         id: string
         unit_price: number
         is_trial: boolean
     }
     students?: {
+        id?: string
         full_name?: string
         is_two_person_lesson?: boolean
         is_default_distant_option?: boolean
