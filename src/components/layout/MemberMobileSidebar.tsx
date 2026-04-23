@@ -48,20 +48,20 @@ export default function MemberMobileSidebar({
     }, [isOpen])
 
     const baseItems = [
-        { href: '/member/profile', icon: Settings, label: 'アカウント設定', subLabel: '基本情報の確認・変更' },
+        { href: '/member/profile', icon: Settings, label: 'アカウント設定', subLabel: '基本情報の確認・変更', external: false },
     ];
 
     const navItems = isTrioMember 
         ? [
-            { href: '/trio/dashboard', icon: Crown, label: 'THE TRIO ホーム', subLabel: 'プレミアム教室' },
-            { href: '/member/dashboard', icon: User, label: 'パーソナル', subLabel: '個人レッスン（メイン事業）' },
+            { href: '/trio/dashboard', icon: Crown, label: 'THE TRIO ホーム', subLabel: 'プレミアム教室', external: false },
+            { href: '/member/dashboard', icon: User, label: 'パーソナル', subLabel: '個人レッスン（メイン事業）', external: false },
             ...baseItems
         ] 
         : [
-            { href: '/member/dashboard', icon: Home, label: 'ホーム', subLabel: 'トップページ' },
-            { href: '/member/reservation', icon: Calendar, label: 'レッスン予約', subLabel: 'スケジュールリクエスト' },
-            { href: '/member/reports', icon: FileText, label: 'カルテ・レポート', subLabel: '成長の記録' },
-            { href: '/trio/dashboard', icon: Crown, label: 'THE TRIO', subLabel: 'プレミアム教室' },
+            { href: '/member/dashboard', icon: Home, label: 'ホーム', subLabel: 'トップページ', external: false },
+            { href: '/member/reservation', icon: Calendar, label: 'レッスン予約', subLabel: 'スケジュールリクエスト', external: false },
+            { href: '/member/reports', icon: FileText, label: 'カルテ・レポート', subLabel: '成長の記録', external: false },
+            { href: '/trio/dashboard', icon: Crown, label: 'THE TRIO', subLabel: 'プレミアム教室', external: false },
             ...baseItems
         ];
 

@@ -45,19 +45,19 @@ export default function WaitlistForm({ waitlistCount, onSuccess }: WaitlistFormP
 
     if (submitted) {
         return (
-            <div className="text-center space-y-6 py-8 animate-in fade-in zoom-in duration-700">
-                <div className="w-20 h-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto shadow-xl shadow-emerald-500/10 border border-emerald-100">
-                    <CheckCircle2 className="w-10 h-10 text-emerald-500" />
+            <div className="text-center space-y-8 py-10 animate-in fade-in zoom-in duration-700">
+                <div className="w-24 h-24 bg-emerald-50 rounded-full flex items-center justify-center mx-auto shadow-xl shadow-emerald-500/10 border border-emerald-100">
+                    <CheckCircle2 className="w-12 h-12 text-emerald-500" />
                 </div>
-                <div className="space-y-2">
-                    <h3 className="text-2xl font-black text-slate-800 tracking-tight">登録が完了しました</h3>
-                    <p className="text-slate-400 text-sm leading-relaxed max-w-xs mx-auto">
-                        ご登録ありがとうございます。欠員が出次第、LINEまたはメールにて最優先でご案内いたします。
+                <div className="space-y-3">
+                    <h3 className="text-2xl font-black text-sky-950 tracking-tight">登録が完了しました</h3>
+                    <p className="text-sky-600/70 text-sm font-bold leading-relaxed max-w-xs mx-auto">
+                        欠員が出次第、LINEまたはメールにて最優先でご案内いたします。
                     </p>
                 </div>
                 <div className="pt-4">
-                    <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 inline-block px-4 py-1.5 rounded-full">
-                        優先ステータス: 有効
+                    <p className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.3em] bg-white border border-emerald-100 inline-block px-6 py-2 rounded-full shadow-sm">
+                        Priority Status: Active
                     </p>
                 </div>
             </div>
@@ -66,44 +66,44 @@ export default function WaitlistForm({ waitlistCount, onSuccess }: WaitlistFormP
 
     return (
         <Card className="border-none shadow-none bg-transparent">
-            <CardHeader className="px-0 pt-0 text-center space-y-4">
-                <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-amber-50 rounded-full border border-amber-100 text-amber-600 text-[10px] font-black uppercase tracking-widest mx-auto shadow-sm">
-                    キャンセル待ち登録
+            <CardHeader className="px-0 pt-0 text-center space-y-6">
+                <div className="inline-flex items-center gap-2 px-5 py-2 bg-white border border-sky-100 rounded-full text-sky-500 text-[10px] font-black uppercase tracking-[0.3em] mx-auto shadow-sm">
+                    Waitlist Registration
                 </div>
                 <div className="space-y-1">
-                    <CardTitle className="text-3xl font-black tracking-tighter text-slate-800">キャンセル待ち登録</CardTitle>
-                    <CardDescription className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">
-                        現在のキャンセル待ち数: <span className="text-amber-600 text-xs">{waitlistCount}</span> 名
+                    <CardTitle className="text-4xl font-black tracking-tighter text-sky-950">キャンセル待ち登録</CardTitle>
+                    <CardDescription className="text-sky-300 font-black uppercase tracking-[0.3em] text-[10px]">
+                        Current Waitlist: <span className="text-sky-500 text-sm">{waitlistCount}</span> Members
                     </CardDescription>
                 </div>
             </CardHeader>
             <CardContent className="px-0">
-                <form onSubmit={handleSubmit} className="space-y-6">
-                    <div className="space-y-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="name" className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">お名前</Label>
+                <form onSubmit={handleSubmit} className="space-y-8">
+                    <div className="space-y-5">
+                        <div className="space-y-2.5">
+                            <Label htmlFor="name" className="text-[10px] font-black text-sky-300 uppercase tracking-widest ml-2">Your Name</Label>
                             <div className="relative group">
-                                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                                <User className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-sky-300 group-focus-within:text-sky-500 transition-colors" />
                                 <Input 
                                     id="name" 
                                     name="name" 
                                     placeholder="お名前" 
                                     required 
-                                    className="h-12 pl-12 rounded-2xl bg-white/80 border-slate-200 focus:border-indigo-400 focus:ring-indigo-100 transition-all text-sm font-medium"
+                                    className="h-14 pl-14 rounded-2xl bg-white border border-sky-100 focus:border-sky-400 focus:ring-sky-100 shadow-sm transition-all text-sm font-bold text-sky-900"
                                 />
                             </div>
                         </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="email" className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">メールアドレス</Label>
+                        <div className="space-y-2.5">
+                            <Label htmlFor="email" className="text-[10px] font-black text-sky-300 uppercase tracking-widest ml-2">Email Address</Label>
                             <div className="relative group">
-                                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+                                <Mail className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-sky-300 group-focus-within:text-sky-500 transition-colors" />
                                 <Input 
                                     id="email" 
                                     name="email" 
                                     type="email" 
                                     placeholder="example@swim-partners.com" 
                                     required 
-                                    className="h-12 pl-12 rounded-2xl bg-white/80 border-slate-200 focus:border-indigo-400 focus:ring-indigo-100 transition-all text-sm font-medium"
+                                    className="h-14 pl-14 rounded-2xl bg-white border border-sky-100 focus:border-sky-400 focus:ring-sky-100 shadow-sm transition-all text-sm font-bold text-sky-900"
                                 />
                             </div>
                         </div>
@@ -112,19 +112,18 @@ export default function WaitlistForm({ waitlistCount, onSuccess }: WaitlistFormP
                     <Button 
                         type="submit" 
                         disabled={loading}
-                        className="w-full h-14 bg-gradient-to-r from-slate-800 to-slate-900 hover:from-black hover:to-slate-800 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-xl shadow-slate-200 transition-all active:scale-[0.98]"
+                        className="w-full h-16 bg-sky-400 hover:bg-sky-500 text-white rounded-2xl font-black text-sm uppercase tracking-[0.2em] shadow-2xl shadow-sky-400/20 transition-all active:scale-[0.98] border-none"
                     >
-                        {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
-                            <>
-                                <Send className="w-4 h-4 mr-2" />
+                        {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : (
+                            <span className="flex items-center gap-3">
+                                <Send className="w-5 h-5" />
                                 キャンセル待ちに登録する
-                            </>
+                            </span>
                         )}
                     </Button>
 
-                    <p className="text-center text-[10px] text-slate-300 font-medium px-4 leading-relaxed uppercase tracking-widest">
-                        * 登録完了後、枠が空き次第優先的にご案内いたします。<br/>
-                        プライバシーポリシーに同意の上送信してください。
+                    <p className="text-center text-[10px] text-sky-300 font-bold px-6 leading-relaxed uppercase tracking-[0.25em]">
+                        Reserved for members limited to 12.
                     </p>
                 </form>
             </CardContent>

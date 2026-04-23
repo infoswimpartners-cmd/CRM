@@ -7,9 +7,10 @@ import { Users } from 'lucide-react';
 interface CapacityProgressProps {
     current: number;
     max: number;
+    hideLabels?: boolean;
 }
 
-export default function CapacityProgress({ current, max }: CapacityProgressProps) {
+export default function CapacityProgress({ current, max, hideLabels = false }: CapacityProgressProps) {
     const percentage = Math.min((current / max) * 100, 100);
     const remaining = max - current;
     
@@ -19,32 +20,34 @@ export default function CapacityProgress({ current, max }: CapacityProgressProps
 
     return (
         <div className="w-full space-y-4">
-            <div className="flex justify-between items-end">
-                <div className="space-y-1">
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">現在の入会状況</p>
-                    <div className="flex items-baseline gap-2">
-                        <span className={cn(
-                            "text-4xl font-black tracking-tighter",
-                            isFull ? "text-red-500" : isWarning ? "text-orange-500" : "text-indigo-600"
+            {!hideLabels && (
+                <div className="flex justify-between items-end">
+                    <div className="space-y-1">
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">現在の入会状況</p>
+                        <div className="flex items-baseline gap-2">
+                            <span className={cn(
+                                "text-4xl font-black tracking-tighter",
+                                isFull ? "text-red-500" : isWarning ? "text-orange-500" : "text-indigo-600"
+                            )}>
+                                {current}
+                            </span>
+                            <span className="text-xl font-bold text-slate-300">/ {max}</span>
+                        </div>
+                    </div>
+                    <div className="text-right">
+                        <p className={cn(
+                            "text-xs font-black uppercase tracking-widest px-3 py-1 rounded-full border shadow-sm transition-all duration-500",
+                            isFull 
+                                ? "bg-red-50 text-red-500 border-red-100" 
+                                : isWarning 
+                                    ? "bg-orange-50 text-orange-500 border-orange-100 animate-pulse" 
+                                    : "bg-indigo-50 text-indigo-600 border-indigo-100"
                         )}>
-                            {current}
-                        </span>
-                        <span className="text-xl font-bold text-slate-300">/ {max}</span>
+                            {isFull ? "満員御礼" : isWarning ? `残り ${remaining} 枠` : "会員募集中"}
+                        </p>
                     </div>
                 </div>
-                <div className="text-right">
-                    <p className={cn(
-                        "text-xs font-black uppercase tracking-widest px-3 py-1 rounded-full border shadow-sm transition-all duration-500",
-                        isFull 
-                            ? "bg-red-50 text-red-500 border-red-100" 
-                            : isWarning 
-                                ? "bg-orange-50 text-orange-500 border-orange-100 animate-pulse" 
-                                : "bg-indigo-50 text-indigo-600 border-indigo-100"
-                    )}>
-                        {isFull ? "満員御礼" : isWarning ? `残り ${remaining} 枠` : "会員募集中"}
-                    </p>
-                </div>
-            </div>
+            )}
 
             <div className="relative h-4 w-full bg-slate-100 rounded-full overflow-hidden shadow-inner p-1 border border-slate-200/50">
                 <div 
@@ -64,10 +67,12 @@ export default function CapacityProgress({ current, max }: CapacityProgressProps
                 )}
             </div>
 
-            <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400/70 uppercase tracking-widest pt-2 justify-center">
-                <Users className="w-3 h-3" />
-                プレミアムメンバーシップ：限定12名
-            </div>
+            {!hideLabels && (
+                <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400/70 uppercase tracking-widest pt-2 justify-center">
+                    <Users className="w-3 h-3" />
+                    プレミアムメンバーシップ：限定12名
+                </div>
+            )}
         </div>
     );
 }

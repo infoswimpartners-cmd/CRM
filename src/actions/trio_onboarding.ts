@@ -29,7 +29,7 @@ export async function getTrioOnboardingStatus() {
 
         if (activeError || waitlistError) {
             console.error('Error fetching TRIO status:', activeError || waitlistError);
-            return { activeCount: 0, waitlistCount: 0, error: '情報の取得に失敗しました' };
+            return { activeCount: 0, waitlistCount: 0, isFull: false, error: '情報の取得に失敗しました' };
         }
 
         return {
@@ -39,7 +39,7 @@ export async function getTrioOnboardingStatus() {
         };
     } catch (err: any) {
         console.error('getTrioOnboardingStatus unexpected error:', err);
-        return { activeCount: 0, waitlistCount: 0, error: 'サーバーとの通信に失敗しました' };
+        return { activeCount: 0, waitlistCount: 0, isFull: false, error: 'サーバーとの通信に失敗しました' };
     }
 }
 

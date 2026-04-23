@@ -49,6 +49,7 @@ const formSchema = z.object({
     }),
     lesson_master_id: z.string().min(1, 'レッスンの種類を選択してください'),
     location: z.string().min(1, '場所は必須です'),
+    menu_description: z.string().optional(),
     coach_comment: z.string().optional(),
     price: z.number().min(0),
     billing_price: z.number().min(0),

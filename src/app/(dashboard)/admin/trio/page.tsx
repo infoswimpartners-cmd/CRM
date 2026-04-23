@@ -179,93 +179,112 @@ export default function AdminTrioManagementPage() {
             </CardContent>
           </Card>
 
-          {/* Slots Table */}
-          <Card className="border-slate-200/60 shadow-sm rounded-3xl overflow-hidden bg-white">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-slate-50/50 hover:bg-slate-50/50">
-                    <TableHead className="font-black text-[10px] uppercase tracking-widest text-slate-400 h-14">日時</TableHead>
-                    <TableHead className="font-black text-[10px] uppercase tracking-widest text-slate-400 h-14">ステータス</TableHead>
-                    <TableHead className="font-black text-[10px] uppercase tracking-widest text-slate-400 h-14">予約人数</TableHead>
-                    <TableHead className="font-black text-[10px] uppercase tracking-widest text-slate-400 h-14">施設予約</TableHead>
-                    <TableHead className="text-right font-black text-[10px] uppercase tracking-widest text-slate-400 pr-8 h-14">操作</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {slots.map(slot => (
-                    <TableRow key={slot.id} className="group hover:bg-slate-50/30 transition-colors">
-                      <TableCell>
-                        <div className="flex flex-col">
-                          <span className="font-bold text-slate-800">
-                            {format(new Date(slot.start_at), 'yyyy/MM/dd (E)', { locale: ja })}
-                          </span>
-                          <span className="text-xs text-slate-400 font-medium tracking-tight">
-                            {format(new Date(slot.start_at), 'HH:mm')} ~ {format(new Date(slot.end_at), 'HH:mm')}
-                          </span>
+          {/* Slots Box List */}
+          <div className="grid grid-cols-1 gap-4">
+            {slots.length > 0 ? (
+              slots.map(slot => (
+                <div 
+                  key={slot.id} 
+                  className="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-sm hover:shadow-md transition-all duration-300 group relative overflow-hidden"
+                >
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-sky-500/5 rounded-full blur-2xl -mr-16 -mt-16" />
+                  
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+                    <div className="flex flex-col md:flex-row md:items-center gap-6">
+                      {/* Date & Time Box */}
+                      <div className="bg-sky-50 rounded-2xl p-4 min-w-[140px] text-center border border-sky-100/50">
+                        <p className="text-[10px] font-black text-sky-400 uppercase tracking-widest mb-1">Schedule</p>
+                        <p className="font-black text-sky-950">
+                          {format(new Date(slot.start_at), 'MM/dd (E)', { locale: ja })}
+                        </p>
+                        <p className="text-xs font-bold text-sky-600 mt-1">
+                          {format(new Date(slot.start_at), 'HH:mm')} - {format(new Date(slot.end_at), 'HH:mm')}
+                        </p>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-3">
+                          <Badge variant="outline" className={cn(
+                            "text-[9px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full",
+                            slot.status === 'entry' ? "bg-blue-500 text-white border-none shadow-sm shadow-blue-500/20" :
+                            slot.status === 'matching' ? "bg-orange-500 text-white border-none shadow-sm shadow-orange-500/20" :
+                            slot.status === 'confirmed' ? "bg-emerald-500 text-white border-none shadow-sm shadow-emerald-500/20" :
+                            "bg-slate-400 text-white border-none"
+                          )}>
+                            {slot.status === 'entry' ? '受付中' : 
+                             slot.status === 'matching' ? 'マッチング中' : 
+                             slot.status === 'confirmed' ? '開催確定' : '終了'}
+                          </Badge>
+                          
+                          <div className="flex items-center gap-2 bg-slate-50 px-3 py-1 rounded-full border border-slate-100">
+                             <Users className="w-3 h-3 text-slate-400" />
+                             <span className="text-[11px] font-black text-slate-600">
+                               {slot.reserved_count} <span className="text-slate-300">/ 3</span>
+                             </span>
+                          </div>
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={cn(
-                          "text-[9px] font-black uppercase tracking-widest px-2 py-0.5",
-                          slot.status === 'entry' ? "bg-blue-50 text-blue-600 border-blue-100" :
-                          slot.status === 'matching' ? "bg-orange-50 text-orange-600 border-orange-100" :
-                          slot.status === 'confirmed' ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
-                          "bg-slate-50 text-slate-400 border-slate-100"
-                        )}>
-                          {slot.status === 'entry' ? '受付中' : 
-                           slot.status === 'matching' ? 'マッチング中' : 
-                           slot.status === 'confirmed' ? '開催確定' : '終了'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <div className={cn(
-                            "w-1.5 h-1.5 rounded-full",
-                            slot.reserved_count === 3 ? "bg-emerald-500" : "bg-slate-300"
-                          )} />
-                          <span className="font-bold text-slate-700">{slot.reserved_count} <span className="text-xs text-slate-400 font-medium">/ 3</span></span>
+
+                        <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-1.5">
+                            {[...Array(3)].map((_, i) => (
+                              <div key={i} className={cn(
+                                "w-2 h-2 rounded-full",
+                                i < slot.reserved_count ? "bg-sky-500" : "bg-slate-100"
+                              )} />
+                            ))}
+                          </div>
+                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Entry Progress</span>
                         </div>
-                      </TableCell>
-                      <TableCell>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-4 border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-6">
+                      <div className="flex flex-col gap-2">
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Facility Status</p>
                         <Button 
                           variant="ghost"
                           size="sm"
                           onClick={() => handleToggleBooked(slot.id, slot.is_facility_booked)}
                           className={cn(
-                            "rounded-full px-4 h-8 text-[10px] font-black uppercase tracking-widest transition-all",
+                            "rounded-xl px-5 h-10 text-[11px] font-black uppercase tracking-widest transition-all shadow-sm border",
                             slot.is_facility_booked 
-                              ? "bg-emerald-50 text-emerald-600 hover:bg-emerald-100 hover:text-emerald-700" 
-                              : "bg-slate-50 text-slate-400 hover:bg-slate-100"
+                              ? "bg-emerald-50 text-emerald-600 border-emerald-100 hover:bg-emerald-100" 
+                              : "bg-amber-50 text-amber-600 border-amber-100 hover:bg-amber-100"
                           )}
                         >
-                          {slot.is_facility_booked ? <CheckCircle2 className="w-3 h-3 mr-1" /> : <AlertCircle className="w-3 h-3 mr-1" />}
-                          {slot.is_facility_booked ? '予約済' : '未予約'}
+                          {slot.is_facility_booked ? (
+                            <>
+                              <CheckCircle2 className="w-3.5 h-3.5 mr-2 animate-in zoom-in duration-300" />
+                              施設予約済
+                            </>
+                          ) : (
+                            <>
+                              <AlertCircle className="w-3.5 h-3.5 mr-2 animate-pulse" />
+                              施設未予約
+                            </>
+                          )}
                         </Button>
-                      </TableCell>
-                      <TableCell className="text-right pr-8">
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          onClick={() => handleDeleteSlot(slot.id)}
-                          className="h-8 w-8 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg group-hover:opacity-100 transition-opacity"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {slots.length === 0 && !loading && (
-                    <TableRow>
-                      <TableCell colSpan={5} className="h-48 text-center text-slate-300 font-bold uppercase tracking-widest mt-12">
-                        募集中のスロットはありません
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </Card>
+                      </div>
+
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={() => handleDeleteSlot(slot.id)}
+                        className="h-10 w-10 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all ml-2"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="bg-slate-50/50 border-2 border-dashed border-slate-100 rounded-[2.5rem] p-20 flex flex-col items-center justify-center text-center">
+                <CalendarIcon className="w-12 h-12 text-slate-200 mb-4" />
+                <p className="font-black text-slate-300 uppercase tracking-widest text-sm">募集中のスロットはありません</p>
+              </div>
+            )}
+          </div>
         </TabsContent>
 
         <TabsContent value="waitlist" className="animate-in fade-in duration-500">

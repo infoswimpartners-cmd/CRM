@@ -194,3 +194,25 @@ export async function getStudentEntries(studentId: string): Promise<{ entries?: 
   if (error) return { error: error.message };
   return { entries: data };
 }
+
+// 7. 生徒の予約詳細（スロット情報込み）を取得
+export async function getDetailedStudentEntries(studentId: string): Promise<{ entries?: any[]; error?: string }> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('trio_entries')
+    .select(`
+      id,
+      payment_status,
+      slot:trio_slots (
+        id,
+        start_at,
+        end_at,
+        status
+      )
+    `)
+    .eq('student_id', studentId)
+    .order('start_at', { ascending: true, foreignTable: 'slot' });
+
+  if (error) return { error: error.message };
+  return { entries: data as any[] };
+}
