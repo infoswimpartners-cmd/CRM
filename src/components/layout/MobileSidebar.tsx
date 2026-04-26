@@ -15,8 +15,9 @@ export function MobileSidebar({ userProfile }: { userProfile: any }) {
     const NavItem = ({ href, icon: Icon, label, isActive }: { href: string, icon: any, label: string, isActive?: boolean }) => (
         <Link
             href={href}
+            prefetch={true}
             onClick={() => setIsOpen(false)}
-            className={`flex items-center gap-3 min-h-[44px] px-4 py-2.5 rounded-xl transition-all duration-300 group ${isActive
+            className={`flex items-center gap-3 min-h-[44px] px-4 py-2.5 rounded-xl transition-all duration-150 group ${isActive
                 ? 'bg-blue-50 text-blue-600 border-l-4 border-blue-600 font-bold shadow-sm'
                 : 'text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 active:bg-blue-100'
                 }`}
@@ -96,7 +97,7 @@ export function MobileSidebar({ userProfile }: { userProfile: any }) {
                 これにより ③ は絶対に ② と重ならない
             */}
             <div
-                className={`fixed top-0 left-0 h-full w-72 bg-white/95 backdrop-blur-xl border-r border-slate-200 z-[70] flex flex-col transform transition-transform duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] ${isOpen ? 'translate-x-0' : '-translate-x-full'} shadow-[20px_0_60px_rgba(0,0,0,0.1)]`}
+                className={`fixed top-0 left-0 h-full w-72 bg-white/95 backdrop-blur-xl border-r border-slate-200 z-[70] flex flex-col transform transition-transform duration-250 ease-[cubic-bezier(0.23,1,0.32,1)] ${isOpen ? 'translate-x-0' : '-translate-x-full'} shadow-[20px_0_60px_rgba(0,0,0,0.1)]`}
                 style={{ willChange: 'transform' }}
             >
                 {/* ① ヘッダー */}

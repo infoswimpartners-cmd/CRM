@@ -16,7 +16,7 @@ export function DesktopSidebar({ role }: DesktopSidebarProps) {
         <Link
             href={href}
             prefetch={true}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group ${isActive
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-150 group ${isActive
                 ? 'bg-blue-50 text-blue-700 border-l-4 border-blue-600 font-bold shadow-sm'
                 : 'text-slate-500 hover:text-blue-700 hover:bg-blue-50'
                 }`}

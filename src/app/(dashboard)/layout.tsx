@@ -60,7 +60,7 @@ export default async function DashboardLayout({
     const NavItem = ({ href, icon: Icon, label, isActive }: { href: string, icon: any, label: string, isActive?: boolean }) => (
         <Link
             href={href}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 group ${isActive
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-150 group ${isActive
                 ? 'bg-cyan-100 text-cyan-900 border-l-4 border-cyan-500 font-bold shadow-sm'
                 : 'text-slate-500 hover:text-cyan-700 hover:bg-cyan-50'
                 }`}
@@ -85,7 +85,7 @@ export default async function DashboardLayout({
             <DesktopSidebar role={safeProfile.role} />
 
             {/* Main Content */}
-            <div className="md:ml-64 ml-0 flex-1 flex flex-col min-h-screen transition-all duration-300 pt-16 md:pt-0 min-w-0">
+            <div className="md:ml-64 ml-0 flex-1 flex flex-col min-h-screen transition-all duration-150 pt-16 md:pt-0 min-w-0">
                 {/* Floating Header（モバイルでは非表示・デスクトップのみ） */}
                 <header className="hidden md:block md:sticky md:top-4 z-40 md:mx-6 md:mt-4">
                     <div className="glass rounded-2xl px-4 md:px-6 py-2 md:py-3 flex items-center justify-between shadow-sm border border-white/40">
