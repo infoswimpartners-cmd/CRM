@@ -76,7 +76,7 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
     // Fetch Trial Masters
     const { data: trialMasters } = await supabase
         .from('lesson_masters')
-        .select('id, name, unit_price, email_template_id')
+        .select('id, name, unit_price, pair_unit_price, email_template_id')
         .eq('is_trial', true)
         .eq('active', true)
         .order('display_order', { ascending: true })
@@ -157,6 +157,7 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
                             coaches={coaches || []}
                             assignedCoachId={student.coach_id}
                             trialMasters={trialMasters || []}
+                            isPair={!!student.apply_pair_pricing}
                         />
                         <Button variant="outline" asChild>
                             <Link href={`/customers/${student.id}/edit`}>

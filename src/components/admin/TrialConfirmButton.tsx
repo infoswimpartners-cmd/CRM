@@ -34,10 +34,11 @@ interface Props {
     studentName: string
     coaches: { id: string, full_name: string | null }[]
     assignedCoachId?: string | null // Add this to auto-select coach
-    trialMasters: { id: string, name: string, unit_price: number, email_template_id: string | null }[]
+    trialMasters: { id: string, name: string, unit_price: number, pair_unit_price: number | null, email_template_id: string | null }[]
+    isPair?: boolean
 }
 
-export function TrialConfirmButton({ studentId, studentName, coaches, assignedCoachId, trialMasters = [] }: Props) {
+export function TrialConfirmButton({ studentId, studentName, coaches, assignedCoachId, trialMasters = [], isPair = false }: Props) {
     const [open, setOpen] = useState(false)
     const [trialMasterId, setTrialMasterId] = useState(trialMasters[0]?.id || '')
     const [date, setDate] = useState('')
@@ -167,11 +168,14 @@ export function TrialConfirmButton({ studentId, studentName, coaches, assignedCo
                                             <SelectValue placeholder="種別を選択" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {trialMasters.map(m => (
-                                                <SelectItem key={m.id} value={m.id}>
-                                                    {m.name} ({m.unit_price.toLocaleString()}円)
-                                                </SelectItem>
-                                            ))}
+                                            {trialMasters.map(m => {
+                                                const price = isPair && m.pair_unit_price !== null ? m.pair_unit_price : m.unit_price;
+                                                return (
+                                                    <SelectItem key={m.id} value={m.id}>
+                                                        {m.name} ({price.toLocaleString()}円)
+                                                    </SelectItem>
+                                                )
+                                            })}
                                         </SelectContent>
                                     </Select>
                                 </div>

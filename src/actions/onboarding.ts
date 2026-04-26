@@ -101,6 +101,24 @@ export async function confirmTrialAndBill(studentId: string, lessonDate: Date, c
             throw new Error(`Schedule creation failed: ${scheduleError?.message}`)
         }
 
+        // [NEW] 予定登録をマイページに反映させるため、lessons テーブルにも登録
+        const { error: lessonInsertError } = await supabaseAdmin
+            .from('lessons')
+            .insert({
+                student_id: studentId,
+                coach_id: coachId,
+                lesson_date: startTime.toISOString(),
+                location: location,
+                student_name: student.full_name,
+                lesson_master_id: trialMaster.id,
+                price: calculateLessonPrice(trialMaster.unit_price, !!student.apply_pair_pricing, trialMaster.pair_unit_price),
+            })
+
+        if (lessonInsertError) {
+            console.error('[Trial Confirm] Lesson Record Creation Failed:', lessonInsertError)
+            // 致命的なエラーとはせず、ログのみ出力して続行（予定登録自体は成功しているため）
+        }
+
         const paymentLink = `${process.env.NEXT_PUBLIC_APP_URL}/pay/trial/${newSchedule.id}`
 
         if (!student.contact_email) {
