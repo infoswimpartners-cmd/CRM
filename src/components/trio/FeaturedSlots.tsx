@@ -12,6 +12,7 @@ import { TrioSlot } from '@/types/trio';
 
 interface FeaturedSlotsProps {
   slots: TrioSlot[];
+  userEntryIds?: string[];
   onBookClick?: (id: string) => void;
 }
 
@@ -19,7 +20,7 @@ interface FeaturedSlotsProps {
  * FeaturedSlots
  * 究極の「明るさ」と「プレミアム感」を備えた募集セッション一覧
  */
-export default function FeaturedSlots({ slots, onBookClick }: FeaturedSlotsProps) {
+export default function FeaturedSlots({ slots, userEntryIds = [], onBookClick }: FeaturedSlotsProps) {
   if (!slots || slots.length === 0) return null;
 
   return (
@@ -28,6 +29,7 @@ export default function FeaturedSlots({ slots, onBookClick }: FeaturedSlotsProps
         const isConfirmed = slot.status === 'confirmed';
         const isMatching = slot.status === 'matching';
         const isFull = slot.reserved_count >= 3;
+        const isUserEntered = userEntryIds.includes(slot.id);
         
         const startDate = new Date(slot.start_at);
         const dateStr = format(startDate, 'M/d (E)', { locale: ja });
@@ -54,14 +56,21 @@ export default function FeaturedSlots({ slots, onBookClick }: FeaturedSlotsProps
                   </div>
                 </div>
                 
-                <Badge variant="outline" className={cn(
-                  "text-[9px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full border shadow-sm transition-all duration-500",
-                  isConfirmed ? "bg-emerald-500 text-white border-none shadow-emerald-500/20" : 
-                  isMatching ? "bg-sky-400 text-white border-none shadow-sky-400/20" :
-                  "bg-white text-sky-400 border-sky-100"
-                )}>
-                  {isConfirmed ? '開催確定' : isMatching ? 'マッチ中' : '募集中'}
-                </Badge>
+                <div className="flex flex-col items-end gap-2">
+                  <Badge variant="outline" className={cn(
+                    "text-[9px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full border shadow-sm transition-all duration-500",
+                    isConfirmed ? "bg-emerald-500 text-white border-none shadow-emerald-500/20" : 
+                    isMatching ? "bg-sky-400 text-white border-none shadow-sky-400/20" :
+                    "bg-white text-sky-400 border-sky-100"
+                  )}>
+                    {isConfirmed ? '開催確定' : isMatching ? 'マッチ中' : '募集中'}
+                  </Badge>
+                  {isUserEntered && (
+                    <Badge variant="outline" className="bg-sky-50 text-sky-400 border-sky-200 text-[9px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full shadow-sm animate-in fade-in zoom-in duration-500">
+                      予約済み
+                    </Badge>
+                  )}
+                </div>
               </div>
 
               <div className="space-y-4">
@@ -92,25 +101,39 @@ export default function FeaturedSlots({ slots, onBookClick }: FeaturedSlotsProps
                 </div>
 
                 <div className="h-px w-full bg-gradient-to-r from-sky-50 to-transparent" />
-                <p className="text-[11px] text-sky-400/70 font-bold leading-relaxed px-1">
-                  ヤエスク専用レーンにて実施。
-                </p>
+                <div className="flex flex-col gap-1">
+                  <p className="text-[11px] text-sky-400/70 font-bold leading-relaxed px-1">
+                    ヤエスク専用レーンにて実施。
+                  </p>
+                  {!isConfirmed && !isFull && !isUserEntered && (
+                    <p className="text-[10px] text-sky-500/80 font-black italic px-1 animate-pulse">
+                      あと {2 - Math.min(1, slot.reserved_count)} 人でマッチング成立！
+                    </p>
+                  )}
+                  {isUserEntered && !isConfirmed && (
+                    <p className="text-[10px] text-sky-500/80 font-black italic px-1">
+                      他の参加者を待っています...
+                    </p>
+                  )}
+                </div>
               </div>
 
               <Button 
                 onClick={() => onBookClick?.(slot.id)}
-                disabled={isFull}
+                disabled={isFull || isUserEntered}
                 className={cn(
                   "w-full h-14 rounded-2xl font-black tracking-widest transition-all duration-700 group/btn border-none relative overflow-hidden",
                   isFull ? "bg-slate-100 text-slate-300" : 
+                  isUserEntered ? "bg-sky-50 text-sky-300 border border-sky-100 shadow-none cursor-default" :
                   isConfirmed ? "bg-emerald-500 text-white hover:bg-emerald-600 shadow-xl shadow-emerald-500/10" :
                   "bg-sky-400 text-white hover:bg-sky-500 shadow-xl shadow-sky-400/10"
                 )}
               >
                 <div className="absolute inset-0 ultra-bright-shimmer opacity-20 pointer-events-none" />
                 <span className="flex items-center gap-2 relative z-10">
-                  {isFull ? '満員御礼' : isConfirmed ? '今すぐ参加する' : 'マッチングにエントリー'}
-                  {!isFull && <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1.5 transition-transform" />}
+                  {isFull ? '満員御礼' : isUserEntered ? '予約済み' : isConfirmed ? '今すぐ参加する' : 'マッチングにエントリー'}
+                  {!isFull && !isUserEntered && <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1.5 transition-transform" />}
+                  {isUserEntered && <CheckCircle2 className="w-4 h-4 text-sky-300" />}
                 </span>
               </Button>
             </div>

@@ -123,10 +123,14 @@ export async function POST(req: NextRequest) {
             )
         }
 
-        const { name, kana, email, phone, message, second_name, second_name_kana, birth_date, second_student_birth_date, gender, second_student_gender } = result.data as any // Type assertion for dynamic second_name
+        const { name, kana, email, phone, message, second_name, second_name_kana, birth_date, second_student_birth_date, gender, second_student_gender } = result.data as any
         const supabaseAdmin = createAdminClient()
 
         console.log(`[Onboarding] New Lead: ${name} (${email})`)
+
+        // 年齢を計算
+        const studentAge = calculateAge(birth_date)
+        const secondStudentAge = calculateAge(second_student_birth_date)
 
         // ---- 冪等性チェック（並行POSTによる重複登録防止） ----
         // GASが同一フォーム送信で短時間に複数回POSTすることがある。
@@ -140,13 +144,29 @@ export async function POST(req: NextRequest) {
         processingRequests.set(dedupKey, Date.now())
 
         // 2. Extract Extra Fields for Notes
-        const standardKeys = ['name', 'kana', 'email', 'phone', 'message', 'type', 'second_name', 'second_name_kana', 'birth_date', 'second_student_birth_date', 'gender', 'second_student_gender']
+        // マップ元の日本語キーも含めて除外対象にする（重複防止）
+        const mappedJapaneseKeys = Object.keys(keyMap)
+        const standardKeys = [
+            'name', 'kana', 'email', 'phone', 'message', 'type', 
+            'second_name', 'second_name_kana', 'birth_date', 'second_student_birth_date', 
+            'gender', 'second_student_gender',
+            ...mappedJapaneseKeys
+        ]
         const extraInfo = Object.entries(result.data)
             .filter(([key]) => !standardKeys.includes(key))
             .map(([key, value]) => `【${key}】: ${value}`)
             .join('\n')
 
         let notes = message ? `[メッセージ]\n${message}` : ''
+        
+        // 年齢情報をメモに追加
+        if (studentAge !== null) {
+            notes = notes ? `${notes}\n【年齢】: ${studentAge}歳` : `【年齢】: ${studentAge}歳`
+        }
+        if (secondStudentAge !== null) {
+            notes = notes ? `${notes}\n【年齢（2人目）】: ${secondStudentAge}歳` : `【年齢（2人目）】: ${secondStudentAge}歳`
+        }
+
         if (extraInfo) {
             notes = notes ? `${notes}\n\n[追加情報]\n${extraInfo}` : `[追加情報]\n${extraInfo}`
         }
@@ -203,29 +223,26 @@ export async function POST(req: NextRequest) {
         const variables: Record<string, string> = {}
         const inputLines: string[] = []
 
+        // メール変数の設定
+        if (studentAge !== null) variables['age'] = String(studentAge)
+        if (secondStudentAge !== null) variables['second_student_age'] = String(secondStudentAge)
+
         for (const [key, value] of Object.entries(result.data)) {
             if (value !== undefined && value !== null) {
+                // 日本語の元キーはスキップ（マッピング後の英語キーで処理するため）
+                if (keyMap[key]) continue
+
                 const strValue = String(value)
                 variables[key] = strValue
 
-                // Format for all_inputs listing
-                // Translate standard keys for better readability if needed, or just use keys
                 const label = translateKey(key) || key
                 inputLines.push(`【${label}】: ${strValue}`)
 
-                if (key === 'birth_date') {
-                    const age = calculateAge(strValue)
-                    if (age !== null) {
-                        variables['age'] = String(age)
-                        inputLines.push(`【年齢】: ${age}歳`)
-                    }
+                if (key === 'birth_date' && studentAge !== null) {
+                    inputLines.push(`【年齢】: ${studentAge}歳`)
                 }
-                if (key === 'second_student_birth_date') {
-                    const age = calculateAge(strValue)
-                    if (age !== null) {
-                        variables['second_student_age'] = String(age)
-                        inputLines.push(`【年齢（2人目）】: ${age}歳`)
-                    }
+                if (key === 'second_student_birth_date' && secondStudentAge !== null) {
+                    inputLines.push(`【年齢（2人目）】: ${secondStudentAge}歳`)
                 }
             }
         }
@@ -278,6 +295,7 @@ function translateKey(key: string): string {
         second_name_kana: 'フリガナ（2人目）',
         birth_date: '生年月日',
         second_student_birth_date: '生年月日（2人目）',
+        second_student_age: '年齢（2人目）',
         gender: '性別',
         second_student_gender: '性別（2人目）'
     }

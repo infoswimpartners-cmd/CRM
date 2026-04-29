@@ -4,7 +4,6 @@ import React, { useEffect, useState } from 'react';
 import { 
   getTrioSlots, 
   confirmTrioSlot, 
-  getTestTaroId, 
   getStudentEntries, 
   getDetailedStudentEntries 
 } from '@/actions/trio_matching';
@@ -31,12 +30,12 @@ export default function TrioDashboard() {
   const [loading, setLoading] = useState(true);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [testTaroId, setTestTaroId] = useState<string | null>(null);
   const [studentId, setStudentId] = useState<string | null>(null);
   const [trioStatus, setTrioStatus] = useState<{ activeCount: number; waitlistCount: number; isFull: boolean } | null>(null);
   const [userType, setUserType] = useState<UserType>('PATTERN_A');
   const [ticketBalance, setTicketBalance] = useState(0);
   const [nextSession, setNextSession] = useState<any>(null);
+  const [userEntryIds, setUserEntryIds] = useState<string[]>([]);
 
   const fetchData = async () => {
     try {
@@ -60,16 +59,30 @@ export default function TrioDashboard() {
               userData = student;
               setTicketBalance(student.trio_ticket_balance || 0);
           }
+      } else {
+          // テスト仕様: 未ログイン時は自動的にテスト太郎（0035）として操作できるようにする
+          const { data: taro } = await supabase
+              .from('students')
+              .select('id, is_trio, trio_ticket_balance')
+              .or('student_number.eq.0035,full_name.ilike.%テスト太郎%')
+              .limit(1)
+              .single();
+              
+          if (taro) {
+              currentStudentId = taro.id;
+              setStudentId(taro.id);
+              userData = taro;
+              setTicketBalance(taro.trio_ticket_balance || 0);
+              toast.info('テストモード：テスト太郎として操作しています', { duration: 5000 });
+          }
       }
       
-      const taroId = await getTestTaroId();
-      setTestTaroId(taroId);
-      
-      const targetUserId = taroId || currentStudentId;
+      const targetUserId = currentStudentId;
       if (!targetUserId) {
         setLoading(false);
         return;
       }
+
 
       const [slotsRes, detailEntriesRes, statusRes] = await Promise.all([
           getTrioSlots(),
@@ -86,6 +99,10 @@ export default function TrioDashboard() {
       // ユーザー状態の判定
       const isReserved = detailEntriesRes.entries && detailEntriesRes.entries.length > 0;
       
+      if (detailEntriesRes.entries) {
+        setUserEntryIds(detailEntriesRes.entries.map((e: any) => e.slot?.id).filter(Boolean));
+      }
+
       if (userData?.is_trio) {
         setUserType('PATTERN_C');
       } else if (detailEntriesRes.entries && detailEntriesRes.entries.length > 0) {
@@ -117,7 +134,7 @@ export default function TrioDashboard() {
   }, []);
 
   const handleBook = async (slotId: string) => {
-    const targetId = testTaroId || studentId;
+    const targetId = studentId;
     if (!targetId) {
       toast.error('ログイン情報が取得できません。');
       return;
@@ -252,6 +269,7 @@ export default function TrioDashboard() {
                 </div>
                 <FeaturedSlots 
                     slots={slots} 
+                    userEntryIds={userEntryIds}
                     onBookClick={handleBook}
                 />
             </div>
