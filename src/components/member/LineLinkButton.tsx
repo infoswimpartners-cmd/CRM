@@ -3,7 +3,12 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { signIn } from "next-auth/react";
+import { MessageCircle } from "lucide-react";
 
+/**
+ * LineLinkButton
+ * プレミアム・クールなデザインのLINE連携ボタン
+ */
 export default function LineLinkButton() {
     const [isLoading, setIsLoading] = useState(false);
 
@@ -18,9 +23,10 @@ export default function LineLinkButton() {
         <Button
             onClick={handleLinkLine}
             disabled={isLoading}
-            className="bg-white text-emerald-600 hover:bg-emerald-50 w-full rounded-2xl h-12 font-black text-sm shadow-lg active:scale-95 transition-all mt-2 cursor-pointer"
+            className="w-full h-16 rounded-[1.5rem] bg-white hover:bg-emerald-50 border border-emerald-100 text-emerald-600 font-black text-sm tracking-widest uppercase transition-all active:scale-95 shadow-[0_10px_40px_rgba(16,185,129,0.08)] flex items-center justify-center gap-3"
         >
-            {isLoading ? "連携処理中..." : "LINEと連携する"}
+            <MessageCircle className="w-5 h-5" />
+            {isLoading ? "PROCESING..." : "LINEと連携する"}
         </Button>
     );
 }

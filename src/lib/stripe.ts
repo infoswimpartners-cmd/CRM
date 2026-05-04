@@ -1,10 +1,14 @@
 import Stripe from 'stripe';
 
-if (!process.env.STRIPE_SECRET_KEY) {
-    console.warn('⚠️ STRIPE_SECRET_KEY is missing. Stripe features will not work.');
+const secretKey = process.env.NODE_ENV === 'production'
+    ? process.env.STRIPE_SECRET_KEY_LIVE
+    : (process.env.STRIPE_SECRET_KEY_TEST || process.env.STRIPE_SECRET_KEY);
+
+if (!secretKey) {
+    console.warn('⚠️ Stripe Secret Key is missing. Stripe features will not work.');
 }
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? 'dummy_key', {
+export const stripe = new Stripe(secretKey ?? 'dummy_key', {
     apiVersion: '2025-12-15.clover',
     typescript: true,
 });

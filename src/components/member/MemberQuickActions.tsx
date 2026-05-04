@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { FileText, XCircle, MessageCircle } from 'lucide-react'
+import { MessageCircle, Crown, User } from 'lucide-react'
 
 /**
  * ダッシュボードのクイックアクション
@@ -10,29 +10,29 @@ import { FileText, XCircle, MessageCircle } from 'lucide-react'
 export default function MemberQuickActions() {
     const actions = [
         {
-            href: '/member/reports',
-            icon: FileText,
-            label: '動画を見る',
-            sublabel: 'カルテ・フィードバック',
-            gradient: 'from-blue-500 to-blue-600',
-            iconBg: 'bg-white/20',
-        },
-        {
-            href: '/member/cancel',
-            icon: XCircle,
-            label: 'キャンセル',
-            sublabel: '予約変更・取消',
-            gradient: 'from-red-400 to-red-500',
-            iconBg: 'bg-white/20',
-        },
-        {
-            href: 'https://lin.ee/placeholder',
+            href: 'https://lin.ee/placeholder', // TODO: 実際のLINEリンクに差し替え
             icon: MessageCircle,
             label: 'LINEで予約',
-            sublabel: '次回のレッスン相談',
-            gradient: 'from-green-400 to-green-600',
+            sublabel: '個人レッスン',
+            gradient: 'from-emerald-500 to-teal-600',
             iconBg: 'bg-white/20',
             external: true,
+        },
+        {
+            href: '/trio',
+            icon: Crown,
+            label: 'Trioを探す',
+            sublabel: 'グループ募集',
+            gradient: 'from-blue-500 to-cyan-600',
+            iconBg: 'bg-white/20',
+        },
+        {
+            href: '/member/profile',
+            icon: User,
+            label: 'マイページ',
+            sublabel: '基本・支払設定',
+            gradient: 'from-slate-600 to-slate-800',
+            iconBg: 'bg-white/20',
         },
     ]
 

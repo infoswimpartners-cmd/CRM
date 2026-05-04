@@ -12,8 +12,9 @@ import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { Loader2, KeyRound, Mail, UserPlus, Eye, EyeOff } from 'lucide-react';
 import { login } from './actions';
-import { useActionState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useActionState, useEffect } from 'react';
+import { signIn, getCsrfToken } from 'next-auth/react';
 
 const initialState = {
     error: '',
@@ -21,6 +22,7 @@ const initialState = {
 
 export default function MemberLoginPage() {
     const [state, formAction, isPending] = useActionState(login, initialState);
+    const [lineLoading, setLineLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const router = useRouter();
 
@@ -29,6 +31,42 @@ export default function MemberLoginPage() {
             toast.error(state.error);
         }
     }, [state?.error]);
+
+    const handleLineLogin = async () => {
+        try {
+            setLineLoading(true);
+            
+            // CSRFトークンを取得
+            const csrfToken = await getCsrfToken();
+            if (!csrfToken) {
+                throw new Error('CSRFトークンの取得に失敗しました。');
+            }
+
+            // 隠しフォームを作成して POST 送信する（中間ページをバイパスするための確実な手法）
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '/api/auth/signin/line';
+            
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = 'csrfToken';
+            csrfInput.value = csrfToken;
+            
+            const callbackInput = document.createElement('input');
+            callbackInput.type = 'hidden';
+            callbackInput.name = 'callbackUrl';
+            callbackInput.value = '/trio/dashboard';
+            
+            form.appendChild(csrfInput);
+            form.appendChild(callbackInput);
+            document.body.appendChild(form);
+            form.submit();
+        } catch (error: any) {
+            console.error('LINE Login Error:', error);
+            toast.error(error.message || 'LINEログインの開始に失敗しました。');
+            setLineLoading(false);
+        }
+    };
 
     return (
         <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center p-4">
@@ -49,6 +87,34 @@ export default function MemberLoginPage() {
                     </div>
                 </CardHeader>
                 <CardContent className="px-8 pb-10 space-y-8">
+                    <div className="space-y-4">
+                        <Button 
+                            variant="outline" 
+                            disabled={lineLoading}
+                            className="w-full h-14 bg-[#06C755] hover:bg-[#05b34d] text-white border-none rounded-2xl font-bold transition-all group flex items-center justify-center gap-3 shadow-lg shadow-emerald-100 disabled:opacity-70"
+                            onClick={handleLineLogin}
+                        >
+                            {lineLoading ? (
+                                <Loader2 className="w-6 h-6 animate-spin" />
+                            ) : (
+                                <>
+                                    <svg viewBox="0 0 24 24" className="w-6 h-6 fill-current">
+                                        <path d="M24 10.304c0-5.231-5.383-9.486-12-9.486-6.617 0-12 4.255-12 9.486 0 4.689 4.269 8.605 10.043 9.356.391.084.922.258 1.058.591.124.302.081.776.039 1.082l-.173 1.039c-.053.314-.256 1.226 1.104.669 1.36-.557 7.333-4.318 10.007-7.391 1.947-2.181 1.922-4.103 1.922-5.346zm-15.659 3.036h-1.895c-.156 0-.282-.126-.282-.282v-3.79c0-.156.126-.282.282-.282h1.895c.156 0 .282.126.282.282v.212c0 .156-.126.282-.282.282h-1.401v1.127h1.401c.156 0 .282.126.282.282v.212c0 .156-.126.282-.282.282h-1.401v1.127h1.401c.156 0 .282.126.282.282v.212c0 .157-.126.282-.282.282zm3.366 0h-1.895c-.156 0-.282-.126-.282-.282v-3.79c0-.156.126-.282.282-.282h.212c.156 0 .282.126.282.282v3.508h1.401c.156 0 .282.126.282.282v.212c0 .157-.126.282-.282.282zm1.611 0h-.212c-.156 0-.282-.126-.282-.282v-3.79c0-.156.126-.282.282-.282h.212c.156 0 .282.126.282.282v3.79c0 .156-.126.282-.282.282zm4.43 0h-1.895c-.156 0-.282-.126-.282-.282v-3.79c0-.156.126-.282.282-.282h.211c.156 0 .282.126.282.282v2.85l1.01-1.34c.05-.067.124-.105.203-.105h.219c.175 0 .296.166.254.336l-.768 1.022 1.02 1.488c.058.084.053.195-.011.274-.064.079-.163.125-.268.125h-.226c-.085 0-.164-.041-.212-.111l-.819-1.196v1.197c0 .156-.126.282-.282.282z" />
+                                    </svg>
+                                    LINEでログイン・登録
+                                </>
+                            )}
+                        </Button>
+
+                        <div className="relative py-2">
+                            <div className="absolute inset-0 flex items-center">
+                                <span className="w-full border-t border-blue-50" />
+                            </div>
+                            <div className="relative flex justify-center text-[10px] uppercase font-bold tracking-[0.2em] text-blue-100">
+                                <span className="bg-white px-4">またはメールアドレスでログイン</span>
+                            </div>
+                        </div>
+                    </div>
                     <form action={formAction} className="space-y-5">
                         <div className="space-y-2">
                             <Label htmlFor="email" className="text-xs font-bold text-blue-900/40 ml-1 uppercase tracking-widest">メールアドレス</Label>
@@ -108,15 +174,6 @@ export default function MemberLoginPage() {
                             {isPending ? <Loader2 className="animate-spin h-6 w-6" /> : "ログインする"}
                         </Button>
                     </form>
-
-                    <div className="relative py-2">
-                        <div className="absolute inset-0 flex items-center">
-                            <span className="w-full border-t border-blue-50" />
-                        </div>
-                        <div className="relative flex justify-center text-[10px] uppercase font-bold tracking-[0.2em] text-blue-100">
-                            <span className="bg-white px-4">または</span>
-                        </div>
-                    </div>
 
                     <div className="space-y-4">
                         <Button asChild variant="outline" className="w-full h-14 border-blue-100 border-2 rounded-2xl text-blue-600 font-bold hover:bg-blue-50 hover:text-blue-700 transition-all group">

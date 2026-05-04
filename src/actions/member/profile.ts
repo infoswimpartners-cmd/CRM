@@ -57,3 +57,39 @@ export async function updateMemberProfile(prevState: any, formData: FormData) {
         return { error: '更新に失敗しました: ' + (e.message || '不明なエラー') }
     }
 }
+
+/**
+ * StripeカスタマーポータルへのURLを作成
+ */
+export async function createStripePortalSession() {
+    try {
+        const { stripe } = await import('@/lib/stripe');
+        const supabase = await createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+
+        if (!session?.user?.id) {
+            return { error: 'セッションが有効ではありません。' }
+        }
+
+        const { data: student } = await supabase
+            .from('students')
+            .select('stripe_customer_id')
+            .eq('auth_user_id', session.user.id)
+            .single();
+
+        if (!student?.stripe_customer_id) {
+            return { error: 'お支払い情報が登録されていません。' }
+        }
+
+        // ポータルセッションの作成
+        const portalSession = await stripe.billingPortal.sessions.create({
+            customer: student.stripe_customer_id,
+            return_url: `${process.env.NEXT_PUBLIC_APP_URL || ''}/member/profile`,
+        });
+
+        return { url: portalSession.url };
+    } catch (err: any) {
+        console.error('Stripe portal error:', err);
+        return { error: 'お支払い画面の準備に失敗しました。' };
+    }
+}

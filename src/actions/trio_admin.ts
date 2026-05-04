@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { TrioSlot } from '@/types/trio';
 import { revalidatePath } from 'next/cache';
+import { cleanupExpiredEntries } from './trio_matching';
 
 // 管理者権限チェック用のユーティリティ
 async function requireAdmin() {
@@ -24,9 +25,6 @@ async function requireAdmin() {
 // 1. スロット作成
 export async function createTrioSlot(startAt: string, endAt: string): Promise<{ success: boolean; error?: string }> {
   try {
-    // 権限などの本実装時は以下のチェックを行う
-    // await requireAdmin();
-
     const supabase = await createClient();
     const { error } = await supabase
       .from('trio_slots')
@@ -54,10 +52,13 @@ export async function createTrioSlot(startAt: string, endAt: string): Promise<{ 
 // 2. スロット削除
 export async function deleteTrioSlot(slotId: string): Promise<{ success: boolean; error?: string }> {
   try {
-    // await requireAdmin();
+    const { createAdminClient } = await import('@/lib/supabase/admin');
+    const supabaseAdmin = createAdminClient();
+    
+    // 関連するエントリーも削除
+    await supabaseAdmin.from('trio_entries').delete().eq('slot_id', slotId);
 
-    const supabase = await createClient();
-    const { error } = await supabase
+    const { error } = await supabaseAdmin
       .from('trio_slots')
       .delete()
       .eq('id', slotId);
@@ -78,10 +79,9 @@ export async function deleteTrioSlot(slotId: string): Promise<{ success: boolean
 // 3. 施設予約完了ステータスのトグル
 export async function toggleFacilityBooked(slotId: string, isBooked: boolean): Promise<{ success: boolean; error?: string }> {
   try {
-    // await requireAdmin();
-
-    const supabase = await createClient();
-    const { error } = await supabase
+    const { createAdminClient } = await import('@/lib/supabase/admin');
+    const supabaseAdmin = createAdminClient();
+    const { error } = await supabaseAdmin
       .from('trio_slots')
       .update({ is_facility_booked: isBooked })
       .eq('id', slotId);
@@ -92,7 +92,6 @@ export async function toggleFacilityBooked(slotId: string, isBooked: boolean): P
     }
 
     revalidatePath('/admin/trio');
-    revalidatePath('/admin/trio/slots');
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message };
@@ -112,5 +111,82 @@ export async function getTrioWaitlist(): Promise<{ waitlist: any[]; error?: stri
     return { waitlist: data || [] };
   } catch (err: any) {
     return { waitlist: [], error: err.message };
+  }
+}
+
+// 5. 管理画面用スロットとエントリー取得
+export async function getTrioAdminSlots(): Promise<{ slots?: any[]; error?: string }> {
+  try {
+    const supabase = await createClient();
+    
+    // 管理画面表示時にも期限切れを掃除
+    await cleanupExpiredEntries();
+
+    const { data, error } = await supabase
+      .from('trio_slots')
+      .select(`
+        *,
+        entries:trio_entries(
+          id,
+          payment_status,
+          student:students(
+            id,
+            full_name,
+            contact_email,
+            contact_phone,
+            is_trio
+          )
+        )
+      `)
+      .order('start_at', { ascending: true });
+
+    if (error) throw error;
+    return { slots: data || [] };
+  } catch (err: any) {
+    return { error: err.message };
+  }
+}
+
+// 6. エントリーのキャンセル（削除）
+export async function cancelTrioEntry(entryId: string, slotId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { createAdminClient } = await import('@/lib/supabase/admin');
+    const supabaseAdmin = createAdminClient();
+    
+    // 1. エントリーを削除
+    const { error: deleteError } = await supabaseAdmin
+      .from('trio_entries')
+      .delete()
+      .eq('id', entryId);
+
+    if (deleteError) throw deleteError;
+
+    // 2. スロットの予約人数を再計算して更新
+    const { data: entries } = await supabaseAdmin
+      .from('trio_entries')
+      .select('id')
+      .eq('slot_id', slotId);
+
+    const newCount = entries?.length || 0;
+    
+    // ステータス判定
+    let newStatus = 'entry';
+    if (newCount === 1) newStatus = 'matching';
+    else if (newCount >= 2) newStatus = 'confirmed';
+
+    await supabaseAdmin
+      .from('trio_slots')
+      .update({ 
+        reserved_count: newCount,
+        status: newStatus
+      })
+      .eq('id', slotId);
+
+    revalidatePath('/admin/trio');
+    revalidatePath('/trio/dashboard');
+    return { success: true };
+  } catch (err: any) {
+    console.error('cancelTrioEntry error:', err);
+    return { success: false, error: 'キャンセルの処理に失敗しました。' };
   }
 }

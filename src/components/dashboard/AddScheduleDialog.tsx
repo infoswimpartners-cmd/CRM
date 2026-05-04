@@ -14,7 +14,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { CalendarIcon, Loader2, ExternalLink, Ticket } from 'lucide-react'
+import { CalendarIcon, Loader2, ExternalLink, Ticket, Trash2, PlusCircle } from 'lucide-react'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
 import { Calendar } from '@/components/ui/calendar'
@@ -68,9 +68,9 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
 
     // Form State
     const [studentId, setStudentId] = useState<string>('none')
-    const [date, setDate] = useState<Date | undefined>(new Date())
-    const [startTime, setStartTime] = useState('10:00')
-    const [endTime, setEndTime] = useState('11:00')
+    const [slots, setSlots] = useState<{ date: Date | undefined; startTime: string; endTime: string }[]>([
+        { date: initialDate || new Date(), startTime: '10:00', endTime: '11:00' }
+    ])
     const [location, setLocation] = useState('')
     const [notes, setNotes] = useState('')
     const [title, setTitle] = useState('')
@@ -86,7 +86,11 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
     // Update date when initialDate changes or dialog opens
     useEffect(() => {
         if (open && initialDate) {
-            setDate(initialDate)
+            setSlots(prev => {
+                const newSlots = [...prev]
+                newSlots[0].date = initialDate
+                return newSlots
+            })
         }
     }, [open, initialDate])
 
@@ -189,13 +193,14 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
     }, [open, selectedCoachId, isAdmin, studentId])
 
 
-    // Check Student Status when Student & Date selected
+    // Check Student Status when Student & Date selected (Preview for first slot)
     useEffect(() => {
-        if (studentId && studentId !== 'none' && date) {
+        const firstSlotDate = slots[0]?.date
+        if (studentId && studentId !== 'none' && firstSlotDate) {
             const check = async () => {
                 setCheckingStatus(true)
                 const { checkStudentLessonStatus } = await import('@/actions/lesson_schedule')
-                const res = await checkStudentLessonStatus(studentId, date.toISOString(), attendanceType)
+                const res = await checkStudentLessonStatus(studentId, firstSlotDate.toISOString(), attendanceType)
 
                 if (res.success) {
                     setIsOverage(!!res.isOverage)
@@ -265,7 +270,7 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
                 setIsTrialMode(false)
             }
         }
-    }, [studentId, date, students, lessonMasters, attendanceType, selectedCoachId])
+    }, [studentId, slots[0]?.date, students, lessonMasters, attendanceType, selectedCoachId])
 
     const generateGoogleCalendarUrl = (
         eventTitle: string,
@@ -296,39 +301,35 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
         return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${text}&dates=${dates}&details=${details}&location=${loc}`
     }
 
-    // Auto-Calculate End Time based on Master or Default
+    // Auto-Calculate End Time for each slot
     useEffect(() => {
-        if (startTime && date) {
-            let duration = 60 // Default 60 min
+        let duration = 60 // Default 60 min
 
-            if (isOverage && selectedMasterId !== 'default') {
-                const master = lessonMasters.find(m => m.id === selectedMasterId)
-                if (master) {
-                    // Extract duration from name (e.g. "60分")
-                    const match = master.name.match(/(\d+)分/)
-                    if (match && match[1]) {
-                        duration = parseInt(match[1])
-                    }
-                }
-            } else if (studentId !== 'none') {
-                // Monthly Member (Normal or Overage)
-                // Fallback: If Membership Name contains 90 -> 90, else 60.
-                if (membershipName && membershipName.includes('90')) {
-                    duration = 90
+        if (isOverage && selectedMasterId !== 'default') {
+            const master = lessonMasters.find(m => m.id === selectedMasterId)
+            if (master) {
+                const match = master.name.match(/(\d+)分/)
+                if (match && match[1]) {
+                    duration = parseInt(match[1])
                 }
             }
+        } else if (studentId !== 'none') {
+            if (membershipName && membershipName.includes('90')) {
+                duration = 90
+            }
+        }
 
-            // Calc End Time
-            const [sh, sm] = startTime.split(':').map(Number)
-            const startD = new Date(date)
+        setSlots(prev => prev.map(slot => {
+            if (!slot.startTime || !slot.date) return slot
+            const [sh, sm] = slot.startTime.split(':').map(Number)
+            const startD = new Date(slot.date)
             startD.setHours(sh, sm, 0)
             const endD = new Date(startD.getTime() + duration * 60000)
-
             const eh = endD.getHours().toString().padStart(2, '0')
             const em = endD.getMinutes().toString().padStart(2, '0')
-            setEndTime(`${eh}:${em}`)
-        }
-    }, [startTime, selectedMasterId, isOverage, membershipName, date, lessonMasters])
+            return { ...slot, endTime: `${eh}:${em}` }
+        }))
+    }, [selectedMasterId, isOverage, membershipName, lessonMasters, studentId])
 
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -339,93 +340,86 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
         try {
             if (!currentUser) throw new Error('Not authenticated')
 
-            if (!date) {
-                toast.error('日付を選択してください')
-                return
-            }
-
             if (studentId === 'none') {
                 toast.error('生徒を選択してください')
                 setLoading(false)
                 return
             }
 
-            // Combine Date and Times
-            const startDateTime = new Date(date)
-            const [sh, sm] = startTime.split(':').map(Number)
-            startDateTime.setHours(sh, sm, 0)
-
-            const endDateTime = new Date(date)
-            const [eh, em] = endTime.split(':').map(Number)
-            endDateTime.setHours(eh, em, 0)
-
-            // Adjust Date if End Time crossed midnight? (Assume same day for simplified UI)
-            if (eh < sh) {
-                endDateTime.setDate(endDateTime.getDate() + 1)
+            if (slots.some(s => !s.date)) {
+                toast.error('すべての日付を選択してください')
+                setLoading(false)
+                return
             }
 
-
-            // Adjust Date if End Time crossed midnight? (Assume same day for simplified UI)
-            if (eh < sh) {
-                endDateTime.setDate(endDateTime.getDate() + 1)
-            }
-
-
-            // NORMAL SCHEDULE creation
-            // Auto-update trial_pending -> trial_confirmed
+            // Start Trial Workflow (Approval based)
             if (studentId !== 'none') {
                 const student = students.find(s => s.id === studentId)
                 if (student?.status === 'trial_pending') {
-                    // Start Trial Workflow (Approval based)
-                    // We don't update status to 'trial_confirmed' immediately anymore?
-                    // Actually, if we just schedule it, it remains 'trial_pending' until lesson done?
-                    // Or maybe we should update it. 
-                    // Existing logic: "Auto-update trial_pending -> trial_confirmed"
-                    // approaches:
-                    // 1. Keep it pending until lesson is done/paid.
-                    // 2. Confirm it now.
-                    // Let's keep existing logic of confirming it if they schedule a lesson?
-                    // But wait, "Trial Pending" means they enquired. 
-                    // "Trial Confirmed" means date is set. So yes, update to confirmed.
-
                     await supabase.from('students').update({ status: 'trial_confirmed' }).eq('id', studentId)
                 }
             }
 
-            // Use Server Action
-            // @ts-ignore
-            const result = await createLessonSchedule({
-                coach_id: selectedCoachId,
-                student_id: studentId === 'none' ? null : studentId,
-                lesson_master_id: (isOverage && selectedMasterId !== 'default') ? selectedMasterId : null,
-                start_time: startDateTime.toISOString(),
-                end_time: endDateTime.toISOString(),
-                title: title,
-                location: location,
-                notes: notes,
-                attendance_type: attendanceType
-            })
+            let successCount = 0
+            let lastResult: any = null
 
-            if (!result) throw new Error('処理結果が取得できませんでした')
-            if (!result.success) throw new Error(result.error)
+            for (const slot of slots) {
+                if (!slot.date) continue
 
-            if (result.isTrial || result.isOverage) {
-                if (membershipName && membershipName.includes('単発')) {
-                    toast.success('レッスンを追加し、レッスン料の請求処理予約を行いました。')
-                } else if (result.isTrial || isTrialMode) {
-                    toast.success('体験レッスンを追加しました。請求管理から承認を行ってください。')
-                } else {
-                    toast.warning('月の上限回数を超えているため、超過分（単発）として登録されました。')
+                // Combine Date and Times
+                const startDateTime = new Date(slot.date)
+                const [sh, sm] = slot.startTime.split(':').map(Number)
+                startDateTime.setHours(sh, sm, 0)
+
+                const endDateTime = new Date(slot.date)
+                const [eh, em] = slot.endTime.split(':').map(Number)
+                endDateTime.setHours(eh, em, 0)
+
+                if (eh < sh) {
+                    endDateTime.setDate(endDateTime.getDate() + 1)
                 }
-            } else {
-                toast.success('スケジュールを追加しました')
+
+                // Use Server Action
+                // @ts-ignore
+                const result = await createLessonSchedule({
+                    coach_id: selectedCoachId,
+                    student_id: studentId === 'none' ? null : studentId,
+                    lesson_master_id: (isOverage && selectedMasterId !== 'default') ? selectedMasterId : null,
+                    start_time: startDateTime.toISOString(),
+                    end_time: endDateTime.toISOString(),
+                    title: title,
+                    location: location,
+                    notes: notes,
+                    attendance_type: attendanceType
+                })
+
+                if (result && result.success) {
+                    successCount++
+                    lastResult = result
+                } else {
+                    console.error('Schedule Save Error for slot:', slot, result?.error)
+                    toast.error(`一部の保存に失敗しました: ${result?.error || '不明なエラー'}`)
+                }
             }
 
-            const gCalUrl = generateGoogleCalendarUrl(title, location, notes, date, startTime, endTime)
-            setCreatedEventUrl(gCalUrl)
+            if (successCount > 0) {
+                if (successCount === slots.length) {
+                    toast.success(`${successCount}件のスケジュールを追加しました`)
+                } else {
+                    toast.warning(`${successCount}件のスケジュールを追加しましたが、一部失敗しました`)
+                }
 
-            // Do NOT call onSuccess immediately, so the dialog stays open to show Success View
-            // if (onSuccess) onSuccess()
+                if (lastResult) {
+                    const firstSlot = slots[0]
+                    if (firstSlot && firstSlot.date) {
+                        const gCalUrl = generateGoogleCalendarUrl(title, location, notes, firstSlot.date, firstSlot.startTime, firstSlot.endTime)
+                        setCreatedEventUrl(gCalUrl)
+                    } else {
+                        // Generic success state to show completion view
+                        setCreatedEventUrl('success')
+                    }
+                }
+            }
 
         } catch (error: any) {
             console.error('Schedule Save Error:', error)
@@ -444,15 +438,12 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
         onOpenChange(false)
         setCreatedEventUrl(null)
         setStudentId('none')
-        setDate(new Date())
-        setStartTime('10:00')
-        setEndTime('11:00')
+        setSlots([{ date: initialDate || new Date(), startTime: '10:00', endTime: '11:00' }])
         setLocation('')
         setNotes('')
         setTitle('')
         setAttendanceType('both')
         setIsTrialMode(false)
-        // setSendTrialInvoice(false) // Removed
         setIsOverage(false)
         setMembershipName(null)
         if (currentUser) setSelectedCoachId(currentUser.id)
@@ -640,75 +631,111 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
                             <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="例: 水泳レッスン" required />
                         </div>
 
-                        <div className="grid gap-2">
-                            <Label>日付</Label>
-                            <Popover>
-                                <PopoverTrigger asChild>
+                        {/* Slots Selection */}
+                        <div className="space-y-4 border-t pt-4">
+                            <div className="flex items-center justify-between">
+                                <Label className="text-sm font-bold text-slate-700">レッスン日時 (最大4つ)</Label>
+                                {slots.length < 4 && (
                                     <Button
-                                        variant={"outline"}
-                                        className={cn(
-                                            "w-full justify-start text-left font-normal",
-                                            !date && "text-muted-foreground"
-                                        )}
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setSlots([...slots, { date: slots[slots.length - 1]?.date || new Date(), startTime: '10:00', endTime: '11:00' }])}
+                                        className="h-8 text-blue-600 border-blue-200 hover:bg-blue-50"
                                     >
-                                        <CalendarIcon className="mr-2 h-4 w-4" />
-                                        {/* Updated Date Format */}
-                                        {date ? format(date, "yyyy年M月d日") : <span>日付を選択</span>}
+                                        <PlusCircle className="w-3.5 h-3.5 mr-1" />
+                                        枠を追加
                                     </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0">
-                                    <Calendar
-                                        mode="single"
-                                        selected={date}
-                                        onSelect={setDate}
-                                        initialFocus
-                                    />
-                                </PopoverContent>
-                            </Popover>
-                        </div>
+                                )}
+                            </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div className="grid gap-2">
-                                <Label>開始時間</Label>
-                                <div className="flex gap-2 items-center">
-                                    <Select
-                                        value={startTime.split(':')[0]}
-                                        onValueChange={(h) => setStartTime(`${h}:${startTime.split(':')[1]}`)}
-                                    >
-                                        <SelectTrigger className="w-full sm:w-[80px]">
-                                            <SelectValue placeholder="時" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {Array.from({ length: 24 }).map((_, i) => {
-                                                const h = i.toString().padStart(2, '0')
-                                                return <SelectItem key={h} value={h}>{h}</SelectItem>
-                                            })}
-                                        </SelectContent>
-                                    </Select>
-                                    <span className="text-sm font-bold">:</span>
-                                    <Select
-                                        value={startTime.split(':')[1]}
-                                        onValueChange={(m) => setStartTime(`${startTime.split(':')[0]}:${m}`)}
-                                    >
-                                        <SelectTrigger className="w-full sm:w-[80px]">
-                                            <SelectValue placeholder="分" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {Array.from({ length: 12 }).map((_, i) => {
-                                                const m = (i * 5).toString().padStart(2, '0')
-                                                return <SelectItem key={m} value={m}>{m}</SelectItem>
-                                            })}
-                                        </SelectContent>
-                                    </Select>
+                            {slots.map((slot, index) => (
+                                <div key={index} className="p-3 bg-slate-50 rounded-lg border border-slate-200 relative space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-bold text-slate-500">枠 {index + 1}</span>
+                                        {slots.length > 1 && (
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() => setSlots(slots.filter((_, i) => i !== index))}
+                                                className="h-6 w-6 text-red-400 hover:text-red-600 hover:bg-red-50"
+                                            >
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                            </Button>
+                                        )}
+                                    </div>
+
+                                    <div className="grid gap-2">
+                                        <Label className="text-xs">日付</Label>
+                                        <Popover>
+                                            <PopoverTrigger asChild>
+                                                <Button
+                                                    variant={"outline"}
+                                                    className={cn(
+                                                        "w-full justify-start text-left font-normal bg-white h-9 text-sm",
+                                                        !slot.date && "text-muted-foreground"
+                                                    )}
+                                                >
+                                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                                    {slot.date ? format(slot.date, "yyyy年M月d日") : <span>日付を選択</span>}
+                                                </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-auto p-0">
+                                                <Calendar
+                                                    mode="single"
+                                                    selected={slot.date}
+                                                    onSelect={(d) => setSlots(slots.map((s, i) => i === index ? { ...s, date: d } : s))}
+                                                    initialFocus
+                                                />
+                                            </PopoverContent>
+                                        </Popover>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="grid gap-2">
+                                            <Label className="text-xs">開始時間</Label>
+                                            <div className="flex gap-1 items-center">
+                                                <Select
+                                                    value={slot.startTime.split(':')[0]}
+                                                    onValueChange={(h) => setSlots(slots.map((s, i) => i === index ? { ...s, startTime: `${h}:${s.startTime.split(':')[1]}` } : s))}
+                                                >
+                                                    <SelectTrigger className="h-9 bg-white text-sm">
+                                                        <SelectValue placeholder="時" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {Array.from({ length: 24 }).map((_, i) => {
+                                                            const h = i.toString().padStart(2, '0')
+                                                            return <SelectItem key={h} value={h}>{h}</SelectItem>
+                                                        })}
+                                                    </SelectContent>
+                                                </Select>
+                                                <span className="text-xs font-bold">:</span>
+                                                <Select
+                                                    value={slot.startTime.split(':')[1]}
+                                                    onValueChange={(m) => setSlots(slots.map((s, i) => i === index ? { ...s, startTime: `${s.startTime.split(':')[0]}:${m}` } : s))}
+                                                >
+                                                    <SelectTrigger className="h-9 bg-white text-sm">
+                                                        <SelectValue placeholder="分" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {Array.from({ length: 12 }).map((_, i) => {
+                                                            const m = (i * 5).toString().padStart(2, '0')
+                                                            return <SelectItem key={m} value={m}>{m}</SelectItem>
+                                                        })}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        </div>
+                                        <div className="grid gap-2">
+                                            <Label className="text-xs">終了時間 (自動)</Label>
+                                            <div className="flex h-9 w-full rounded-md border border-input bg-gray-100 px-3 py-2 text-sm shadow-sm items-center text-gray-500">
+                                                {slot.endTime}
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
-                            <div className="grid gap-2">
-                                <Label>終了時間 (自動)</Label>
-                                <div className="flex h-10 w-full rounded-md border border-input bg-gray-100 px-3 py-2 text-base shadow-sm items-center text-gray-600">
-                                    {endTime}
-                                </div>
-                                {/* Hidden Input not needed if we manage endTime state directly */}
-                            </div>
+                            ))}
                         </div>
 
                         <div className="grid gap-2">

@@ -30,6 +30,7 @@ export default function RootLayout({
     <html lang="ja" suppressHydrationWarning>
       <body
         className={`antialiased font-sans relative min-h-screen bg-white`}
+        suppressHydrationWarning
       >
         <FluidWaterBackground />
         <AuthProvider>

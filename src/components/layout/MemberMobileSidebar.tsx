@@ -7,17 +7,15 @@ import {
     Home,
     Calendar,
     FileText,
-    Ticket,
-    MessageCircle,
     LogOut,
     ChevronRight,
     User,
     Settings,
-    Crown
+    Crown,
+    Sparkles
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { usePathname } from 'next/navigation'
-import Image from 'next/image'
 import { cn } from '@/lib/utils'
 
 interface MemberMobileSidebarProps {
@@ -28,6 +26,10 @@ interface MemberMobileSidebarProps {
     handleLogout: () => Promise<void>
 }
 
+/**
+ * MemberMobileSidebar
+ * 明るくクールなサイドナビゲーション
+ */
 export default function MemberMobileSidebar({
     isOpen,
     onClose,
@@ -37,7 +39,6 @@ export default function MemberMobileSidebar({
 }: MemberMobileSidebarProps) {
     const pathname = usePathname()
 
-    // Prevent scrolling when menu is open
     useEffect(() => {
         if (isOpen) {
             document.body.style.overflow = 'hidden'
@@ -47,124 +48,94 @@ export default function MemberMobileSidebar({
         return () => { document.body.style.overflow = 'unset' }
     }, [isOpen])
 
-    const baseItems = [
-        { href: '/member/profile', icon: Settings, label: 'アカウント設定', subLabel: '基本情報の確認・変更', external: false },
+    const navItems = [
+        { href: '/member/dashboard', icon: Home, label: 'ホーム', subLabel: 'Dashboard' },
+        { href: '/member/reports', icon: FileText, label: 'カルテ・レポート', subLabel: 'Medical Records' },
+        { href: '/trio', icon: Crown, label: 'THE TRIO', subLabel: 'Premium Matching', isTrio: true },
+        { href: '/member/profile', icon: Settings, label: 'アカウント設定', subLabel: 'Settings' },
     ];
-
-    const navItems = isTrioMember 
-        ? [
-            { href: '/trio/dashboard', icon: Crown, label: 'THE TRIO ホーム', subLabel: 'プレミアム教室', external: false },
-            { href: '/member/dashboard', icon: User, label: 'パーソナル', subLabel: '個人レッスン（メイン事業）', external: false },
-            ...baseItems
-        ] 
-        : [
-            { href: '/member/dashboard', icon: Home, label: 'ホーム', subLabel: 'トップページ', external: false },
-            { href: '/member/reservation', icon: Calendar, label: 'レッスン予約', subLabel: 'スケジュールリクエスト', external: false },
-            { href: '/member/reports', icon: FileText, label: 'カルテ・レポート', subLabel: '成長の記録', external: false },
-            { href: '/trio/dashboard', icon: Crown, label: 'THE TRIO', subLabel: 'プレミアム教室', external: false },
-            ...baseItems
-        ];
 
     return (
         <>
-            {/* Overlay */}
             <div
                 className={cn(
-                    "fixed inset-0 bg-black/40 z-[100] backdrop-blur-sm transition-opacity duration-300",
+                    "fixed inset-0 bg-slate-900/40 z-[100] backdrop-blur-sm transition-opacity duration-500",
                     isOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
                 )}
                 onClick={onClose}
             />
 
-            {/* Sidebar Drawer */}
             <div className={cn(
-                "fixed top-0 left-0 h-full w-80 max-w-[85vw] bg-white/95 backdrop-blur-2xl border-r border-white/40 z-[110] shadow-2xl transform transition-transform duration-500 cubic-bezier(0.4, 0, 0.2, 1)",
+                "fixed top-0 left-0 h-full w-80 max-w-[85vw] bg-white z-[110] shadow-[0_0_100px_rgba(0,0,0,0.1)] transform transition-transform duration-700 cubic-bezier(0.16, 1, 0.3, 1)",
                 isOpen ? "translate-x-0" : "-translate-x-full"
             )}>
                 {/* Header */}
-                <div className="p-8 flex items-center justify-between border-b border-blue-50 bg-gradient-to-br from-blue-50/80 to-white/80">
-                    <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-2xl bg-blue-600 shadow-lg shadow-blue-200 flex items-center justify-center text-white transform rotate-3">
-                            <User className="w-6 h-6" />
+                <div className="p-10 flex flex-col gap-8">
+                    <div className="flex items-center justify-between">
+                        <div className="w-12 h-12 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center text-sky-500 shadow-sm">
+                            <Sparkles className="w-6 h-6" />
                         </div>
-                        <div>
-                            <p className="text-[10px] text-blue-400 font-black tracking-widest uppercase">会員プロフィール</p>
-                            <h2 className="font-black text-gray-800 text-lg">{studentName || 'ゲスト'} 様</h2>
-                        </div>
+                        <Button variant="ghost" size="icon" onClick={onClose} className="rounded-2xl hover:bg-slate-50 text-slate-400 w-12 h-12 border border-slate-100">
+                            <X className="h-6 w-6" />
+                        </Button>
                     </div>
-                    <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full hover:bg-blue-50 text-gray-400">
-                        <X className="h-6 w-6" />
-                    </Button>
+
+                    <div className="space-y-1">
+                        <p className="text-[10px] text-sky-500 font-black tracking-[0.3em] uppercase">Authenticated Member</p>
+                        <h2 className="font-black text-slate-900 text-2xl tracking-tighter">{studentName || 'Explorer'} <span className="text-slate-300 font-medium">様</span></h2>
+                    </div>
                 </div>
 
                 {/* Nav Items */}
-                <nav className="p-4 space-y-3 h-[calc(100vh-200px)] overflow-y-auto">
+                <nav className="px-6 space-y-2 h-[calc(100vh-320px)] overflow-y-auto">
                     {navItems.map((item) => {
-                        const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-                        const ItemContent = (
-                            <div className={cn(
-                                "flex items-center justify-between w-full p-4 rounded-3xl transition-all duration-300 group",
-                                isActive
-                                    ? "bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-xl shadow-blue-200"
-                                    : "text-gray-500 hover:bg-blue-50/50 hover:text-blue-600"
-                            )}>
-                                <div className="flex items-center gap-4">
-                                    <div className={cn(
-                                        "p-2.5 rounded-2xl transition-all duration-300",
-                                        isActive ? "bg-white/20 shadow-inner" : "bg-gray-50 group-hover:bg-white group-hover:shadow-sm"
-                                    )}>
-                                        <item.icon className={cn("w-5 h-5", isActive && "stroke-[2.5px]")} />
-                                    </div>
-                                    <div>
-                                        <p className="font-black text-sm tracking-tight">{item.label}</p>
-                                        <p className={cn(
-                                            "text-[10px] font-bold uppercase tracking-tighter",
-                                            isActive ? "text-blue-100/80" : "text-gray-300"
-                                        )}>{item.subLabel}</p>
-                                    </div>
-                                </div>
-                                <ChevronRight className={cn(
-                                    "w-4 h-4 transition-transform group-hover:translate-x-1",
-                                    isActive ? "text-white/60" : "text-gray-300"
-                                )} />
-                            </div>
-                        )
-
-                        if (item.external) {
-                            return (
-                                <a
-                                    key={item.href}
-                                    href={item.href}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="block"
-                                    onClick={onClose}
-                                >
-                                    {ItemContent}
-                                </a>
-                            )
-                        }
-
+                        const isActive = pathname === item.href || (item.href !== '/member/dashboard' && pathname.startsWith(item.href + '/'))
+                        
                         return (
-                            <Link key={item.href} href={item.href} onClick={onClose} className="block">
-                                {ItemContent}
+                            <Link key={item.href} href={item.href} onClick={onClose} className="block group">
+                                <div className={cn(
+                                    "flex items-center justify-between w-full p-5 rounded-[2rem] transition-all duration-500",
+                                    isActive
+                                        ? (item.isTrio ? "bg-amber-500 text-white shadow-xl shadow-amber-100" : "bg-sky-600 text-white shadow-xl shadow-sky-100")
+                                        : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                                )}>
+                                    <div className="flex items-center gap-5">
+                                        <div className={cn(
+                                            "w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-500",
+                                            isActive ? "bg-white/20" : "bg-slate-50 group-hover:bg-white border border-slate-100"
+                                        )}>
+                                            <item.icon className={cn("w-5 h-5", isActive && "stroke-[2.5px]")} />
+                                        </div>
+                                        <div>
+                                            <p className="font-black text-sm tracking-tight">{item.label}</p>
+                                            <p className={cn(
+                                                "text-[9px] font-black uppercase tracking-widest",
+                                                isActive ? "text-white/60" : "text-slate-300"
+                                            )}>{item.subLabel}</p>
+                                        </div>
+                                    </div>
+                                    <ChevronRight className={cn(
+                                        "w-4 h-4 transition-transform duration-500 group-hover:translate-x-1",
+                                        isActive ? "text-white/40" : "text-slate-300"
+                                    )} />
+                                </div>
                             </Link>
                         )
                     })}
                 </nav>
 
                 {/* Footer / Logout */}
-                <div className="absolute bottom-0 left-0 right-0 p-6 bg-gray-50/50 border-t border-gray-100">
+                <div className="absolute bottom-0 left-0 right-0 p-8 border-t border-slate-50">
                     <Button
                         variant="ghost"
                         onClick={() => {
                             onClose()
                             handleLogout()
                         }}
-                        className="w-full justify-start text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all h-12"
+                        className="w-full justify-start text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-[1.5rem] transition-all h-14 px-6 group"
                     >
-                        <LogOut className="mr-3 h-5 w-5" />
-                        <span className="font-bold text-sm">ログアウト</span>
+                        <LogOut className="mr-4 h-5 w-5 group-hover:-translate-x-1 transition-transform" />
+                        <span className="font-black text-xs uppercase tracking-widest">Logout</span>
                     </Button>
                 </div>
             </div>

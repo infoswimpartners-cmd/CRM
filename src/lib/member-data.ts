@@ -10,9 +10,9 @@ export const getCachedMemberData = cache(async () => {
 
     // 1. Auth User
     const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) return { user: null, student: null, isTrioMember: false };
+    if (authError || !user) return { user: null, student: null, isTrioMember: false, isPersonalMember: false };
 
-    // 2. Student Data (Commonly used fields)
+    // 2. Student Data
     const { data: student, error: studentError } = await supabase
         .from('students')
         .select(`
@@ -28,11 +28,20 @@ export const getCachedMemberData = cache(async () => {
         if (studentError.code !== 'PGRST116') {
             console.error('Error fetching cached student data:', studentError.message || studentError);
         }
-        return { user, student: null, isTrioMember: false };
+        return { user, student: null, isTrioMember: false, isPersonalMember: false };
     }
 
-    const planName = student.membership_types?.name || '';
-    const isTrioMember = planName.toLowerCase().includes('trio');
+    // 会員種別の判定（独立したフラグとして管理）
+    // Trio会員: is_trioフラグがtrueであること
+    const isTrioMember = !!student.is_trio;
+    
+    // 個人レッスン会員: 有効なプラン（membership_type_id）が設定されていること
+    const isPersonalMember = !!student.membership_type_id;
 
-    return { user, student, isTrioMember };
+    return { 
+        user, 
+        student, 
+        isTrioMember, 
+        isPersonalMember 
+    };
 });

@@ -35,14 +35,16 @@ import {
   Plus, 
   Trash2, 
   CheckCircle2, 
-  AlertCircle 
+  AlertCircle,
+  Phone
 } from 'lucide-react';
-import { getTrioSlots } from '@/actions/trio_matching';
 import { 
   createTrioSlot, 
   deleteTrioSlot, 
   toggleFacilityBooked, 
-  getTrioWaitlist 
+  getTrioWaitlist,
+  getTrioAdminSlots,
+  cancelTrioEntry
 } from '@/actions/trio_admin';
 import { TrioSlot } from '@/types/trio';
 import { format } from 'date-fns';
@@ -51,7 +53,7 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
 export default function AdminTrioManagementPage() {
-  const [slots, setSlots] = useState<TrioSlot[]>([]);
+  const [slots, setSlots] = useState<any[]>([]);
   const [waitlist, setWaitlist] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('slots');
@@ -66,7 +68,7 @@ export default function AdminTrioManagementPage() {
     setLoading(true);
     try {
       const [slotsRes, waitlistRes] = await Promise.all([
-        getTrioSlots(),
+        getTrioAdminSlots(),
         getTrioWaitlist()
       ]);
       
@@ -121,6 +123,22 @@ export default function AdminTrioManagementPage() {
       await fetchData();
     } else {
       toast.error(res.error || '更新に失敗しました');
+    }
+  };
+
+  const handleCancelEntry = async (entryId: string, slotId: string) => {
+    if (!window.confirm('このエントリーをキャンセル（削除）しますか？')) return;
+    
+    try {
+      const res = await cancelTrioEntry(entryId, slotId);
+      if (res.success) {
+        toast.success('エントリーをキャンセルしました');
+        await fetchData();
+      } else {
+        toast.error(res.error || 'キャンセルに失敗しました');
+      }
+    } catch (err) {
+      toast.error('通信エラーが発生しました');
     }
   };
 
@@ -263,21 +281,67 @@ export default function AdminTrioManagementPage() {
                               施設未予約
                             </>
                           )}
+                            </Button>
+                        </div>
+
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => handleDeleteSlot(slot.id)}
+                          className="h-10 w-10 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all ml-2"
+                        >
+                          <Trash2 className="w-5 h-5" />
                         </Button>
                       </div>
-
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        onClick={() => handleDeleteSlot(slot.id)}
-                        className="h-10 w-10 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all ml-2"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </Button>
                     </div>
+
+                    {/* Entries Display */}
+                    {slot.entries && slot.entries.length > 0 && (
+                      <div className="mt-6 border-t border-slate-100 pt-6">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">Participants ({slot.entries.length})</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {slot.entries.map((entry: any) => (
+                            <div key={entry.id} className="relative bg-slate-50/80 rounded-2xl p-4 border border-slate-100/50 group/entry">
+                              <button 
+                                onClick={() => handleCancelEntry(entry.id, slot.id)}
+                                className="absolute top-3 right-3 p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all opacity-0 group-hover/entry:opacity-100"
+                                title="キャンセル（削除）"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                              <div className="flex items-center gap-2 mb-2">
+                                <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-500">
+                                  <User className="w-4 h-4" />
+                                </div>
+                                <div>
+                                  <div className="text-xs font-black text-slate-800">{entry.student.full_name}</div>
+                                  <div className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">
+                                    {entry.student.is_trio ? 'Member' : 'Experience'}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 text-[11px] text-slate-500 mb-1">
+                                <Mail className="w-3.5 h-3.5 text-slate-400" />
+                                {entry.student.contact_email || '未登録'}
+                              </div>
+                              <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                                <Phone className="w-3.5 h-3.5 text-slate-400" />
+                                {entry.student.contact_phone || '未登録'}
+                              </div>
+                              <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-1">
+                                <span className={cn(
+                                  "w-2 h-2 rounded-full",
+                                  entry.payment_status === 'paid' ? "bg-emerald-400" : "bg-amber-400"
+                                )} />
+                                決済状況: {entry.payment_status === 'paid' ? '済 (Paid)' : '未 (Pending)'}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))
+                ))
             ) : (
               <div className="bg-slate-50/50 border-2 border-dashed border-slate-100 rounded-[2.5rem] p-20 flex flex-col items-center justify-center text-center">
                 <CalendarIcon className="w-12 h-12 text-slate-200 mb-4" />

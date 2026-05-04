@@ -125,7 +125,6 @@ export async function POST(req: NextRequest) {
                         }
 
                         // 3. Record Transaction
-                        // ticket_transactions might not exist if migration failed, so we try/catch or assume it exists based on previous verification
                         try {
                             const { error: txError } = await supabaseAdmin
                                 .from('ticket_transactions')
@@ -139,13 +138,35 @@ export async function POST(req: NextRequest) {
 
                             if (txError) {
                                 console.error('[Stripe Webhook] Failed to insert transaction record:', txError);
-                                // Non-critical error, balance is already updated
                             }
                         } catch (e) {
                             console.error('[Stripe Webhook] Transaciton insert failed (Unknown error):', e);
                         }
 
                         console.log(`[Stripe Webhook] Successfully added ${amount} tickets to Student ${studentId}. New Balance: ${newBalance}`);
+                    }
+                } else if (type === 'trio_trial' && studentId) {
+                    // --- THE TRIO TRIAL PAYMENT LOGIC ---
+                    const slotId = session.metadata?.slotId;
+                    console.log(`[Stripe Webhook] Processing THE TRIO Trial Payment for Student: ${studentId}, Slot: ${slotId}`);
+
+                    if (slotId) {
+                        // Update payment_status in trio_entries and clear expiration
+                        const { error: updateError } = await supabaseAdmin
+                            .from('trio_entries')
+                            .update({ 
+                                payment_status: 'paid',
+                                expires_at: null 
+                            })
+                            .eq('student_id', studentId)
+                            .eq('slot_id', slotId);
+
+                        if (updateError) {
+                            console.error('[Stripe Webhook] Failed to update TRIO trial payment status:', updateError);
+                            throw updateError;
+                        }
+
+                        console.log(`[Stripe Webhook] Successfully marked TRIO Trial Payment as paid for Student ${studentId}`);
                     }
                 } else if (type === 'trio_ticket_purchase' && studentId) {
                     // --- THE TRIO TICKET PURCHASE LOGIC ---

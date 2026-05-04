@@ -48,19 +48,12 @@ export default function MemberDesktopSidebar({
         { href: '/member/profile', icon: Settings, label: 'アカウント設定', subLabel: '基本情報の確認・変更', external: false },
     ];
 
-    const navItems = isTrioMember 
-        ? [
-            { href: '/trio/dashboard', icon: Crown, label: 'THE TRIO', subLabel: 'プレミアム教室・グループレッスン', external: false },
-            { href: '/member/dashboard', icon: LayoutGrid, label: 'パーソナル', subLabel: '個人向けオーダーメイド指導', external: false },
-            ...baseItems
-        ] 
-        : [
-            { href: '/member/dashboard', icon: LayoutGrid, label: 'パーソナル', subLabel: '個人向けオーダーメイド指導', external: false },
-            { href: '/member/reservation', icon: Calendar, label: 'レッスン予約', subLabel: 'スケジュールリクエスト', external: false },
-            { href: '/member/reports', icon: FileText, label: 'カルテ・レポート', subLabel: '成長の記録', external: false },
-            { href: '/trio/dashboard', icon: Crown, label: 'THE TRIO', subLabel: 'プレミアム教室・グループレッスン', external: false },
-            ...baseItems
-        ];
+    const navItems = [
+        { href: '/member/dashboard', icon: LayoutGrid, label: 'ホーム', subLabel: '予約の確認・キャンセル', external: false },
+        { href: '/member/reports', icon: FileText, label: 'カルテ', subLabel: 'レッスンレポート・成長の記録', external: false },
+        { href: '/trio', icon: Crown, label: 'Trio', subLabel: 'グループレッスン募集一覧', external: false },
+        { href: '/member/profile', icon: User, label: 'マイページ', subLabel: '基本情報・お支払い方法の変更', external: false },
+    ];
 
     if (pathname === '/member/login') return null;
 

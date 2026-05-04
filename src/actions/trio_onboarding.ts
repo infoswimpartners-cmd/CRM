@@ -101,7 +101,7 @@ export async function createTrioEnrollmentSession(studentId?: string) {
             ],
             // 入会金は初期費用としてPriceの設定に含まれるか、add_invoice_itemsで追加する想定
             success_url: `${APP_URL}/trio/dashboard?enrollment=success`,
-            cancel_url: `${APP_URL}/trio/join?enrollment=cancel`,
+            cancel_url: `${APP_URL}/trio?enrollment=cancel`,
             metadata: {
                 type: 'trio_enrollment',
                 studentId: studentId || ''

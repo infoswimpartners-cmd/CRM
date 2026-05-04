@@ -97,11 +97,11 @@ export function MobileSidebar({ userProfile }: { userProfile: any }) {
                 これにより ③ は絶対に ② と重ならない
             */}
             <div
-                className={`fixed top-0 left-0 h-full w-72 bg-white/95 backdrop-blur-xl border-r border-slate-200 z-[70] flex flex-col transform transition-transform duration-250 ease-[cubic-bezier(0.23,1,0.32,1)] ${isOpen ? 'translate-x-0' : '-translate-x-full'} shadow-[20px_0_60px_rgba(0,0,0,0.1)]`}
+                className={`fixed top-0 left-0 h-full w-72 bg-white border-r border-slate-200 z-[70] flex flex-col transform transition-transform duration-250 ease-[cubic-bezier(0.23,1,0.32,1)] ${isOpen ? 'translate-x-0' : '-translate-x-full'} shadow-[20px_0_60px_rgba(0,0,0,0.1)]`}
                 style={{ willChange: 'transform' }}
             >
                 {/* ① ヘッダー */}
-                <div className="flex-shrink-0 flex items-center justify-between px-4 min-h-[56px] border-b border-slate-100 bg-white/50">
+                <div className="flex-shrink-0 flex items-center justify-between px-4 min-h-[56px] border-b border-slate-100 bg-white">
                     <span className="font-bold text-lg text-slate-800">メニュー</span>
                     <Button
                         variant="ghost"
@@ -128,7 +128,7 @@ export function MobileSidebar({ userProfile }: { userProfile: any }) {
                             <NavItem href="/admin/reports" icon={Calendar} label="実施メモ一覧" isActive={pathname?.startsWith('/admin/reports')} />
 
                             <NavHeading>運営管理</NavHeading>
-                            <NavItem href="/admin/inquiries" icon={MessageCircle} label="お問い合わせ" isActive={pathname?.startsWith('/admin/inquiries')} />
+                            <NavItem href="/admin/inquiries" icon={MessageCircle} label="リード管理" isActive={pathname?.startsWith('/admin/inquiries')} />
                             <NavItem href="/admin/schedule" icon={Calendar} label="全体スケジュール" isActive={pathname?.startsWith('/admin/schedule')} />
                             <NavItem href="/customers" icon={Users} label="会員管理" isActive={pathname?.startsWith('/customers')} />
                             <NavItem href="/admin/trio" icon={Crown} label="TRIO管理" isActive={pathname?.startsWith('/admin/trio')} />
@@ -169,7 +169,7 @@ export function MobileSidebar({ userProfile }: { userProfile: any }) {
                 </nav>
 
                 {/* ③ ログアウト（flex-shrink-0 → 常に最下部・重なりゼロ） */}
-                <div className="flex-shrink-0 border-t border-slate-100 bg-slate-50/90 safe-bottom">
+                <div className="flex-shrink-0 border-t border-slate-100 bg-slate-50 safe-bottom">
                     <form action="/auth/signout" method="post" className="p-3">
                         <button
                             type="submit"

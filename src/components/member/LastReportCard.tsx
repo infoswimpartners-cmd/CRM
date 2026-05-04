@@ -1,85 +1,72 @@
-import Link from 'next/link'
-import { format } from 'date-fns'
-import { ja } from 'date-fns/locale'
-import { FileText, ArrowRight, MessageCircle } from 'lucide-react'
-import { cn } from '@/lib/utils'
+'use client';
+
+import React from 'react';
+import { MessageSquare, ArrowRight, Star } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import Link from 'next/link';
 
 interface LastReportCardProps {
-    report: {
-        id: string
-        lesson_date: string
-        coach_comment?: string | null
-        menu_description?: string | null
-        profiles?: { full_name: string | null } | null // joined coach profile
-    } | null
+    report: any;
 }
 
+/**
+ * LastReportCard
+ * 明るくクールなフィードバック表示
+ */
 export default function LastReportCard({ report }: LastReportCardProps) {
     if (!report) {
         return (
-            <div className="glass-card p-6 bg-gradient-to-br from-indigo-50/50 to-white/50 dark:from-gray-800/50 dark:to-gray-900/50">
-                <div className="flex items-center gap-3 mb-4">
-                    <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg">
-                        <FileText className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-                    </div>
-                    <h3 className="font-bold text-gray-800 dark:text-gray-100">最新のフィードバック</h3>
+            <Card className="bg-white border-slate-100 rounded-[2.5rem] p-10 flex flex-col items-center text-center gap-6 shadow-[0_20px_60px_rgba(0,0,0,0.03)] border">
+                <div className="w-16 h-16 rounded-2xl bg-slate-50 flex items-center justify-center border border-slate-100 shadow-sm">
+                    <MessageSquare className="w-8 h-8 text-slate-300 opacity-50" />
                 </div>
-                <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">まだフィードバックはありません。</p>
-            </div>
-        )
+                <div className="space-y-2">
+                    <h3 className="text-xl font-black text-slate-800 tracking-tight">レポートはまだありません</h3>
+                    <p className="text-xs text-slate-400 font-bold leading-relaxed px-4">
+                        レッスン終了後、コーチからのフィードバックがここに表示されます。
+                    </p>
+                </div>
+            </Card>
+        );
     }
 
-    const date = new Date(report.lesson_date)
-    const coachName = report.profiles?.full_name || '担当コーチ'
-
     return (
-        <div className="glass-card relative overflow-hidden group border-white/40 bg-white/60">
-            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                <FileText className="w-24 h-24 text-blue-600 transform rotate-12" />
-            </div>
+        <Card className="group relative overflow-hidden bg-white border border-slate-100 rounded-[2.5rem] p-10 transition-all duration-1000 shadow-[0_30px_80px_rgba(0,0,0,0.05)] hover:shadow-[0_40px_100px_rgba(0,0,0,0.08)]">
+            {/* Decoration */}
+            <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-full blur-[60px] -mr-16 -mt-16 opacity-60" />
+            
+            <div className="relative z-10 space-y-6">
+                <div className="flex items-center justify-between">
+                    <div className="inline-flex items-center gap-2.5 px-4 py-2 bg-indigo-50 border border-indigo-100 rounded-full text-indigo-600">
+                        <Star className="w-3.5 h-3.5 fill-indigo-600" />
+                        <span className="text-[10px] font-black uppercase tracking-widest">Latest Feedback</span>
+                    </div>
+                </div>
 
-            <div className="relative p-6 space-y-4">
-                {/* Header */}
-                <div className="flex justify-between items-start">
+                <div className="space-y-4">
+                    <p className="text-base font-black text-slate-800 leading-relaxed line-clamp-3 tracking-tight">
+                        {report.feedback_text || 'フィードバックの準備中です。'}
+                    </p>
                     <div className="flex items-center gap-3">
-                        <div className="p-2.5 bg-blue-500 text-white rounded-2xl shadow-lg shadow-blue-100">
-                            <FileText className="w-5 h-5" />
+                        <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center">
+                            <span className="text-[10px] font-black text-slate-400 uppercase">Coach</span>
                         </div>
-                        <div>
-                            <h3 className="font-black text-gray-800 tracking-tight">最新のフィードバック</h3>
-                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
-                                {format(date, 'yyyy.MM.dd (E)', { locale: ja })} • {coachName}
-                            </p>
-                        </div>
+                        <span className="text-sm font-bold text-slate-500">{report.profiles?.full_name} コーチ</span>
                     </div>
                 </div>
 
-                {/* Coach Comment Section */}
-                <div className="bg-white/40 backdrop-blur-sm rounded-2xl p-4 border border-white/60 shadow-inner">
-                    <div className="flex items-start gap-3">
-                        <MessageCircle className="w-4 h-4 text-blue-500 mt-1 shrink-0" />
-                        <div className="space-y-1">
-                            <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest leading-none mb-1">コーチからのメッセージ</p>
-                            <p className="text-sm text-gray-700 font-medium whitespace-pre-wrap leading-relaxed">
-                                {report.coach_comment || "コメントはありません。"}
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Footer / Link */}
-                <div className="pt-2">
-                    <Link
-                        href="/member/reports"
-                        className="flex items-center justify-between w-full p-4 bg-white/80 hover:bg-blue-600 hover:text-white transition-all rounded-2xl border border-white/60 shadow-sm group/link active:scale-95"
-                    >
-                        <span className="text-sm font-black text-gray-600 group-hover/link:text-white transition-colors">
-                            すべての履歴を見る
-                        </span>
-                        <ArrowRight className="w-4 h-4 text-gray-300 group-hover/link:text-white transition-all transform group-hover/link:translate-x-1" />
+                <Button 
+                    asChild 
+                    variant="outline"
+                    className="w-full h-14 rounded-2xl border-slate-100 bg-slate-50 hover:bg-white hover:border-indigo-200 text-slate-600 font-black text-xs uppercase tracking-widest transition-all group/btn"
+                >
+                    <Link href={`/member/reports`}>
+                        レポート詳細を見る
+                        <ArrowRight className="ml-2 w-4 h-4 group-hover/btn:translate-x-1 transition-transform text-indigo-500" />
                     </Link>
-                </div>
+                </Button>
             </div>
-        </div>
-    )
+        </Card>
+    );
 }

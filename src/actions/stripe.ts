@@ -244,6 +244,16 @@ export async function assignMembership(studentId: string, membershipTypeId: stri
             return { success: false, error: 'この会員種別はStripeと連携されていません。' }
         }
 
+        // --- ENVIRONMENT MAPPING (TEST MODE ONLY) ---
+        let targetPriceId = membership.stripe_price_id;
+        const isTestMode = process.env.NODE_ENV !== 'production' && !targetPriceId.startsWith('price_live');
+        
+        // テスト環境で本番用価格ID（price_1TN...）を検知した場合、テスト用IDに差し替える
+        if (isTestMode && targetPriceId === 'price_1TNtfKP0UQGtpYXmwzZ3Bp4s') {
+            targetPriceId = 'price_1SwGXsP0UQGtpYXmHVVBOKjm'; // テスト用: テスト月2回会員
+            debugLog(`[AssignMembership] Mapping Live Price to Test Price: ${targetPriceId}`);
+        }
+
         let subscriptionId = student.stripe_subscription_id
 
         // Validate current subscription
@@ -266,7 +276,7 @@ export async function assignMembership(studentId: string, membershipTypeId: stri
             await stripe.subscriptions.update(subscriptionId, {
                 items: [{
                     id: itemId,
-                    price: membership.stripe_price_id
+                    price: targetPriceId
                 }],
                 // 来月からの場合は案分なし（次期から適用）、今すぐの場合は即時適用（差額あり）
                 proration_behavior: startTiming === 'next' ? 'none' : 'always_invoice'
@@ -286,7 +296,7 @@ export async function assignMembership(studentId: string, membershipTypeId: stri
 
             const subscriptionParams: any = {
                 customer: student.stripe_customer_id,
-                items: [{ price: membership.stripe_price_id }],
+                items: [{ price: targetPriceId }],
                 billing_cycle_anchor: anchorTimestamp,
                 proration_behavior: 'none',
                 payment_behavior: 'default_incomplete',

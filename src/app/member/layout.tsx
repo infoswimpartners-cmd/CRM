@@ -8,7 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getCachedMemberData } from "@/lib/member-data";
 
 export default async function MembersLayout({ children }: { children: ReactNode }) {
-    const { user, student, isTrioMember } = await getCachedMemberData();
+    const { user, student, isTrioMember, isPersonalMember } = await getCachedMemberData();
     const supabase = await createClient();
 
     let unreadCount = 0;
