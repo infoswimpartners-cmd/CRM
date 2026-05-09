@@ -344,7 +344,7 @@ export async function createLessonSchedule(params: CreateLessonScheduleParams) {
                     let adminEventId: string | null = null;
                     if (adminRefreshToken) {
                         adminEventId = await createCalendarEvent(adminRefreshToken, {
-                            summary: `${params.title}${params.coach_id ? ` (担当: ${params.coach_id})` : ''}`,
+                            summary: params.title,
                             description: params.notes || '',
                             location: params.location || '',
                             start: params.start_time,
