@@ -322,23 +322,43 @@ export async function createLessonSchedule(params: CreateLessonScheduleParams) {
 
                 // 5. Google Calendar Sync
                 try {
-                    const { createCalendarEvent, getAdminRefreshToken } = await import('@/lib/google-calendar')
-                    const adminRefreshToken = await getAdminRefreshToken(supabaseAdmin)
+                    const { createCalendarEvent, getAdminRefreshToken, getCoachRefreshToken } = await import('@/lib/google-calendar')
+                    
+                    // a) Coach's individual calendar sync
+                    let coachEventId: string | null = null;
+                    if (params.coach_id) {
+                        const coachRefreshToken = await getCoachRefreshToken(supabaseAdmin, params.coach_id)
+                        if (coachRefreshToken) {
+                            coachEventId = await createCalendarEvent(coachRefreshToken, {
+                                summary: params.title,
+                                description: params.notes || '',
+                                location: params.location || '',
+                                start: params.start_time,
+                                end: params.end_time,
+                            })
+                        }
+                    }
 
+                    // b) Admin's master calendar sync
+                    const adminRefreshToken = await getAdminRefreshToken(supabaseAdmin)
+                    let adminEventId: string | null = null;
                     if (adminRefreshToken) {
-                        const newEventId = await createCalendarEvent(adminRefreshToken, {
-                            summary: params.title,
+                        adminEventId = await createCalendarEvent(adminRefreshToken, {
+                            summary: `${params.title}${params.coach_id ? ` (担当: ${params.coach_id})` : ''}`,
                             description: params.notes || '',
                             location: params.location || '',
                             start: params.start_time,
                             end: params.end_time,
                         })
-                        if (newEventId) {
-                            await supabaseAdmin
-                                .from('lesson_schedules')
-                                .update({ google_event_id: newEventId })
-                                .eq('id', inserted.id)
-                        }
+                    }
+
+                    // Store event ID (prioritize coach's for their reference, or admin's if only that exists)
+                    const finalEventId = coachEventId || adminEventId
+                    if (finalEventId) {
+                        await supabaseAdmin
+                            .from('lesson_schedules')
+                            .update({ google_event_id: finalEventId })
+                            .eq('id', inserted.id)
                     }
                 } catch (calErr) {
                     console.error('[createLessonSchedule] Googleカレンダー同期失敗:', calErr)

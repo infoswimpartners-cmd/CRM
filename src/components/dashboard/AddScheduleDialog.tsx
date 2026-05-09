@@ -1,4 +1,5 @@
 'use client'
+// Force reload: 2026-05-09T10:20:00
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -14,7 +15,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { CalendarIcon, Loader2, ExternalLink, Ticket, Trash2, PlusCircle } from 'lucide-react'
+import { CalendarIcon, Loader2, ExternalLink as ExternalLinkIcon, Ticket, Trash2, PlusCircle } from 'lucide-react'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
 import { Calendar } from '@/components/ui/calendar'
@@ -115,6 +116,7 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
     const [currentCount, setCurrentCount] = useState<number>(0)
     const [rolloverCount, setRolloverCount] = useState<number>(0)
     const [currentTickets, setCurrentTickets] = useState<number>(0)
+    const [isGoogleLinked, setIsGoogleLinked] = useState(false)
     const [checkingStatus, setCheckingStatus] = useState(false)
 
     // Initial Data Fetch (User Role, Coaches, Lesson Masters)
@@ -148,6 +150,10 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
                     .order('full_name') // access check?
 
                 if (allCoaches) setCoaches(allCoaches as any)
+
+                if (profile?.google_refresh_token) {
+                    setIsGoogleLinked(true)
+                }
             }
 
             // Fetch Masters (Static Import)
@@ -483,6 +489,21 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
                             </div>
                         )}
 
+                        {/* Google Calendar Sync Status (Admin only) */}
+                        {isAdmin && !isGoogleLinked && (
+                            <div className="p-3 bg-amber-50 border border-amber-200 rounded-md flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 text-amber-700">
+                                    <CalendarIcon className="w-4 h-4" />
+                                    <span className="text-xs font-bold">Googleカレンダー未連携</span>
+                                </div>
+                                <Button variant="ghost" size="sm" asChild className="h-7 text-xs text-amber-700 hover:text-amber-800 hover:bg-amber-100 p-0 px-2">
+                                    <Link href={`/api/google/auth?state=${encodeURIComponent('/coach/schedule')}`}>
+                                        設定する <ExternalLinkIcon className="w-3 h-3 ml-1" />
+                                    </Link>
+                                </Button>
+                            </div>
+                        )}
+
                         <div className="grid gap-2">
                             <Label>生徒 <span className="text-red-500">*</span></Label>
                             <Select value={studentId} onValueChange={(val) => {
@@ -771,9 +792,25 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
                             <p className="text-sm text-green-700">
                                 {isTrialMode
                                     ? '体験レッスンを登録しました。請求管理から承認を行ってください。'
-                                    : 'スケジュールを保存し、Googleカレンダーに自動同期しました。'}
+                                    : (isGoogleLinked 
+                                        ? 'スケジュールを保存し、Googleカレンダーに自動同期しました。'
+                                        : 'スケジュールを保存しました。')}
                             </p>
                         </div>
+
+                        {/* Google Calendar Manual Add Button */}
+                        {createdEventUrl && createdEventUrl !== 'success' && (
+                            <div className="flex flex-col items-center gap-3 p-4 border rounded-xl bg-slate-50">
+                                <p className="text-xs text-slate-500 font-medium">自分のGoogleカレンダーに追加する</p>
+                                <Button asChild className="w-full bg-white text-slate-700 border hover:bg-slate-50 shadow-sm gap-2">
+                                    <a href={createdEventUrl} target="_blank" rel="noopener noreferrer">
+                                        <CalendarIcon className="w-4 h-4 text-blue-500" />
+                                        Googleカレンダーに追加
+                                        <ExternalLinkIcon className="w-3 h-3 text-slate-400" />
+                                    </a>
+                                </Button>
+                            </div>
+                        )}
 
                         <div className="pt-4 flex justify-center">
                             <Button variant="outline" onClick={handleClose}>

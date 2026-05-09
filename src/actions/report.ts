@@ -108,7 +108,7 @@ export async function submitLessonReport(values: FormValues) {
                 // レッスン名・コーチ名を取得
                 const { data: lessonMaster } = await supabase
                     .from('lesson_masters')
-                    .select('name')
+                    .select('name, is_trial')
                     .eq('id', data.lesson_master_id)
                     .single()
 
@@ -140,6 +140,35 @@ export async function submitLessonReport(values: FormValues) {
         } catch (emailError) {
             console.error('Error sending report notification email:', emailError)
             // メール失敗しても処理を続行
+        }
+
+        // 5. 体験レッスンの場合、生徒のステータスを更新
+        if (data.student_id) {
+            const { createAdminClient } = await import('@/lib/supabase/admin')
+            const supabaseAdmin = createAdminClient()
+
+            // lesson_masters の情報を取得（メール通知ブロックの外で取得している場合もあるが、確実を期す）
+            const { data: masterInfo } = await supabaseAdmin
+                .from('lesson_masters')
+                .select('is_trial')
+                .eq('id', data.lesson_master_id)
+                .single()
+
+            if (masterInfo?.is_trial) {
+                const { data: student } = await supabaseAdmin
+                    .from('students')
+                    .select('status')
+                    .eq('id', data.student_id)
+                    .single()
+
+                if (student?.status === 'trial_confirmed') {
+                    await supabaseAdmin
+                        .from('students')
+                        .update({ status: 'trial_done' })
+                        .eq('id', data.student_id)
+                    console.log(`[Status Update] Student ${data.student_id} status updated to trial_done`)
+                }
+            }
         }
 
         revalidatePath('/coach')
@@ -346,15 +375,38 @@ export async function submitPublicLessonReport(values: PublicFormValues) {
 
         if (error) throw error
 
-        // 3. 管理者通知（メール設定のlesson_report_sentトリガー経由）
+        const { data: lessonMaster } = await supabase
+            .from('lesson_masters')
+            .select('name, is_trial')
+            .eq('id', data.lesson_master_id)
+            .single()
+
+        // 3. 体験レッスンの場合、生徒のステータスを更新
+        if (data.student_id) {
+            const { createAdminClient } = await import('@/lib/supabase/admin')
+            const supabaseAdmin = createAdminClient()
+
+            if (lessonMaster?.is_trial) {
+                const { data: student } = await supabaseAdmin
+                    .from('students')
+                    .select('status')
+                    .eq('id', data.student_id)
+                    .single()
+
+                if (student?.status === 'trial_confirmed') {
+                    await supabaseAdmin
+                        .from('students')
+                        .update({ status: 'trial_done' })
+                        .eq('id', data.student_id)
+                    console.log(`[Public Status Update] Student ${data.student_id} status updated to trial_done`)
+                }
+            }
+        }
+
+        // 4. 管理者通知（メール設定のlesson_report_sentトリガー経由）
         const toAddress = process.env.REPORT_NOTIFICATION_EMAIL || process.env.SMTP_USER
 
         if (toAddress) {
-            const { data: lessonMaster } = await supabase
-                .from('lesson_masters')
-                .select('name')
-                .eq('id', data.lesson_master_id)
-                .single()
 
             const { data: coach } = await supabase
                 .from('profiles')
@@ -509,7 +561,7 @@ export async function submitAdminProxyReport(values: AdminProxyValues) {
     // 5. レッスン単価を取得して最終金額を計算
     const { data: master } = await supabaseAdmin
         .from('lesson_masters')
-        .select('unit_price')
+        .select('unit_price, is_trial')
         .eq('id', data.lesson_master_id)
         .single()
     const finalPrice = (master?.unit_price ?? data.price) + facilityFee
@@ -546,6 +598,23 @@ export async function submitAdminProxyReport(values: AdminProxyValues) {
         })
 
         if (error) throw new Error(error.message)
+
+        // 8. 体験レッスンの場合、生徒のステータスを更新
+        if (data.student_id && master?.is_trial) {
+            const { data: student } = await supabaseAdmin
+                .from('students')
+                .select('status')
+                .eq('id', data.student_id)
+                .single()
+
+            if (student?.status === 'trial_confirmed') {
+                await supabaseAdmin
+                    .from('students')
+                    .update({ status: 'trial_done' })
+                    .eq('id', data.student_id)
+                console.log(`[Admin Proxy Status Update] Student ${data.student_id} status updated to trial_done`)
+            }
+        }
 
         revalidatePath('/admin/reports')
         return { success: true }

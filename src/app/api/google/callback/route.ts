@@ -6,13 +6,14 @@ export async function GET(req: NextRequest) {
     const searchParams = req.nextUrl.searchParams;
     const code = searchParams.get('code');
     const error = searchParams.get('error');
+    const state = searchParams.get('state') || '/admin/settings'; // Default redirect
 
     if (error) {
-        return NextResponse.redirect(new URL('/admin/settings?error=google_auth_failed', req.url));
+        return NextResponse.redirect(new URL(`${state}?error=google_auth_failed`, req.url));
     }
 
     if (!code) {
-        return NextResponse.redirect(new URL('/admin/settings?error=no_code', req.url));
+        return NextResponse.redirect(new URL(`${state}?error=no_code`, req.url));
     }
 
     try {
@@ -41,7 +42,7 @@ export async function GET(req: NextRequest) {
 
             if (updateError) {
                 console.error('Failed to update profile tokens:', updateError);
-                return NextResponse.redirect(new URL('/admin/settings?error=db_update_failed', req.url));
+                return NextResponse.redirect(new URL(`${state}?error=db_update_failed`, req.url));
             }
         } else {
              // If they already linked and clicked again without prompt=consent forcing a new one, 
@@ -49,10 +50,10 @@ export async function GET(req: NextRequest) {
              console.log('No refresh token to update (already linked).')
         }
 
-        return NextResponse.redirect(new URL('/admin/settings?success=google_connected', req.url));
+        return NextResponse.redirect(new URL(`${state}?success=google_connected`, req.url));
 
     } catch (err) {
         console.error('Google Auth Callback Error:', err);
-        return NextResponse.redirect(new URL('/admin/settings?error=exception', req.url));
+        return NextResponse.redirect(new URL(`${state}?error=exception`, req.url));
     }
 }

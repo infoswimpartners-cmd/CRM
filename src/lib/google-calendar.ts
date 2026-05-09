@@ -7,7 +7,7 @@ export const GOOGLE_OAUTH_CONFIG = {
     scope: 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly offline'
 };
 
-export function getGoogleAuthURL() {
+export function getGoogleAuthURL(state?: string) {
     const params = new URLSearchParams({
         client_id: GOOGLE_OAUTH_CONFIG.clientId!,
         redirect_uri: GOOGLE_OAUTH_CONFIG.redirectUri,
@@ -16,6 +16,9 @@ export function getGoogleAuthURL() {
         access_type: 'offline', // リフレッシュトークン取得に必須
         prompt: 'consent', // リフレッシュトークンが確実に返るよう強制
     });
+    if (state) {
+        params.set('state', state);
+    }
     return `${GOOGLE_OAUTH_CONFIG.authUrl}?${params.toString()}`;
 }
 
@@ -252,6 +255,24 @@ export async function getAdminRefreshToken(supabaseAdmin: any): Promise<string |
         return data?.google_refresh_token || null;
     } catch (e) {
         console.error('[getAdminRefreshToken] Error:', e);
+        return null;
+    }
+}
+
+/**
+ * 指定されたコーチのリフレッシュトークンをDBから取得するヘルパー
+ */
+export async function getCoachRefreshToken(supabaseAdmin: any, coachId: string): Promise<string | null> {
+    try {
+        const { data } = await supabaseAdmin
+            .from('profiles')
+            .select('google_refresh_token')
+            .eq('id', coachId)
+            .single();
+
+        return data?.google_refresh_token || null;
+    } catch (e) {
+        console.error('[getCoachRefreshToken] Error:', e);
         return null;
     }
 }

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Lock } from 'lucide-react'
 import Link from 'next/link'
 import { BankInfoForm } from '@/components/settings/BankInfoForm'
+import { GoogleCalendarSettings } from '@/components/settings/GoogleCalendarSettings'
 
 export default async function SettingsPage() {
     const supabase = await createClient()
@@ -93,6 +94,11 @@ export default async function SettingsPage() {
                 </Card>
 
 
+
+                <GoogleCalendarSettings 
+                    initialIsLinked={!!profile.google_refresh_token} 
+                    redirectPath="/settings"
+                />
 
                 <BankInfoForm />
             </div>

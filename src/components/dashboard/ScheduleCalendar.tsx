@@ -98,6 +98,8 @@ export function ScheduleCalendar({ adminView = false }: ScheduleCalendarProps) {
     // Admin Filter State
     const [selectedCoachFilter, setSelectedCoachFilter] = React.useState<string>('all')
     const [coaches, setCoaches] = React.useState<{ id: string, full_name: string }[]>([])
+    const [isGoogleLinked, setIsGoogleLinked] = React.useState(false)
+    const [currentUserProfile, setCurrentUserProfile] = React.useState<any>(null)
 
     // View Mode State
     const [viewMode, setViewMode] = React.useState<'calendar' | 'list'>('calendar')
@@ -111,6 +113,27 @@ export function ScheduleCalendar({ adminView = false }: ScheduleCalendarProps) {
         setSelectedSchedule(schedule)
         setIsEditOpen(true)
     }
+
+    // Fetch Current User Profile & Link Status
+    React.useEffect(() => {
+        const fetchProfile = async () => {
+            const supabase = createClient()
+            const { data: { user } } = await supabase.auth.getUser()
+            if (user) {
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', user.id)
+                    .single()
+                
+                if (profile) {
+                    setCurrentUserProfile(profile)
+                    setIsGoogleLinked(!!profile.google_refresh_token)
+                }
+            }
+        }
+        fetchProfile()
+    }, [])
 
     // Fetch Coaches (Admin Only)
     React.useEffect(() => {
@@ -352,6 +375,22 @@ export function ScheduleCalendar({ adminView = false }: ScheduleCalendarProps) {
                     </button>
                 </div>
 
+                {/* Prominent Google Link Button (Coach only, not linked) */}
+                {!adminView && !isGoogleLinked && (
+                    <div className="flex-1">
+                        <Button 
+                            variant="outline" 
+                            className="w-full h-11 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200 text-amber-700 font-bold hover:from-amber-100 hover:to-orange-100 shadow-sm animate-pulse"
+                            asChild
+                        >
+                            <a href={`/api/google/auth?state=${encodeURIComponent('/coach/schedule')}`}>
+                                <CalendarPlus className="mr-2 h-5 w-5" />
+                                Googleカレンダー自動同期を有効にする
+                            </a>
+                        </Button>
+                    </div>
+                )}
+
                 <div className="flex items-center gap-2 w-full sm:w-auto">
                     {/* Admin: Coach Filter */}
                     {adminView && (
@@ -370,6 +409,8 @@ export function ScheduleCalendar({ adminView = false }: ScheduleCalendarProps) {
                         </div>
                     )}
 
+
+                    {/* Hidden if linked as per request */}
 
                     {/* Manual Add Button */}
                     <Button

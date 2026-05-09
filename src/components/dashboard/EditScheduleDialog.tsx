@@ -1,4 +1,5 @@
 'use client'
+// Force reload: 2026-05-09T10:20:00
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -14,7 +15,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { CalendarIcon, Loader2, Trash2 } from 'lucide-react'
+import { CalendarIcon, Loader2, Trash2, ExternalLink as ExternalLinkIcon } from 'lucide-react'
 import { format } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
@@ -79,6 +80,7 @@ export function EditScheduleDialog({ schedule, open, onOpenChange, onSuccess }: 
     const [isDeleting, setIsDeleting] = useState(false)
     const [showDeleteAlert, setShowDeleteAlert] = useState(false)
     const [students, setStudents] = useState<Student[]>([])
+    const [isGoogleLinked, setIsGoogleLinked] = useState(false)
     const router = useRouter()
 
     // Admin & Coach State
@@ -128,6 +130,10 @@ export function EditScheduleDialog({ schedule, open, onOpenChange, onSuccess }: 
                     .select('id, full_name')
 
                 if (allCoaches) setCoaches(allCoaches)
+
+                if (profile?.google_refresh_token) {
+                    setIsGoogleLinked(true)
+                }
             }
         }
         init()
@@ -278,6 +284,28 @@ export function EditScheduleDialog({ schedule, open, onOpenChange, onSuccess }: 
         }
     }
 
+    const generateGoogleCalendarUrl = () => {
+        if (!date) return '#'
+        const startDateTime = new Date(date)
+        const [sh, sm] = startTime.split(':').map(Number)
+        startDateTime.setHours(sh, sm, 0)
+
+        const endDateTime = new Date(date)
+        const [eh, em] = endTime.split(':').map(Number)
+        endDateTime.setHours(eh, em, 0)
+
+        const toGCalString = (d: Date) => {
+            return d.toISOString().replace(/-|:|\./g, '').substring(0, 15) + 'Z'
+        }
+
+        const dates = `${toGCalString(startDateTime)}/${toGCalString(endDateTime)}`
+        const details = encodeURIComponent(notes || '')
+        const txt = encodeURIComponent(title)
+        const loc = encodeURIComponent(location)
+
+        return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${txt}&dates=${dates}&details=${details}&location=${loc}`
+    }
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!schedule) return
@@ -378,6 +406,20 @@ export function EditScheduleDialog({ schedule, open, onOpenChange, onSuccess }: 
                                 </Select>
                             </div>
                         )}
+
+                        {/* Google Calendar Link (Manual) */}
+                        <div className="flex items-center justify-between p-3 border rounded-lg bg-slate-50">
+                            <div className="flex items-center gap-2">
+                                <CalendarIcon className="w-4 h-4 text-blue-500" />
+                                <span className="text-xs font-bold text-slate-700">Googleカレンダーに追加</span>
+                            </div>
+                            <Button variant="outline" size="sm" asChild className="h-8 text-xs gap-1 bg-white">
+                                <a href={generateGoogleCalendarUrl()} target="_blank" rel="noopener noreferrer">
+                                    カレンダーを開く
+                                    <ExternalLinkIcon className="w-3 h-3 text-slate-400" />
+                                </a>
+                            </Button>
+                        </div>
 
                         <div className="grid gap-2">
                             <Label>生徒</Label>
