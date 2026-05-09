@@ -118,7 +118,7 @@ export function EditScheduleDialog({ schedule, open, onOpenChange, onSuccess }: 
             // Check Role
             const { data: profile } = await supabase
                 .from('profiles')
-                .select('role')
+                .select('role, google_refresh_token')
                 .eq('id', user.id)
                 .single()
 
