@@ -11,9 +11,11 @@ if (!secretKey) {
 }
 
 export const stripe = new Stripe(secretKey || 'missing_key_restart_needed', {
-    apiVersion: '2023-10-16', 
+    // TypeScriptの型定義に合わせる
+    apiVersion: '2025-12-15.clover' as any, 
     typescript: true,
 });
+
 
 
 
