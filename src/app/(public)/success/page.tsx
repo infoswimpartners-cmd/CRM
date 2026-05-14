@@ -3,15 +3,28 @@ import { Suspense } from 'react'
 import Link from 'next/link'
 import { CheckCircle2, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { stripe } from '@/lib/stripe'
 
 export default async function SuccessPage({
     searchParams,
 }: {
     searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
-    await searchParams // Unused but need to await for consistency if TypeScript complains or for future use
-    // If we wanted to show specific details, we could fetch the session from Stripe here based on session_id
-    // For now, a generic success message is sufficient as the email confirms details.
+    const params = await searchParams
+    const sessionId = typeof params.session_id === 'string' ? params.session_id : null
+    
+    let type = 'unknown'
+    if (sessionId) {
+        try {
+            const session = await stripe.checkout.sessions.retrieve(sessionId)
+            type = session.metadata?.type || 'unknown'
+        } catch (e) {
+            console.error('Failed to fetch stripe session:', e)
+        }
+    }
+
+    const isTrial = type === 'trial_fee' || type === 'trio_trial'
+    const isTicket = type === 'ticket_purchase' || type === 'trio_ticket_purchase'
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-cyan-50 to-blue-50 flex items-center justify-center p-4">
@@ -25,7 +38,13 @@ export default async function SuccessPage({
                     <div className="space-y-2">
                         <h1 className="text-2xl font-bold text-gray-900">お支払いが完了しました</h1>
                         <p className="text-gray-600 leading-relaxed">
-                            体験レッスンのお申し込みありがとうございます。<br />
+                            {isTrial ? (
+                                <>体験レッスンのお申し込みありがとうございます。<br /></>
+                            ) : isTicket ? (
+                                <>チケットのご購入ありがとうございます。<br /></>
+                            ) : (
+                                <>ご利用ありがとうございます。<br /></>
+                            )}
                             ご登録のメールアドレスに詳細をお送りしましたのでご確認ください。
                         </p>
                     </div>

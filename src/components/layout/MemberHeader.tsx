@@ -56,7 +56,7 @@ export default function MemberHeader({ unreadCount = 0, studentName, planName, i
                                 {getPageTitle()}
                             </span>
                             <h2 className="font-black text-slate-900 text-xl md:text-2xl tracking-tighter leading-none mt-1">
-                                {studentName || 'Explorer'} <span className="text-slate-300 font-medium">様</span>
+                                {studentName || 'ゲスト'} <span className="text-slate-300 font-medium">様</span>
                             </h2>
                         </Link>
                         

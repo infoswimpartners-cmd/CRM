@@ -23,7 +23,7 @@ async function requireAdmin() {
 }
 
 // 1. スロット作成
-export async function createTrioSlot(startAt: string, endAt: string): Promise<{ success: boolean; error?: string }> {
+export async function createTrioSlot(startAt: string, endAt: string, location: string = 'ヤエスク'): Promise<{ success: boolean; error?: string }> {
   try {
     const supabase = await createClient();
     const { error } = await supabase
@@ -31,6 +31,7 @@ export async function createTrioSlot(startAt: string, endAt: string): Promise<{ 
       .insert([{
         start_at: startAt,
         end_at: endAt,
+        location: location,
         status: 'entry',
         reserved_count: 0,
         is_facility_booked: false
@@ -188,5 +189,24 @@ export async function cancelTrioEntry(entryId: string, slotId: string): Promise<
   } catch (err: any) {
     console.error('cancelTrioEntry error:', err);
     return { success: false, error: 'キャンセルの処理に失敗しました。' };
+  }
+}
+
+// 7. LINE通知テスト送信
+export async function sendTrioTestLineNotification(lineUserId: string, message: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    await requireAdmin();
+    
+    if (!lineUserId || !message) {
+      return { success: false, error: '送信先IDとメッセージは必須です。' };
+    }
+
+    const { lineService } = await import('@/lib/line');
+    await lineService.pushMessage(lineUserId, message);
+    
+    return { success: true };
+  } catch (err: any) {
+    console.error('sendTrioTestLineNotification error:', err);
+    return { success: false, error: err.message || '送信に失敗しました。' };
   }
 }

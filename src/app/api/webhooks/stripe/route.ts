@@ -81,9 +81,9 @@ export async function POST(req: NextRequest) {
                             : '未定'
                         const lessonLocation = location || '未定'
 
-                        // 4. Send Customer Email (trial_lesson_reserved trigger)
+                        // 4. Send Customer Email (trial_payment_completed trigger)
                         await emailService.sendTriggerEmail(
-                            'trial_lesson_reserved',
+                            'trial_payment_completed',
                             student.contact_email,
                             {
                                 full_name: student.full_name,

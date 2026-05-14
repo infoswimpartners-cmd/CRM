@@ -5,8 +5,10 @@ import {
   getTrioSlots, 
   getDetailedStudentEntries,
   confirmTrioSlot,
-  getTrioPortalData
+  getTrioPortalData,
+  verifyTrioPayment
 } from '@/actions/trio_matching';
+import TrioAccessModal from '@/components/trio/TrioAccessModal';
 import { getTrioOnboardingStatus, createTrioEnrollmentSession } from '@/actions/trio_onboarding';
 import { createTrioTicketCheckoutSession } from '@/actions/stripe';
 import { TrioSlot } from '@/types/trio';
@@ -39,7 +41,9 @@ function TrioPortalContent() {
   
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
-  const [userEntrySlotIds, setUserEntrySlotIds] = useState<string[]>([]);
+  const [userPaidSlotIds, setUserPaidSlotIds] = useState<string[]>([]);
+  const [userPendingSlotIds, setUserPendingSlotIds] = useState<string[]>([]);
+  const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
   const [userType, setUserType] = useState<UserType>('PATTERN_A');
   const [ticketBalance, setTicketBalance] = useState(0);
   const [nextSession, setNextSession] = useState<any>(null);
@@ -76,8 +80,17 @@ function TrioPortalContent() {
           setStudentData(student);
           setTicketBalance(student.trio_ticket_balance || 0);
 
-          const entryIds = entries.map((e: any) => e.slot?.id).filter(Boolean);
-          setUserEntrySlotIds(entryIds);
+          const paidIds = entries
+            .filter((e: any) => e.payment_status === 'paid')
+            .map((e: any) => e.slot?.id)
+            .filter(Boolean);
+          setUserPaidSlotIds(paidIds);
+
+          const pendingIds = entries
+            .filter((e: any) => e.payment_status === 'pending')
+            .map((e: any) => e.slot?.id)
+            .filter(Boolean);
+          setUserPendingSlotIds(pendingIds);
 
           if (student.is_trio) {
             setUserType('PATTERN_C');
@@ -101,7 +114,7 @@ function TrioPortalContent() {
                 id: slotData.id,
                 date: startDate.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' }),
                 time: startDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
-                location: 'ヤエスク',
+                location: slotData.location || 'ヤエスク',
                 reservedCount: displayCount
               });
             }
@@ -110,7 +123,8 @@ function TrioPortalContent() {
           }
       } else {
         setNextSession(null);
-        setUserEntrySlotIds([]);
+        setUserPaidSlotIds([]);
+        setUserPendingSlotIds([]);
         setStudentData(null);
       }
     } catch (err: any) {
@@ -127,15 +141,36 @@ function TrioPortalContent() {
     fetchData();
   }, [session]);
 
+  // Handle post-login intent restoration
+  useEffect(() => {
+    if (isPortalLoggedIn && !loading) {
+      const intentSlotId = localStorage.getItem('trio_intent_slot_id');
+      if (intentSlotId) {
+        localStorage.removeItem('trio_intent_slot_id');
+        setSelectedSlotId(intentSlotId);
+        setIsRegisterModalOpen(true);
+      }
+    }
+  }, [isPortalLoggedIn, loading]);
+
   useEffect(() => {
     const paymentStatus = searchParams.get('payment');
+    const sessionId = searchParams.get('session_id');
+
     if (paymentStatus === 'success' && !hasShownSuccess.current) {
       hasShownSuccess.current = true;
-      toast.success('エントリーが完了しました！', {
-        description: 'ダッシュボードから詳細を確認できます。',
-        duration: 5000,
-      });
-      router.replace('/trio', { scroll: false });
+      const verify = async () => {
+        if (sessionId) {
+          await verifyTrioPayment(sessionId);
+        }
+        toast.success('エントリーが完了しました！', {
+          description: 'ダッシュボードから詳細を確認できます。',
+          duration: 5000,
+        });
+        router.replace('/trio', { scroll: false });
+        fetchData();
+      };
+      verify();
     } else if (paymentStatus === 'cancel') {
         toast.error('お支払いがキャンセルされました。');
         router.replace('/trio', { scroll: false });
@@ -143,6 +178,12 @@ function TrioPortalContent() {
   }, [searchParams, router]);
 
   const handleBook = async (slotId: string) => {
+    if (!isPortalLoggedIn) {
+      // 未ログインなら、このスロットを保存してLINEログイン
+      localStorage.setItem('trio_intent_slot_id', slotId);
+      handleLineLogin();
+      return;
+    }
     setSelectedSlotId(slotId);
     setIsRegisterModalOpen(true);
   };
@@ -229,7 +270,7 @@ function TrioPortalContent() {
             nextSession={nextSession}
             onEnrollClick={() => document.getElementById('reservations')?.scrollIntoView({ behavior: 'smooth' })}
             onLineLogin={handleLineLogin}
-            onAccessClick={() => toast.info('アクセス情報を表示します')}
+            onAccessClick={() => setIsAccessModalOpen(true)}
             onCancelClick={(id) => handleBook(id)}
           />
         </div>
@@ -250,7 +291,8 @@ function TrioPortalContent() {
               </div>
               <FeaturedSlots 
                   slots={slots} 
-                  userEntryIds={userEntrySlotIds}
+                  userPaidIds={userPaidSlotIds}
+                  userPendingIds={userPendingSlotIds}
                   onBookClick={handleBook}
               />
           </div>
@@ -339,9 +381,16 @@ function TrioPortalContent() {
         onClose={() => setIsRegisterModalOpen(false)}
         slotId={selectedSlotId}
         onSuccess={() => fetchData()}
-        isUserEntered={selectedSlotId ? userEntrySlotIds.includes(selectedSlotId) : false}
+        isUserPaid={selectedSlotId ? userPaidSlotIds.includes(selectedSlotId) : false}
+        isUserPending={selectedSlotId ? userPendingSlotIds.includes(selectedSlotId) : false}
         isPortalLoggedIn={isPortalLoggedIn}
         existingProfileData={studentData}
+      />
+
+      <TrioAccessModal 
+        isOpen={isAccessModalOpen}
+        onClose={() => setIsAccessModalOpen(false)}
+        facilityName={nextSession?.location || 'ヤエスク'}
       />
     </div>
   );

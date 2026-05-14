@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { TrioSlot } from '@/types/trio';
 import { revalidatePath } from 'next/cache';
+import { getAppConfig } from '@/actions/app_configs';
 
 // 有効期限切れの未払いエントリーをクリーンアップする内部関数
 export async function cleanupExpiredEntries() {
@@ -129,8 +130,8 @@ export async function confirmTrioSlot(slotId: string, studentId: string, customC
   }
 
   // エントリー追加
-  // 体験参加（pending）の場合は10分間の有効期限を設定
-  const expiresAt = !student.is_trio ? new Date(Date.now() + 10 * 60 * 1000).toISOString() : null;
+  // 体験参加（pending）の場合は5分間の有効期限を設定
+  const expiresAt = !student.is_trio ? new Date(Date.now() + 5 * 60 * 1000).toISOString() : null;
 
   const { error: entryError } = await supabase
     .from('trio_entries')
@@ -174,10 +175,23 @@ export async function confirmTrioSlot(slotId: string, studentId: string, customC
       .single();
 
     if (currentStudent?.line_user_id) {
-      const { lineService } = await import('@/lib/line');
-      const formattedDate = new Date(slot.start_at).toLocaleString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' });
-      const message = `【THE TRIO】予約受付完了のお知らせ\n\n${currentStudent.full_name}様\nセッションの予約を受け付けました。\n\n日時：${formattedDate}\n場所：THE TRIO 専用施設\n\n2名以上の予約でマッチング成立（開催確定）となります。確定次第、改めてご連絡いたします。`;
-      await lineService.pushMessage(currentStudent.line_user_id, message);
+      // LINE設定の取得
+      const isEnabled = await getAppConfig('trio_line_notify_enabled');
+      if (isEnabled !== 'false') {
+        const template = await getAppConfig('trio_line_entry_template');
+        const formattedDate = new Date(slot.start_at).toLocaleString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' });
+        const location = slot.location || 'THE TRIO 専用施設';
+        
+        let message = template || `【THE TRIO】予約受付完了のお知らせ\n\n{{name}}様\nセッションの予約を受け付けました。\n\n日時：{{date}}\n場所：{{location}}\n\n2名以上の予約でマッチング成立（開催確定）となります。確定次第、改めてご連絡いたします。`;
+        
+        message = message
+          .replace(/{{name}}/g, currentStudent.full_name)
+          .replace(/{{date}}/g, formattedDate)
+          .replace(/{{location}}/g, location);
+
+        const { lineService } = await import('@/lib/line');
+        await lineService.pushMessage(currentStudent.line_user_id, message);
+      }
     }
   } catch (err) {
     console.error('Failed to send instant LINE notification:', err);
@@ -202,12 +216,23 @@ export async function confirmTrioSlot(slotId: string, studentId: string, customC
         if (participants) {
           try {
             const formattedDate = new Date(slot.start_at).toLocaleString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' });
-            
+            const location = slot.location || 'THE TRIO 専用施設';
+
+            // LINE設定の取得
+            const isEnabled = await getAppConfig('trio_line_notify_enabled');
+            const template = await getAppConfig('trio_line_matching_template');
+
             for (const p of participants) {
               // LINE通知の送信
-              if (p.line_user_id) {
+              if (p.line_user_id && isEnabled !== 'false') {
+                let message = template || `【THE TRIO】マッチング成立のお知らせ\n\n{{name}}様、お待たせいたしました！\n以下のセッションのマッチングが成立し、開催が確定しました。\n\n日時：{{date}}\n場所：{{location}}\n\n当日のご来場を心よりお待ちしております。`;
+                
+                message = message
+                  .replace(/{{name}}/g, p.full_name)
+                  .replace(/{{date}}/g, formattedDate)
+                  .replace(/{{location}}/g, location);
+
                 const { lineService } = await import('@/lib/line');
-                const message = `【THE TRIO】マッチング成立のお知らせ\n\n${p.full_name}様、お待たせいたしました！\n以下のセッションのマッチングが成立し、開催が確定しました。\n\n日時：${formattedDate}\n場所：THE TRIO 専用施設\n\n当日のご来場を心よりお待ちしております。`;
                 await lineService.pushMessage(p.line_user_id, message);
               }
 
@@ -217,7 +242,7 @@ export async function confirmTrioSlot(slotId: string, studentId: string, customC
                 await emailService.sendTriggerEmail('trial_lesson_reserved', p.contact_email, {
                   full_name: p.full_name,
                   lesson_date: formattedDate,
-                  location: 'THE TRIO 専用施設'
+                  location: slot.location || 'THE TRIO 専用施設'
                 });
               }
             }
@@ -568,5 +593,47 @@ export async function cancelTrioEntryByStudent(slotId: string): Promise<{ succes
   } catch (err: any) {
     console.error('cancelTrioEntryByStudent error:', err);
     return { success: false, error: '通信エラーが発生しました。' };
+  }
+}
+
+// 9. Stripe決済完了の即時検証とDB更新
+export async function verifyTrioPayment(sessionId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { stripe } = await import('@/lib/stripe');
+    const { createAdminClient } = await import('@/lib/supabase/admin');
+    
+    // 1. Stripeからセッション情報を取得
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    
+    if (session.payment_status === 'paid') {
+      const { studentId, slotId, type } = session.metadata || {};
+      
+      if (type === 'trio_trial' && studentId && slotId) {
+        const supabaseAdmin = createAdminClient();
+        
+        // 2. DBを更新 (Webhookを待たずに即時反映)
+        const { error: updateError } = await supabaseAdmin
+          .from('trio_entries')
+          .update({ 
+            payment_status: 'paid',
+            expires_at: null 
+          })
+          .eq('student_id', studentId)
+          .eq('slot_id', slotId);
+          
+        if (updateError) {
+          console.error('verifyTrioPayment DB update error:', updateError);
+          return { success: false, error: 'DBの更新に失敗しました。' };
+        }
+        
+        revalidatePath('/trio');
+        return { success: true };
+      }
+    }
+    
+    return { success: false, error: '決済が完了していないか、対象外のセッションです。' };
+  } catch (err: any) {
+    console.error('verifyTrioPayment error:', err);
+    return { success: false, error: '検証中にエラーが発生しました。' };
   }
 }

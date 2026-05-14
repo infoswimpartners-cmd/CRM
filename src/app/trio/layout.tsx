@@ -16,7 +16,7 @@ export default async function TrioPublicLayout({ children }: { children: ReactNo
     let studentName = "";
     let planName = "";
 
-    if (user && student) {
+    if (student) {
         studentName = student.full_name || "";
         planName = student.membership_types?.name || "";
 
@@ -27,6 +27,9 @@ export default async function TrioPublicLayout({ children }: { children: ReactNo
             .eq('student_id', student.id)
             .eq('is_read', false);
         unreadCount = count || 0;
+    } else if (user) {
+        // 生徒レコードが見つからない場合は、ログインユーザー名（LINE名など）を表示
+        studentName = (user as any).name || (user as any).full_name || "";
     }
 
     return (

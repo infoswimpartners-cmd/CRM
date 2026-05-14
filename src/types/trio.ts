@@ -10,6 +10,7 @@ export interface TrioSlot {
   status: TrioSlotStatus;
   reserved_count: number;
   is_facility_booked: boolean;
+  location?: string;
 }
 
 export interface TrioEntry {

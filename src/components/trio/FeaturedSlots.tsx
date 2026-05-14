@@ -12,7 +12,8 @@ import { TrioSlot } from '@/types/trio';
 
 interface FeaturedSlotsProps {
   slots: TrioSlot[];
-  userEntryIds?: string[];
+  userPaidIds?: string[];
+  userPendingIds?: string[];
   onBookClick?: (id: string) => void;
   isMyEntrySection?: boolean;
 }
@@ -21,7 +22,7 @@ interface FeaturedSlotsProps {
  * FeaturedSlots
  * 明るく、清潔感があり、かつプレミアムな募集セッション一覧
  */
-export default function FeaturedSlots({ slots, userEntryIds = [], onBookClick, isMyEntrySection }: FeaturedSlotsProps) {
+export default function FeaturedSlots({ slots, userPaidIds = [], userPendingIds = [], onBookClick, isMyEntrySection }: FeaturedSlotsProps) {
   if (!slots || slots.length === 0) return null;
 
   return (
@@ -30,7 +31,8 @@ export default function FeaturedSlots({ slots, userEntryIds = [], onBookClick, i
         const isConfirmed = slot.status === 'confirmed';
         const isMatching = slot.status === 'matching';
         const isFull = slot.reserved_count >= 3;
-        const isUserEntered = userEntryIds.includes(slot.id);
+        const isUserPaid = userPaidIds.includes(slot.id);
+        const isUserPending = userPendingIds.includes(slot.id);
         
         const startDate = new Date(slot.start_at);
         const dateStr = format(startDate, 'M/d (E)', { locale: ja });
@@ -61,8 +63,8 @@ export default function FeaturedSlots({ slots, userEntryIds = [], onBookClick, i
             <div className="space-y-6 relative z-10">
               <div className="flex items-start justify-between">
                 <div className="space-y-2">
-                  <div className="inline-flex items-center gap-2 px-3 py-1 bg-sky-50 border border-sky-100 rounded-full group-hover:bg-sky-100 transition-colors duration-500">
-                    <Calendar className="w-3 h-3 text-sky-500" />
+                  <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 bg-white border border-sky-100 rounded-full group-hover:bg-sky-50 transition-colors duration-500 shadow-sm">
+                    <Calendar className="w-3.5 h-3.5 text-sky-500" />
                     <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{dateStr}</span>
                   </div>
                   <div className="flex items-center gap-1">
@@ -80,9 +82,14 @@ export default function FeaturedSlots({ slots, userEntryIds = [], onBookClick, i
                   )}>
                     {isConfirmed ? '開催確定' : isMatching ? 'マッチ中' : '募集中'}
                   </Badge>
-                  {isUserEntered && (
+                  {isUserPaid && (
                     <Badge variant="outline" className="bg-blue-50 text-blue-600 border-blue-100 text-[9px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full animate-in fade-in zoom-in duration-500">
                       予約済み
+                    </Badge>
+                  )}
+                  {isUserPending && (
+                    <Badge variant="outline" className="bg-amber-50 text-amber-600 border-amber-100 text-[9px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full animate-in fade-in zoom-in duration-500">
+                      決済待ち
                     </Badge>
                   )}
                 </div>
@@ -118,16 +125,21 @@ export default function FeaturedSlots({ slots, userEntryIds = [], onBookClick, i
                 <div className="h-px w-full bg-gradient-to-r from-slate-100 to-transparent" />
                 <div className="flex flex-col gap-1">
                   <p className="text-[11px] text-slate-500 font-bold leading-relaxed px-1">
-                    ヤエスク専用レーンにて実施。
+                    {slot.location || 'ヤエスク'}専用レーンにて実施。
                   </p>
-                  {!isConfirmed && !isFull && !isUserEntered && (
+                  {!isConfirmed && !isFull && !isUserPaid && !isUserPending && (
                     <p className="text-[10px] text-sky-500 font-black italic px-1 animate-pulse">
                       あと {2 - Math.min(1, slot.reserved_count)} 人でマッチング成立！
                     </p>
                   )}
-                  {isUserEntered && !isConfirmed && (
+                  {isUserPaid && !isConfirmed && (
                     <p className="text-[10px] text-blue-500 font-black italic px-1">
                       他の参加者を待っています...
+                    </p>
+                  )}
+                  {isUserPending && (
+                    <p className="text-[10px] text-amber-500 font-black italic px-1">
+                      まもなく予約が取り消されます。お急ぎください！
                     </p>
                   )}
                 </div>
@@ -135,22 +147,26 @@ export default function FeaturedSlots({ slots, userEntryIds = [], onBookClick, i
 
               <Button 
                 onClick={() => {
-                  if (isUserEntered) return;
+                  if (isUserPaid) return;
                   onBookClick?.(slot.id);
                 }}
                 disabled={isFull}
                 className={cn(
                   "w-full h-14 rounded-2xl font-black tracking-widest transition-all duration-700 group/btn border-none relative overflow-hidden",
                   isFull ? "bg-slate-100 text-slate-400 cursor-not-allowed" : 
-                  isUserEntered ? "bg-blue-50 text-blue-400 border border-blue-100 cursor-default" :
+                  isUserPaid ? "bg-blue-50 text-blue-400 border border-blue-100 cursor-default" :
+                  isUserPending ? "bg-amber-500 text-white hover:bg-amber-400 shadow-xl shadow-amber-100" :
                   isConfirmed ? "bg-emerald-600 text-white hover:bg-emerald-500 shadow-xl shadow-emerald-100" :
                   "bg-sky-600 text-white hover:bg-sky-500 shadow-xl shadow-sky-100"
                 )}
               >
                 <span className="flex items-center gap-2 relative z-10">
-                  {isFull ? '満員御礼' : isUserEntered ? '予約済み' : isConfirmed ? '今すぐ参加する' : 'マッチングにエントリー'}
-                  {!isFull && !isUserEntered && <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1.5 transition-transform" />}
-                  {isUserEntered && <CheckCircle2 className="w-4 h-4" />}
+                  {isFull ? '満員御礼' : 
+                   isUserPaid ? '予約済み' : 
+                   isUserPending ? '決済を完了する' : 
+                   isConfirmed ? '今すぐ参加する' : 'マッチングにエントリー'}
+                  {!isFull && !isUserPaid && <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1.5 transition-transform" />}
+                  {isUserPaid && <CheckCircle2 className="w-4 h-4" />}
                 </span>
               </Button>
             </div>

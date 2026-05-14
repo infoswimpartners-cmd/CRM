@@ -68,11 +68,14 @@ const TRIGGER_VARIABLES: Record<string, { key: string; label: string }[]> = {
     ],
     trial_lesson_reserved: [
         { key: 'name', label: '氏名' },
-        { key: 'full_name', label: '氏名(full_name)' },
         { key: 'lesson_date', label: 'レッスン日時' },
-        { key: 'location', label: '場所' },
         { key: 'amount', label: '金額' },
         { key: 'payment_link', label: '決済リンク' },
+    ],
+    trial_payment_completed: [
+        { key: 'full_name', label: '氏名' },
+        { key: 'lesson_date', label: 'レッスン日時' },
+        { key: 'location', label: '場所' },
     ],
     enrollment_completed: [
         { key: 'name', label: '氏名' },
