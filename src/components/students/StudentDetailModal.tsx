@@ -13,8 +13,8 @@ import { StudentChart } from '@/components/customers/StudentChart'
 import { StudentCounseling } from '@/components/customers/StudentCounseling'
 import { StudentLessonHistory } from '@/components/customers/StudentLessonHistory'
 import { createClient } from '@/lib/supabase/client'
-import { Loader2 } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { Loader2, User2, Cake } from 'lucide-react'
+import { cn, calculateAge } from '@/lib/utils'
 
 interface StudentDetailModalProps {
     student: any | null
@@ -83,13 +83,68 @@ export function StudentDetailModal({ student, isOpen, onOpenChange }: StudentDet
                 <DialogHeader className="p-4 pr-12 bg-white border-b border-slate-100 flex-shrink-0">
                     <div className="flex flex-col gap-2">
                         <div className="flex items-start justify-between">
-                            <div>
-                                <DialogTitle className="text-xl md:text-2xl font-bold flex flex-wrap items-center gap-2 text-slate-900">
-                                    {student.full_name}
-                                </DialogTitle>
-                                <p className="text-sm text-slate-500 font-medium">
-                                    {student.full_name_kana || '-'}
-                                </p>
+                            <div className="w-full">
+                                <div className="flex flex-col gap-6">
+                                    {/* 1人目の情報ブロック */}
+                                    <div className="space-y-2.5">
+                                        <div>
+                                            <DialogTitle className="text-xl md:text-2xl font-bold text-slate-900">
+                                                {student.full_name}
+                                            </DialogTitle>
+                                            <p className="text-xs md:text-sm text-slate-500 font-medium mt-0.5">
+                                                {student.full_name_kana}
+                                            </p>
+                                        </div>
+                                        <div className="flex items-center gap-3 text-[10px] md:text-xs font-medium p-2 bg-slate-50 rounded-xl border border-slate-100 max-w-fit">
+                                            <Badge variant="outline" className="bg-white text-slate-500 border-slate-200 font-bold px-1.5 py-0 shadow-sm">1人目</Badge>
+                                            <div className="flex items-center gap-3 text-slate-600">
+                                                {student.gender && (
+                                                    <span className="flex items-center gap-1">
+                                                        <User2 className="h-3.5 w-3.5 text-slate-400" />
+                                                        {student.gender}
+                                                    </span>
+                                                )}
+                                                {student.birth_date && (
+                                                    <span className="flex items-center gap-1 border-l border-slate-200 pl-3">
+                                                        <Cake className="h-3.5 w-3.5 text-slate-400" />
+                                                        {new Date(student.birth_date).toLocaleDateString('ja-JP')}
+                                                        <span className="text-slate-400 font-normal ml-0.5">({calculateAge(new Date(student.birth_date))}歳)</span>
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* 2人目の情報ブロック (存在する場合のみ) */}
+                                    {student.second_student_name && (
+                                        <div className="space-y-2.5 pt-4 border-t border-slate-100">
+                                            <div>
+                                                <h3 className="text-xl md:text-2xl font-bold text-slate-900">
+                                                    {student.second_student_name}
+                                                </h3>
+                                                <p className="text-xs md:text-sm text-slate-500 font-medium mt-0.5">
+                                                    {student.second_student_name_kana || '-'}
+                                                </p>
+                                            </div>
+                                            <div className="flex items-center gap-3 text-[10px] md:text-xs font-medium p-2 bg-blue-50/30 rounded-xl border border-blue-50/50 max-w-fit">
+                                                <Badge variant="outline" className="bg-white text-blue-600 border-blue-100 font-bold px-1.5 py-0 shadow-sm">2人目</Badge>
+                                                <div className="flex items-center gap-3 text-slate-600">
+                                                    <span className="flex items-center gap-1">
+                                                        <User2 className="h-3.5 w-3.5 text-blue-300" />
+                                                        {student.second_student_gender || '性別未設定'}
+                                                    </span>
+                                                    {student.second_student_birth_date && (
+                                                        <span className="flex items-center gap-1 border-l border-slate-200 pl-3">
+                                                            <Cake className="h-3.5 w-3.5 text-blue-300" />
+                                                            {new Date(student.second_student_birth_date).toLocaleDateString('ja-JP')}
+                                                            <span className="text-slate-400 font-normal ml-0.5">({calculateAge(new Date(student.second_student_birth_date))}歳)</span>
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                             <div className="flex flex-col items-end gap-1.5">
                                 <Badge variant="secondary" className={cn(

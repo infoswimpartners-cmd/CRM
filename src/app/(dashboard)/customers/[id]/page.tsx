@@ -14,7 +14,7 @@ import { TrialConfirmButton } from '@/components/admin/TrialConfirmButton'
 import { StripeManager } from '@/components/admin/students/StripeManager'
 import { getStripeCustomerStatus } from '@/actions/stripe'
 import { Badge } from '@/components/ui/badge'
-import { Landmark, Users, MessageCircle, Calendar, Ticket } from 'lucide-react'
+import { Landmark, Users, MessageCircle, Calendar, Ticket, Cake, User2 } from 'lucide-react'
 import { UnlinkLineButton } from '@/components/admin/UnlinkLineButton'
 import { StudentAccountLinker } from '@/components/admin/StudentAccountLinker'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -194,29 +194,66 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
                             </Badge>
                         </div>
 
-                        <div className="flex flex-col sm:flex-row sm:items-end gap-4">
-                            <div>
-                                <h1 className="text-3xl font-bold tracking-tight">
-                                    {student.full_name}
-                                    {student.second_student_name && <span className="text-slate-400 font-medium ml-2">/ {student.second_student_name}</span>}
-                                </h1>
-                                <p className="text-gray-500 font-medium">
-                                    {student.full_name_kana}
-                                    {student.second_student_name_kana && ` / ${student.second_student_name_kana}`}
-                                </p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-2">
+                            {/* 1人目の情報ブロック */}
+                            <div className="space-y-4">
+                                <div>
+                                    <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+                                        {student.full_name}
+                                    </h1>
+                                    <p className="text-sm text-slate-500 font-medium mt-1">
+                                        {student.full_name_kana}
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-3 text-sm p-3 bg-slate-50/80 rounded-2xl border border-slate-100/50 w-full shadow-sm">
+                                    <Badge variant="outline" className="bg-white text-slate-500 border-slate-200 font-bold px-2.5 py-0.5 shadow-sm">1人目</Badge>
+                                    <div className="flex items-center gap-3">
+                                        {student.gender && (
+                                            <span className="flex items-center gap-1.5 text-slate-700 font-semibold">
+                                                <User2 className="h-4 w-4 text-slate-400" />
+                                                {student.gender}
+                                            </span>
+                                        )}
+                                        {student.birth_date && (
+                                            <span className="flex items-center gap-1.5 text-slate-700 font-semibold border-l border-slate-200 pl-3">
+                                                <Cake className="h-4 w-4 text-slate-400" />
+                                                {new Date(student.birth_date).toLocaleDateString('ja-JP')}
+                                                <span className="text-slate-400 font-normal ml-0.5">({calculateAge(new Date(student.birth_date))}歳)</span>
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
-                            <div className="flex gap-2 mb-1">
-                                {student.gender && (
-                                    <Badge variant="secondary" className="font-normal text-gray-600">
-                                        {student.gender}
-                                    </Badge>
-                                )}
-                                {student.birth_date && (
-                                    <Badge variant="secondary" className="font-normal text-gray-600">
-                                        {new Date(student.birth_date).toLocaleDateString('ja-JP')}生まれ ({calculateAge(new Date(student.birth_date))}歳)
-                                    </Badge>
-                                )}
-                            </div>
+                            
+                            {/* 2人目の情報ブロック (存在する場合のみ) */}
+                            {student.second_student_name && (
+                                <div className="space-y-4">
+                                    <div>
+                                        <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+                                            {student.second_student_name}
+                                        </h1>
+                                        <p className="text-sm text-slate-500 font-medium mt-1">
+                                            {student.second_student_name_kana || '-'}
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center gap-3 text-sm p-3 bg-blue-50/30 rounded-2xl border border-blue-100/30 w-full shadow-sm">
+                                        <Badge variant="outline" className="bg-white text-blue-600 border-blue-100 font-bold px-2.5 py-0.5 shadow-sm">2人目</Badge>
+                                        <div className="flex items-center gap-3">
+                                            <span className="flex items-center gap-1.5 text-slate-700 font-semibold">
+                                                <User2 className="h-4 w-4 text-blue-300" />
+                                                {student.second_student_gender || '性別未設定'}
+                                            </span>
+                                            {student.second_student_birth_date && (
+                                                <span className="flex items-center gap-1.5 text-slate-700 font-semibold border-l border-slate-200 pl-3">
+                                                    <Cake className="h-4 w-4 text-blue-300" />
+                                                    {new Date(student.second_student_birth_date).toLocaleDateString('ja-JP')}
+                                                    <span className="text-slate-400 font-normal ml-0.5">({calculateAge(new Date(student.second_student_birth_date))}歳)</span>
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -304,7 +341,7 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
                                         <Label className="text-xs text-slate-500">生年月日</Label>
                                         <div className="text-sm">
                                             {student.second_student_birth_date
-                                                ? new Date(student.second_student_birth_date).toLocaleDateString('ja-JP')
+                                                ? `${new Date(student.second_student_birth_date).toLocaleDateString('ja-JP')} (${calculateAge(new Date(student.second_student_birth_date))}歳)`
                                                 : '-'}
                                         </div>
                                     </div>
