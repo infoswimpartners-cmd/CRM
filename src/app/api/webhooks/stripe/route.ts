@@ -81,14 +81,17 @@ export async function POST(req: NextRequest) {
                             : '未定'
                         const lessonLocation = location || '未定'
 
-                        // 4. Send Customer Email (trial_payment_completed trigger)
+                        // 4. お礼メール送信 (パーソナル体験専用トリガー)
                         await emailService.sendTriggerEmail(
                             'trial_payment_completed',
                             student.contact_email,
                             {
+                                name: student.full_name,
                                 full_name: student.full_name,
                                 lesson_date: formattedDate,
-                                location: lessonLocation
+                                location: lessonLocation,
+                                title: '体験レッスン',
+                                amount: (session.amount_total || 0).toLocaleString() + '円'
                             }
                         )
                     }
@@ -182,6 +185,34 @@ export async function POST(req: NextRequest) {
                         }
 
                         console.log(`[Stripe Webhook] Successfully marked TRIO Trial Payment as paid for Student ${studentId}`);
+
+                        // 2. お礼メール送信 (payment_success トリガー)
+                        try {
+                            const [{ data: stdInfo }, { data: slotInfo }] = await Promise.all([
+                                supabaseAdmin.from('students').select('contact_email, full_name').eq('id', studentId).single(),
+                                supabaseAdmin.from('trio_slots').select('start_at').eq('id', slotId).single()
+                            ]);
+
+                            if (stdInfo?.contact_email && slotInfo) {
+                                const formattedDate = new Date(slotInfo.start_at).toLocaleString('ja-JP', { 
+                                    timeZone: 'Asia/Tokyo',
+                                    year: 'numeric',
+                                    month: '2-digit',
+                                    day: '2-digit',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                });
+
+                                await emailService.sendTriggerEmail('trio_trial_payment_completed', stdInfo.contact_email, {
+                                    name: stdInfo.full_name,
+                                    lesson_date: formattedDate,
+                                    title: 'THE TRIO 体験レッスン',
+                                    amount: (session.amount_total || 0).toLocaleString() + '円'
+                                });
+                            }
+                        } catch (e) {
+                            console.error('[Stripe Webhook] TRIO Email error:', e);
+                        }
                     }
                 } else if (type === 'trio_ticket_purchase' && studentId) {
                     // --- THE TRIO TICKET PURCHASE LOGIC ---

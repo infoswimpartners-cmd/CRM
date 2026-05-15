@@ -127,6 +127,12 @@ const TRIGGER_VARIABLES: Record<string, { key: string; label: string }[]> = {
         { key: 'location', label: '場所' },
         { key: 'coach_name', label: 'コーチ名' },
     ],
+    trio_trial_payment_completed: [
+        { key: 'name', label: '氏名' },
+        { key: 'lesson_date', label: 'レッスン日時' },
+        { key: 'title', label: '内容/プラン名' },
+        { key: 'amount', label: '金額' },
+    ],
 }
 
 export interface TrialMaster { id: string; name: string; email_template_id: string | null }
@@ -847,7 +853,7 @@ export function EmailTemplateManager({ templates, triggers, trialMasters = [] }:
                         </h2>
                         <p className="text-sm text-gray-500 mt-1">決済完了時や入会完了時に送信される、お礼メールの設定です。</p>
                     </div>
-                    {triggersList.filter(t => ['payment_success', 'payment_failed', 'trial_payment_completed', 'enrollment_completed'].includes(t.id)).map(trigger => (
+                    {triggersList.filter(t => ['payment_success', 'payment_failed', 'trial_payment_completed', 'trio_trial_payment_completed', 'enrollment_completed'].includes(t.id)).map(trigger => (
                         <TriggerCard key={trigger.id} trigger={trigger} />
                     ))}
 
