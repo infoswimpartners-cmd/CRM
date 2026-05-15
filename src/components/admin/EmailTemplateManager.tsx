@@ -86,6 +86,9 @@ const TRIGGER_VARIABLES: Record<string, { key: string; label: string }[]> = {
         { key: 'name', label: '氏名' },
         { key: 'student_name', label: '生徒名' },
         { key: 'lesson_date', label: 'レッスン日時' },
+        { key: 'date', label: '日付' },
+        { key: 'time', label: '時刻' },
+        { key: 'title', label: '内容/チケット名' },
         { key: 'amount', label: '金額' },
         { key: 'payment_link', label: '決済リンク' },
         { key: 'payment_url', label: '決済URL' },
@@ -231,6 +234,121 @@ export function EmailTemplateManager({ templates, triggers, trialMasters = [] }:
         useSensor(PointerSensor),
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
     )
+
+    // トリガーごとのカードコンポーネント
+    const TriggerCard = ({ trigger }: { trigger: EmailTrigger }) => {
+        const draft = chatDrafts[trigger.id] || { url: '', enabled: false, messageTemplate: '' }
+        const chatExpanded = expandedChat[trigger.id] || false
+        
+        return (
+            <div key={trigger.id} className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden mb-4">
+                {/* メイン行 */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between p-4 gap-3">
+                    <div className="flex-1 space-y-0.5 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-semibold text-gray-900 text-sm">{trigger.name}</span>
+                            <Badge variant="outline" className="text-[10px] font-mono text-gray-400 bg-gray-50">{trigger.id}</Badge>
+                            {draft.enabled && draft.url && (
+                                <Badge className="text-[10px] bg-green-100 text-green-700 border-green-200">
+                                    <MessageSquare className="w-2.5 h-2.5 mr-1" />Chat ON
+                                </Badge>
+                            )}
+                        </div>
+                        <p className="text-xs text-gray-500">{trigger.description}</p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap flex-none">
+                        <Select
+                            value={trigger.template_id || 'none'}
+                            onValueChange={val => handleTriggerUpdate(trigger.id, val === 'none' ? null : val, trigger.is_enabled)}
+                            disabled={!trigger.is_enabled}
+                        >
+                            <SelectTrigger className="w-[200px] bg-white border-gray-300 text-sm h-8">
+                                <SelectValue placeholder="メールを選択..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="none" className="text-gray-400 italic">-- 送信しない --</SelectItem>
+                                {templatesList.map(tmpl => (
+                                    <SelectItem key={tmpl.id} value={tmpl.id}>
+                                        {tmpl.subject} ({tmpl.key})
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <div className="flex items-center gap-1.5">
+                            <Switch
+                                checked={trigger.is_enabled}
+                                onCheckedChange={checked => handleTriggerUpdate(trigger.id, trigger.template_id, checked)}
+                            />
+                            <span className="text-xs text-gray-500 w-7">{trigger.is_enabled ? 'ON' : 'OFF'}</span>
+                        </div>
+                        <Button
+                            variant="outline" size="sm"
+                            className={`gap-1 text-xs h-8 ${chatExpanded ? 'bg-green-50 border-green-300 text-green-700' : 'text-gray-600'}`}
+                            onClick={() => setExpandedChat(prev => ({ ...prev, [trigger.id]: !prev[trigger.id] }))}
+                        >
+                            <MessageSquare className="w-3.5 h-3.5" />
+                            Google Chat
+                            {chatExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                        </Button>
+                    </div>
+                </div>
+
+                {/* Google Chat 設定パネル */}
+                {chatExpanded && (
+                    <div className="border-t border-gray-100 bg-green-50/40 p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                            <span className="font-semibold text-sm text-green-800 flex items-center gap-1.5">
+                                <MessageSquare className="w-4 h-4 text-green-600" />
+                                Google Chat Webhook 設定
+                            </span>
+                            <a href="https://developers.google.com/workspace/chat/quickstart/webhooks" target="_blank" rel="noreferrer"
+                                className="text-xs text-blue-500 underline flex items-center gap-0.5">
+                                URLの取得方法 <ExternalLink className="w-3 h-3" />
+                            </a>
+                        </div>
+                        <div className="flex gap-3 items-end">
+                            <div className="flex-1 space-y-1">
+                                <Label className="text-xs text-gray-600">Webhook URL</Label>
+                                <Input
+                                    value={draft.url}
+                                    onChange={e => setChatDrafts(prev => ({ ...prev, [trigger.id]: { ...prev[trigger.id], url: e.target.value } }))}
+                                    placeholder="https://chat.googleapis.com/v1/spaces/.../messages?key=..."
+                                    className="font-mono text-xs bg-white h-8"
+                                />
+                            </div>
+                            <div className="flex items-center gap-2 flex-none pb-0.5">
+                                <Switch
+                                    checked={draft.enabled}
+                                    onCheckedChange={checked => setChatDrafts(prev => ({ ...prev, [trigger.id]: { ...prev[trigger.id], enabled: checked } }))}
+                                />
+                                <Label className="text-xs">{draft.enabled ? 'Chat ON' : 'Chat OFF'}</Label>
+                            </div>
+                        </div>
+                        <div className="space-y-1">
+                            <Label className="text-xs text-gray-600">
+                                カスタムメッセージ
+                                <span className="ml-1.5 text-gray-400 font-normal">（空の場合はメール本文と同じ内容を送信）</span>
+                            </Label>
+                            <Textarea
+                                value={draft.messageTemplate}
+                                onChange={e => setChatDrafts(prev => ({ ...prev, [trigger.id]: { ...prev[trigger.id], messageTemplate: e.target.value } }))}
+                                placeholder={`例: 📧 *新規問い合わせ* が届きました\nお名前: {{name}}\nメール: {{to}}`}
+                                className="font-mono text-xs h-20 bg-white resize-none"
+                            />
+                        </div>
+                        <div className="flex justify-end">
+                            <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white gap-1.5 h-8"
+                                onClick={() => handleChatSave(trigger.id)}>
+                                <Save className="w-3.5 h-3.5" />
+                                Google Chat設定を保存
+                            </Button>
+                        </div>
+                    </div>
+                )}
+            </div>
+        )
+    }
+
 
     const handleSelect = (tmpl: EmailTemplate) => {
         setIsCreating(false)
@@ -710,117 +828,40 @@ export function EmailTemplateManager({ templates, triggers, trialMasters = [] }:
                         </h2>
                         <p className="text-sm text-gray-500 mt-1">どのイベントでどのメールを送るか、コード不要で設定できます。</p>
                     </div>
-                    {triggersList.map(trigger => {
-                        const draft = chatDrafts[trigger.id] || { url: '', enabled: false, messageTemplate: '' }
-                        const chatExpanded = expandedChat[trigger.id] || false
-                        return (
-                            <div key={trigger.id} className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-                                {/* メイン行 */}
-                                <div className="flex flex-col md:flex-row md:items-center justify-between p-4 gap-3">
-                                    <div className="flex-1 space-y-0.5 min-w-0">
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                            <span className="font-semibold text-gray-900 text-sm">{trigger.name}</span>
-                                            <Badge variant="outline" className="text-[10px] font-mono text-gray-400 bg-gray-50">{trigger.id}</Badge>
-                                            {draft.enabled && draft.url && (
-                                                <Badge className="text-[10px] bg-green-100 text-green-700 border-green-200">
-                                                    <MessageSquare className="w-2.5 h-2.5 mr-1" />Chat ON
-                                                </Badge>
-                                            )}
-                                        </div>
-                                        <p className="text-xs text-gray-500">{trigger.description}</p>
-                                    </div>
-                                    <div className="flex items-center gap-2 flex-wrap flex-none">
-                                        <Select
-                                            value={trigger.template_id || 'none'}
-                                            onValueChange={val => handleTriggerUpdate(trigger.id, val === 'none' ? null : val, trigger.is_enabled)}
-                                            disabled={!trigger.is_enabled}
-                                        >
-                                            <SelectTrigger className="w-[200px] bg-white border-gray-300 text-sm h-8">
-                                                <SelectValue placeholder="メールを選択..." />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="none" className="text-gray-400 italic">-- 送信しない --</SelectItem>
-                                                {templatesList.map(tmpl => (
-                                                    <SelectItem key={tmpl.id} value={tmpl.id}>
-                                                        {tmpl.subject} ({tmpl.key})
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        <div className="flex items-center gap-1.5">
-                                            <Switch
-                                                checked={trigger.is_enabled}
-                                                onCheckedChange={checked => handleTriggerUpdate(trigger.id, trigger.template_id, checked)}
-                                            />
-                                            <span className="text-xs text-gray-500 w-7">{trigger.is_enabled ? 'ON' : 'OFF'}</span>
-                                        </div>
-                                        <Button
-                                            variant="outline" size="sm"
-                                            className={`gap-1 text-xs h-8 ${chatExpanded ? 'bg-green-50 border-green-300 text-green-700' : 'text-gray-600'}`}
-                                            onClick={() => setExpandedChat(prev => ({ ...prev, [trigger.id]: !prev[trigger.id] }))}
-                                        >
-                                            <MessageSquare className="w-3.5 h-3.5" />
-                                            Google Chat
-                                            {chatExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                                        </Button>
-                                    </div>
-                                </div>
+                    {/* 集客・体験申し込み関連 */}
+                    <div className="flex-none mb-4">
+                        <h2 className="text-lg font-semibold flex items-center gap-2">
+                            <Mail className="w-5 h-4 text-cyan-600" />
+                            集客・体験申し込み通知
+                        </h2>
+                    </div>
+                    {triggersList.filter(t => ['inquiry_received', 'reception_completed', 'trial_lesson_reserved', 'trial_form_submitted_admin', 'trial_lesson_reminder', 'trial_lesson_followup'].includes(t.id)).map(trigger => (
+                        <TriggerCard key={trigger.id} trigger={trigger} />
+                    ))}
 
-                                {/* Google Chat 設定パネル */}
-                                {chatExpanded && (
-                                    <div className="border-t border-gray-100 bg-green-50/40 p-4 space-y-3">
-                                        <div className="flex items-center justify-between">
-                                            <span className="font-semibold text-sm text-green-800 flex items-center gap-1.5">
-                                                <MessageSquare className="w-4 h-4 text-green-600" />
-                                                Google Chat Webhook 設定
-                                            </span>
-                                            <a href="https://developers.google.com/workspace/chat/quickstart/webhooks" target="_blank" rel="noreferrer"
-                                                className="text-xs text-blue-500 underline flex items-center gap-0.5">
-                                                URLの取得方法 <ExternalLink className="w-3 h-3" />
-                                            </a>
-                                        </div>
-                                        <div className="flex gap-3 items-end">
-                                            <div className="flex-1 space-y-1">
-                                                <Label className="text-xs text-gray-600">Webhook URL</Label>
-                                                <Input
-                                                    value={draft.url}
-                                                    onChange={e => setChatDrafts(prev => ({ ...prev, [trigger.id]: { ...prev[trigger.id], url: e.target.value } }))}
-                                                    placeholder="https://chat.googleapis.com/v1/spaces/.../messages?key=..."
-                                                    className="font-mono text-xs bg-white h-8"
-                                                />
-                                            </div>
-                                            <div className="flex items-center gap-2 flex-none pb-0.5">
-                                                <Switch
-                                                    checked={draft.enabled}
-                                                    onCheckedChange={checked => setChatDrafts(prev => ({ ...prev, [trigger.id]: { ...prev[trigger.id], enabled: checked } }))}
-                                                />
-                                                <Label className="text-xs">{draft.enabled ? 'Chat ON' : 'Chat OFF'}</Label>
-                                            </div>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <Label className="text-xs text-gray-600">
-                                                カスタムメッセージ
-                                                <span className="ml-1.5 text-gray-400 font-normal">（空の場合はメール本文と同じ内容を送信）</span>
-                                            </Label>
-                                            <Textarea
-                                                value={draft.messageTemplate}
-                                                onChange={e => setChatDrafts(prev => ({ ...prev, [trigger.id]: { ...prev[trigger.id], messageTemplate: e.target.value } }))}
-                                                placeholder={`例: 📧 *新規問い合わせ* が届きました\nお名前: {{name}}\nメール: {{to}}`}
-                                                className="font-mono text-xs h-20 bg-white resize-none"
-                                            />
-                                        </div>
-                                        <div className="flex justify-end">
-                                            <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white gap-1.5 h-8"
-                                                onClick={() => handleChatSave(trigger.id)}>
-                                                <Save className="w-3.5 h-3.5" />
-                                                Google Chat設定を保存
-                                            </Button>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )
-                    })}
+                    {/* 決済・入会関連 */}
+                    <div className="flex-none mb-4 mt-8 pt-6 border-t border-gray-200">
+                        <h2 className="text-lg font-semibold flex items-center gap-2">
+                            <Save className="w-5 h-4 text-emerald-600" />
+                            決済・入会のお礼メール設定
+                        </h2>
+                        <p className="text-sm text-gray-500 mt-1">決済完了時や入会完了時に送信される、お礼メールの設定です。</p>
+                    </div>
+                    {triggersList.filter(t => ['payment_success', 'payment_failed', 'trial_payment_completed', 'enrollment_completed'].includes(t.id)).map(trigger => (
+                        <TriggerCard key={trigger.id} trigger={trigger} />
+                    ))}
+
+                    {/* レッスン・報告関連 */}
+                    <div className="flex-none mb-4 mt-8 pt-6 border-t border-gray-200">
+                        <h2 className="text-lg font-semibold flex items-center gap-2">
+                            <MessageSquare className="w-5 h-4 text-indigo-600" />
+                            レッスン・指導報告
+                        </h2>
+                    </div>
+                    {triggersList.filter(t => !['inquiry_received', 'reception_completed', 'trial_lesson_reserved', 'trial_form_submitted_admin', 'trial_lesson_reminder', 'trial_lesson_followup', 'payment_success', 'payment_failed', 'trial_payment_completed', 'enrollment_completed'].includes(t.id)).map(trigger => (
+                        <TriggerCard key={trigger.id} trigger={trigger} />
+                    ))}
+
 
                     {/* 体験レッスンプラン別設定 */}
                     <div className="flex-none mb-4 mt-8 pt-6 border-t border-gray-200">

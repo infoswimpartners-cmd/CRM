@@ -139,6 +139,21 @@ export async function POST(req: NextRequest) {
                             if (txError) {
                                 console.error('[Stripe Webhook] Failed to insert transaction record:', txError);
                             }
+
+                            // 4. お礼メール送信 (payment_success トリガー)
+                            try {
+                                const { data: stdInfo } = await supabaseAdmin.from('students').select('contact_email, full_name').eq('id', studentId).single();
+                                if (stdInfo?.contact_email) {
+                                    await emailService.sendTriggerEmail('payment_success', stdInfo.contact_email, {
+                                        name: stdInfo.full_name,
+                                        title: session.metadata?.ticket_name || 'チケット購入',
+                                        amount: (session.amount_total || 0).toLocaleString() + '円'
+                                    });
+                                }
+                            } catch (e) {
+                                console.error('[Stripe Webhook] Email error:', e);
+                            }
+
                         } catch (e) {
                             console.error('[Stripe Webhook] Transaciton insert failed (Unknown error):', e);
                         }
