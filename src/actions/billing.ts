@@ -182,18 +182,21 @@ export async function processLessonBilling(scheduleId: string, forceManualEmail:
             // We don't have student status here, but usually trial lessons have "体験" in title.
             // Let's rely on Title or Overage + No Membership?
             // Safer: Check Title for "体験"
-            const isTrial = data.title && data.title.includes('体験')
+            const isTrial = data.title && (data.title.includes('体験') || data.title.includes('トライアル'))
 
             if (isTrial) {
-                console.log('[Billing] Detected Trial Lesson. Sending payment_success trigger.')
+                console.log('[Billing] Detected Trial Lesson. Sending trial_lesson_reserved trigger.')
                 await emailService.sendTriggerEmail(
-                    'payment_success',
+                    'trial_lesson_reserved',
                     student.contact_email,
                     {
                         name: student.full_name,
+                        student_name: student.full_name,
                         lesson_date: format(lessonDate, 'yyyy/MM/dd HH:mm') + '〜' + format(addMinutes(lessonDate, 60), 'HH:mm'),
+                        trial_date: format(lessonDate, 'yyyy/MM/dd HH:mm'),
                         amount: price.toLocaleString(),
-                        payment_link: paymentUrl
+                        payment_link: paymentUrl,
+                        payment_url: paymentUrl
                     }
                 )
             } else {
@@ -209,11 +212,14 @@ export async function processLessonBilling(scheduleId: string, forceManualEmail:
                     student.contact_email,
                     {
                         student_name: formatStudentNames(student),
+                        name: formatStudentNames(student),
                         date: format(lessonDate, 'yyyy/MM/dd'),
                         time: format(lessonDate, 'HH:mm'),
+                        lesson_date: format(lessonDate, 'yyyy/MM/dd HH:mm'),
                         title: data.title,
                         amount: price.toLocaleString() + '円',
-                        payment_url: paymentUrl
+                        payment_url: paymentUrl,
+                        payment_link: paymentUrl
                     }
                 )
             }
