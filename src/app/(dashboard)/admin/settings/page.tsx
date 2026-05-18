@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Calendar } from 'lucide-react'
 import { CompanySettingsForm } from "@/components/admin/CompanySettingsForm"
 import { PaymentSlipTemplateForm } from "@/components/admin/PaymentSlipTemplateForm"
+import { TermsSettingsForm } from "@/components/admin/TermsSettingsForm"
 
 export default async function SettingsPage() {
     const supabase = await createClient()
@@ -69,6 +70,18 @@ export default async function SettingsPage() {
                             </Button>
                         )}
                     </div>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>利用規約設定</CardTitle>
+                    <CardDescription>
+                        体験申し込みフォームに表示される利用規約を編集します。
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <TermsSettingsForm />
                 </CardContent>
             </Card>
 

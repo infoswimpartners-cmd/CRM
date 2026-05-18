@@ -7,6 +7,7 @@ export default function BookingForm() {
   const [isLiffReady, setIsLiffReady] = useState(false);
   const [liffError, setLiffError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [termsText, setTermsText] = useState<string | null>(null);
   
   // フォーム入力値の状態管理
   const [formData, setFormData] = useState({
@@ -63,7 +64,23 @@ export default function BookingForm() {
         setIsLiffReady(true);
       }
     };
+
+    const fetchTerms = async () => {
+      try {
+        const res = await fetch("/api/public/terms");
+        if (res.ok) {
+          const data = await res.json();
+          setTermsText(data.terms);
+        } else {
+          setTermsText("利用規約の読み込みに失敗しました。");
+        }
+      } catch (error) {
+        setTermsText("利用規約の読み込みに失敗しました。");
+      }
+    };
+
     initLiff();
+    fetchTerms();
   }, []);
 
   // 入力変更ハンドラ
@@ -288,18 +305,26 @@ export default function BookingForm() {
           <textarea name="notes" value={formData.notes} onChange={handleChange} placeholder="自由にご記入ください" style={{ ...inputStyle, minHeight: "80px", resize: "vertical" }} />
         </label>
 
-        <div style={{ marginTop: "30px", padding: "15px", backgroundColor: "#fff", borderRadius: "8px", border: "1px solid #eee" }}>
-          <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer", fontWeight: "bold" }}>
+        <div style={{ marginTop: "30px" }}>
+          <div style={sectionTitleStyle}>利用規約</div>
+          <div style={{ 
+            height: "200px", 
+            overflowY: "auto", 
+            padding: "15px", 
+            backgroundColor: "#fff", 
+            border: "1px solid #ccc", 
+            borderRadius: "8px",
+            fontSize: "13px",
+            color: "#555",
+            whiteSpace: "pre-wrap",
+            lineHeight: "1.6"
+          }}>
+            {termsText === null ? "利用規約を読み込み中..." : termsText}
+          </div>
+          
+          <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer", fontWeight: "bold", marginTop: "15px" }}>
             <input type="checkbox" name="agreed" checked={formData.agreed} onChange={handleChange} required style={{ width: "20px", height: "20px" }} />
-            <span>
-              <span onClick={() => {
-                if (liff.isInClient()) {
-                  liff.openWindow({ url: "https://swim-partners.com/rule", external: true });
-                } else {
-                  window.open("https://swim-partners.com/rule", "_blank");
-                }
-              }} style={{ color: "#00B900", textDecoration: "underline", cursor: "pointer" }}>利用規約</span>に同意する
-            </span>
+            <span>上記の利用規約に同意する</span>
           </label>
         </div>
 
