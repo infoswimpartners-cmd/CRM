@@ -1,0 +1,39 @@
+
+> swim-partners-manager@0.1.0 dev
+> next dev
+
+▲ Next.js 16.1.1 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://10.119.50.51:3000
+- Environments: .env.local
+- Experiments (use with caution):
+  · optimizePackageImports
+
+✓ Starting...
+✓ Ready in 459ms
+ GET /admin/trio 200 in 3.0s (compile: 1527ms, proxy.ts: 408ms, render: 1087ms)
+ GET /api/auth/session 200 in 837ms (compile: 547ms, proxy.ts: 276ms, render: 14ms)
+ POST /admin/trio 200 in 479ms (compile: 1786µs, proxy.ts: 148ms, render: 329ms)
+ POST /admin/trio 200 in 351ms (compile: 6ms, proxy.ts: 144ms, render: 201ms)
+ POST /admin/trio 200 in 314ms (compile: 5ms, proxy.ts: 142ms, render: 167ms)
+ POST /admin/trio 200 in 314ms (compile: 7ms, proxy.ts: 136ms, render: 171ms)
+ POST /admin/trio 200 in 572ms (compile: 1974µs, proxy.ts: 149ms, render: 421ms)
+ POST /admin/trio 200 in 270ms (compile: 3ms, proxy.ts: 136ms, render: 131ms)
+ POST /admin/trio 200 in 320ms (compile: 2ms, proxy.ts: 196ms, render: 122ms)
+ GET /api/auth/session 200 in 320ms (compile: 7ms, proxy.ts: 272ms, render: 42ms)
+ GET /admin/settings 200 in 3.1s (compile: 401ms, proxy.ts: 1115ms, render: 1577ms)
+ GET /api/auth/session 200 in 111ms (compile: 1457µs, proxy.ts: 102ms, render: 7ms)
+ GET /api/admin/settings/terms 200 in 610ms (compile: 78ms, proxy.ts: 309ms, render: 223ms)
+ GET /api/admin/settings/payment-template 200 in 631ms (compile: 77ms, proxy.ts: 323ms, render: 231ms)
+ GET /api/admin/settings/company 200 in 794ms (compile: 178ms, proxy.ts: 122ms, render: 495ms)
+ POST /api/admin/settings/payment-template 200 in 553ms (compile: 6ms, proxy.ts: 139ms, render: 408ms)
+ GET /api/auth/session 200 in 507ms (compile: 17ms, proxy.ts: 479ms, render: 12ms)
+ GET /api/auth/session 200 in 106ms (compile: 4ms, proxy.ts: 95ms, render: 7ms)
+ GET /api/auth/session 200 in 165ms (compile: 8ms, proxy.ts: 148ms, render: 10ms)
+ GET /api/auth/session 200 in 119ms (compile: 1860µs, proxy.ts: 112ms, render: 5ms)
+ GET /api/auth/session 200 in 628ms (compile: 21ms, proxy.ts: 595ms, render: 12ms)
+ GET /api/auth/session 200 in 113ms (compile: 8ms, proxy.ts: 99ms, render: 6ms)
+ GET /api/auth/session 200 in 942ms (compile: 154ms, proxy.ts: 766ms, render: 22ms)
+ GET /api/auth/session 200 in 106ms (compile: 3ms, proxy.ts: 97ms, render: 6ms)
+ GET /api/auth/session 200 in 620ms (compile: 18ms, proxy.ts: 592ms, render: 10ms)
+ GET /api/auth/session 200 in 105ms (compile: 2ms, proxy.ts: 98ms, render: 5ms)
