@@ -23,6 +23,7 @@ export async function POST(req: Request) {
         datetime1: payload.datetime1 || null,
         datetime2: payload.datetime2 || null,
         datetime3: payload.datetime3 || null,
+        available_times: payload.availableTimes || null,
         frequency: payload.frequency,
         notes: payload.notes,
         skill_level: payload.skillLevel,

@@ -20,9 +20,16 @@ export default function BookingForm() {
     emailConfirm: "",
     phone: "",
     station: "",
-    datetime1: "",
-    datetime2: "",
-    datetime3: "",
+    date1: "",
+    time1Start: "",
+    time1End: "",
+    date2: "",
+    time2Start: "",
+    time2End: "",
+    date3: "",
+    time3Start: "",
+    time3End: "",
+    availableTimes: "",
     skillLevel: "",
     frequency: "",
     notes: "",
@@ -93,9 +100,19 @@ export default function BookingForm() {
     }
 
     // Makeへ送信するデータ
+    const formatDateTime = (date: string, start: string, end: string) => {
+      if (!date) return "";
+      if (start && end) return `${date} ${start}〜${end}`;
+      if (start) return `${date} ${start}〜`;
+      return date;
+    };
+
     const payload = {
       userId: userId,
       ...formData,
+      datetime1: formatDateTime(formData.date1, formData.time1Start, formData.time1End),
+      datetime2: formatDateTime(formData.date2, formData.time2Start, formData.time2End),
+      datetime3: formatDateTime(formData.date3, formData.time3Start, formData.time3End),
       source: "体験予約フォーム"
     };
 
@@ -110,9 +127,11 @@ export default function BookingForm() {
       });
 
       if (response.ok) {
-        alert("お申し込みを受け付けました！");
         if (liff.isInClient()) {
+          // LIFF環境下ではアラートを出さずに即座に閉じる
           liff.closeWindow();
+        } else {
+          alert("お申し込みを受け付けました！画面を閉じてください。");
         }
       } else {
         alert("送信に失敗しました。もう一度お試しください。");
@@ -209,20 +228,36 @@ export default function BookingForm() {
         </label>
 
         <div style={sectionTitleStyle}>希望日時（第3希望まで）</div>
+        <p style={{ fontSize: "12px", color: "#666", marginBottom: "15px", marginTop: "-10px" }}>時間帯は10分刻みで選択できます（例：13:00〜15:00）</p>
 
         <label style={labelStyle}>
           第1希望日時:
-          <input type="datetime-local" name="datetime1" value={formData.datetime1} onChange={handleChange} required style={inputStyle} />
+          <div style={{ display: "flex", gap: "5px", alignItems: "center", marginTop: "6px" }}>
+            <input type="date" name="date1" value={formData.date1} onChange={handleChange} required style={{ ...inputStyle, marginTop: 0, flex: 1, padding: "10px 5px" }} />
+            <input type="time" name="time1Start" value={formData.time1Start} onChange={handleChange} step="600" required style={{ ...inputStyle, marginTop: 0, flex: 1, padding: "10px 5px" }} />
+            <span>〜</span>
+            <input type="time" name="time1End" value={formData.time1End} onChange={handleChange} step="600" required style={{ ...inputStyle, marginTop: 0, flex: 1, padding: "10px 5px" }} />
+          </div>
         </label>
 
         <label style={labelStyle}>
           第2希望日時:
-          <input type="datetime-local" name="datetime2" value={formData.datetime2} onChange={handleChange} style={inputStyle} />
+          <div style={{ display: "flex", gap: "5px", alignItems: "center", marginTop: "6px" }}>
+            <input type="date" name="date2" value={formData.date2} onChange={handleChange} style={{ ...inputStyle, marginTop: 0, flex: 1, padding: "10px 5px" }} />
+            <input type="time" name="time2Start" value={formData.time2Start} onChange={handleChange} step="600" style={{ ...inputStyle, marginTop: 0, flex: 1, padding: "10px 5px" }} />
+            <span>〜</span>
+            <input type="time" name="time2End" value={formData.time2End} onChange={handleChange} step="600" style={{ ...inputStyle, marginTop: 0, flex: 1, padding: "10px 5px" }} />
+          </div>
         </label>
 
         <label style={labelStyle}>
           第3希望日時:
-          <input type="datetime-local" name="datetime3" value={formData.datetime3} onChange={handleChange} style={inputStyle} />
+          <div style={{ display: "flex", gap: "5px", alignItems: "center", marginTop: "6px" }}>
+            <input type="date" name="date3" value={formData.date3} onChange={handleChange} style={{ ...inputStyle, marginTop: 0, flex: 1, padding: "10px 5px" }} />
+            <input type="time" name="time3Start" value={formData.time3Start} onChange={handleChange} step="600" style={{ ...inputStyle, marginTop: 0, flex: 1, padding: "10px 5px" }} />
+            <span>〜</span>
+            <input type="time" name="time3End" value={formData.time3End} onChange={handleChange} step="600" style={{ ...inputStyle, marginTop: 0, flex: 1, padding: "10px 5px" }} />
+          </div>
         </label>
 
         <div style={sectionTitleStyle}>泳力・目標</div>
@@ -244,6 +279,11 @@ export default function BookingForm() {
         </label>
 
         <label style={labelStyle}>
+          入会をご検討の場合、レッスン可能な曜日や時間帯（任意）:
+          <textarea name="availableTimes" value={formData.availableTimes} onChange={handleChange} placeholder="例：月曜10:00〜12:00、木曜18:00以降など" style={{ ...inputStyle, minHeight: "60px", resize: "vertical" }} />
+        </label>
+
+        <label style={labelStyle}>
           その他（ご質問など）:
           <textarea name="notes" value={formData.notes} onChange={handleChange} placeholder="自由にご記入ください" style={{ ...inputStyle, minHeight: "80px", resize: "vertical" }} />
         </label>
@@ -252,7 +292,13 @@ export default function BookingForm() {
           <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer", fontWeight: "bold" }}>
             <input type="checkbox" name="agreed" checked={formData.agreed} onChange={handleChange} required style={{ width: "20px", height: "20px" }} />
             <span>
-              <a href="https://swim-partners.com/rule" target="_blank" rel="noopener noreferrer" style={{ color: "#00B900", textDecoration: "underline" }}>利用規約</a>に同意する
+              <span onClick={() => {
+                if (liff.isInClient()) {
+                  liff.openWindow({ url: "https://swim-partners.com/rule", external: true });
+                } else {
+                  window.open("https://swim-partners.com/rule", "_blank");
+                }
+              }} style={{ color: "#00B900", textDecoration: "underline", cursor: "pointer" }}>利用規約</span>に同意する
             </span>
           </label>
         </div>
