@@ -75,6 +75,25 @@ export async function POST(req: NextRequest) {
                         .eq('id', studentId)
                         .single()
 
+                    let coachName = '未定';
+                    if (scheduleId) {
+                        const { data: sched } = await supabaseAdmin
+                            .from('lesson_schedules')
+                            .select('coach_id')
+                            .eq('id', scheduleId)
+                            .single();
+                        if (sched?.coach_id) {
+                            const { data: p } = await supabaseAdmin
+                                .from('profiles')
+                                .select('full_name')
+                                .eq('id', sched.coach_id)
+                                .single();
+                            if (p?.full_name) {
+                                coachName = p.full_name;
+                            }
+                        }
+                    }
+
                     if (student && !fetchError) {
                         const formattedDate = lessonDate
                             ? new Date(lessonDate).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })
@@ -90,8 +109,9 @@ export async function POST(req: NextRequest) {
                                 full_name: student.full_name,
                                 lesson_date: formattedDate,
                                 location: lessonLocation,
+                                coach_name: coachName,
                                 title: '体験レッスン',
-                                amount: (session.amount_total || 0).toLocaleString() + '円'
+                                amount: (session.amount_total || 0).toLocaleString()
                             }
                         )
                     }
