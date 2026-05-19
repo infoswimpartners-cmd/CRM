@@ -5,7 +5,6 @@ export async function POST(req: Request) {
     const payload = await req.json();
     const webhookUrl = process.env.NEXT_PUBLIC_MAKE_WEBHOOK_URL;
 
-
     // 2. Make Webhook へ送信
     if (!webhookUrl) {
       return NextResponse.json({ error: "Webhook URL is not configured" }, { status: 500 });
