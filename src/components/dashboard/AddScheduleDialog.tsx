@@ -325,17 +325,28 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
             }
         }
 
-        setSlots(prev => prev.map(slot => {
-            if (!slot.startTime || !slot.date) return slot
-            const [sh, sm] = slot.startTime.split(':').map(Number)
-            const startD = new Date(slot.date)
-            startD.setHours(sh, sm, 0)
-            const endD = new Date(startD.getTime() + duration * 60000)
-            const eh = endD.getHours().toString().padStart(2, '0')
-            const em = endD.getMinutes().toString().padStart(2, '0')
-            return { ...slot, endTime: `${eh}:${em}` }
-        }))
-    }, [selectedMasterId, isOverage, membershipName, lessonMasters, studentId])
+        setSlots(prev => {
+            let hasChanges = false
+            const newSlots = prev.map(slot => {
+                if (!slot.startTime || !slot.date) return slot
+                const [sh, sm] = slot.startTime.split(':').map(Number)
+                const startD = new Date(slot.date)
+                startD.setHours(sh, sm, 0)
+                const endD = new Date(startD.getTime() + duration * 60000)
+                const eh = endD.getHours().toString().padStart(2, '0')
+                const em = endD.getMinutes().toString().padStart(2, '0')
+                const newEndTime = `${eh}:${em}`
+                
+                if (slot.endTime !== newEndTime) {
+                    hasChanges = true
+                    return { ...slot, endTime: newEndTime }
+                }
+                return slot
+            })
+            return hasChanges ? newSlots : prev
+        })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedMasterId, isOverage, membershipName, lessonMasters, studentId, JSON.stringify(slots.map(s => s.startTime))])
 
 
     const handleSubmit = async (e: React.FormEvent) => {
