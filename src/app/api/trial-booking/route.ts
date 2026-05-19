@@ -65,12 +65,18 @@ export async function POST(req: Request) {
     // 2. Make Webhook へ送信 (エラーが起きても顧客には成功を返す)
     if (webhookUrl) {
       try {
+        // MakeのWebhookでスキーマエラー（406 Invalid schema）が起きるのを防ぐため、
+        // 空文字 ("") のプロパティを null に変換して送信する
+        const cleanPayload = Object.fromEntries(
+          Object.entries(payload).map(([key, value]) => [key, value === "" ? null : value])
+        );
+
         const response = await fetch(webhookUrl, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(payload),
+          body: JSON.stringify(cleanPayload),
         });
 
         if (!response.ok) {
