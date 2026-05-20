@@ -210,7 +210,7 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
             {/* 料金詳細ページへの美しいテキストリンク */}
             <div className="mb-4">
               <a
-                href="https://swim-partners.com/price"
+                href="https://swim-partners.com/course-price"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center text-xs font-bold text-blue-600 hover:text-blue-700 hover:underline transition-colors"
