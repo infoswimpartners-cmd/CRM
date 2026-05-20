@@ -5,7 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { stripe } from '@/lib/stripe';
 import { revalidatePath } from 'next/cache';
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://manager.swim-partners.com';
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://member.swim-partners.com';
 
 /**
  * THE TRIOの現在の状況（アクティブ人数、Waitlist人数）を取得

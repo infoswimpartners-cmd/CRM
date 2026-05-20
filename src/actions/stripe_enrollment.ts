@@ -3,7 +3,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { stripe } from '@/lib/stripe'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://manager.swim-partners.com'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://member.swim-partners.com'
 
 // 本番用価格IDとテスト環境用価格IDのマッピング辞書
 const PRICE_ID_MAP: Record<string, string> = {

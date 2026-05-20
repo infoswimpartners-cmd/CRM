@@ -16,7 +16,7 @@ function debugLog(msg: string) {
     }
 }
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://manager.swim-partners.com'
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://member.swim-partners.com'
 
 export async function createStripeCustomer(studentId: string) {
     const supabase = await createClient()
