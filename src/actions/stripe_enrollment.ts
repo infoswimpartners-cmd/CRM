@@ -67,7 +67,7 @@ export async function createEnrollmentCheckoutSession(planId: string, lineUserId
 
         // 環境に応じた価格IDのマッピング（テスト環境で本番用価格IDを差し替える）
         let targetPriceId = priceId
-        const isTestMode = process.env.NODE_ENV !== 'production' || !targetPriceId.startsWith('price_live')
+        const isTestMode = process.env.NODE_ENV !== 'production'
         
         if (isTestMode) {
             if (PRICE_ID_MAP[targetPriceId]) {
