@@ -19,13 +19,20 @@ export default async function EnrollPage() {
     .eq('active', true)
     .order('display_order', { ascending: true });
 
-  // 一般入会フォームに表示する標準プラン（表示順通りに定義）
-  const targetNames = ['月4回（60分）', '月2回（60分）', '単発'];
+  // 一般入会フォームに表示する標準プランおよび時間バリエーション
+  const targetNames = [
+    '月4回（60分）',
+    '月4回（90分）',
+    '月4回 (120分)',
+    '月2回（60分）',
+    '月2回（90分）',
+    '月2回 (120分)',
+    '単発'
+  ];
 
-  // 対象のプランのみを抽出し、指定順にソート
+  // 対象のプランのみを抽出
   const filteredPlans = (dbPlans || [])
-    .filter((plan) => targetNames.includes(plan.name))
-    .sort((a, b) => targetNames.indexOf(a.name) - targetNames.indexOf(b.name));
+    .filter((plan) => targetNames.includes(plan.name));
 
   return <EnrollmentForm dbPlans={filteredPlans} />;
 }

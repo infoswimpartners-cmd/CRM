@@ -16,6 +16,8 @@ const PRICE_ID_MAP: Record<string, string> = {
     'price_1SwKVcP0UQGtpYXmJqUXBecy': 'price_1TSX3TP0UQGtpYXmAfC6TLIO',
     'price_1SwKVdP0UQGtpYXmjXxiPSK6': 'price_1TSX3TP0UQGtpYXmAfC6TLIO',
     'price_1TNtfKP0UQGtpYXmwzZ3Bp4s': 'price_1TSX3TP0UQGtpYXmAfC6TLIO',
+    'price_1T10PIP0UQGtpYXmGylnrbuW': 'price_1TSX3TP0UQGtpYXmAfC6TLIO',
+    'price_1T10NRP0UQGtpYXm9a9qqBZK': 'price_1TSX3TP0UQGtpYXmAfC6TLIO',
 }
 
 /**
