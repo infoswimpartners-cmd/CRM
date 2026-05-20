@@ -3,62 +3,20 @@
 import React, { useState, useEffect } from 'react';
 import liff from '@line/liff';
 
-// 1. ホームページの情報を忠実に再現したプランデータ
-const PLANS = [
-  {
-    id: 'monthly-4',
-    name: '月4回継続プラン（一番人気）',
-    price: 34000,
-    period: '月',
-    description: '着実にステップアップしたい方へ。定期的にお得に通えるおすすめプランです。',
-    rules: [
-      'コーチの交通費・施設利用料がすべて含まれています。',
-      'レッスンの追加・先行利用は「8,500円/回」で可能です。',
-      '振替の有効期間は【2ヶ月間】となります。',
-      '入会金・年会費は一切かかりません。'
-    ],
-  },
-  {
-    id: 'monthly-2',
-    name: '月2回継続プラン',
-    price: 17400,
-    period: '月',
-    description: 'ご自身のペースで無理なく、コツコツと継続していきたい方向けのプランです。',
-    rules: [
-      'コーチの交通費・施設利用料がすべて含まれています。',
-      'レッスンの追加・先行利用は「8,700円/回」で可能です。',
-      '振替の有効期間は【2ヶ月間】となります。',
-      '入会金・年会費は一切かかりません。'
-    ],
-  },
-  {
-    id: 'package-25m',
-    name: '25m完泳パッケージ（全12回）',
-    price: 102000,
-    period: '一括',
-    description: '夏までに絶対に泳ぎたい方向け！圧倒的安心の「完泳保証」が付いたパッケージです。',
-    rules: [
-      'プロの完泳保証付き（万が一12回で泳げなかった場合、最大4回分の補講レッスンを無償提供）。',
-      '1回あたり8,500円（月4回コースと同等の特別価格）で受講可能です。',
-      'コーチの交通費・施設利用料がすべて含まれています。'
-    ],
-  },
-  {
-    id: 'single',
-    name: '単発プラン',
-    price: 0,
-    period: '月',
-    description: '定期的に通うのが難しい方へ。月会費0円で、受講した分だけその都度決済されるプランです。',
-    rules: [
-      '入会金・年会費・月会費は一切かかりません（0円/月）。',
-      'レッスンを受講する都度、レッスン料金が発生いたします。',
-      '初回手続き時にクレジットカード情報を登録いただきます（登録時の決済額は0円です）。',
-      '2回目以降のレッスン受講時は、登録カードから受講料が自動決済されます。'
-    ],
-  }
-];
+interface DBPlan {
+  id: string;
+  name: string;
+  fee: number;
+  stripe_price_id: string;
+  active: boolean;
+  display_order: number;
+}
 
-export default function EnrollmentForm() {
+interface EnrollmentFormProps {
+  dbPlans: DBPlan[];
+}
+
+export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
   const [selectedPlanId, setSelectedPlanId] = useState('');
   const [agreedTerms, setAgreedTerms] = useState({
     billing: false,
@@ -101,6 +59,70 @@ export default function EnrollmentForm() {
     initLiff();
   }, []);
 
+  // Supabaseから取得したプランデータをUI用の定義にマッピング・統合する
+  const PLANS = [
+    ...dbPlans.map((plan) => {
+      let description = 'Swim Partners の会員プランです。';
+      let rules: string[] = [
+        'コーチの交通費・施設利用料が含まれています。',
+        '振替の有効期間は【2ヶ月間】となります。',
+        '入会金・年会費は一切かかりません。'
+      ];
+      let period = '月';
+
+      // プラン名に基づいたルールの動的判定
+      if (plan.name.includes('月4回')) {
+        description = '着実にステップアップしたい方へ。定期的にお得に通えるおすすめプランです。';
+        rules = [
+          'コーチの交通費・施設利用料がすべて含まれています。',
+          'レッスンの追加・先行利用は「8,500円/回」で可能です。',
+          '振替の有効期間は【2ヶ月間】となります。',
+          '入会金・年会費は一切かかりません。'
+        ];
+      } else if (plan.name.includes('月2回')) {
+        description = 'ご自身のペースで無理なく、コツコツと継続していきたい方向けのプランです。';
+        rules = [
+          'コーチの交通費・施設利用料がすべて含まれています。',
+          'レッスンの追加・先行利用は「8,700円/回」で可能です。',
+          '振替の有効期間は【2ヶ月間】となります。',
+          '入会金・年会費は一切かかりません。'
+        ];
+      } else if (plan.name.includes('単発')) {
+        description = '定期的に通うのが難しい方へ。月会費0円で、受講した分だけその都度決済されるプランです。';
+        rules = [
+          '入会金・年会費・月会費は一切かかりません（0円/月）。',
+          'レッスンを受講する都度、レッスン料金が発生いたします。',
+          '初回手続き時にクレジットカード情報を登録いただきます（登録時の決済額は0円です）。',
+          '2回目以降のレッスン受講時は、登録カードから受講料が自動決済されます。'
+        ];
+      }
+
+      return {
+        id: plan.id,
+        stripePriceId: plan.stripe_price_id,
+        name: plan.name,
+        price: plan.fee,
+        period,
+        description,
+        rules,
+      };
+    }),
+    // 25m完泳パッケージ（一括決済プラン）を静的に統合
+    {
+      id: 'package-25m',
+      stripePriceId: 'price_1SwKVfP0UQGtpYXm9cgy3v1g', // 必要に応じてマッピング。完泳パッケージ用のテスト・本番ID
+      name: '25m完泳パッケージ（全12回）',
+      price: 102000,
+      period: '一括',
+      description: '夏までに絶対に泳ぎたい方向け！圧倒的安心の「完泳保証」が付いたパッケージです。',
+      rules: [
+        'プロの完泳保証付き（万が一12回で泳げなかった場合、最大4回分の補講レッスンを無償提供）。',
+        '1回あたり8,500円（月4回コースと同等の特別価格）で受講可能です。',
+        'コーチの交通費・施設利用料がすべて含まれています。'
+      ],
+    }
+  ];
+
   // 選択されたプランの情報を取得
   const currentPlan = PLANS.find(p => p.id === selectedPlanId);
 
@@ -112,7 +134,7 @@ export default function EnrollmentForm() {
     if (isSubmitDisabled) return;
 
     // Stripe決済画面やMake Webhookへのデータ引き渡し時、LINEのuserIdも含めて処理します
-    alert(`LINE ID: ${userId}\nプラン「${currentPlan?.name}」でStripe決済画面へ遷移します。`);
+    alert(`LINE ID: ${userId}\nプラン「${currentPlan?.name}」\nStripe Price ID: ${currentPlan?.stripePriceId}\nでStripe決済画面へ遷移します。`);
   };
 
   // 読み込み中の美しくリッチな表示
