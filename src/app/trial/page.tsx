@@ -56,6 +56,9 @@ export default function BookingForm() {
           setIsLiffReady(true);
         } else {
           const redirectUri = window.location.origin + window.location.pathname;
+          // リダイレクトがブロックされた場合のためにメッセージを表示
+          setLiffError("LINEログインが必要です。ログイン画面へ移動します...");
+          setIsLiffReady(true);
           liff.login({ redirectUri });
         }
       } catch (error: any) {
