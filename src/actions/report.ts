@@ -150,7 +150,7 @@ export async function submitLessonReport(values: FormValues) {
             // lesson_masters の情報を取得（メール通知ブロックの外で取得している場合もあるが、確実を期す）
             const { data: masterInfo } = await supabaseAdmin
                 .from('lesson_masters')
-                .select('is_trial')
+                .select('name, is_trial')
                 .eq('id', data.lesson_master_id)
                 .single()
 
@@ -167,6 +167,16 @@ export async function submitLessonReport(values: FormValues) {
                         .update({ status: 'trial_done' })
                         .eq('id', data.student_id)
                     console.log(`[Status Update] Student ${data.student_id} status updated to trial_done`)
+
+                    // Make Webhookをトリガー
+                    await triggerMakeTrialDoneWebhook(data.student_id, user.id, {
+                        student_name: data.student_name,
+                        lesson_date: data.lesson_date,
+                        location: data.location,
+                        lesson_type: masterInfo?.name || '体験レッスン',
+                        price: data.price,
+                        description: data.menu_description || ''
+                    });
                 }
             }
         }
@@ -399,6 +409,16 @@ export async function submitPublicLessonReport(values: PublicFormValues) {
                         .update({ status: 'trial_done' })
                         .eq('id', data.student_id)
                     console.log(`[Public Status Update] Student ${data.student_id} status updated to trial_done`)
+
+                    // Make Webhookをトリガー
+                    await triggerMakeTrialDoneWebhook(data.student_id, data.coach_id, {
+                        student_name: data.student_name,
+                        lesson_date: data.lesson_date,
+                        location: data.location,
+                        lesson_type: lessonMaster?.name || '体験レッスン',
+                        price: data.price,
+                        description: data.menu_description || ''
+                    });
                 }
             }
         }
@@ -561,7 +581,7 @@ export async function submitAdminProxyReport(values: AdminProxyValues) {
     // 5. レッスン単価を取得して最終金額を計算
     const { data: master } = await supabaseAdmin
         .from('lesson_masters')
-        .select('unit_price, is_trial')
+        .select('unit_price, is_trial, name')
         .eq('id', data.lesson_master_id)
         .single()
     const finalPrice = (master?.unit_price ?? data.price) + facilityFee
@@ -613,6 +633,16 @@ export async function submitAdminProxyReport(values: AdminProxyValues) {
                     .update({ status: 'trial_done' })
                     .eq('id', data.student_id)
                 console.log(`[Admin Proxy Status Update] Student ${data.student_id} status updated to trial_done`)
+
+                // Make Webhookをトリガー
+                await triggerMakeTrialDoneWebhook(data.student_id, data.coach_id, {
+                    student_name: data.student_name,
+                    lesson_date: data.lesson_date,
+                    location: data.location,
+                    lesson_type: master?.name || '体験レッスン',
+                    price: finalPrice,
+                    description: data.menu_description || ''
+                });
             }
         }
 
@@ -621,5 +651,72 @@ export async function submitAdminProxyReport(values: AdminProxyValues) {
     } catch (error: any) {
         console.error('[AdminProxyReport] Error:', error)
         return { success: false, error: error.message || '作成に失敗しました' }
+    }
+}
+
+// ── Make Webhook トリガー（体験レッスン終了時） ──────────────────────────────────────────
+async function triggerMakeTrialDoneWebhook(studentId: string, coachId: string, lessonData: {
+    student_name: string,
+    lesson_date: string,
+    location: string,
+    lesson_type: string,
+    price: number,
+    description: string
+}) {
+    const webhookUrl = process.env.MAKE_TRIAL_DONE_WEBHOOK_URL;
+    if (!webhookUrl) {
+        console.warn("MAKE_TRIAL_DONE_WEBHOOK_URL is not set. Skipping Webhook trigger.");
+        return;
+    }
+
+    try {
+        const { createAdminClient } = await import('@/lib/supabase/admin');
+        const supabaseAdmin = createAdminClient();
+
+        // 1. 生徒の情報を取得（line_user_id や連絡先）
+        const { data: student } = await supabaseAdmin
+            .from('students')
+            .select('line_user_id, contact_email, contact_phone')
+            .eq('id', studentId)
+            .single();
+
+        // 2. コーチの名前を取得
+        const { data: coach } = await supabaseAdmin
+            .from('profiles')
+            .select('full_name')
+            .eq('id', coachId)
+            .single();
+
+        const payload = {
+            student_id: studentId,
+            student_name: lessonData.student_name,
+            line_user_id: student?.line_user_id || null,
+            contact_email: student?.contact_email || null,
+            contact_phone: student?.contact_phone || null,
+            coach_id: coachId,
+            coach_name: coach?.full_name || 'コーチ',
+            lesson_date: lessonData.lesson_date,
+            location: lessonData.location,
+            lesson_type: lessonData.lesson_type,
+            price: lessonData.price,
+            menu_description: lessonData.description || ''
+        };
+
+        const response = await fetch(webhookUrl, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`Make Trial Done Webhook Error (${response.status}):`, errorText);
+        } else {
+            console.log(`Successfully triggered Make Trial Done Webhook for student: ${studentId}`);
+        }
+    } catch (error) {
+        console.error("Error triggering Make Trial Done Webhook:", error);
     }
 }
