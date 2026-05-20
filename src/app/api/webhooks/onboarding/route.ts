@@ -96,6 +96,7 @@ export async function POST(req: NextRequest) {
             '生年月日（2人目）': 'second_student_birth_date',
             '2人目の生年月日': 'second_student_birth_date',
             '生年月日2': 'second_student_birth_date',
+            'second_birth_date': 'second_student_birth_date',
             '性別': 'gender',
             '性別（2人目）': 'second_student_gender',
             '2人目の性別': 'second_student_gender',

@@ -14,9 +14,11 @@ export default function BookingForm() {
     name: "",
     kana: "",
     dob: "",
+    gender: "",
     name2: "",
     kana2: "",
     dob2: "",
+    gender2: "",
     email: "",
     emailConfirm: "",
     phone: "",
@@ -208,6 +210,16 @@ export default function BookingForm() {
           <input type="date" name="dob" value={formData.dob} onChange={handleChange} required style={inputStyle} />
         </label>
 
+        <label style={labelStyle}>
+          性別:
+          <select name="gender" value={formData.gender} onChange={handleChange} required style={inputStyle}>
+            <option value="">選択してください</option>
+            <option value="男性">男性</option>
+            <option value="女性">女性</option>
+            <option value="回答しない">回答しない</option>
+          </select>
+        </label>
+
         <div style={sectionTitleStyle}>2人目の情報（任意）</div>
 
         <label style={labelStyle}>
@@ -223,6 +235,16 @@ export default function BookingForm() {
         <label style={labelStyle}>
           生年月日（2人目）:
           <input type="date" name="dob2" value={formData.dob2} onChange={handleChange} style={inputStyle} />
+        </label>
+
+        <label style={labelStyle}>
+          性別（2人目）:
+          <select name="gender2" value={formData.gender2} onChange={handleChange} style={inputStyle}>
+            <option value="">選択してください</option>
+            <option value="男性">男性</option>
+            <option value="女性">女性</option>
+            <option value="回答しない">回答しない</option>
+          </select>
         </label>
 
         <div style={sectionTitleStyle}>連絡先・その他</div>
