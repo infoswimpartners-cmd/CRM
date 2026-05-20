@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { stripe } from '@/lib/stripe'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://manager.swim-partners.com'
@@ -22,7 +22,7 @@ const PRICE_ID_MAP: Record<string, string> = {
  * オンライン入会手続き用の Stripe Checkout セッションを作成する
  */
 export async function createEnrollmentCheckoutSession(planId: string, lineUserId: string) {
-    const supabase = await createClient()
+    const supabase = createAdminClient()
 
     try {
         if (!planId) {

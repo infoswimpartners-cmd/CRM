@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import EnrollmentForm from '@/components/forms/EnrollmentForm';
 
 export const dynamic = 'force-dynamic';
@@ -10,7 +10,7 @@ export const metadata = {
 };
 
 export default async function EnrollPage() {
-  const supabase = await createClient();
+  const supabase = createAdminClient();
   
   // membership_types からアクティブなプランを取得
   const { data: dbPlans } = await supabase
@@ -19,5 +19,13 @@ export default async function EnrollPage() {
     .eq('active', true)
     .order('display_order', { ascending: true });
 
-  return <EnrollmentForm dbPlans={dbPlans || []} />;
+  // 一般入会フォームに表示する標準プラン（表示順通りに定義）
+  const targetNames = ['月4回（60分）', '月2回（60分）', '単発'];
+
+  // 対象のプランのみを抽出し、指定順にソート
+  const filteredPlans = (dbPlans || [])
+    .filter((plan) => targetNames.includes(plan.name))
+    .sort((a, b) => targetNames.indexOf(a.name) - targetNames.indexOf(b.name));
+
+  return <EnrollmentForm dbPlans={filteredPlans} />;
 }
