@@ -324,8 +324,52 @@ export async function sendTestEmail(key: string, subject: string, body: string, 
     }
 
 
-    // 3-b. メール送信（宛先がある場合のみ）
+    // 3-b. メール送信またはLINE優先送信のシミュレート
+    let isLineSent = false
     if (recipient) {
+        try {
+            // LINE連携の有無を確認（大文字小文字/空白の揺れ、および同一メールアドレス重複登録に対応）
+            const { data: students } = await supabase
+                .from('students')
+                .select('line_user_id')
+                .ilike('contact_email', recipient.trim())
+
+            const student = (students || []).find(s => s.line_user_id)
+
+            // テスト送信でLINE優先送信の対象とするテンプレートキー判定
+            const isLineTargetTemplate = [
+                'trial_confirmed',
+                'trial_payment_request',
+                'trial_payment_completed',
+                'trio_trial_payment_completed',
+                'payment_success'
+            ].includes(key)
+
+            if (student?.line_user_id && isLineTargetTemplate) {
+                const { lineService } = await import('@/lib/line')
+                let lineMessage = ''
+                if (key === 'trial_confirmed') {
+                    lineMessage = `【体験レッスン予約確定とご請求】\n\n${testBody}`
+                } else if (key === 'trial_payment_completed') {
+                    lineMessage = `【体験レッスン決済完了】\n\n${testBody}`
+                } else if (key === 'trio_trial_payment_completed') {
+                    lineMessage = `【THE TRIO 体験レッスン決済完了】\n\n${testBody}`
+                } else {
+                    lineMessage = `📢 ${testSubject}\n\n${testBody}`
+                }
+
+                const success = await lineService.pushMessage(student.line_user_id, `🧪 [TEST]\n${lineMessage}`)
+                if (success) {
+                    results.push('LINE')
+                    isLineSent = true
+                }
+            }
+        } catch (lineErr) {
+            console.error('[Test] LINE check/send error:', lineErr)
+        }
+    }
+
+    if (recipient && !isLineSent) {
         try {
             const ok = await emailService.sendEmail({
                 to: recipient,
@@ -340,7 +384,7 @@ export async function sendTestEmail(key: string, subject: string, body: string, 
                 return { success: false, error: error.message }
             }
         }
-    } else if (!hasChatChannels) {
+    } else if (!recipient && !hasChatChannels) {
         // メールアドレスもChatも設定がない場合
         return { success: false, error: '送信先がありません。メールアドレスを入力するか、Google Chat Webhookを設定してください。' }
     }

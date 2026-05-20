@@ -2,6 +2,7 @@
 import nodemailer from 'nodemailer'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { sendGoogleChatMessage, replaceVariables } from '@/lib/google-chat'
+import { lineService } from '@/lib/line'
 
 interface EmailOptions {
     to: string
@@ -172,6 +173,16 @@ ${text}
     async sendTriggerEmail(triggerId: string, to: string, variables: Record<string, string>, overrideTemplate?: { subject: string, body: string }): Promise<boolean> {
         try {
             const supabase = createAdminClient()
+
+            // 1. LINE連携の有無を事前に確認（同一メールアドレスの重複登録に対応）
+            const { data: students } = await supabase
+                .from('students')
+                .select('line_user_id')
+                .ilike('contact_email', to.trim())
+
+            const student = (students || []).find(s => s.line_user_id)
+            const hasLineLinked = !!student?.line_user_id
+
             const { data: trigger, error: triggerError } = await supabase
                 .from('email_triggers')
                 .select('template_id, is_enabled, google_chat_webhook_url, google_chat_enabled, google_chat_message_template')
@@ -189,9 +200,9 @@ ${text}
             }
 
             // --- メールテンプレートを先に取得・レンダリング ---
-            // Google Chat のデフォルトメッセージでメール本文を共用するため先に処理する
             let renderedSubject = ''
             let renderedBody = ''
+            let isApprovalRequired = false
 
             if (overrideTemplate) {
                 renderedSubject = overrideTemplate.subject
@@ -203,14 +214,6 @@ ${text}
                     renderedSubject = renderedSubject.replace(regex, v)
                     renderedBody = renderedBody.replace(regex, v)
                 }
-
-                // メール送信
-                await this.sendEmail({
-                    to,
-                    subject: renderedSubject,
-                    text: renderedBody,
-                    requireApproval: false, // Overrideの場合は一旦falseで送信（必要に応じて変更）
-                })
             } else if (trigger.template_id) {
                 const { data: template, error: templateError } = await supabase
                     .from('email_templates')
@@ -230,6 +233,7 @@ ${text}
 
                 renderedSubject = template.subject
                 renderedBody = template.body
+                isApprovalRequired = template.is_approval_required ?? false
 
                 // 変数を置換
                 for (const [k, v] of Object.entries(variables)) {
@@ -237,37 +241,71 @@ ${text}
                     renderedSubject = renderedSubject.replace(regex, v)
                     renderedBody = renderedBody.replace(regex, v)
                 }
-
-                // メール送信
-                await this.sendEmail({
-                    to,
-                    subject: renderedSubject,
-                    text: renderedBody,
-                    requireApproval: template.is_approval_required ?? false,
-                })
-            } else {
-                console.log(`[Trigger No Template] Skipping email for '${triggerId}'`)
             }
 
-            // --- Google Chat 送信 ---
+            // 2. LINE連携されており、かつLINE送信対象のトリガーである場合はLINEにのみ送信
+            const isLineTargetTrigger = ['trial_lesson_reserved', 'trial_payment_completed', 'trio_trial_payment_completed', 'payment_success'].includes(triggerId)
+            const shouldSendToLine = hasLineLinked && isLineTargetTrigger && student?.line_user_id
+
+            if (shouldSendToLine) {
+                console.log(`[Notification] Student has LINE linked (${student.line_user_id}). Sending to LINE instead of email for trigger '${triggerId}'.`)
+                try {
+                    let lineMessage = ''
+                    if (triggerId === 'trial_lesson_reserved') {
+                        lineMessage = `【体験レッスン予約確定とご請求】\n\n${renderedBody}`
+                    } else if (triggerId === 'trial_payment_completed') {
+                        lineMessage = `【体験レッスン決済完了】\n\n${renderedBody}`
+                    } else if (triggerId === 'trio_trial_payment_completed') {
+                        lineMessage = `【THE TRIO 体験レッスン決済完了】\n\n${renderedBody}`
+                    } else {
+                        lineMessage = `📢 ${renderedSubject}\n\n${renderedBody}`
+                    }
+
+                    const success = await lineService.pushMessage(student.line_user_id, lineMessage)
+                    if (success) {
+                        console.log(`[LINE] Successfully sent LINE message to ${student.line_user_id} for trigger ${triggerId}`)
+                    } else {
+                        console.error(`[LINE] Failed to send LINE message to ${student.line_user_id}`)
+                    }
+                } catch (lineErr) {
+                    console.error('[LINE] Error sending LINE message:', lineErr)
+                }
+            } else {
+                // LINE未連携、またはLINE対象外のトリガーの場合は通常通りメールを送信 (フォールバック)
+                if (overrideTemplate) {
+                    await this.sendEmail({
+                        to,
+                        subject: renderedSubject,
+                        text: renderedBody,
+                        requireApproval: false,
+                    })
+                } else if (trigger.template_id && (renderedSubject || renderedBody)) {
+                    await this.sendEmail({
+                        to,
+                        subject: renderedSubject,
+                        text: renderedBody,
+                        requireApproval: isApprovalRequired,
+                    })
+                } else {
+                    console.log(`[Trigger No Template] Skipping email for '${triggerId}'`)
+                }
+            }
+
+            // --- Google Chat 送信 (Chatは配信チャネル切り替えの影響を受けず、常に動く) ---
             if (trigger.google_chat_enabled && trigger.google_chat_webhook_url) {
                 try {
                     let message: string
 
                     if (trigger.google_chat_message_template) {
-                        // カスタムテンプレートがある場合はそれを使用
                         message = replaceVariables(trigger.google_chat_message_template, { ...variables, to, trigger_id: triggerId })
                     } else if (renderedSubject || renderedBody) {
-                        // カスタムテンプレートが空の場合 → メールと同じ件名＋本文を送信
                         message = `📧 *${renderedSubject}*\n\n${renderedBody}`
                     } else {
-                        // テンプレートもメールもない場合のフォールバック
                         message = `🔔 *${triggerId}* が発火しました\n対象: ${to}`
                     }
 
                     await sendGoogleChatMessage(trigger.google_chat_webhook_url, message)
                 } catch (chatErr) {
-                    // Google Chatエラーはメール送信をブロックしない
                     console.error('[GoogleChat] Non-fatal error in trigger:', chatErr)
                 }
             }

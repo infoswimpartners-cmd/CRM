@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { stripe } from '@/lib/stripe'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { emailService } from '@/lib/email'
+import { lineService } from '@/lib/line'
 import Stripe from 'stripe'
 
 export async function POST(req: NextRequest) {
@@ -68,10 +69,10 @@ export async function POST(req: NextRequest) {
                         }
                     }
 
-                    // 3. Fetch Student Info for Email
+                    // 3. Fetch Student Info for Email and LINE
                     const { data: student, error: fetchError } = await supabaseAdmin
                         .from('students')
-                        .select('contact_email, full_name')
+                        .select('contact_email, full_name, line_user_id')
                         .eq('id', studentId)
                         .single()
 
@@ -114,6 +115,7 @@ export async function POST(req: NextRequest) {
                                 amount: (session.amount_total || 0).toLocaleString()
                             }
                         )
+
                     }
                 } else if (type === 'ticket_purchase' && studentId) {
                     // --- TICKET PURCHASE LOGIC ---
@@ -304,6 +306,32 @@ export async function POST(req: NextRequest) {
                                 payment_intent_id: paymentIntentId ?? null
                             })
                             .eq('id', sid)
+                    }
+                }
+
+                // 3. Send Payment Success Email and LINE (Invoice Paid)
+                const stripeCustomerId = invoice.customer as string
+                if (stripeCustomerId) {
+                    const { data: student } = await supabaseAdmin
+                        .from('students')
+                        .select('id, full_name, contact_email')
+                        .eq('stripe_customer_id', stripeCustomerId)
+                        .single()
+
+                    if (student?.contact_email) {
+                        const itemNames = invoice.lines.data
+                            .map(line => line.description)
+                            .filter(Boolean)
+                            .join('、')
+                        const lessonNames = itemNames || 'レッスン料金'
+
+                        console.log(`[Stripe Webhook] Sending Payment Success (Invoice Paid) email/LINE to: ${student.contact_email}`)
+                        await emailService.sendTriggerEmail('payment_success', student.contact_email, {
+                            name: student.full_name,
+                            student_name: student.full_name,
+                            title: lessonNames,
+                            amount: (invoice.amount_paid || 0).toLocaleString() + '円'
+                        })
                     }
                 }
                 break

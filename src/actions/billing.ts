@@ -3,6 +3,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { stripe } from '@/lib/stripe'
 import { emailService } from '@/lib/email'
+import { lineService } from '@/lib/line'
 import { format, addMinutes } from 'date-fns'
 import { revalidatePath } from 'next/cache'
 
@@ -32,7 +33,7 @@ export async function processLessonBilling(scheduleId: string, forceManualEmail:
         // 2. Fetch Student
         const { data: student, error: studentError } = await supabaseAdmin
             .from('students')
-            .select('id, stripe_customer_id, contact_email, full_name, second_student_name')
+            .select('id, stripe_customer_id, contact_email, full_name, second_student_name, line_user_id')
             .eq('id', scheduleRaw.student_id)
             .single()
 
