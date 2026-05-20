@@ -20,16 +20,14 @@ interface EnrollmentFormProps {
 export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
   const [selectedParentPlan, setSelectedParentPlan] = useState('');
   const [selectedDuration, setSelectedDuration] = useState<'60' | '90' | '120'>('60');
-  const [selectedInitialLessons, setSelectedInitialLessons] = useState(0);
   const [agreedTerms, setAgreedTerms] = useState({
     billing: false,
     cancel: false,
     initialLessons: false,
   });
 
-  // プラン・時間変更時に先行受講回数と同意チェックをリセット
+  // プラン・時間変更時に同意チェックをリセット
   useEffect(() => {
-    setSelectedInitialLessons(0);
     setAgreedTerms(prev => ({ ...prev, initialLessons: false }));
   }, [selectedParentPlan, selectedDuration]);
 
@@ -164,7 +162,7 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
 
     setIsSubmitting(true);
     try {
-      const res = await createEnrollmentCheckoutSession(activePlan.id, userId, selectedInitialLessons);
+      const res = await createEnrollmentCheckoutSession(activePlan.id, userId);
       if (res.success && res.url) {
         // Stripe Checkout画面へリダイレクト
         window.location.href = res.url;
@@ -285,34 +283,7 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
                     </div>
                   )}
 
-                  {/* 先行受講回数選択オプション（月4回・月2回が選択された場合に出現） */}
-                  {selectedParentPlan === plan.id && (plan.id === 'monthly-4' || plan.id === 'monthly-2') && (
-                    <div className="ml-7 mt-2 p-3 bg-slate-100/80 rounded-xl border border-slate-200/60 animate-fadeIn space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs font-bold text-slate-500 block">📅 翌月1日までの先行受講レッスン回数</span>
-                        <span className="text-[9px] font-bold bg-amber-500 text-white px-1.5 py-0.5 rounded">体験後すぐに受講可能</span>
-                      </div>
-                      <p className="text-[10px] text-slate-500 leading-normal">
-                        入会から翌月1日の本格スタートまでにレッスンを受けたい場合、回数を選択してください。1回分の料金を回数分、初月に上乗せ請求いたします。
-                      </p>
-                      <div className="grid grid-cols-5 gap-2">
-                        {Array.from({ length: plan.id === 'monthly-4' ? 5 : 3 }).map((_, idx) => (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => setSelectedInitialLessons(idx)}
-                            className={`py-2 px-3 rounded-lg text-xs font-bold transition-all border ${
-                              selectedInitialLessons === idx
-                                ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white border-transparent shadow-sm'
-                                : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-200'
-                            }`}
-                          >
-                            {idx}回
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  {/* 先行受講回数選択オプションは実績報告ベースに統一するため廃止 */}
                 </div>
               ))}
             </div>
@@ -326,37 +297,33 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
                 
                 {activePlan.id ? (
                   <div className="mt-3 space-y-3">
-                    {/* 本日お支払い額 (先行受講分) */}
+                    {/* 本日お支払い額 */}
                     <div className="bg-white p-3 rounded-lg border border-slate-200/80 shadow-sm">
                       <div className="flex justify-between items-center text-xs text-slate-500 font-bold">
-                        <span>① 本日の即時決済額 (初月先行受講料)</span>
-                        {selectedInitialLessons > 0 && (selectedParentPlan === 'monthly-4' || selectedParentPlan === 'monthly-2') ? (
-                          <span className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded text-[10px]">
-                            ¥{Math.round(activePlan.price / (selectedParentPlan === 'monthly-4' ? 4 : 2)).toLocaleString()} × {selectedInitialLessons}回
-                          </span>
-                        ) : null}
+                        <span>① 本日の即時決済額</span>
                       </div>
                       <div className="mt-1 flex justify-between items-baseline">
-                        <span className="text-xs font-bold text-slate-700">本日お支払い額 (税込)</span>
+                        <span className="text-xs font-bold text-slate-700">
+                          {selectedParentPlan === 'package-25m' ? '本日お支払い額 (税込)' : 'クレジットカード登録 (本日決済なし)'}
+                        </span>
                         <span className="text-2xl font-black text-blue-600">
-                          ¥{((selectedParentPlan === 'monthly-4' || selectedParentPlan === 'monthly-2') 
-                            ? Math.round(activePlan.price / (selectedParentPlan === 'monthly-4' ? 4 : 2)) * selectedInitialLessons 
-                            : (selectedParentPlan === 'package-25m' ? activePlan.price : 0)
-                          ).toLocaleString()}
+                          ¥{((selectedParentPlan === 'package-25m') ? activePlan.price : 0).toLocaleString()}
                         </span>
                       </div>
-                      {(selectedParentPlan === 'monthly-4' || selectedParentPlan === 'monthly-2') && selectedInitialLessons > 0 && (
-                        <p className="text-[10px] text-amber-600 font-bold mt-1.5">
-                          ※体験レッスン後、翌月1日の本格スタートまでに受講する先行レッスン分です。
+                      {selectedParentPlan !== 'package-25m' && (
+                        <p className="text-[10px] text-slate-500 mt-1.5 leading-relaxed">
+                          ※本日は決済用クレジットカード情報の登録（安全なStripeシステム経由）のみを行います。本日時点で決済は発生いたしません。
                         </p>
                       )}
                     </div>
 
-                    {/* 翌月1日以降のお支払い (継続月会費) */}
+                    {/* 翌月1日以降のお支払い (継続月会費 ＆ 先行受講分合算) */}
                     <div className="bg-white p-3 rounded-lg border border-slate-200/80 shadow-sm">
-                      <span className="text-xs text-slate-500 font-bold block mb-1">② 翌月1日以降の月々のお支払い (継続月謝)</span>
+                      <span className="text-xs text-slate-500 font-bold block mb-1">
+                        ② 翌月1日以降のお支払い (月謝 ＆ 先行受講分合算)
+                      </span>
                       <div className="flex justify-between items-baseline">
-                        <span className="text-xs font-bold text-slate-700">月額料金 (税込)</span>
+                        <span className="text-xs font-bold text-slate-700">基本月額料金 (税込)</span>
                         <span className="text-xl font-bold text-slate-800">
                           {selectedParentPlan === 'package-25m' ? (
                             <span className="text-xs font-bold text-slate-500">一括（追加継続課金なし）</span>
@@ -369,9 +336,15 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
                         </span>
                       </div>
                       {selectedParentPlan !== 'package-25m' && selectedParentPlan !== 'single' && (
-                        <p className="text-[10px] text-slate-500 mt-1">
-                          ※月会費の自動引き落としは翌月1日から開始されます（毎月25日引落）。
-                        </p>
+                        <div className="mt-2 pt-2 border-t border-slate-100 space-y-1 text-[10px] text-slate-500 leading-relaxed">
+                          <p className="font-bold text-amber-600">📅 体験レッスン後〜翌月1日までに先行受講された場合：</p>
+                          <p>
+                            実際の受講実績に基づき、<strong>受講日（日付）が明記された状態で、翌月1日の初回月謝引き落とし時に自動合算（追加請求）</strong>されます。
+                          </p>
+                          <p className="mt-1 text-slate-400">
+                            ※月会費の自動引き落としは翌月1日から開始されます（毎月25日引落）。
+                          </p>
+                        </div>
                       )}
                     </div>
 
@@ -440,8 +413,8 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
                     className="mt-1 h-4 w-4 rounded border-blue-500 text-blue-600 focus:ring-blue-500"
                   />
                   <span className="ml-3 text-xs text-slate-700 leading-relaxed">
-                    <strong>初月先行受講分および翌月以降の月謝に関する同意（必須）：</strong><br />
-                    当月中に先行受講するレッスン（{selectedInitialLessons}回分）の料金 ¥{((selectedParentPlan === 'monthly-4' ? Math.round(activePlan.price / 4) : Math.round(activePlan.price / 2)) * selectedInitialLessons).toLocaleString()} は本日即座に決済されることに同意します。また、本格的な月会費（月額 ¥{activePlan.price.toLocaleString()}）の自動引き落としは翌月1日から開始されることに同意します。
+                    <strong>初月の先行受講および月謝の自動合算に関する同意（必須）：</strong><br />
+                    体験レッスン受講後、翌月1日の本格スタートまでに先行受講したレッスンについては、実際の受講実績（スケジュール承認）に基づき、受講日（日付）が明記された状態で、翌月1日の初回月謝引き落とし時に自動合算（追加課金）されることに同意します。また、本格的な月会費（月額 ¥{activePlan.price.toLocaleString()}）の自動引き落としは翌月1日から開始されることに同意します。
                   </span>
                 </label>
               )}

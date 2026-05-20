@@ -23,7 +23,7 @@ const PRICE_ID_MAP: Record<string, string> = {
 /**
  * オンライン入会手続き用の Stripe Checkout セッションを作成する
  */
-export async function createEnrollmentCheckoutSession(planId: string, lineUserId: string, initialLessonsCount: number = 0) {
+export async function createEnrollmentCheckoutSession(planId: string, lineUserId: string) {
     const supabase = createAdminClient()
 
     try {
@@ -139,40 +139,6 @@ export async function createEnrollmentCheckoutSession(planId: string, lineUserId
                     membership_type_id: planId,
                     studentId: student?.id || '',
                 },
-            }
-
-            // 先行受講分の追加料金を計算し line_items に追加
-            if (initialLessonsCount > 0 && plan) {
-                const fee = plan.fee
-                let perLessonFee = 0
-                if (planId.includes('monthly-4') || plan.name.includes('月4回')) {
-                    perLessonFee = Math.round(fee / 4)
-                } else if (planId.includes('monthly-2') || plan.name.includes('月2回')) {
-                    perLessonFee = Math.round(fee / 2)
-                }
-
-                const totalInitialFee = perLessonFee * initialLessonsCount
-
-                if (totalInitialFee > 0) {
-                    // One-time（一回限り）の先行受講分を line_items に追加（mode: 'subscription' でも混在可能）
-                    sessionConfig.line_items.push({
-                        price_data: {
-                            currency: 'jpy',
-                            product_data: {
-                                name: `${planName} 先行受講料 (${initialLessonsCount}回分)`,
-                                description: `翌月1日開始までの先行受講レッスン料（1回あたり ¥${perLessonFee.toLocaleString()} × ${initialLessonsCount}回）`,
-                            },
-                            unit_amount: totalInitialFee,
-                        },
-                        quantity: 1,
-                    })
-
-                    // メタデータにも先行受講情報を記録
-                    sessionConfig.metadata.initial_lessons_count = String(initialLessonsCount)
-                    sessionConfig.metadata.initial_lessons_fee = String(totalInitialFee)
-                    sessionConfig.subscription_data.metadata.initial_lessons_count = String(initialLessonsCount)
-                    sessionConfig.subscription_data.metadata.initial_lessons_fee = String(totalInitialFee)
-                }
             }
         }
 
