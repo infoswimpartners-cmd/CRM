@@ -23,7 +23,7 @@ const PRICE_ID_MAP: Record<string, string> = {
 /**
  * オンライン入会手続き用の Stripe Checkout セッションを作成する
  */
-export async function createEnrollmentCheckoutSession(planId: string, lineUserId: string) {
+export async function createEnrollmentCheckoutSession(planId: string, lineUserId: string, initialLessonsCount: number = 0) {
     const supabase = createAdminClient()
 
     try {
@@ -36,6 +36,7 @@ export async function createEnrollmentCheckoutSession(planId: string, lineUserId
 
         let priceId = ''
         let planName = ''
+        let plan: any = null
         const isPackage = planId === 'package-25m'
 
         if (isPackage) {
@@ -44,17 +45,18 @@ export async function createEnrollmentCheckoutSession(planId: string, lineUserId
             planName = '25m完泳パッケージ（全12回）'
         } else {
             // Supabaseからプランを取得
-            const { data: plan, error: planError } = await supabase
+            const { data: fetchedPlan, error: planError } = await supabase
                 .from('membership_types')
                 .select('*')
                 .eq('id', planId)
                 .single()
 
-            if (planError || !plan) {
+            if (planError || !fetchedPlan) {
                 console.error('Plan fetch error:', planError)
                 return { success: false, error: '選択されたプランが見つかりませんでした。' }
             }
 
+            plan = fetchedPlan
             priceId = plan.stripe_price_id
             planName = plan.name
         }
@@ -113,13 +115,64 @@ export async function createEnrollmentCheckoutSession(planId: string, lineUserId
 
         // サブスクリプションの場合は subscription_data にもメタデータを格納
         if (!isPackage) {
+            // 日本時間の翌月1日0:00のUNIXタイムスタンプを算出
+            const now = new Date()
+            // サーバーのタイムゾーンに影響されないよう、JST（UTC+9）ベースで計算
+            const jstNow = new Date(now.getTime() + (9 * 60 * 60 * 1000))
+            let nextYear = jstNow.getUTCFullYear()
+            let nextMonth = jstNow.getUTCMonth() + 2; // getUTCMonthは0-11のため、当月は+1、翌月は+2
+            if (nextMonth > 12) {
+                nextMonth = 1
+                nextYear += 1
+            }
+            
+            // JSTの翌月1日0:00:00は、UTCでは前日（当月末日）の15:00:00
+            const utcNextMonthFirst = Date.UTC(nextYear, nextMonth - 1, 1, 0, 0, 0)
+            const jstNextMonthFirstUnix = Math.floor((utcNextMonthFirst - (9 * 60 * 60 * 1000)) / 1000)
+
             sessionConfig.subscription_data = {
+                billing_cycle_anchor: jstNextMonthFirstUnix,
+                proration_behavior: 'none', // 日割り計算をスキップして翌月1日から全額引き落とし
                 metadata: {
                     type: 'membership_enrollment',
                     line_user_id: lineUserId,
                     membership_type_id: planId,
                     studentId: student?.id || '',
                 },
+            }
+
+            // 先行受講分の追加料金を計算し line_items に追加
+            if (initialLessonsCount > 0 && plan) {
+                const fee = plan.fee
+                let perLessonFee = 0
+                if (planId.includes('monthly-4') || plan.name.includes('月4回')) {
+                    perLessonFee = Math.round(fee / 4)
+                } else if (planId.includes('monthly-2') || plan.name.includes('月2回')) {
+                    perLessonFee = Math.round(fee / 2)
+                }
+
+                const totalInitialFee = perLessonFee * initialLessonsCount
+
+                if (totalInitialFee > 0) {
+                    // One-time（一回限り）の先行受講分を line_items に追加（mode: 'subscription' でも混在可能）
+                    sessionConfig.line_items.push({
+                        price_data: {
+                            currency: 'jpy',
+                            product_data: {
+                                name: `${planName} 先行受講料 (${initialLessonsCount}回分)`,
+                                description: `翌月1日開始までの先行受講レッスン料（1回あたり ¥${perLessonFee.toLocaleString()} × ${initialLessonsCount}回）`,
+                            },
+                            unit_amount: totalInitialFee,
+                        },
+                        quantity: 1,
+                    })
+
+                    // メタデータにも先行受講情報を記録
+                    sessionConfig.metadata.initial_lessons_count = String(initialLessonsCount)
+                    sessionConfig.metadata.initial_lessons_fee = String(totalInitialFee)
+                    sessionConfig.subscription_data.metadata.initial_lessons_count = String(initialLessonsCount)
+                    sessionConfig.subscription_data.metadata.initial_lessons_fee = String(totalInitialFee)
+                }
             }
         }
 
