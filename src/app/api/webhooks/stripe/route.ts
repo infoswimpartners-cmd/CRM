@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
         switch (event.type) {
             case 'checkout.session.completed': {
                 const session = event.data.object as Stripe.Checkout.Session
-                const { studentId, type, lessonDate, location } = session.metadata || {}
+                const { studentId, type, lessonDate, location, line_user_id, membership_type_id } = session.metadata || {}
 
                 if (type === 'trial_fee' && studentId) {
                     const { scheduleId } = session.metadata || {}
@@ -269,6 +269,90 @@ export async function POST(req: NextRequest) {
                         }
 
                         console.log(`[Stripe Webhook] Successfully added ${amount} TRIO tickets to Student ${studentId}. New Balance: ${newBalance}`);
+                    }
+                } else if (type === 'membership_enrollment') {
+                    const lineUserId = line_user_id || session.metadata?.line_user_id
+                    const planId = membership_type_id || session.metadata?.membership_type_id
+                    console.log(`[Stripe Webhook] Processing Membership Enrollment for LINE User: ${lineUserId}, Plan: ${planId}`)
+
+                    if (lineUserId) {
+                        const { data: student } = await supabaseAdmin
+                            .from('students')
+                            .select('*')
+                            .eq('line_user_id', lineUserId)
+                            .maybeSingle()
+
+                        const isPackage = planId === 'package-25m'
+                        const nowStr = new Date().toISOString()
+                        const targetPlanId = isPackage ? null : planId
+
+                        const updateData: any = {
+                            status: 'active',
+                            membership_type_id: targetPlanId,
+                            stripe_customer_id: session.customer as string || null,
+                            stripe_subscription_id: session.subscription as string || null,
+                            membership_started_at: nowStr,
+                            is_bank_transfer: false
+                        }
+
+                        if (student) {
+                            console.log(`[Stripe Webhook] Found existing student: ${student.id} (${student.full_name}). Updating to active...`)
+                            const { error: updateError } = await supabaseAdmin
+                                .from('students')
+                                .update(updateData)
+                                .eq('id', student.id)
+
+                            if (updateError) {
+                                console.error('[Stripe Webhook] Failed to update student details:', updateError)
+                                throw updateError
+                            }
+
+                            if (student.contact_email) {
+                                try {
+                                    await emailService.sendTriggerEmail('payment_success', student.contact_email, {
+                                        name: student.full_name,
+                                        title: isPackage ? '25m完泳パッケージ（一括）入会' : 'Swim Partners 月謝プラン入会',
+                                        amount: (session.amount_total || 0).toLocaleString() + '円'
+                                    })
+                                } catch (e) {
+                                    console.error('[Stripe Webhook] Failed to send email:', e)
+                                }
+                            }
+                        } else {
+                            console.log(`[Stripe Webhook] Student not found for LINE User: ${lineUserId}. Creating a new student record...`)
+                            const customerName = session.customer_details?.name || '新規LINEユーザー'
+                            const customerEmail = session.customer_details?.email || ''
+                            const customerPhone = session.customer_details?.phone || ''
+                            const tempStudentNumber = 'L' + Math.floor(1000 + Math.random() * 9000).toString()
+
+                            const { error: insertError } = await supabaseAdmin
+                                .from('students')
+                                .insert({
+                                    full_name: customerName,
+                                    contact_email: customerEmail,
+                                    contact_phone: customerPhone,
+                                    line_user_id: lineUserId,
+                                    student_number: tempStudentNumber,
+                                    ...updateData
+                                })
+
+                            if (insertError) {
+                                console.error('[Stripe Webhook] Failed to insert new student details:', insertError)
+                                throw insertError
+                            }
+
+                            if (customerEmail) {
+                                try {
+                                    await emailService.sendTriggerEmail('payment_success', customerEmail, {
+                                        name: customerName,
+                                        title: isPackage ? '25m完泳パッケージ（一括）入会' : 'Swim Partners 月謝プラン入会',
+                                        amount: (session.amount_total || 0).toLocaleString() + '円'
+                                    })
+                                } catch (e) {
+                                    console.error('[Stripe Webhook] Failed to send email to new student:', e)
+                                }
+                            }
+                        }
                     }
                 }
                 break

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import liff from '@line/liff';
+import { createEnrollmentCheckoutSession } from '@/actions/stripe_enrollment';
 
 interface DBPlan {
   id: string;
@@ -27,6 +28,7 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
   const [isLiffReady, setIsLiffReady] = useState(false);
   const [liffError, setLiffError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // LIFF初期化とLINE ユーザーID取得
   useEffect(() => {
@@ -127,14 +129,27 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
   const currentPlan = PLANS.find(p => p.id === selectedPlanId);
 
   // すべての規約に同意し、プランが選ばれているかチェック（ボタンの活性化条件）
-  const isSubmitDisabled = !selectedPlanId || !agreedTerms.billing || !agreedTerms.cancel || !userId;
+  const isSubmitDisabled = !selectedPlanId || !agreedTerms.billing || !agreedTerms.cancel || !userId || isSubmitting;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitDisabled) return;
 
-    // Stripe決済画面やMake Webhookへのデータ引き渡し時、LINEのuserIdも含めて処理します
-    alert(`LINE ID: ${userId}\nプラン「${currentPlan?.name}」\nStripe Price ID: ${currentPlan?.stripePriceId}\nでStripe決済画面へ遷移します。`);
+    setIsSubmitting(true);
+    try {
+      const res = await createEnrollmentCheckoutSession(selectedPlanId, userId);
+      if (res.success && res.url) {
+        // Stripe Checkout画面へリダイレクト
+        window.location.href = res.url;
+      } else {
+        alert(res.error || "決済画面の生成に失敗しました。時間をおいて再度お試しください。");
+        setIsSubmitting(false);
+      }
+    } catch (err: any) {
+      console.error("Submit error:", err);
+      alert("通信エラーが発生しました。接続状況を確認の上、再度お試しください。");
+      setIsSubmitting(false);
+    }
   };
 
   // 読み込み中の美しくリッチな表示
@@ -279,7 +294,11 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
                 : 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white hover:opacity-95 active:scale-[0.98]'
             }`}
           >
-            {selectedPlanId ? 'クレジットカード決済登録へ進む' : 'プランを選択してください'}
+            {isSubmitting
+              ? '決済画面へ移動中...'
+              : selectedPlanId
+              ? 'クレジットカード決済登録へ進む'
+              : 'プランを選択してください'}
           </button>
 
         </form>
