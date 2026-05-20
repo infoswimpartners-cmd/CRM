@@ -147,13 +147,13 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
 
   // すべての規約に同意し、プランが正しく選ばれているかチェック（ボタンの活性化条件）
   const isInitialLessonsAgreementRequired = selectedParentPlan === 'monthly-4' || selectedParentPlan === 'monthly-2';
-  const isSubmitDisabled = 
-    !selectedParentPlan || 
-    (activePlan && !activePlan.id) || 
-    !agreedTerms.billing || 
-    !agreedTerms.cancel || 
-    (isInitialLessonsAgreementRequired && !agreedTerms.initialLessons) || 
-    !userId || 
+  const isSubmitDisabled =
+    !selectedParentPlan ||
+    (activePlan && !activePlan.id) ||
+    !agreedTerms.billing ||
+    !agreedTerms.cancel ||
+    (isInitialLessonsAgreementRequired && !agreedTerms.initialLessons) ||
+    !userId ||
     isSubmitting;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -206,7 +206,7 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
   return (
     <div className="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 lg:px-8 font-sans">
       <div className="max-w-md mx-auto bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
-        
+
         {/* ヘッダー */}
         <div className="bg-gradient-to-r top-0 from-blue-700 to-cyan-500 p-6 text-center text-white">
           <h1 className="text-xl font-bold tracking-wider">Swim Partners</h1>
@@ -214,13 +214,13 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          
+
           {/* STEP 1: プラン選択 */}
           <div>
             <label className="block text-sm font-bold text-slate-700 mb-2">
               ① ご希望の入会プランを選択してください
             </label>
-            
+
             {/* 料金詳細ページへの美しいテキストリンク */}
             <div className="mb-4">
               <a
@@ -237,11 +237,10 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
               {PARENT_PLANS.map((plan) => (
                 <div key={plan.id} className="space-y-2">
                   <label
-                    className={`block p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                      selectedParentPlan === plan.id
+                    className={`block p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedParentPlan === plan.id
                         ? 'border-blue-500 bg-blue-50/50'
                         : 'border-slate-200 hover:border-slate-300 bg-white'
-                    }`}
+                      }`}
                   >
                     <div className="flex justify-between items-center">
                       <div className="flex items-center space-x-3">
@@ -270,11 +269,10 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
                             key={duration}
                             type="button"
                             onClick={() => setSelectedDuration(duration)}
-                            className={`py-2 px-3 rounded-lg text-xs font-bold transition-all border ${
-                              selectedDuration === duration
+                            className={`py-2 px-3 rounded-lg text-xs font-bold transition-all border ${selectedDuration === duration
                                 ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white border-transparent shadow-sm'
                                 : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-200'
-                            }`}
+                              }`}
                           >
                             {duration}分
                           </button>
@@ -294,7 +292,7 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
             <div className="bg-slate-50 rounded-xl p-5 border border-slate-200 space-y-4 animate-fadeIn">
               <div>
                 <span className="text-xs font-bold bg-blue-600 text-white px-2 py-0.5 rounded">ご請求明細</span>
-                
+
                 {activePlan.id ? (
                   <div className="mt-3 space-y-3">
                     {/* 本日お支払い額 */}
@@ -376,7 +374,7 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
             <label className="block text-sm font-bold text-slate-700 mb-2">
               ② 利用規約および重要事項への同意
             </label>
-            
+
             <div className="space-y-3">
               <label className="flex items-start p-3 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors">
                 <input
@@ -387,7 +385,7 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
                 />
                 <span className="ml-3 text-xs text-slate-600 leading-relaxed">
                   <strong>月謝・決済に関する同意：</strong><br />
-                  継続プランの場合、毎月25日に翌月分の月謝が登録クレジットカードより自動決済されることに同意します。（Stripeシステムを利用）
+                  継続プランの場合、毎月1日に当月分の月謝が登録クレジットカードより自動決済されることに同意します。（Stripeシステムを利用）
                 </span>
               </label>
 
@@ -414,7 +412,7 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
                   />
                   <span className="ml-3 text-xs text-slate-700 leading-relaxed">
                     <strong>初月の先行受講および月謝の自動合算に関する同意（必須）：</strong><br />
-                    体験レッスン受講後、翌月1日の本格スタートまでに先行受講したレッスンについては、実際の受講実績（スケジュール承認）に基づき、受講日（日付）が明記された状態で、翌月1日の初回月謝引き落とし時に自動合算（追加課金）されることに同意します。また、本格的な月会費（月額 ¥{activePlan.price.toLocaleString()}）の自動引き落としは翌月1日から開始されることに同意します。
+                    体験レッスン受講後、翌月1日の本格スタートまでに先行受講したレッスンについては、実際の受講実績に基づき、翌月1日の初回月謝引き落とし時に自動合算（追加課金）されることに同意します。また、本格的な月会費（月額 ¥{activePlan.price.toLocaleString()}）の自動引き落としは翌月1日から開始されることに同意します。
                   </span>
                 </label>
               )}
@@ -425,17 +423,16 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
           <button
             type="submit"
             disabled={isSubmitDisabled}
-            className={`w-full py-4 px-4 rounded-xl font-bold text-center tracking-wider transition-all shadow-md ${
-              isSubmitDisabled
+            className={`w-full py-4 px-4 rounded-xl font-bold text-center tracking-wider transition-all shadow-md ${isSubmitDisabled
                 ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
                 : 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white hover:opacity-95 active:scale-[0.98]'
-            }`}
+              }`}
           >
             {isSubmitting
               ? '決済画面へ移動中...'
               : selectedParentPlan
-              ? 'クレジットカード決済登録へ進む'
-              : 'プランを選択してください'}
+                ? 'クレジットカード決済登録へ進む'
+                : 'プランを選択してください'}
           </button>
 
         </form>

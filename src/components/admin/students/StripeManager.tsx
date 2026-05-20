@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { CreditCard, ExternalLink, Loader2, Link as LinkIcon, AlertTriangle, Pencil } from 'lucide-react'
+import { CreditCard, ExternalLink, Loader2, Link as LinkIcon, AlertTriangle, Pencil, Copy, Check } from 'lucide-react'
 import { createStripeCustomer, createPaymentSetupLink, updateStudentStripeId } from '@/actions/stripe'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
@@ -28,6 +28,7 @@ export function StripeManager({ studentId, stripeCustomerId, paymentMethodStatus
     const [isManualMode, setIsManualMode] = useState(false)
     const [manualId, setManualId] = useState('')
     const [isUpdating, setIsUpdating] = useState(false)
+    const [copied, setCopied] = useState(false)
 
     async function handleCreateCustomer() {
         setIsCreating(true)
@@ -48,10 +49,6 @@ export function StripeManager({ studentId, stripeCustomerId, paymentMethodStatus
         try {
             const result = await createPaymentSetupLink(studentId)
             if (result.success && result.url) {
-                // In a real app we might email this, but here we open it or copy it.
-                // Let's open in new tab for Admin to perhaps share or guide?
-                // Or better, copy to clipboard.
-                // For simplicity: Open in new tab, but also copy.
                 window.open(result.url, '_blank')
                 toast.success('決済設定ページを開きました')
             } else {
@@ -75,15 +72,27 @@ export function StripeManager({ studentId, stripeCustomerId, paymentMethodStatus
                 setIsManualMode(false)
                 setManualId('')
             } else {
-                toast.error('更正失敗: ' + result.error)
+                toast.error('更新失敗: ' + result.error)
             }
         } finally {
             setIsUpdating(false)
         }
     }
 
+    async function handleCopyId() {
+        if (!stripeCustomerId) return
+        try {
+            await navigator.clipboard.writeText(stripeCustomerId)
+            setCopied(true)
+            toast.success('Stripe IDをコピーしました')
+            setTimeout(() => setCopied(false), 2000)
+        } catch (err) {
+            toast.error('コピーに失敗しました')
+        }
+    }
+
     return (
-        <Card className="bg-white border-slate-200">
+        <Card className="bg-white border-slate-200 shadow-sm">
             <CardHeader className="pb-2">
                 <CardTitle className="text-lg font-bold flex items-center gap-2 text-slate-700">
                     <CreditCard className="w-5 h-5 text-indigo-600" />
@@ -91,7 +100,46 @@ export function StripeManager({ studentId, stripeCustomerId, paymentMethodStatus
                 </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-                {!stripeCustomerId && !isManualMode ? (
+                {isManualMode ? (
+                    /* Manual ID Entry Mode (Unified) */
+                    <div className="space-y-3 p-3 bg-slate-50 border border-slate-200/60 rounded-xl">
+                        <Label className="text-xs font-bold text-slate-600">Stripe Customer ID (手動連携)</Label>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                            <Input
+                                value={manualId}
+                                onChange={(e) => setManualId(e.target.value)}
+                                placeholder="cus_..."
+                                className="h-9 text-xs font-mono flex-1 bg-white border-slate-200"
+                            />
+                            <div className="flex gap-2 w-full sm:w-auto">
+                                <Button
+                                    size="sm"
+                                    onClick={handleManualUpdate}
+                                    disabled={isUpdating}
+                                    className="h-9 flex-1 sm:flex-initial bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-4"
+                                >
+                                    {isUpdating && <Loader2 className="w-3 h-3 animate-spin mr-1.5" />}
+                                    保存
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                        setIsManualMode(false)
+                                        setManualId('')
+                                    }}
+                                    className="h-9 flex-1 sm:flex-initial text-xs text-slate-500 border-slate-200 bg-white hover:bg-slate-50 px-3"
+                                >
+                                    キャンセル
+                                </Button>
+                            </div>
+                        </div>
+                        <p className="text-[10px] text-slate-400">
+                            ※ すでにStripe上に存在する顧客ID (cus_...) を入力してください。
+                        </p>
+                    </div>
+                ) : !stripeCustomerId ? (
+                    /* Customer not created yet */
                     <div className="flex flex-col gap-3">
                         <div className="flex items-center gap-2 text-sm text-yellow-600 bg-yellow-50 p-3 rounded-md">
                             <AlertTriangle className="w-4 h-4" />
@@ -100,7 +148,7 @@ export function StripeManager({ studentId, stripeCustomerId, paymentMethodStatus
                         <Button
                             onClick={handleCreateCustomer}
                             disabled={isCreating}
-                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
+                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium shadow-sm transition-all"
                         >
                             {isCreating && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                             顧客データを作成する
@@ -108,16 +156,17 @@ export function StripeManager({ studentId, stripeCustomerId, paymentMethodStatus
                         <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => setIsManualMode(true)}
-                            className="text-xs text-slate-500 hover:text-indigo-600"
+                            onClick={() => {
+                                setManualId('')
+                                setIsManualMode(true)
+                            }}
+                            className="text-xs text-slate-500 hover:text-indigo-600 hover:border-indigo-200 transition-all"
                         >
                             IDを手動入力する
                         </Button>
                     </div>
-                ) : !stripeCustomerId && isManualMode ? (
-                    // Manual Mode when no ID exists
-                    null
                 ) : (
+                    /* Customer registered */
                     <div className="space-y-4">
                         <div className="flex items-center justify-between p-3 bg-slate-50 rounded-md">
                             <span className="text-sm font-medium text-slate-500">ステータス</span>
@@ -138,7 +187,7 @@ export function StripeManager({ studentId, stripeCustomerId, paymentMethodStatus
                                 variant="outline"
                                 onClick={handleSendSetupLink}
                                 disabled={isLinking}
-                                className="w-full justify-start text-slate-600"
+                                className="w-full justify-start text-slate-600 hover:text-indigo-600 hover:border-indigo-100 hover:bg-indigo-50/10 transition-all"
                             >
                                 {isLinking ? (
                                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -152,78 +201,48 @@ export function StripeManager({ studentId, stripeCustomerId, paymentMethodStatus
                             </p>
                         </div>
 
-                        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 bg-slate-50/50 border border-slate-100 rounded-xl">
-                            <div className="flex flex-col gap-1 items-center sm:items-start overflow-hidden">
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 bg-slate-50/50 border border-slate-100 rounded-xl">
+                            <div className="flex flex-col gap-1 items-start overflow-hidden w-full">
                                 <span className="text-[10px] uppercase tracking-wider font-bold text-slate-400">Stripe Customer ID</span>
-                                <div className="flex items-center gap-1.5 group">
-                                    <span className="text-xs font-mono text-slate-600 truncate max-w-[140px] sm:max-w-none">
+                                <div className="flex items-center gap-2 w-full justify-between sm:justify-start">
+                                    <span className="text-xs font-mono text-slate-600 truncate max-w-[200px] sm:max-w-[180px] md:max-w-none">
                                         {stripeCustomerId}
                                     </span>
-                                    <button
-                                        onClick={() => setIsManualMode(true)}
-                                        className="text-slate-300 hover:text-indigo-600 transition-all p-1 rounded-full hover:bg-white"
-                                        title="IDを手動編集"
-                                    >
-                                        <Pencil className="w-3 h-3" />
-                                    </button>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                        <button
+                                            onClick={handleCopyId}
+                                            className="text-slate-400 hover:text-indigo-600 transition-all p-1.5 rounded-md hover:bg-white border border-slate-100 shadow-sm"
+                                            title="IDをコピー"
+                                        >
+                                            {copied ? <Check className="w-3 h-3 text-green-600 animate-in fade-in zoom-in-50 duration-200" /> : <Copy className="w-3 h-3" />}
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setManualId(stripeCustomerId)
+                                                setIsManualMode(true)
+                                            }}
+                                            className="text-slate-400 hover:text-indigo-600 transition-all p-1.5 rounded-md hover:bg-white border border-slate-100 shadow-sm"
+                                            title="IDを手動編集"
+                                        >
+                                            <Pencil className="w-3 h-3" />
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
 
                             <Button
                                 variant="outline"
                                 size="sm"
-                                className="h-8 px-3 text-xs text-slate-600 border-slate-200 hover:bg-white hover:text-indigo-600 hover:border-indigo-200 shadow-sm transition-all"
+                                className="h-8 w-full sm:w-auto px-3 text-xs text-slate-600 border-slate-200 hover:bg-white hover:text-indigo-600 hover:border-indigo-200 shadow-sm transition-all shrink-0"
                                 onClick={() => window.open(`https://dashboard.stripe.com/customers/${stripeCustomerId}`, '_blank')}
                             >
                                 <ExternalLink className="w-3 h-3 mr-1.5" />
                                 管理画面
                             </Button>
                         </div>
-                    </div >
-                )
-                }
-
-                {/* Manual ID Entry Mode */}
-                {
-                    isManualMode && (
-                        <div className="pt-4 border-t border-slate-100">
-                            <div className="space-y-2">
-                                <Label className="text-xs font-bold text-slate-600">Stripe Customer ID (手動連携)</Label>
-                                <div className="flex gap-2">
-                                    <Input
-                                        value={manualId}
-                                        onChange={(e) => setManualId(e.target.value)}
-                                        placeholder="cus_..."
-                                        className="h-8 text-xs font-mono"
-                                    />
-                                    <Button
-                                        size="sm"
-                                        onClick={handleManualUpdate}
-                                        disabled={isUpdating}
-                                        className="h-8 bg-slate-800 hover:bg-slate-700 text-white"
-                                    >
-                                        {isUpdating ? <Loader2 className="w-3 h-3 animate-spin" /> : '保存'}
-                                    </Button>
-                                    <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        onClick={() => {
-                                            setIsManualMode(false);
-                                            setManualId('');
-                                        }}
-                                        className="h-8 w-8 p-0"
-                                    >
-                                        X
-                                    </Button>
-                                </div>
-                                <p className="text-[10px] text-slate-400">
-                                    ※ すでにStripe上に存在する顧客ID (cus_...) を入力してください。
-                                </p>
-                            </div>
-                        </div>
-                    )
-                }
-            </CardContent >
-        </Card >
+                    </div>
+                )}
+            </CardContent>
+        </Card>
     )
 }
