@@ -62,7 +62,9 @@ export async function POST(req: Request) {
       console.error("CRM (leads) logic error:", dbEx);
     }
 
-    // 2. Make Webhook へ送信 (エラーが起きても顧客には成功を返す)
+    // 2. Make Webhook へ送信 (エラーの原因となっているため一時的に無効化)
+    // もしMakeで「LINE通知」などの別処理を行っている場合は、Make側のスキーマ設定が直り次第コメントアウトを解除してください。
+    /*
     if (webhookUrl) {
       try {
         // MakeのWebhookでスキーマエラーが起きるのを防ぐため、
@@ -88,6 +90,7 @@ export async function POST(req: Request) {
         console.error("Make Webhook Fetch Error:", webhookError);
       }
     }
+    */
 
     return NextResponse.json({ success: true });
   } catch (error) {
