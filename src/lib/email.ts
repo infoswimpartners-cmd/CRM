@@ -258,7 +258,7 @@ ${text}
                     } else if (triggerId === 'trio_trial_payment_completed') {
                         lineMessage = `【THE TRIO 体験レッスン決済完了】\n\n${renderedBody}`
                     } else if (triggerId === 'enrollment_completed') {
-                        lineMessage = `🎉【本入会手続き完了】\n\n${renderedBody}`
+                        lineMessage = `【本入会手続き完了】\n\n${renderedBody}`
                     } else {
                         lineMessage = `📢 ${renderedSubject}\n\n${renderedBody}`
                     }

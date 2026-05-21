@@ -339,7 +339,7 @@ export async function sendTestEmail(key: string, subject: string, body: string, 
             } else if (key === 'trio_trial_payment_completed') {
                 lineMessage = `【THE TRIO 体験レッスン決済完了】\n\n${testBody}`
             } else if (key === 'enrollment_complete' || key === 'enrollment_completed') {
-                lineMessage = `🎉【本入会手続き完了】\n\n${testBody}`
+                lineMessage = `【本入会手続き完了】\n\n${testBody}`
             } else {
                 lineMessage = `📢 ${testSubject}\n\n${testBody}`
             }
@@ -383,7 +383,7 @@ export async function sendTestEmail(key: string, subject: string, body: string, 
                 } else if (key === 'trio_trial_payment_completed') {
                     lineMessage = `【THE TRIO 体験レッスン決済完了】\n\n${testBody}`
                 } else if (key === 'enrollment_complete' || key === 'enrollment_completed') {
-                    lineMessage = `🎉【本入会手続き完了】\n\n${testBody}`
+                    lineMessage = `【本入会手続き完了】\n\n${testBody}`
                 } else {
                     lineMessage = `📢 ${testSubject}\n\n${testBody}`
                 }
