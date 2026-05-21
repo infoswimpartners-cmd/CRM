@@ -3,7 +3,6 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import WithdrawalForm from '@/components/forms/WithdrawalForm';
 import { Suspense } from 'react';
 import { Loader2 } from 'lucide-react';
-import { redirect } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -29,7 +28,7 @@ async function WithdrawContent({ resolvedSearchParams }: { resolvedSearchParams:
   // 2. クエリパラメータからLINEユーザーIDを取得
   const queryLineUserId = resolvedSearchParams.line_user_id || resolvedSearchParams.userId || '';
   
-  // ログインしていない場合でも、クエリパラメータにLINE IDがあればログインをスキップして進む
+  // ログインしていない場合でも、クエリパラメータにLINE IDがあれば優先して読み込み
   if (queryLineUserId) {
     lineUserId = queryLineUserId;
     
@@ -50,10 +49,9 @@ async function WithdrawContent({ resolvedSearchParams }: { resolvedSearchParams:
     }
   }
 
-  // 3. ログインセッションもなく、かつクエリパラメータにLINE IDもない場合はログイン画面へリダイレクト
-  if (!user && !queryLineUserId) {
-    redirect('/member/login');
-  }
+  // 【ユーザー要望に基づく変更】
+  // ログインセッションがなく、かつパラメータもないプレーンな本番URL（/withdraw）アクセスであっても、
+  // ログイン画面へ強制リダイレクトさせず、手動入力フォームとして直接表示します。
 
   return (
     <div className="py-8">
