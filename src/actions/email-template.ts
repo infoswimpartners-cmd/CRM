@@ -414,8 +414,8 @@ export async function sendTestEmail(key: string, subject: string, body: string, 
                 return { success: false, error: error.message }
             }
         }
-    } else if (!recipient && !hasChatChannels) {
-        // メールアドレスもChatも設定がない場合
+    } else if (!recipient && !hasChatChannels && !isLineSent) {
+        // メールアドレス、Chat、LINEのいずれの送信先も設定・送信されていない場合
         return { success: false, error: '送信先がありません。メールアドレスを入力するか、Google Chat Webhookを設定してください。' }
     }
 
