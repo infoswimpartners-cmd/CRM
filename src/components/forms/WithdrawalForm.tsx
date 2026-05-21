@@ -38,6 +38,7 @@ export default function WithdrawalForm({ initialLineUserId = '', studentName = '
   const [isPending, setIsPending] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   // クエリパラメータやPropsが変化した際の自動同期
   useEffect(() => {
@@ -53,17 +54,28 @@ export default function WithdrawalForm({ initialLineUserId = '', studentName = '
     }
   }, [studentName]);
 
-  // LIFF初期化とLINE ID自動解決
+  // LINEアプリ内ブラウザ（トーク画面からのクリック等）での自動OAuthログインリダイレクト
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const isLineBrowser = /Line/i.test(navigator.userAgent);
+      
+      // LINEアプリ内ブラウザで開かれており、かつLINE IDがまだ自動解決できていない場合
+      if (isLineBrowser && !lineUserId && !isRedirecting) {
+        setIsRedirecting(true);
+        // NextAuthのLINEログインへリダイレクトして確実にセッションを確立させる
+        const callbackUrl = window.location.origin + window.location.pathname;
+        window.location.href = `/api/auth/signin/line?callbackUrl=${encodeURIComponent(callbackUrl)}`;
+      }
+    }
+  }, [lineUserId, isRedirecting]);
+
+  // LIFF SDKによる補助的な初期化と検出（念のための二重化）
   useEffect(() => {
     const initLiff = async () => {
       try {
         const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
-        if (!liffId) {
-          console.warn("NEXT_PUBLIC_LIFF_ID is not configured.");
-          return;
-        }
+        if (!liffId) return;
 
-        // クライアントサイドでのみ実行
         if (typeof window !== 'undefined') {
           if (!liff.isInClient() && liff.isLoggedIn() === undefined) {
             await liff.init({ liffId });
@@ -71,28 +83,19 @@ export default function WithdrawalForm({ initialLineUserId = '', studentName = '
             await liff.init({ liffId });
           }
 
-          // LINEアプリ内ブラウザ（またはLIFFクライアント）であるかを判定
-          const isLineBrowser = liff.isInClient() || /Line/i.test(navigator.userAgent);
-
           if (liff.isLoggedIn()) {
             const profile = await liff.getProfile();
             if (profile?.userId) {
               setLineUserId(profile.userId);
-              
-              // LINE IDから受講生名を取得
               const name = await getStudentNameByLineId(profile.userId);
               if (name) {
                 setStudentNameState(name);
               }
             }
-          } else if (isLineBrowser) {
-            // LINEアプリ内ブラウザで開かれており、かつ未ログインの場合は自動でLINEログインを実行
-            const redirectUri = window.location.origin + window.location.pathname;
-            liff.login({ redirectUri });
           }
         }
       } catch (error) {
-        console.error("LIFF initialization or profile fetch failed:", error);
+        console.error("LIFF helper failed:", error);
       }
     };
 
@@ -133,6 +136,23 @@ export default function WithdrawalForm({ initialLineUserId = '', studentName = '
       setIsPending(false);
     }
   };
+
+  if (isRedirecting) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white p-8 rounded-2xl shadow-2xl text-center border border-slate-100/80">
+          <div className="w-16 h-16 bg-slate-50 text-slate-800 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner animate-spin">
+            <Loader2 className="w-8 h-8" />
+          </div>
+          <h2 className="text-lg font-black text-slate-800 tracking-tight">LINEアカウントを認証中</h2>
+          <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+            LINEアプリ内からのアクセスを検知しました。<br />
+            自動的にログインを行い、受講生情報を読み込んでいます...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (isSubmitted) {
     return (
