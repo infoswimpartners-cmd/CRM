@@ -71,6 +71,9 @@ export default function WithdrawalForm({ initialLineUserId = '', studentName = '
             await liff.init({ liffId });
           }
 
+          // LINEアプリ内ブラウザ（またはLIFFクライアント）であるかを判定
+          const isLineBrowser = liff.isInClient() || /Line/i.test(navigator.userAgent);
+
           if (liff.isLoggedIn()) {
             const profile = await liff.getProfile();
             if (profile?.userId) {
@@ -82,6 +85,10 @@ export default function WithdrawalForm({ initialLineUserId = '', studentName = '
                 setStudentNameState(name);
               }
             }
+          } else if (isLineBrowser) {
+            // LINEアプリ内ブラウザで開かれており、かつ未ログインの場合は自動でLINEログインを実行
+            const redirectUri = window.location.origin + window.location.pathname;
+            liff.login({ redirectUri });
           }
         }
       } catch (error) {
