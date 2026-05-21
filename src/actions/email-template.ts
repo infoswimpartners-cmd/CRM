@@ -254,7 +254,7 @@ export async function updateLessonMasterEmailTemplate(id: string, email_template
     return { success: true }
 }
 
-export async function sendTestEmail(key: string, subject: string, body: string, toEmail: string) {
+export async function sendTestEmail(key: string, subject: string, body: string, toEmail: string, sendToTestTaroLine?: boolean) {
     const supabase = await createAdminClient()
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -326,7 +326,33 @@ export async function sendTestEmail(key: string, subject: string, body: string, 
 
     // 3-b. メール送信またはLINE優先送信のシミュレート
     let isLineSent = false
-    if (recipient) {
+    if (sendToTestTaroLine) {
+        try {
+            // テスト太郎のLINE IDへ直接送信
+            const testTaroLineUserId = 'U0e5a7654874369ca5e38deb47fd783aa'
+            const { lineService } = await import('@/lib/line')
+            let lineMessage = ''
+            if (key === 'trial_confirmed') {
+                lineMessage = `【体験レッスン予約確定とご請求】\n\n${testBody}`
+            } else if (key === 'trial_payment_completed') {
+                lineMessage = `【体験レッスン決済完了】\n\n${testBody}`
+            } else if (key === 'trio_trial_payment_completed') {
+                lineMessage = `【THE TRIO 体験レッスン決済完了】\n\n${testBody}`
+            } else if (key === 'enrollment_complete' || key === 'enrollment_completed') {
+                lineMessage = `🎉【本入会手続き完了】\n\n${testBody}`
+            } else {
+                lineMessage = `📢 ${testSubject}\n\n${testBody}`
+            }
+
+            const success = await lineService.pushMessage(testTaroLineUserId, `🧪 [TEST]\n${lineMessage}`)
+            if (success) {
+                results.push('LINE')
+                isLineSent = true
+            }
+        } catch (lineErr) {
+            console.error('[Test] LINE test send error:', lineErr)
+        }
+    } else if (recipient) {
         try {
             // LINE連携の有無を確認（大文字小文字/空白の揺れ、および同一メールアドレス重複登録に対応）
             const { data: students } = await supabase
@@ -342,7 +368,9 @@ export async function sendTestEmail(key: string, subject: string, body: string, 
                 'trial_payment_request',
                 'trial_payment_completed',
                 'trio_trial_payment_completed',
-                'payment_success'
+                'payment_success',
+                'enrollment_complete',
+                'enrollment_completed'
             ].includes(key)
 
             if (student?.line_user_id && isLineTargetTemplate) {
@@ -354,6 +382,8 @@ export async function sendTestEmail(key: string, subject: string, body: string, 
                     lineMessage = `【体験レッスン決済完了】\n\n${testBody}`
                 } else if (key === 'trio_trial_payment_completed') {
                     lineMessage = `【THE TRIO 体験レッスン決済完了】\n\n${testBody}`
+                } else if (key === 'enrollment_complete' || key === 'enrollment_completed') {
+                    lineMessage = `🎉【本入会手続き完了】\n\n${testBody}`
                 } else {
                     lineMessage = `📢 ${testSubject}\n\n${testBody}`
                 }

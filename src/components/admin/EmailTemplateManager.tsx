@@ -256,7 +256,7 @@ export function EmailTemplateManager({ templates, triggers, trialMasters = [] }:
                         <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-semibold text-gray-900 text-sm">{trigger.name}</span>
                             <Badge variant="outline" className="text-[10px] font-mono text-gray-400 bg-gray-50">{trigger.id}</Badge>
-                            {['trial_lesson_reserved', 'trial_payment_completed', 'trio_trial_payment_completed', 'payment_success'].includes(trigger.id) && (
+                            {['trial_lesson_reserved', 'trial_payment_completed', 'trio_trial_payment_completed', 'payment_success', 'enrollment_completed'].includes(trigger.id) && (
                                 <Badge className="text-[10px] bg-[#06C755] text-white border-none font-bold hover:bg-[#06C755]">
                                     <MessageSquare className="w-2.5 h-2.5 mr-1" />LINE優先配信
                                 </Badge>
@@ -269,7 +269,7 @@ export function EmailTemplateManager({ templates, triggers, trialMasters = [] }:
                         </div>
                         <p className="text-xs text-gray-500">
                             {trigger.description}
-                            {['trial_lesson_reserved', 'trial_payment_completed', 'trio_trial_payment_completed', 'payment_success'].includes(trigger.id) && (
+                            {['trial_lesson_reserved', 'trial_payment_completed', 'trio_trial_payment_completed', 'payment_success', 'enrollment_completed'].includes(trigger.id) && (
                                 <span className="text-[10px] text-emerald-600 block mt-1 font-medium">※LINE連携済みの生徒には、メールの代わりにLINEへ優先配信されます。</span>
                             )}
                         </p>

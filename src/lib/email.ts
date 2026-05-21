@@ -244,7 +244,7 @@ ${text}
             }
 
             // 2. LINE連携されており、かつLINE送信対象のトリガーである場合はLINEにのみ送信
-            const isLineTargetTrigger = ['trial_lesson_reserved', 'trial_payment_completed', 'trio_trial_payment_completed', 'payment_success'].includes(triggerId)
+            const isLineTargetTrigger = ['trial_lesson_reserved', 'trial_payment_completed', 'trio_trial_payment_completed', 'payment_success', 'enrollment_completed'].includes(triggerId)
             const shouldSendToLine = hasLineLinked && isLineTargetTrigger && student?.line_user_id
 
             if (shouldSendToLine) {
@@ -257,9 +257,12 @@ ${text}
                         lineMessage = `【体験レッスン決済完了】\n\n${renderedBody}`
                     } else if (triggerId === 'trio_trial_payment_completed') {
                         lineMessage = `【THE TRIO 体験レッスン決済完了】\n\n${renderedBody}`
+                    } else if (triggerId === 'enrollment_completed') {
+                        lineMessage = `🎉【本入会手続き完了】\n\n${renderedBody}`
                     } else {
                         lineMessage = `📢 ${renderedSubject}\n\n${renderedBody}`
                     }
+
 
                     const success = await lineService.pushMessage(student.line_user_id, lineMessage)
                     if (success) {
