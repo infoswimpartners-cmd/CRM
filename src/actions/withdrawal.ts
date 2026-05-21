@@ -1,5 +1,27 @@
 'use server';
 
+import { createAdminClient } from '@/lib/supabase/admin';
+
+/**
+ * LINEユーザーIDに紐づく受講生の名前を取得するサーバーアクション
+ */
+export async function getStudentNameByLineId(lineUserId: string) {
+  try {
+    if (!lineUserId) return null;
+    const supabaseAdmin = createAdminClient();
+    const { data: dbStudent } = await supabaseAdmin
+      .from('students')
+      .select('full_name')
+      .eq('line_user_id', lineUserId)
+      .single();
+    
+    return dbStudent?.full_name || null;
+  } catch (e) {
+    console.error('Failed to fetch student name by line_user_id server action:', e);
+    return null;
+  }
+}
+
 /**
  * 退会申請データをMake (Webhook) に送信するサーバーアクション
  */

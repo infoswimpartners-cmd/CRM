@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { submitWithdrawal } from '@/actions/withdrawal';
+import { submitWithdrawal, getStudentNameByLineId } from '@/actions/withdrawal';
 import { Loader2, CheckCircle2, AlertCircle, Info, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import liff from '@line/liff';
 
 // 退会理由の定義
 const REASONS = [
@@ -25,6 +26,7 @@ export default function WithdrawalForm({ initialLineUserId = '', studentName = '
   // URLクエリパラメータまたは初期プロップスからLINEユーザーIDを決定
   const paramLineUserId = searchParams.get('line_user_id') || searchParams.get('userId') || '';
   const [lineUserId, setLineUserId] = useState(paramLineUserId || initialLineUserId);
+  const [studentNameState, setStudentNameState] = useState(studentName);
   
   const [reason, setReason] = useState('');
   const [agreed, setAgreed] = useState({
@@ -44,6 +46,51 @@ export default function WithdrawalForm({ initialLineUserId = '', studentName = '
       setLineUserId(activeId);
     }
   }, [paramLineUserId, initialLineUserId]);
+
+  useEffect(() => {
+    if (studentName) {
+      setStudentNameState(studentName);
+    }
+  }, [studentName]);
+
+  // LIFF初期化とLINE ID自動解決
+  useEffect(() => {
+    const initLiff = async () => {
+      try {
+        const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
+        if (!liffId) {
+          console.warn("NEXT_PUBLIC_LIFF_ID is not configured.");
+          return;
+        }
+
+        // クライアントサイドでのみ実行
+        if (typeof window !== 'undefined') {
+          if (!liff.isInClient() && liff.isLoggedIn() === undefined) {
+            await liff.init({ liffId });
+          } else if (liff.id === null) {
+            await liff.init({ liffId });
+          }
+
+          if (liff.isLoggedIn()) {
+            const profile = await liff.getProfile();
+            if (profile?.userId) {
+              setLineUserId(profile.userId);
+              
+              // LINE IDから受講生名を取得
+              const name = await getStudentNameByLineId(profile.userId);
+              if (name) {
+                setStudentNameState(name);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error("LIFF initialization or profile fetch failed:", error);
+      }
+    };
+
+    initLiff();
+  }, []);
 
   // ボタンの活性化条件（理由選択 ＋ LINEユーザーIDの入力 ＋ 3つのチェックすべて必須）
   const isSubmitDisabled = 
@@ -95,8 +142,8 @@ export default function WithdrawalForm({ initialLineUserId = '', studentName = '
           
           <div className="mt-8 pt-6 border-t border-slate-100">
             <p className="text-xs text-slate-400">これまでの受講、誠にありがとうございました。</p>
-            {studentName && (
-              <p className="text-xs font-semibold text-slate-500 mt-2">受講生: {studentName} 様</p>
+            {studentNameState && (
+              <p className="text-xs font-semibold text-slate-500 mt-2">受講生: {studentNameState} 様</p>
             )}
           </div>
         </div>
@@ -134,11 +181,11 @@ export default function WithdrawalForm({ initialLineUserId = '', studentName = '
         )}
 
         {/* 生徒情報サマリー */}
-        {studentName && (
+        {studentNameState && (
           <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 flex items-center justify-between">
             <div className="space-y-0.5">
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Target Student</p>
-              <p className="text-sm font-black text-slate-700">{studentName} 様</p>
+              <p className="text-sm font-black text-slate-700">{studentNameState} 様</p>
             </div>
             <span className="text-[10px] font-bold bg-slate-200 text-slate-600 px-2 py-1 rounded-full">
               認証済み
