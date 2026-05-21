@@ -13,8 +13,13 @@ export const metadata = {
   description: 'Swim Partners のオンライン退会お手続きフォームです。規約をご確認の上、お手続きをお進めください。',
 };
 
+interface SearchParams {
+  line_user_id?: string;
+  userId?: string;
+}
+
 // サーバー側で検索クエリやセッションから受講生情報を解決するコンポーネント
-async function WithdrawContent({ searchParams }: { searchParams: { line_user_id?: string; userId?: string } }) {
+async function WithdrawContent({ resolvedSearchParams }: { resolvedSearchParams: SearchParams }) {
   // 1. まずログインセッションがあるかチェック
   const { user, student: sessionStudent } = await getCachedMemberData();
   
@@ -22,7 +27,7 @@ async function WithdrawContent({ searchParams }: { searchParams: { line_user_id?
   let studentName = sessionStudent?.full_name || '';
 
   // 2. クエリパラメータからLINEユーザーIDを取得
-  const queryLineUserId = searchParams.line_user_id || searchParams.userId || '';
+  const queryLineUserId = resolvedSearchParams.line_user_id || resolvedSearchParams.userId || '';
   
   // ログインしていない場合でも、クエリパラメータにLINE IDがあればログインをスキップして進む
   if (queryLineUserId) {
@@ -60,7 +65,14 @@ async function WithdrawContent({ searchParams }: { searchParams: { line_user_id?
   );
 }
 
-export default function WithdrawPage({ searchParams }: { searchParams: { line_user_id?: string; userId?: string } }) {
+interface PageProps {
+  searchParams: Promise<SearchParams>;
+}
+
+export default async function WithdrawPage({ searchParams }: PageProps) {
+  // Next.js 15/16 仕様: サーバーコンポーネントの searchParams は Promise のため await で解決する
+  const resolvedSearchParams = await searchParams;
+
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
       <Suspense fallback={
@@ -71,7 +83,7 @@ export default function WithdrawPage({ searchParams }: { searchParams: { line_us
           </div>
         </div>
       }>
-        <WithdrawContent searchParams={searchParams} />
+        <WithdrawContent resolvedSearchParams={resolvedSearchParams} />
       </Suspense>
     </div>
   );
