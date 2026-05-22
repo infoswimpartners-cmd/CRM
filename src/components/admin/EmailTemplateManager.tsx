@@ -188,6 +188,7 @@ export function EmailTemplateManager({ templates, triggers, trialMasters = [] }:
     const savedPopupSelection = useRef<{ start: number; end: number }>({ start: 0, end: 0 })
     const [showPopupVariables, setShowPopupVariables] = useState(true)
     const [showMainVariables, setShowMainVariables] = useState(true)
+    const [showPopupInnerVariables, setShowPopupInnerVariables] = useState(true)
 
     const savePopupSelectionPos = useCallback(() => {
         const el = popupTextareaRef.current
@@ -995,59 +996,76 @@ export function EmailTemplateManager({ templates, triggers, trialMasters = [] }:
                 <div className="flex-1 min-h-0 flex flex-col lg:flex-row p-4 gap-4 bg-slate-50">
                     {/* 左側：変数挿入パネル */}
                     {showPopupVariables && (
-                        <div className="w-full lg:w-72 flex-none flex flex-col gap-2 bg-white p-3 border border-slate-200 rounded-xl">
-                            <span className="text-xs font-bold text-slate-600 flex items-center gap-1">
-                                📌 クリックして変数を挿入
-                            </span>
-                            <p className="text-[10px] text-slate-400">
-                                カーソル位置に自動で変数が差し込まれます。
-                            </p>
-                            <div className="overflow-y-auto flex-1 pr-1 space-y-3 mt-1 min-h-[120px] lg:min-h-0">
-                                <div>
-                                    <span className="text-[10px] font-semibold text-cyan-700 bg-cyan-50 px-1.5 py-0.5 rounded">推奨変数</span>
-                                    <div className="flex flex-wrap gap-1.5 mt-2">
-                                        {selectedTemplate && getRecommendedVars(selectedTemplate).map(v => (
-                                            <button
-                                                key={v.key}
-                                                type="button"
-                                                onMouseDown={(e) => {
-                                                    e.preventDefault();
-                                                    insertVariableToPopup(v.key);
-                                                }}
-                                                title={v.label}
-                                                className="flex items-center gap-1 px-2 py-1 rounded border border-cyan-200 bg-cyan-50 hover:bg-cyan-100 hover:border-cyan-400 transition-all cursor-pointer text-left"
-                                            >
-                                                <code className="text-[10px] font-mono text-cyan-800">{`{{${v.key}}}`}</code>
-                                                <span className="text-[9px] text-cyan-600 truncate max-w-[80px]">{v.label}</span>
-                                            </button>
-                                        ))}
-                                        {selectedTemplate && getRecommendedVars(selectedTemplate).length === 0 && (
-                                            <span className="text-[11px] text-slate-400">推奨変数はありません</span>
+                        <div className="w-full lg:w-72 flex-none flex flex-col gap-2 bg-white p-3 border border-slate-200 rounded-xl h-fit">
+                            <div 
+                                className="flex items-center justify-between cursor-pointer hover:bg-slate-50 p-1.5 -m-1.5 rounded-lg transition-colors select-none"
+                                onClick={() => setShowPopupInnerVariables(!showPopupInnerVariables)}
+                            >
+                                <span className="text-xs font-bold text-slate-600 flex items-center gap-1">
+                                    📌 クリックして変数を挿入
+                                    {showPopupInnerVariables ? (
+                                        <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
+                                    ) : (
+                                        <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                                    )}
+                                </span>
+                                <span className="text-xs text-cyan-600 font-medium bg-cyan-50 px-1.5 py-0.5 rounded">
+                                    {showPopupInnerVariables ? '非表示にする' : '表示する'}
+                                </span>
+                            </div>
+                            {showPopupInnerVariables && (
+                                <>
+                                    <p className="text-[10px] text-slate-400 mt-1">
+                                        カーソル位置に自動で変数が差し込まれます。
+                                    </p>
+                                    <div className="overflow-y-auto flex-1 pr-1 space-y-3 mt-1 min-h-[120px] lg:min-h-0">
+                                        <div>
+                                            <span className="text-[10px] font-semibold text-cyan-700 bg-cyan-50 px-1.5 py-0.5 rounded">推奨変数</span>
+                                            <div className="flex flex-wrap gap-1.5 mt-2">
+                                                {selectedTemplate && getRecommendedVars(selectedTemplate).map(v => (
+                                                    <button
+                                                        key={v.key}
+                                                        type="button"
+                                                        onMouseDown={(e) => {
+                                                            e.preventDefault();
+                                                            insertVariableToPopup(v.key);
+                                                        }}
+                                                        title={v.label}
+                                                        className="flex items-center gap-1 px-2 py-1 rounded border border-cyan-200 bg-cyan-50 hover:bg-cyan-100 hover:border-cyan-400 transition-all cursor-pointer text-left"
+                                                    >
+                                                        <code className="text-[10px] font-mono text-cyan-800">{`{{${v.key}}}`}</code>
+                                                        <span className="text-[9px] text-cyan-600 truncate max-w-[80px]">{v.label}</span>
+                                                    </button>
+                                                ))}
+                                                {selectedTemplate && getRecommendedVars(selectedTemplate).length === 0 && (
+                                                    <span className="text-[11px] text-slate-400">推奨変数はありません</span>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {selectedTemplate && (selectedTemplate.variables || []).filter(v => !getRecommendedVars(selectedTemplate).find(rv => rv.key === v)).length > 0 && (
+                                            <div>
+                                                <span className="text-[10px] font-semibold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">その他の変数</span>
+                                                <div className="flex flex-wrap gap-1.5 mt-2">
+                                                    {(selectedTemplate.variables || []).filter(v => !getRecommendedVars(selectedTemplate).find(rv => rv.key === v)).map(v => (
+                                                        <button
+                                                            key={v}
+                                                            type="button"
+                                                            onMouseDown={(e) => {
+                                                                e.preventDefault();
+                                                                insertVariableToPopup(v);
+                                                            }}
+                                                            className="flex items-center px-2 py-1 rounded border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 transition-all cursor-pointer"
+                                                        >
+                                                            <code className="text-[10px] font-mono text-slate-700">{`{{${v}}}`}</code>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
                                         )}
                                     </div>
-                                </div>
-
-                                {selectedTemplate && (selectedTemplate.variables || []).filter(v => !getRecommendedVars(selectedTemplate).find(rv => rv.key === v)).length > 0 && (
-                                    <div>
-                                        <span className="text-[10px] font-semibold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">その他の変数</span>
-                                        <div className="flex flex-wrap gap-1.5 mt-2">
-                                            {(selectedTemplate.variables || []).filter(v => !getRecommendedVars(selectedTemplate).find(rv => rv.key === v)).map(v => (
-                                                <button
-                                                    key={v}
-                                                    type="button"
-                                                    onMouseDown={(e) => {
-                                                        e.preventDefault();
-                                                        insertVariableToPopup(v);
-                                                    }}
-                                                    className="flex items-center px-2 py-1 rounded border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 transition-all cursor-pointer"
-                                                >
-                                                    <code className="text-[10px] font-mono text-slate-700">{`{{${v}}}`}</code>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
+                                </>
+                            )}
                         </div>
                     )}
 
