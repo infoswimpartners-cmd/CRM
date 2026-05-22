@@ -181,6 +181,38 @@ export function EmailTemplateManager({ templates, triggers, trialMasters = [] }:
     const [isDuplicating, setIsDuplicating] = useState(false)
     const [isHeaderEditOpen, setIsHeaderEditOpen] = useState(false)
 
+    // ポップアップエディタ用の状態管理（完全レスポンシブ・ライトテーマ）
+    const [isPopupEditorOpen, setIsPopupEditorOpen] = useState(false)
+    const [popupBody, setPopupBody] = useState('')
+    const popupTextareaRef = useRef<HTMLTextAreaElement>(null)
+    const savedPopupSelection = useRef<{ start: number; end: number }>({ start: 0, end: 0 })
+    const [showPopupVariables, setShowPopupVariables] = useState(true)
+
+    const savePopupSelectionPos = useCallback(() => {
+        const el = popupTextareaRef.current
+        if (!el) return
+        savedPopupSelection.current = { start: el.selectionStart ?? 0, end: el.selectionEnd ?? 0 }
+    }, [])
+
+    const insertVariableToPopup = useCallback((variable: string) => {
+        const textToInsert = `{{${variable}}}`
+        const { start, end } = savedPopupSelection.current
+
+        setPopupBody(prev => {
+            const next = prev.substring(0, start) + textToInsert + prev.substring(end)
+            const newPos = start + textToInsert.length
+            savedPopupSelection.current = { start: newPos, end: newPos }
+            setTimeout(() => {
+                const el = popupTextareaRef.current
+                if (el) {
+                    el.focus()
+                    el.setSelectionRange(newPos, newPos)
+                }
+            }, 0)
+            return next
+        })
+    }, [])
+
     // 新規作成
     const [isCreating, setIsCreating] = useState(false)
     const [newKey, setNewKey] = useState('')
@@ -577,8 +609,9 @@ export function EmailTemplateManager({ templates, triggers, trialMasters = [] }:
     }
 
     return (
-        // 全体はページ高さいっぱいに広げ、スクロールはここ一箇所のみ
-        <Tabs defaultValue="templates" className="w-full h-[calc(100vh-130px)] flex flex-col">
+        <>
+            {/* 全体はページ高さいっぱいに広げ、スクロールはここ一箇所のみ */}
+            <Tabs defaultValue="templates" className="w-full h-[calc(100vh-130px)] flex flex-col">
             {/* タブバー */}
             <div className="flex-none flex items-center gap-4 mb-4 border-b border-gray-200 pb-2">
                 <TabsList className="bg-gray-100/80 p-1">
@@ -782,12 +815,18 @@ export function EmailTemplateManager({ templates, triggers, trialMasters = [] }:
                                         ref={textareaRef}
                                         value={body}
                                         onChange={e => setBody(e.target.value)}
-                                        onFocus={saveBodySelection}
-                                        onKeyUp={saveBodySelection}
-                                        onMouseUp={saveBodySelection}
-                                        onClick={saveBodySelection}
-                                        className="flex-1 font-mono text-sm leading-relaxed resize-none p-3 min-h-0"
-                                        placeholder="メール本文を入力..."
+                                        onFocus={() => {
+                                            saveBodySelection();
+                                            setPopupBody(body);
+                                            setIsPopupEditorOpen(true);
+                                        }}
+                                        onClick={() => {
+                                            setPopupBody(body);
+                                            setIsPopupEditorOpen(true);
+                                        }}
+                                        className="flex-1 font-mono text-sm leading-relaxed resize-none p-3 min-h-0 cursor-pointer bg-slate-50/50 hover:bg-slate-50 transition-colors"
+                                        placeholder="クリックしてメール本文を大きく編集..."
+                                        readOnly
                                     />
                                 </div>
                             </div>
@@ -919,5 +958,152 @@ export function EmailTemplateManager({ templates, triggers, trialMasters = [] }:
                 </div>
             </TabsContent>
         </Tabs>
+
+        {/* プレミアムなメール本文編集用ポップアップモーダル（完全レスポンシブ・PCサイズ最適化・ライトテーマ） */}
+        <Dialog open={isPopupEditorOpen} onOpenChange={setIsPopupEditorOpen}>
+            <DialogContent className="w-[88vw] max-w-[96vw] h-[90vh] max-h-[92vh] p-0 flex flex-col overflow-hidden bg-slate-50 border border-slate-200 rounded-2xl shadow-2xl gap-0">
+                <DialogHeader className="p-4 bg-white border-b border-slate-100 flex flex-row items-center justify-between space-y-0">
+                    <div>
+                        <DialogTitle className="text-base font-semibold text-slate-800 flex items-center gap-2">
+                            <Mail className="w-5 h-5 text-cyan-600" />
+                            メール本文の編集（拡大画面）
+                        </DialogTitle>
+                        <DialogDescription className="text-xs text-slate-400 mt-0.5">
+                            PC画面に最適化された広いエディタで、変数を挿入しながら快適に本文を編集できます。
+                        </DialogDescription>
+                    </div>
+                </DialogHeader>
+
+                {/* ポップアップメインコンテンツ：左右分割レイアウト（PC） */}
+                <div className="flex-1 min-h-0 flex flex-col lg:flex-row p-4 gap-4 bg-slate-50">
+                    {/* 左側：変数挿入パネル */}
+                    {showPopupVariables && (
+                        <div className="w-full lg:w-72 flex-none flex flex-col gap-2 bg-white p-3 border border-slate-200 rounded-xl">
+                            <span className="text-xs font-bold text-slate-600 flex items-center gap-1">
+                                📌 クリックして変数を挿入
+                            </span>
+                            <p className="text-[10px] text-slate-400">
+                                カーソル位置に自動で変数が差し込まれます。
+                            </p>
+                            <div className="overflow-y-auto flex-1 pr-1 space-y-3 mt-1 min-h-[120px] lg:min-h-0">
+                                <div>
+                                    <span className="text-[10px] font-semibold text-cyan-700 bg-cyan-50 px-1.5 py-0.5 rounded">推奨変数</span>
+                                    <div className="flex flex-wrap gap-1.5 mt-2">
+                                        {selectedTemplate && getRecommendedVars(selectedTemplate).map(v => (
+                                            <button
+                                                key={v.key}
+                                                type="button"
+                                                onMouseDown={(e) => {
+                                                    e.preventDefault();
+                                                    insertVariableToPopup(v.key);
+                                                }}
+                                                title={v.label}
+                                                className="flex items-center gap-1 px-2 py-1 rounded border border-cyan-200 bg-cyan-50 hover:bg-cyan-100 hover:border-cyan-400 transition-all cursor-pointer text-left"
+                                            >
+                                                <code className="text-[10px] font-mono text-cyan-800">{`{{${v.key}}}`}</code>
+                                                <span className="text-[9px] text-cyan-600 truncate max-w-[80px]">{v.label}</span>
+                                            </button>
+                                        ))}
+                                        {selectedTemplate && getRecommendedVars(selectedTemplate).length === 0 && (
+                                            <span className="text-[11px] text-slate-400">推奨変数はありません</span>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {selectedTemplate && (selectedTemplate.variables || []).filter(v => !getRecommendedVars(selectedTemplate).find(rv => rv.key === v)).length > 0 && (
+                                    <div>
+                                        <span className="text-[10px] font-semibold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">その他の変数</span>
+                                        <div className="flex flex-wrap gap-1.5 mt-2">
+                                            {(selectedTemplate.variables || []).filter(v => !getRecommendedVars(selectedTemplate).find(rv => rv.key === v)).map(v => (
+                                                <button
+                                                    key={v}
+                                                    type="button"
+                                                    onMouseDown={(e) => {
+                                                        e.preventDefault();
+                                                        insertVariableToPopup(v);
+                                                    }}
+                                                    className="flex items-center px-2 py-1 rounded border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 transition-all cursor-pointer"
+                                                >
+                                                    <code className="text-[10px] font-mono text-slate-700">{`{{${v}}}`}</code>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 右側：巨大エディタ領域 */}
+                    <div className="flex-1 flex flex-col bg-white border border-slate-200 rounded-xl overflow-hidden p-4 gap-3">
+                        <div className="flex-none flex items-center justify-between border-b border-slate-100 pb-2 gap-2 flex-wrap">
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 text-[11px] px-2 py-0 border-cyan-200 bg-cyan-50/50 text-cyan-700 hover:bg-cyan-50"
+                                    onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        setShowPopupVariables(!showPopupVariables);
+                                    }}
+                                >
+                                    📋 {showPopupVariables ? '変数を非表示' : '変数を表示'}
+                                </Button>
+                                <span className="text-xs font-semibold text-slate-500 ml-1">件名：</span>
+                                <span className="text-xs font-semibold text-slate-800 truncate max-w-[150px] sm:max-w-[300px] lg:max-w-[400px]">
+                                    {subject || '（件名未設定）'}
+                                </span>
+                            </div>
+                            <span className="text-[10px] text-slate-400 bg-slate-50 px-2 py-0.5 rounded border border-slate-100">
+                                文字数: {popupBody.length} 文字
+                            </span>
+                        </div>
+                        <div className="flex-1 min-h-0">
+                            <textarea
+                                ref={popupTextareaRef}
+                                value={popupBody}
+                                onChange={e => {
+                                    setPopupBody(e.target.value);
+                                    // リアルタイムにカーソル位置を記録
+                                    const el = e.target;
+                                    savedPopupSelection.current = { start: el.selectionStart ?? 0, end: el.selectionEnd ?? 0 };
+                                }}
+                                onFocus={savePopupSelectionPos}
+                                onKeyUp={savePopupSelectionPos}
+                                onMouseUp={savePopupSelectionPos}
+                                onClick={savePopupSelectionPos}
+                                className="w-full h-full font-mono text-sm leading-relaxed p-4 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 resize-none overflow-y-auto"
+                                placeholder="メール本文を入力..."
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                {/* フッター：適用とキャンセル */}
+                <DialogFooter className="p-4 bg-white border-t border-slate-100 flex flex-row items-center justify-end gap-2">
+                    <Button
+                        variant="outline"
+                        onClick={() => setIsPopupEditorOpen(false)}
+                        className="text-slate-600 hover:bg-slate-50 h-9"
+                    >
+                        変更を破棄して閉じる
+                    </Button>
+                    <Button
+                        onClick={() => {
+                            setBody(popupBody);
+                            setIsPopupEditorOpen(false);
+                            toast({
+                                title: '本文を反映しました',
+                                description: '「保存」ボタンを押すことで変更が確定します。',
+                            });
+                        }}
+                        className="bg-cyan-600 hover:bg-cyan-700 text-white h-9 px-4 font-medium"
+                    >
+                        編集を本文に適用する
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    </>
     )
 }
