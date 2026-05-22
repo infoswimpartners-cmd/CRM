@@ -961,7 +961,7 @@ export function EmailTemplateManager({ templates, triggers, trialMasters = [] }:
 
         {/* プレミアムなメール本文編集用ポップアップモーダル（完全レスポンシブ・PCサイズ最適化・ライトテーマ） */}
         <Dialog open={isPopupEditorOpen} onOpenChange={setIsPopupEditorOpen}>
-            <DialogContent className="w-[88vw] max-w-[96vw] h-[90vh] max-h-[92vh] p-0 flex flex-col overflow-hidden bg-slate-50 border border-slate-200 rounded-2xl shadow-2xl gap-0">
+            <DialogContent className="w-[88vw] sm:max-w-none max-w-[96vw] h-[90vh] max-h-[92vh] p-0 flex flex-col overflow-hidden bg-slate-50 border border-slate-200 rounded-2xl shadow-2xl gap-0">
                 <DialogHeader className="p-4 bg-white border-b border-slate-100 flex flex-row items-center justify-between space-y-0">
                     <div>
                         <DialogTitle className="text-base font-semibold text-slate-800 flex items-center gap-2">
