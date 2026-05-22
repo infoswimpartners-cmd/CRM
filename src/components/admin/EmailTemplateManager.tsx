@@ -187,6 +187,7 @@ export function EmailTemplateManager({ templates, triggers, trialMasters = [] }:
     const popupTextareaRef = useRef<HTMLTextAreaElement>(null)
     const savedPopupSelection = useRef<{ start: number; end: number }>({ start: 0, end: 0 })
     const [showPopupVariables, setShowPopupVariables] = useState(true)
+    const [showMainVariables, setShowMainVariables] = useState(true)
 
     const savePopupSelectionPos = useCallback(() => {
         const el = popupTextareaRef.current
@@ -564,46 +565,62 @@ export function EmailTemplateManager({ templates, triggers, trialMasters = [] }:
 
         return (
             <div className="rounded-lg border border-slate-200 bg-slate-50 overflow-hidden">
-                <div className="flex items-center justify-between px-3 py-2 bg-white border-b border-slate-200">
-                    <span className="text-xs font-semibold text-slate-600">📌 変数を挿入</span>
-                    <span className="text-[11px] text-slate-400">
-                        挿入先：
-                        <span className={`font-bold ml-1 ${field === 'subject' ? 'text-cyan-600' : 'text-indigo-600'}`}>
-                            {field === 'subject' ? '📝 件名' : '📄 本文'}
+                <div 
+                    className="flex items-center justify-between px-3 py-2 bg-white border-b border-slate-200 cursor-pointer hover:bg-slate-50/50 transition-colors select-none"
+                    onClick={() => setShowMainVariables(!showMainVariables)}
+                >
+                    <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-semibold text-slate-600">📌 変数を挿入</span>
+                        {showMainVariables ? (
+                            <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
+                        ) : (
+                            <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                        )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className="text-[11px] text-slate-400">
+                            挿入先：
+                            <span className={`font-bold ml-1 ${field === 'subject' ? 'text-cyan-600' : 'text-indigo-600'}`}>
+                                {field === 'subject' ? '📝 件名' : '📄 本文'}
+                            </span>
                         </span>
-                        <span className="text-slate-300 ml-1">（クリックで切替）</span>
-                    </span>
-                </div>
-                <div className="p-2.5 flex flex-wrap gap-1.5">
-                    {recommended.length > 0 && recommended.map(v => (
-                        <button
-                            key={v.key}
-                            type="button"
-                            // mouseDown で保存済みselectionを上書きせずに挿入
-                            onMouseDown={(e) => { e.preventDefault(); insertVariable(v.key) }}
-                            title={v.label}
-                            className="flex items-center gap-1 px-2 py-1 rounded border border-cyan-200 bg-cyan-50 hover:bg-cyan-100 hover:border-cyan-400 transition-all cursor-pointer"
-                        >
-                            <code className="text-[11px] font-mono text-cyan-800">{`{{${v.key}}}`}</code>
-                            <span className="text-[10px] text-cyan-600">{v.label}</span>
-                        </button>
-                    ))}
-                    {extra.map(v => (
-                        <button
-                            key={v}
-                            type="button"
-                            onMouseDown={(e) => { e.preventDefault(); insertVariable(v) }}
-                            className="flex items-center px-2 py-1 rounded border border-slate-200 bg-white hover:bg-indigo-50 hover:border-indigo-300 transition-all cursor-pointer"
-                        >
-                            <code className="text-[11px] font-mono text-slate-700">{`{{${v}}}`}</code>
-                        </button>
-                    ))}
-                    {recommended.length === 0 && extra.length === 0 && (
-                        <span className="text-xs text-slate-400 py-0.5">
-                            💡「自動送信ロジック設定」でこのテンプレートをトリガーに割り当てると変数が表示されます
+                        <span className="text-xs text-cyan-600 font-medium bg-cyan-50 px-1.5 py-0.5 rounded">
+                            {showMainVariables ? '非表示にする' : '表示する'}
                         </span>
-                    )}
+                    </div>
                 </div>
+                {showMainVariables && (
+                    <div className="p-2.5 flex flex-wrap gap-1.5 transition-all">
+                        {recommended.length > 0 && recommended.map(v => (
+                            <button
+                                key={v.key}
+                                type="button"
+                                // mouseDown で保存済みselectionを上書きせずに挿入
+                                onMouseDown={(e) => { e.preventDefault(); insertVariable(v.key) }}
+                                title={v.label}
+                                className="flex items-center gap-1 px-2 py-1 rounded border border-cyan-200 bg-cyan-50 hover:bg-cyan-100 hover:border-cyan-400 transition-all cursor-pointer"
+                            >
+                                <code className="text-[11px] font-mono text-cyan-800">{`{{${v.key}}}`}</code>
+                                <span className="text-[10px] text-cyan-600">{v.label}</span>
+                            </button>
+                        ))}
+                        {extra.map(v => (
+                            <button
+                                key={v}
+                                type="button"
+                                onMouseDown={(e) => { e.preventDefault(); insertVariable(v) }}
+                                className="flex items-center px-2 py-1 rounded border border-slate-200 bg-white hover:bg-indigo-50 hover:border-indigo-300 transition-all cursor-pointer"
+                            >
+                                <code className="text-[11px] font-mono text-slate-700">{`{{${v}}}`}</code>
+                            </button>
+                        ))}
+                        {recommended.length === 0 && extra.length === 0 && (
+                            <span className="text-xs text-slate-400 py-0.5">
+                                💡「自動送信ロジック設定」でこのテンプレートをトリガーに割り当てると変数が表示されます
+                            </span>
+                        )}
+                    </div>
+                )}
             </div>
         )
     }
