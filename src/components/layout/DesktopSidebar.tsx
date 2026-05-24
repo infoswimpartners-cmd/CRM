@@ -56,7 +56,6 @@ export function DesktopSidebar({ role }: DesktopSidebarProps) {
                         <NavItem href="/admin/reports" icon={Calendar} label="全レッスン報告" isActive={pathname?.startsWith('/admin/reports')} />
 
                         <NavHeading>財務管理</NavHeading>
-                        <NavItem href="/admin/payments" icon={CreditCard} label="決済状況" isActive={pathname?.startsWith('/admin/payments')} />
                         <NavItem href="/admin/finance/payouts" icon={CreditCard} label="報酬支払管理" isActive={pathname?.startsWith('/admin/finance/payouts')} />
                         <NavItem href="/admin/approvals" icon={FileCheck} label="承認管理" isActive={pathname?.startsWith('/admin/approvals')} />
 
