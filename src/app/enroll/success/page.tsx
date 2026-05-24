@@ -5,14 +5,16 @@ import liff from '@line/liff';
 
 export default function EnrollSuccessPage() {
   const [isLiffReady, setIsLiffReady] = useState(false);
+  const [isInLiff, setIsInLiff] = useState(false);
 
   useEffect(() => {
     const initLiff = async () => {
       try {
-        const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
+        const liffId = process.env.NEXT_PUBLIC_ENROLL_LIFF_ID || process.env.NEXT_PUBLIC_LIFF_ID;
         if (!liffId) return;
         await liff.init({ liffId });
         setIsLiffReady(true);
+        setIsInLiff(liff.isInClient());
       } catch (err) {
         console.error("LIFF Success Page init error:", err);
       }
@@ -73,13 +75,42 @@ export default function EnrollSuccessPage() {
             </ul>
           </div>
 
-          {/* LINEを閉じるボタン */}
-          <button
-            onClick={handleClose}
-            className="w-full py-4 px-4 bg-gradient-to-r from-blue-600 to-cyan-500 hover:opacity-95 active:scale-[0.98] text-white rounded-xl font-bold text-center tracking-wider transition-all shadow-md"
-          >
-            LINEアプリに戻る
-          </button>
+          {/* ボタンまたはLINE連携案内の表示 */}
+          {isInLiff ? (
+            <button
+              onClick={handleClose}
+              className="w-full py-4 px-4 bg-gradient-to-r from-blue-600 to-cyan-500 hover:opacity-95 active:scale-[0.98] text-white rounded-xl font-bold text-center tracking-wider transition-all shadow-md"
+            >
+              LINEアプリに戻る
+            </button>
+          ) : (
+            <div className="space-y-4">
+              <div className="rounded-xl border border-emerald-100 bg-emerald-50/20 p-4 text-left space-y-2.5">
+                <h3 className="text-xs font-bold text-emerald-800 flex items-center gap-1.5">
+                  💬 LINE公式アカウントを連携してください
+                </h3>
+                <p className="text-[11px] text-emerald-700 leading-relaxed">
+                  レッスン前日の予約リマインダーや大切なお知らせをLINEで便利に受け取るため、公式LINEとの連携をお願いいたします。
+                </p>
+                <div className="flex flex-col gap-2 pt-1">
+                  <a
+                    href="https://line.me/R/ti/p/@swim_partners"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-3 px-4 bg-[#06C755] hover:bg-[#05b34c] text-white rounded-xl font-bold text-center text-xs tracking-wider transition-all shadow-sm flex items-center justify-center gap-2"
+                  >
+                    1. 公式LINEを友だち追加
+                  </a>
+                  <a
+                    href="/member/activate"
+                    className="w-full py-3 px-4 bg-gradient-to-r from-blue-600 to-cyan-500 hover:opacity-95 text-white rounded-xl font-bold text-center text-xs tracking-wider transition-all shadow-sm flex items-center justify-center gap-2"
+                  >
+                    2. システムとLINEを連携する
+                  </a>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
