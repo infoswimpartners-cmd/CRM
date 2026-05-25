@@ -14,7 +14,7 @@ export async function cancelSchedule(scheduleId: string) {
         // 1. Fetch Schedule to check for Stripe ID and Google Event ID
         const { data: schedule, error: fetchError } = await supabaseAdmin
             .from('lesson_schedules')
-            .select('stripe_invoice_item_id, student_id, google_event_id')
+            .select('stripe_invoice_item_id, student_id, google_event_id, coach_id')
             .eq('id', scheduleId)
             .single()
 
@@ -33,10 +33,17 @@ export async function cancelSchedule(scheduleId: string) {
         // 3. Delete from Google Calendar if exists
         if (schedule.google_event_id) {
             try {
-                const { deleteCalendarEvent, getAdminRefreshToken } = await import('@/lib/google-calendar')
-                const adminRefreshToken = await getAdminRefreshToken(supabaseAdmin)
-                if (adminRefreshToken) {
-                    await deleteCalendarEvent(adminRefreshToken, schedule.google_event_id)
+                const { deleteCalendarEvent, getAdminRefreshToken, getCoachRefreshToken } = await import('@/lib/google-calendar')
+                // 優先的にそのコーチ自身のトークンを取得
+                let token = await getCoachRefreshToken(supabaseAdmin, schedule.coach_id)
+                
+                // 未連携の場合は管理者のトークンをフォールバックとして使用
+                if (!token) {
+                    token = await getAdminRefreshToken(supabaseAdmin)
+                }
+
+                if (token) {
+                    await deleteCalendarEvent(token, schedule.google_event_id)
                 }
             } catch (calErr) {
                 console.error(`[CancelSchedule] Failed to delete Google Calendar Event (${schedule.google_event_id}):`, calErr)

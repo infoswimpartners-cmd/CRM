@@ -45,9 +45,9 @@ export default function BookingForm() {
   useEffect(() => {
     const initLiff = async () => {
       try {
-        const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
+        const liffId = process.env.NEXT_PUBLIC_TRIAL_LIFF_ID || process.env.NEXT_PUBLIC_LIFF_ID;
         if (!liffId) {
-          throw new Error("NEXT_PUBLIC_LIFF_ID が設定されていません。");
+          throw new Error("NEXT_PUBLIC_TRIAL_LIFF_ID または NEXT_PUBLIC_LIFF_ID が設定されていません。");
         }
 
         await liff.init({ liffId });

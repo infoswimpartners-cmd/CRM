@@ -584,16 +584,23 @@ export async function rejectLessonSchedule(scheduleId: string) {
         // [MODIFIED] Delete from Google Calendar first
         const { data: existing } = await supabaseAdmin
             .from('lesson_schedules')
-            .select('google_event_id')
+            .select('google_event_id, coach_id')
             .eq('id', scheduleId)
             .single()
 
         if (existing?.google_event_id) {
             try {
-                const { deleteCalendarEvent, getAdminRefreshToken } = await import('@/lib/google-calendar')
-                const adminRefreshToken = await getAdminRefreshToken(supabaseAdmin)
-                if (adminRefreshToken) {
-                    await deleteCalendarEvent(adminRefreshToken, existing.google_event_id)
+                const { deleteCalendarEvent, getAdminRefreshToken, getCoachRefreshToken } = await import('@/lib/google-calendar')
+                // 優先的にそのコーチ自身のトークンを取得
+                let token = await getCoachRefreshToken(supabaseAdmin, existing.coach_id)
+                
+                // 未連携の場合は管理者のトークンをフォールバックとして使用
+                if (!token) {
+                    token = await getAdminRefreshToken(supabaseAdmin)
+                }
+
+                if (token) {
+                    await deleteCalendarEvent(token, existing.google_event_id)
                 }
             } catch (calErr) {
                 console.error('[rejectLessonSchedule] Googleカレンダー削除失敗:', calErr)

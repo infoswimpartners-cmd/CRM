@@ -11,6 +11,7 @@ import { MobileSidebar } from '@/components/layout/MobileSidebar'
 import { DesktopSidebar } from '@/components/layout/DesktopSidebar'
 import { GlobalSearchContainer } from '@/components/layout/GlobalSearchContainer' // Import Container
 import { NotificationBell } from '@/components/layout/NotificationBell' // [NEW]
+import { CoachBottomNav } from '@/components/layout/CoachBottomNav' // [NEW]
 import Image from 'next/image'
 
 export const dynamic = 'force-dynamic'
@@ -130,9 +131,10 @@ export default async function DashboardLayout({
                     </div>
                 </header>
 
-                <main className="relative z-10 flex-1 p-4 md:p-6 space-y-6">
+                <main className={`relative z-10 flex-1 p-4 md:p-6 space-y-6 ${safeProfile.role === 'coach' ? 'pb-20 md:pb-6' : ''}`}>
                     {children}
                 </main>
+                {safeProfile.role === 'coach' && <CoachBottomNav />}
             </div >
         </div >
     )

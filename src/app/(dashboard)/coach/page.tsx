@@ -36,37 +36,6 @@ export default async function CoachDashboard() {
 
     return (
         <div className="space-y-5 md:space-y-8 animate-fade-in-up pb-10 min-w-0">
-            {/* Header / Welcome / Important Actions */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm min-w-0">
-                <div className="min-w-0">
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <h1 className="text-lg md:text-2xl font-bold text-slate-900">
-                            Welcome back, <span className="text-cyan-600">{profile?.full_name || 'Coach'}</span>
-                        </h1>
-                        {profile?.coach_number && (
-                            <Badge variant="outline" className="text-xs md:text-sm px-2.5 py-0.5 bg-cyan-50 text-cyan-700 border-cyan-300 shadow-sm font-mono tracking-wide shrink-0">
-                                ID: {profile.coach_number}
-                            </Badge>
-                        )}
-                    </div>
-                    <p className="text-slate-500 text-xs md:text-sm">今日の予定を確認して、レッスン業務を開始しましょう。</p>
-                </div>
-                <div className="grid grid-cols-2 sm:flex items-center gap-2 w-full sm:w-auto">
-                    <Button asChild variant="outline" size="sm" className="bg-white hover:bg-slate-50 text-slate-700 border-slate-200 text-xs md:text-sm">
-                        <Link href="/coach/schedule">
-                            <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
-                            予定を登録
-                        </Link>
-                    </Button>
-                    <Button asChild size="sm" className="bg-cyan-600 hover:bg-cyan-700 text-white shadow-md shadow-cyan-200 border-none text-xs md:text-sm">
-                        <Link href="/coach/report">
-                            <FileText className="mr-1.5 h-3.5 w-3.5" />
-                            レッスン報告
-                        </Link>
-                    </Button>
-                </div>
-            </div>
-
             {/* Manual Banner (Highest Priority) */}
             <ManualBanner />
 

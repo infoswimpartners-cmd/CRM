@@ -143,16 +143,78 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
 
             if (profile?.role === 'admin') {
                 setIsAdmin(true)
-                const { data: allCoaches } = await supabase
-                    .from('profiles')
-                    .select('id, full_name')
-                    .in('role', ['coach', 'admin'])
-                    .order('full_name') // access check?
-
-                if (allCoaches) setCoaches(allCoaches as any)
-
                 if (profile?.google_refresh_token) {
                     setIsGoogleLinked(true)
+                }
+
+                // 顧客詳細ページからの遷移などで、初期生徒ID（initialStudentId）が指定されている場合
+                if (initialStudentId) {
+                    try {
+                        const { data: assigned, error } = await supabase
+                            .from('student_coaches')
+                            .select(`
+                                role,
+                                coach_id,
+                                profiles (
+                                    id,
+                                    full_name
+                                )
+                            `)
+                            .eq('student_id', initialStudentId)
+
+                        if (error) throw error
+
+                        if (assigned && assigned.length > 0) {
+                            const formatted = assigned
+                                .map((ac: any) => {
+                                    const prof = Array.isArray(ac.profiles) ? ac.profiles[0] : ac.profiles
+                                    return {
+                                        id: prof?.id || ac.coach_id,
+                                        full_name: prof?.full_name || '未設定'
+                                    }
+                                })
+                                .filter((c: any) => !!c.id)
+
+                            setCoaches(formatted)
+
+                            // メインコーチを自動選択
+                            const main = assigned.find((ac: any) => ac.role === 'main')
+                            if (main) {
+                                const prof = Array.isArray(main.profiles) ? main.profiles[0] : main.profiles
+                                setSelectedCoachId(prof?.id || main.coach_id)
+                            } else if (formatted.length > 0) {
+                                setSelectedCoachId(formatted[0].id)
+                            }
+                        } else {
+                            // 担当コーチが登録されていない場合は、全コーチを表示する（フォールバック）
+                            const { data: allCoaches } = await supabase
+                                .from('profiles')
+                                .select('id, full_name')
+                                .in('role', ['coach', 'admin'])
+                                .order('full_name')
+
+                            if (allCoaches) setCoaches(allCoaches as any)
+                        }
+                    } catch (err) {
+                        console.error('Failed to fetch assigned coaches:', err)
+                        // エラー発生時は全コーチを表示（フォールバック）
+                        const { data: allCoaches } = await supabase
+                            .from('profiles')
+                            .select('id, full_name')
+                            .in('role', ['coach', 'admin'])
+                            .order('full_name')
+
+                        if (allCoaches) setCoaches(allCoaches as any)
+                    }
+                } else {
+                    // 通常の挙動（全コーチを表示）
+                    const { data: allCoaches } = await supabase
+                        .from('profiles')
+                        .select('id, full_name')
+                        .in('role', ['coach', 'admin'])
+                        .order('full_name')
+
+                    if (allCoaches) setCoaches(allCoaches as any)
                 }
             }
 

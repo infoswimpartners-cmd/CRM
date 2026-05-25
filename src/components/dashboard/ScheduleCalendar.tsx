@@ -22,6 +22,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { createClient } from '@/lib/supabase/client'
 import { AddScheduleDialog } from './AddScheduleDialog'
 import { EditScheduleDialog } from './EditScheduleDialog'
+import { AddOpenSlotsDialog } from './AddOpenSlotsDialog' // [NEW]
 import { formatStudentNames } from '@/lib/utils'
 
 
@@ -44,28 +45,38 @@ interface Schedule {
     student?: { full_name: string, second_student_name?: string | null } // Joined data structure
     coach_id: string
     profiles?: { full_name: string, avatar_url: string } // Joined Coach data
+    student_id?: string
+    billing_status?: string
 }
 
 interface ScheduleCalendarProps {
     adminView?: boolean
 }
 
-const getStatusColor = (status?: string) => {
-    switch (status) {
-        case 'requested': return 'bg-orange-500'
-        case 'booked': return 'bg-blue-600'
-        case 'open': return 'bg-gray-400'
-        default: return 'bg-blue-400'
+const getStatusColor = (schedule: Schedule) => {
+    if (!schedule.student_id) {
+        // 空き枠（生徒なし）
+        return 'bg-gray-400'
     }
+    // 登録された予定（生徒あり）
+    if (schedule.billing_status === 'paid') {
+        return 'bg-blue-600'
+    }
+    if (schedule.billing_status === 'pending') {
+        return 'bg-orange-500' // 体験など未決済・調整中の場合
+    }
+    return 'bg-blue-500'
 }
 
-const getStatusBorder = (status?: string) => {
-    switch (status) {
-        case 'requested': return 'border-l-4 border-l-orange-500'
-        case 'booked': return 'border-l-4 border-l-blue-600'
-        case 'open': return 'border-l-4 border-l-gray-300'
-        default: return ''
+const getStatusBorder = (schedule: Schedule) => {
+    if (!schedule.student_id) {
+        // 空き枠（生徒なし）
+        return 'border-l-4 border-l-gray-300 bg-gray-50/50'
     }
+    if (schedule.billing_status === 'paid') {
+        return 'border-l-4 border-l-blue-600'
+    }
+    return 'border-l-4 border-l-orange-500'
 }
 
 /** Googleカレンダーのイベント事前入力URLを生成（APIキー不要） */
@@ -108,6 +119,7 @@ export function ScheduleCalendar({ adminView = false }: ScheduleCalendarProps) {
     // Edit Dialog State
     const [selectedSchedule, setSelectedSchedule] = React.useState<Schedule | null>(null)
     const [isEditOpen, setIsEditOpen] = React.useState(false)
+    const [isOpenSlotsOpen, setIsOpenSlotsOpen] = React.useState(false) // [NEW]
 
     const handleScheduleClick = (schedule: Schedule) => {
         setSelectedSchedule(schedule)
@@ -248,11 +260,11 @@ export function ScheduleCalendar({ adminView = false }: ScheduleCalendarProps) {
     const selectedDaySchedules = schedules.filter(s => isSameDay(new Date(s.start_time), selectedDate))
         .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime())
 
-    // 現在の月の登録レッスン本数（open以外）を集計
+    // 現在の月の登録レッスン本数（open以外＝生徒あり）を集計
     const monthLessonsCount = React.useMemo(() => {
         return schedules.filter(s =>
             isSameMonth(new Date(s.start_time), currentMonth) &&
-            s.status !== 'open'
+            !!s.student_id
         ).length
     }, [schedules, currentMonth])
 
@@ -283,7 +295,7 @@ export function ScheduleCalendar({ adminView = false }: ScheduleCalendarProps) {
             key={schedule.id}
             className={cn(
                 "cursor-pointer hover:shadow-md transition-shadow",
-                getStatusBorder(schedule.status)
+                getStatusBorder(schedule)
             )}
             onClick={() => handleScheduleClick(schedule)}
         >
@@ -412,16 +424,14 @@ export function ScheduleCalendar({ adminView = false }: ScheduleCalendarProps) {
 
                     {/* Hidden if linked as per request */}
 
-                    {/* Manual Add Button */}
+                    {/* Open Slots Add Button */}
                     <Button
-                        onClick={() => {
-                            setAddDialogDate(new Date())
-                            setIsAddOpen(true)
-                        }}
-                        className="h-10 rounded-xl bg-blue-600 hover:bg-blue-700 text-xs md:text-sm px-4 shadow-sm"
+                        onClick={() => setIsOpenSlotsOpen(true)}
+                        variant="outline"
+                        className="h-10 rounded-xl border-cyan-200 text-cyan-700 hover:bg-cyan-50 text-xs md:text-sm px-4 shadow-sm cursor-pointer"
                     >
                         <Plus className="mr-1.5 h-4 w-4" />
-                        追加
+                        空き枠登録
                     </Button>
                 </div>
             </div>
@@ -469,7 +479,6 @@ export function ScheduleCalendar({ adminView = false }: ScheduleCalendarProps) {
                                     <button
                                         key={day.toString()}
                                         onClick={() => setSelectedDate(day)}
-                                        onDoubleClick={() => handleDateDoubleClick(day)}
                                         className={cn(
                                             "relative bg-white min-h-[50px] md:min-h-[60px] p-0.5 md:p-1 flex flex-col items-center justify-start hover:bg-gray-50 transition-colors",
                                             !isCurrentMonth && "bg-gray-50/50 text-gray-400",
@@ -489,7 +498,7 @@ export function ScheduleCalendar({ adminView = false }: ScheduleCalendarProps) {
                                             {schedules.filter(s => isSameDay(new Date(s.start_time), day)).map((s, i) => (
                                                 <div key={s.id} className={cn(
                                                     "w-1 h-1 md:w-1.5 md:h-1.5 rounded-full",
-                                                    getStatusColor(s.status)
+                                                    getStatusColor(s)
                                                 )} />
                                             ))}
                                         </div>
@@ -505,10 +514,6 @@ export function ScheduleCalendar({ adminView = false }: ScheduleCalendarProps) {
                         <h3 className="font-bold flex items-center gap-2 border-b pb-2">
                             {format(selectedDate, 'M月d日 (E)', { locale: ja })} の予定
                             <Badge variant="secondary">{selectedDaySchedules.length}件</Badge>
-                            <Button variant="ghost" size="sm" className="ml-auto text-xs" onClick={() => handleDateDoubleClick(selectedDate)}>
-                                <Plus className="w-4 h-4 mr-1" />
-                                追加
-                            </Button>
                         </h3>
 
                         <div className="space-y-3">
@@ -517,12 +522,8 @@ export function ScheduleCalendar({ adminView = false }: ScheduleCalendarProps) {
                                     <ScheduleCard key={schedule.id} schedule={schedule} />
                                 ))
                             ) : (
-                                <div
-                                    className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border border-dashed cursor-pointer hover:bg-gray-100 transition-colors"
-                                    onClick={() => handleDateDoubleClick(selectedDate)}
-                                >
-                                    予定はありません<br />
-                                    <span className="text-xs text-blue-500 block mt-1">ダブルクリックまたはここをクリックして追加</span>
+                                <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border border-dashed">
+                                    予定はありません
                                 </div>
                             )}
                         </div>
@@ -561,6 +562,12 @@ export function ScheduleCalendar({ adminView = false }: ScheduleCalendarProps) {
                 schedule={selectedSchedule}
                 open={isEditOpen}
                 onOpenChange={setIsEditOpen}
+                onSuccess={handleSuccess}
+            />
+
+            <AddOpenSlotsDialog
+                open={isOpenSlotsOpen}
+                onOpenChange={setIsOpenSlotsOpen}
                 onSuccess={handleSuccess}
             />
         </div>
