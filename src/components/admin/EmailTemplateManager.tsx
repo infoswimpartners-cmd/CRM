@@ -155,11 +155,8 @@ export function EmailTemplateManager({ templates, triggers, trialMasters = [] }:
 
     // Google Chat設定の展開状態
     const [expandedChat, setExpandedChat] = useState<Record<string, boolean>>({})
-    const [chatDrafts, setChatDrafts] = useState<Record<string, { url: string; enabled: boolean; messageTemplate: string }>>({})
-
-    // triggers (props) の更新に同期させて chatDrafts を初期化
-    useEffect(() => {
-        const initial: typeof chatDrafts = {}
+    const [chatDrafts, setChatDrafts] = useState<Record<string, { url: string; enabled: boolean; messageTemplate: string }>>(() => {
+        const initial: Record<string, { url: string; enabled: boolean; messageTemplate: string }> = {}
         triggers.forEach(t => {
             initial[t.id] = {
                 url: t.google_chat_webhook_url || '',
@@ -167,7 +164,22 @@ export function EmailTemplateManager({ templates, triggers, trialMasters = [] }:
                 messageTemplate: t.google_chat_message_template || ''
             }
         })
-        setChatDrafts(initial)
+        return initial
+    })
+
+    // triggers (props) の更新に同期させて chatDrafts を更新
+    useEffect(() => {
+        setChatDrafts(prev => {
+            const next = { ...prev }
+            triggers.forEach(t => {
+                next[t.id] = {
+                    url: t.google_chat_webhook_url || '',
+                    enabled: t.google_chat_enabled || false,
+                    messageTemplate: t.google_chat_message_template || ''
+                }
+            })
+            return next
+        })
     }, [triggers])
 
     const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate | null>(templates[0] || null)
@@ -411,7 +423,10 @@ export function EmailTemplateManager({ templates, triggers, trialMasters = [] }:
                                 <Label className="text-xs text-gray-600">Webhook URL</Label>
                                 <Input
                                     value={draft.url}
-                                    onChange={e => setChatDrafts(prev => ({ ...prev, [trigger.id]: { ...prev[trigger.id], url: e.target.value } }))}
+                                    onChange={e => setChatDrafts(prev => {
+                                        const current = prev[trigger.id] || { url: '', enabled: false, messageTemplate: '' }
+                                        return { ...prev, [trigger.id]: { ...current, url: e.target.value } }
+                                    })}
                                     placeholder="https://chat.googleapis.com/v1/spaces/.../messages?key=..."
                                     className="font-mono text-xs bg-white h-8"
                                 />
@@ -419,7 +434,10 @@ export function EmailTemplateManager({ templates, triggers, trialMasters = [] }:
                             <div className="flex items-center gap-2 flex-none pb-0.5">
                                 <Switch
                                     checked={draft.enabled}
-                                    onCheckedChange={checked => setChatDrafts(prev => ({ ...prev, [trigger.id]: { ...prev[trigger.id], enabled: checked } }))}
+                                    onCheckedChange={checked => setChatDrafts(prev => {
+                                        const current = prev[trigger.id] || { url: '', enabled: false, messageTemplate: '' }
+                                        return { ...prev, [trigger.id]: { ...current, enabled: checked } }
+                                    })}
                                 />
                                 <Label className="text-xs">{draft.enabled ? 'Chat ON' : 'Chat OFF'}</Label>
                             </div>
@@ -595,8 +613,7 @@ export function EmailTemplateManager({ templates, triggers, trialMasters = [] }:
     }
 
     const handleChatSave = async (id: string) => {
-        const draft = chatDrafts[id]
-        if (!draft) return
+        const draft = chatDrafts[id] || { url: '', enabled: false, messageTemplate: '' }
         const trigger = triggersList.find(t => t.id === id)
         if (!trigger) return
         try {
