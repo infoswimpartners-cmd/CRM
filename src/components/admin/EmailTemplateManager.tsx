@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
-import { Loader2, Mail, Save, Trash2, SlidersHorizontal, Settings2, GripVertical, MessageSquare, ChevronDown, ChevronUp, ExternalLink, Copy } from 'lucide-react'
+import { Loader2, Mail, Save, Trash2, SlidersHorizontal, Settings2, GripVertical, MessageSquare, ChevronDown, ChevronUp, ExternalLink, Copy, Edit3 } from 'lucide-react'
 import { TestEmailDialog } from './TestEmailDialog'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -157,6 +157,7 @@ export function EmailTemplateManager({ templates, triggers, trialMasters = [] }:
     const [expandedChat, setExpandedChat] = useState<Record<string, boolean>>({})
     const [chatDrafts, setChatDrafts] = useState<Record<string, { url: string; enabled: boolean; messageTemplate: string }>>({})
 
+    // triggers (props) の更新に同期させて chatDrafts を初期化
     useEffect(() => {
         const initial: typeof chatDrafts = {}
         triggers.forEach(t => {
@@ -180,6 +181,53 @@ export function EmailTemplateManager({ templates, triggers, trialMasters = [] }:
     const [isDeleting, setIsDeleting] = useState(false)
     const [isDuplicating, setIsDuplicating] = useState(false)
     const [isHeaderEditOpen, setIsHeaderEditOpen] = useState(false)
+
+    // Google Chat メッセージポップアップエディタ用の状態管理
+    const [activeChatTriggerId, setActiveChatTriggerId] = useState<string | null>(null)
+    const [chatTemplateBody, setChatTemplateBody] = useState('')
+    const chatTextareaRef = useRef<HTMLTextAreaElement>(null)
+    const savedChatSelection = useRef<{ start: number; end: number }>({ start: 0, end: 0 })
+
+    const saveChatSelectionPos = useCallback(() => {
+        const el = chatTextareaRef.current
+        if (!el) return
+        savedChatSelection.current = { start: el.selectionStart ?? 0, end: el.selectionEnd ?? 0 }
+    }, [])
+
+    const insertVariableToChat = useCallback((variable: string) => {
+        const textToInsert = `{{${variable}}}`
+        const { start, end } = savedChatSelection.current
+
+        setChatTemplateBody(prev => {
+            const next = prev.substring(0, start) + textToInsert + prev.substring(end)
+            const newPos = start + textToInsert.length
+            savedChatSelection.current = { start: newPos, end: newPos }
+            setTimeout(() => {
+                const el = chatTextareaRef.current
+                if (el) {
+                    el.focus()
+                    el.setSelectionRange(newPos, newPos)
+                }
+            }, 0)
+            return next
+        })
+    }, [])
+
+    const handleChatTemplateSave = () => {
+        if (!activeChatTriggerId) return
+        setChatDrafts(prev => ({
+            ...prev,
+            [activeChatTriggerId]: {
+                ...prev[activeChatTriggerId],
+                messageTemplate: chatTemplateBody
+            }
+        }))
+        toast({
+            title: 'メッセージを反映しました',
+            description: '「Google Chat設定を保存」ボタンを押すことで変更が確定します。',
+        })
+        setActiveChatTriggerId(null)
+    }
 
     // ポップアップエディタ用の状態管理（完全レスポンシブ・ライトテーマ）
     const [isPopupEditorOpen, setIsPopupEditorOpen] = useState(false)
@@ -377,19 +425,38 @@ export function EmailTemplateManager({ templates, triggers, trialMasters = [] }:
                             </div>
                         </div>
                         <div className="space-y-1">
-                            <Label className="text-xs text-gray-600">
-                                カスタムメッセージ
-                                <span className="ml-1.5 text-gray-400 font-normal">（空の場合はメール本文と同じ内容を送信）</span>
-                            </Label>
+                            <div className="flex justify-between items-center">
+                                <Label className="text-xs text-gray-600 flex items-center gap-1">
+                                    カスタムメッセージ
+                                    <span className="text-[10px] text-gray-400 font-normal">（空の場合はメール本文を送信）</span>
+                                </Label>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 text-[10px] gap-1 text-green-700 hover:text-green-800 hover:bg-green-50 border-green-200"
+                                    onClick={() => {
+                                        setChatTemplateBody(draft.messageTemplate)
+                                        setActiveChatTriggerId(trigger.id)
+                                    }}
+                                >
+                                    <Edit3 className="w-3 h-3" />
+                                    ポップアップでメッセージを編集
+                                </Button>
+                            </div>
                             <Textarea
                                 value={draft.messageTemplate}
-                                onChange={e => setChatDrafts(prev => ({ ...prev, [trigger.id]: { ...prev[trigger.id], messageTemplate: e.target.value } }))}
-                                placeholder={`例: 📧 *新規問い合わせ* が届きました\nお名前: {{name}}\nメール: {{to}}`}
-                                className="font-mono text-xs h-20 bg-white resize-none"
+                                readOnly
+                                onClick={() => {
+                                    setChatTemplateBody(draft.messageTemplate)
+                                    setActiveChatTriggerId(trigger.id)
+                                }}
+                                placeholder="※空の場合は、デフォルトで『メールの件名 ＋ 本文』がGoogle Chatに送信されます。クリックして見出しの調整や変数を埋め込んだ自由なカスタムメッセージを作成可能です。"
+                                className="font-mono text-[10px] h-16 bg-slate-50 hover:bg-slate-100/70 border border-slate-200 text-slate-600 cursor-pointer resize-none leading-relaxed transition-colors"
                             />
                         </div>
-                        <div className="flex justify-end">
-                            <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white gap-1.5 h-8"
+                        <div className="flex justify-end pt-1">
+                            <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white gap-1.5 h-8 text-xs font-bold"
                                 onClick={() => handleChatSave(trigger.id)}>
                                 <Save className="w-3.5 h-3.5" />
                                 Google Chat設定を保存
@@ -1138,7 +1205,85 @@ export function EmailTemplateManager({ templates, triggers, trialMasters = [] }:
                     </Button>
                 </DialogFooter>
             </DialogContent>
-        </Dialog>
-    </>
+            </Dialog>
+
+            {/* Google Chat メッセージテンプレート編集ダイアログ */}
+            <Dialog open={!!activeChatTriggerId} onOpenChange={(open) => !open && setActiveChatTriggerId(null)}>
+                <DialogContent className="sm:max-w-[650px] max-h-[85vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+                            <MessageSquare className="w-4 h-4 text-green-600" />
+                            Google Chat メッセージ編集 - {triggersList.find(t => t.id === activeChatTriggerId)?.name}
+                        </DialogTitle>
+                        <DialogDescription className="text-xs text-slate-500">
+                            この自動送信ロジックが実行されたときに Google Chat へ送信されるメッセージの内容を編集します。
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    {activeChatTriggerId && (
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-3">
+                            {/* 左側: エディタ */}
+                            <div className="md:col-span-2 space-y-2">
+                                <Label className="text-xs font-bold text-slate-600">メッセージ本文（マークダウン対応）</Label>
+                                <Textarea
+                                    ref={chatTextareaRef}
+                                    value={chatTemplateBody}
+                                    onChange={(e) => setChatTemplateBody(e.target.value)}
+                                    onSelect={saveChatSelectionPos}
+                                    onKeyUp={saveChatSelectionPos}
+                                    onMouseUp={saveChatSelectionPos}
+                                    placeholder={`例: 📧 *新規問い合わせ* が届きました\nお名前: {{name}}\nメール: {{to}}`}
+                                    className="font-mono text-xs h-[300px] leading-relaxed resize-none focus-visible:ring-emerald-500 focus-visible:border-emerald-500"
+                                />
+                                <p className="text-[10px] text-slate-400">
+                                  ※ `**太字**` や `*イタリック*` のように記述すると Google Chat 上で装飾されて表示されます。
+                                </p>
+                            </div>
+
+                            {/* 右側: 変数選択パネル */}
+                            <div className="space-y-2">
+                                <Label className="text-xs font-bold text-slate-600">挿入可能な変数</Label>
+                                <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-2.5 max-h-[300px] overflow-y-auto space-y-1.5">
+                                    {(TRIGGER_VARIABLES[activeChatTriggerId] || []).length > 0 ? (
+                                        (TRIGGER_VARIABLES[activeChatTriggerId] || []).map(v => (
+                                            <button
+                                                key={v.key}
+                                                type="button"
+                                                onMouseDown={(e) => {
+                                                    e.preventDefault();
+                                                    insertVariableToChat(v.key);
+                                                }}
+                                                className="w-full text-left p-1.5 rounded-lg bg-white border border-slate-200 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-800 transition-all text-[11px] font-medium flex items-center justify-between"
+                                            >
+                                                <span>{v.label}</span>
+                                                <code className="text-[9px] bg-slate-100 text-slate-500 px-1 py-0.5 rounded font-mono font-normal">
+                                                    {v.key}
+                                                </code>
+                                            </button>
+                                        ))
+                                    ) : (
+                                        <p className="text-[10px] text-slate-400 italic text-center py-4">
+                                            利用可能な変数がありません。
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <DialogFooter className="pt-2 border-t border-slate-100 flex items-center justify-end gap-2">
+                        <Button variant="outline" onClick={() => setActiveChatTriggerId(null)} className="h-9 text-xs">
+                            変更を破棄して閉じる
+                        </Button>
+                        <Button
+                            onClick={handleChatTemplateSave}
+                            className="bg-green-600 hover:bg-green-700 text-white h-9 text-xs font-bold"
+                        >
+                            編集をメッセージに適用する
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </>
     )
 }
