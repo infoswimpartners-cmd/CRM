@@ -23,7 +23,7 @@ const PRICE_ID_MAP: Record<string, string> = {
 /**
  * オンライン入会手続き用の Stripe Checkout セッションを作成する
  */
-export async function createEnrollmentCheckoutSession(planId: string, lineUserId: string) {
+export async function createEnrollmentCheckoutSession(planId: string, lineUserId: string, email?: string, phone?: string) {
     const supabase = createAdminClient()
 
     try {
@@ -76,12 +76,65 @@ export async function createEnrollmentCheckoutSession(planId: string, lineUserId
             }
         }
 
-        // LINEユーザーIDから既存の生徒情報を取得
-        const { data: student } = await supabase
-            .from('students')
-            .select('id, stripe_customer_id, contact_email, full_name')
-            .eq('line_user_id', lineUserId)
-            .single()
+        // --- 本人確認による自動LINE連携 ---
+        let targetStudentId = ''
+        if (email && phone) {
+            const formattedPhone = phone.replace(/[-]/g, '').trim() // ハイフンを除去
+
+            // 入力されたメールアドレス（大文字小文字無視）で生徒を検索
+            const { data: studentsByEmail } = await supabase
+                .from('students')
+                .select('id, contact_phone, line_user_id')
+                .ilike('contact_email', email.trim())
+
+            if (studentsByEmail && studentsByEmail.length > 0) {
+                // 電話番号も一致する生徒を検索
+                const matchStudent = studentsByEmail.find(s => {
+                    const dbPhone = (s.contact_phone || '').replace(/[-]/g, '').trim()
+                    return dbPhone === formattedPhone || dbPhone.endsWith(formattedPhone) || formattedPhone.endsWith(dbPhone)
+                })
+
+                if (matchStudent) {
+                    console.log(`[Stripe Checkout] Student identified via verification: ${matchStudent.id}`)
+                    targetStudentId = matchStudent.id
+
+                    // 現在のLINE IDと異なる場合はその場で自動連携
+                    if (matchStudent.line_user_id !== lineUserId) {
+                        console.log(`[Stripe Checkout] Auto-linking LINE ID ${lineUserId} to Student ${matchStudent.id}`)
+                        const { error: linkError } = await supabase
+                            .from('students')
+                            .update({ line_user_id: lineUserId })
+                            .eq('id', matchStudent.id)
+
+                        if (linkError) {
+                            console.error('[Stripe Checkout] Auto-link LINE ID failed:', linkError)
+                        }
+                    }
+                }
+            }
+
+            if (!targetStudentId) {
+                return { success: false, error: 'ご入力いただいた情報（メールアドレス・電話番号）に一致する体験お申し込みデータが見つかりませんでした。内容をご確認の上、正しい登録情報を入力してください。' }
+            }
+        }
+
+        // 既存の生徒情報を取得 (本人確認で特定されたIDがある場合はそれを使用、なければLINE IDから検索)
+        let student = null
+        if (targetStudentId) {
+            const { data: fetchedStudent } = await supabase
+                .from('students')
+                .select('id, stripe_customer_id, contact_email, full_name')
+                .eq('id', targetStudentId)
+                .single()
+            student = fetchedStudent
+        } else {
+            const { data: fetchedStudent } = await supabase
+                .from('students')
+                .select('id, stripe_customer_id, contact_email, full_name')
+                .eq('line_user_id', lineUserId)
+                .maybeSingle() // LINEが未連携の場合はnullを返す
+            student = fetchedStudent
+        }
 
         // Stripe Checkout Session パラメータ
         const sessionConfig: any = {
@@ -103,6 +156,9 @@ export async function createEnrollmentCheckoutSession(planId: string, lineUserId
         } else if (student?.contact_email) {
             // なければメールアドレスをプレフィル
             sessionConfig.customer_email = student.contact_email
+        } else if (email) {
+            // またはフォームで入力されたメールアドレスを利用
+            sessionConfig.customer_email = email.trim()
         }
 
         // line_items の追加

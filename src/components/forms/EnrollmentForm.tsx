@@ -26,6 +26,10 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
     initialLessons: false,
   });
 
+  // 本人確認用の入力ステート
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+
   // プラン・時間変更時に同意チェックをリセット
   useEffect(() => {
     setAgreedTerms(prev => ({ ...prev, initialLessons: false }));
@@ -41,9 +45,9 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
   useEffect(() => {
     const initLiff = async () => {
       try {
-        const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
+        const liffId = process.env.NEXT_PUBLIC_ENROLL_LIFF_ID || process.env.NEXT_PUBLIC_LIFF_ID;
         if (!liffId) {
-          throw new Error("NEXT_PUBLIC_LIFF_ID が設定されていません。");
+          throw new Error("NEXT_PUBLIC_ENROLL_LIFF_ID または NEXT_PUBLIC_LIFF_ID が設定されていません。");
         }
 
         await liff.init({ liffId });
@@ -154,6 +158,8 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
     !agreedTerms.cancel ||
     (isInitialLessonsAgreementRequired && !agreedTerms.initialLessons) ||
     !userId ||
+    !email.trim() ||
+    !phone.trim() ||
     isSubmitting;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -162,7 +168,7 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
 
     setIsSubmitting(true);
     try {
-      const res = await createEnrollmentCheckoutSession(activePlan.id, userId);
+      const res = await createEnrollmentCheckoutSession(activePlan.id, userId, email, phone);
       if (res.success && res.url) {
         // Stripe Checkout画面へリダイレクト
         window.location.href = res.url;
@@ -287,7 +293,45 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
             </div>
           </div>
 
-          {/* STEP 2: 動的な料金・ルール表示（プラン選択時のみ出現） */}
+          {/* STEP 2: ご本人確認 */}
+          <div className="space-y-4 border-t border-slate-100 pt-5">
+            <label className="block text-sm font-bold text-slate-700 mb-1">
+              ② ご本人確認（体験お申し込み時の情報）
+            </label>
+            <p className="text-[10px] text-slate-500 leading-relaxed">
+              ※システムでお客様の体験お申し込みデータと安全に照合し、同時にLINEとのシステム連携（紐付け）を完了させるために必須となります。
+            </p>
+            
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <label htmlFor="email" className="text-[11px] font-bold text-slate-500 ml-1">登録メールアドレス</label>
+                <input
+                  id="email"
+                  type="email"
+                  placeholder="example@mail.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="w-full bg-slate-50 border border-slate-200 h-11 px-4 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-medium"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label htmlFor="phone" className="text-[11px] font-bold text-slate-500 ml-1">登録電話番号（ハイフンなし）</label>
+                <input
+                  id="phone"
+                  type="tel"
+                  placeholder="09012345678"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  required
+                  className="w-full bg-slate-50 border border-slate-200 h-11 px-4 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-medium"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* STEP 3: 動的な料金・ルール表示（プラン選択時のみ出現） */}
           {activePlan && (
             <div className="bg-slate-50 rounded-xl p-5 border border-slate-200 space-y-4 animate-fadeIn">
               <div>
@@ -369,10 +413,10 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
             </div>
           )}
 
-          {/* STEP 3: 利用規約・同意事項 */}
+          {/* STEP 4: 利用規約・同意事項 */}
           <div className="space-y-3 border-t border-slate-100 pt-5">
             <label className="block text-sm font-bold text-slate-700 mb-2">
-              ② 利用規約および重要事項への同意
+              ③ 利用規約および重要事項への同意
             </label>
 
             <div className="space-y-3">
