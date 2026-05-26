@@ -278,8 +278,8 @@ export async function assignMembership(studentId: string, membershipTypeId: stri
                     id: itemId,
                     price: targetPriceId
                 }],
-                // 来月からの場合は案分なし（次期から適用）、今すぐの場合は即時適用（差額あり）
-                proration_behavior: startTiming === 'next' ? 'none' : 'always_invoice'
+                // 来月からの場合は案分なし（次期から適用）、今すぐの場合は即時適用（即時決済は行わず、次月に合算請求）
+                proration_behavior: startTiming === 'next' ? 'none' : 'create_prorations'
             })
         } else {
             // Create new subscription
@@ -307,25 +307,19 @@ export async function assignMembership(studentId: string, membershipTypeId: stri
             // 「今すぐ変更（即時決済）」かつ初期費用が発生する場合のみ、当月分の料金を別途請求
             // （サブスクリプション自体はproration_behavior: noneにより当月分が0円になるため）
             // pending状態のままサブスクリプションを作成すると次月に合算されてしまうため、即時Invoiceを発行して決済する
+            // 「今すぐ変更（即時決済）」かつ初期費用が発生する場合
+            // 即時での引き落としは行わず、インボイスアイテム（保留状態）としてStripeに登録し、次月の月謝請求と自動的に合算されるようにします。
             if (startTiming === 'immediate' && membership.fee > 0) {
                 try {
                     await stripe.invoiceItems.create({
                         customer: student.stripe_customer_id,
                         amount: membership.fee,
                         currency: 'jpy',
-                        description: `初期費用（初月分分会費）: ${membership.name}`
+                        description: `初期費用（初月分会費）: ${membership.name}`
                     })
-
-                    const invoice = await stripe.invoices.create({
-                        customer: student.stripe_customer_id,
-                        auto_advance: true,
-                        collection_method: 'charge_automatically',
-                        description: `初期費用（初月分分会費）: ${membership.name}`
-                    })
-
-                    await stripe.invoices.pay(invoice.id)
+                    debugLog(`[AssignMembership] Created pending invoice item for fee: ${membership.fee}. This will be combined with the next monthly invoice.`)
                 } catch (e) {
-                    console.error('Immediate Charge Invoice Error:', e)
+                    console.error('Pending Charge Invoice Item Error:', e)
                 }
             }
 
