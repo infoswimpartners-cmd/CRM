@@ -171,7 +171,7 @@ export async function assignMembership(studentId: string, membershipTypeId: stri
         // 2. Fetch Student with subscription info
         const { data: student } = await supabase
             .from('students')
-            .select('stripe_customer_id, stripe_subscription_id, membership_type_id')
+            .select('stripe_customer_id, stripe_subscription_id, membership_type_id, apply_pair_pricing, is_two_person_lesson, apply_pair_membership_fee')
             .eq('id', studentId)
             .single()
 
@@ -236,7 +236,7 @@ export async function assignMembership(studentId: string, membershipTypeId: stri
 
         const { data: membership } = await supabase
             .from('membership_types')
-            .select('name, stripe_price_id, fee')
+            .select('name, stripe_price_id, fee, pair_fee, stripe_pair_price_id')
             .eq('id', membershipTypeId)
             .single()
 
@@ -244,9 +244,23 @@ export async function assignMembership(studentId: string, membershipTypeId: stri
             return { success: false, error: 'この会員種別はStripeと連携されていません。' }
         }
 
+        // 生徒がペア受講対象かつ、ペア月謝会費適用フラグが有効（デフォルト）であるかを判定
+        const isPairStudent = !!student.apply_pair_pricing || !!student.is_two_person_lesson
+        const applyPairFee = isPairStudent && (student.apply_pair_membership_fee !== false)
+
+        let targetPriceId = membership.stripe_price_id
+        let targetFee = membership.fee
+
+        if (applyPairFee && membership.stripe_pair_price_id) {
+            targetPriceId = membership.stripe_pair_price_id
+            targetFee = membership.pair_fee || Math.round(membership.fee * 1.5) // マスタにペア会費が未登録の場合はフォールバックとして1.5倍
+            debugLog(`[AssignMembership] Using Pair Price ID: ${targetPriceId} (fee: ${targetFee}) for student ${studentId}`)
+        } else {
+            debugLog(`[AssignMembership] Using Normal Price ID: ${targetPriceId} (fee: ${targetFee}) for student ${studentId}`)
+        }
+
         // --- ENVIRONMENT MAPPING (TEST MODE ONLY) ---
-        let targetPriceId = membership.stripe_price_id;
-        const isTestMode = process.env.NODE_ENV !== 'production' && !targetPriceId.startsWith('price_live');
+        const isTestMode = process.env.NODE_ENV !== 'production' && !targetPriceId.startsWith('price_live')
         
         // テスト環境で本番用価格ID（price_1TN...）を検知した場合、テスト用IDに差し替える
         if (isTestMode && targetPriceId === 'price_1TNtfKP0UQGtpYXmwzZ3Bp4s') {
@@ -304,20 +318,17 @@ export async function assignMembership(studentId: string, membershipTypeId: stri
                 expand: ['latest_invoice.payment_intent'],
             }
 
-            // 「今すぐ変更（即時決済）」かつ初期費用が発生する場合のみ、当月分の料金を別途請求
-            // （サブスクリプション自体はproration_behavior: noneにより当月分が0円になるため）
-            // pending状態のままサブスクリプションを作成すると次月に合算されてしまうため、即時Invoiceを発行して決済する
             // 「今すぐ変更（即時決済）」かつ初期費用が発生する場合
             // 即時での引き落としは行わず、インボイスアイテム（保留状態）としてStripeに登録し、次月の月謝請求と自動的に合算されるようにします。
-            if (startTiming === 'immediate' && membership.fee > 0) {
+            if (startTiming === 'immediate' && targetFee > 0) {
                 try {
                     await stripe.invoiceItems.create({
                         customer: student.stripe_customer_id,
-                        amount: membership.fee,
+                        amount: targetFee,
                         currency: 'jpy',
-                        description: `初期費用（初月分会費）: ${membership.name}`
+                        description: `初期費用（初月分会費）: ${membership.name}${applyPairFee ? '（ペア）' : ''}`
                     })
-                    debugLog(`[AssignMembership] Created pending invoice item for fee: ${membership.fee}. This will be combined with the next monthly invoice.`)
+                    debugLog(`[AssignMembership] Created pending invoice item for fee: ${targetFee}. This will be combined with the next monthly invoice.`)
                 } catch (e) {
                     console.error('Pending Charge Invoice Item Error:', e)
                 }

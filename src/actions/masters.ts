@@ -52,6 +52,7 @@ export async function updateMembershipTypeOrder(items: { id: string, display_ord
 export async function createMembershipTypeAction(data: {
     name: string
     fee: number
+    pairFee?: number
     selectedLessons: { id: string, rewardPrice: number | null }[]
 }) {
     const supabase = await createClient()
@@ -72,14 +73,36 @@ export async function createMembershipTypeAction(data: {
             recurring: { interval: 'month' },
         })
 
+        // ペア受講の会費設定がある場合、Stripeにペア用商品を自動登録
+        let pairProductId = null
+        let pairPriceId = null
+        if (data.pairFee && data.pairFee > 0) {
+            const pairProduct = await stripe.products.create({
+                name: `${data.name}（ペア）`,
+                type: 'service',
+            })
+            pairProductId = pairProduct.id
+
+            const pairPrice = await stripe.prices.create({
+                product: pairProduct.id,
+                unit_amount: data.pairFee,
+                currency: 'jpy',
+                recurring: { interval: 'month' },
+            })
+            pairPriceId = pairPrice.id
+        }
+
         // 2. Insert into DB
         const { data: typeData, error: typeError } = await supabase
             .from('membership_types')
             .insert({
-                name: data.name, // Added missing name
+                name: data.name,
                 fee: data.fee,
-                stripe_product_id: product.id, // Store Product ID
+                pair_fee: data.pairFee || null,
+                stripe_product_id: product.id,
                 stripe_price_id: price.id,
+                stripe_pair_product_id: pairProductId,
+                stripe_pair_price_id: pairPriceId,
                 default_lesson_master_id: data.selectedLessons.length > 0 ? data.selectedLessons[0].id : null,
                 reward_master_id: null,
             })

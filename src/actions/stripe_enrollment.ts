@@ -61,21 +61,6 @@ export async function createEnrollmentCheckoutSession(planId: string, lineUserId
             planName = plan.name
         }
 
-        if (!priceId) {
-            return { success: false, error: 'このプランはStripeと連携されていません。' }
-        }
-
-        // 環境に応じた価格IDのマッピング（テスト環境で本番用価格IDを差し替える）
-        let targetPriceId = priceId
-        const isTestMode = process.env.NODE_ENV !== 'production'
-        
-        if (isTestMode) {
-            if (PRICE_ID_MAP[targetPriceId]) {
-                console.log(`[Stripe Checkout] Mapping Live Price -> Test Price: ${targetPriceId} -> ${PRICE_ID_MAP[targetPriceId]}`)
-                targetPriceId = PRICE_ID_MAP[targetPriceId]
-            }
-        }
-
         // --- 本人確認による自動LINE連携 ---
         let targetStudentId = ''
         if (email && phone) {
@@ -120,20 +105,48 @@ export async function createEnrollmentCheckoutSession(planId: string, lineUserId
 
         // 既存の生徒情報を取得 (本人確認で特定されたIDがある場合はそれを使用、なければLINE IDから検索)
         let student = null
+        const selectFields = 'id, stripe_customer_id, contact_email, full_name, apply_pair_pricing, is_two_person_lesson, apply_pair_membership_fee'
         if (targetStudentId) {
             const { data: fetchedStudent } = await supabase
                 .from('students')
-                .select('id, stripe_customer_id, contact_email, full_name')
+                .select(selectFields)
                 .eq('id', targetStudentId)
                 .single()
             student = fetchedStudent
         } else {
             const { data: fetchedStudent } = await supabase
                 .from('students')
-                .select('id, stripe_customer_id, contact_email, full_name')
+                .select(selectFields)
                 .eq('line_user_id', lineUserId)
                 .maybeSingle() // LINEが未連携の場合はnullを返す
             student = fetchedStudent
+        }
+
+        // ペア月謝会費の自動判定と適用
+        if (student && plan && !isPackage) {
+            const isPairStudent = !!student.apply_pair_pricing || !!student.is_two_person_lesson
+            const applyPairFee = isPairStudent && (student.apply_pair_membership_fee !== false)
+            
+            if (applyPairFee && plan.stripe_pair_price_id) {
+                priceId = plan.stripe_pair_price_id
+                planName = `${plan.name}（ペア）`
+                console.log(`[Stripe Checkout] Applying Pair Price ID: ${priceId} for student ${student.id}`)
+            }
+        }
+
+        if (!priceId) {
+            return { success: false, error: 'このプランはStripeと連携されていません。' }
+        }
+
+        // 環境に応じた価格IDのマッピング（テスト環境で本番用価格IDを差し替える）
+        let targetPriceId = priceId
+        const isTestMode = process.env.NODE_ENV !== 'production'
+        
+        if (isTestMode) {
+            if (PRICE_ID_MAP[targetPriceId]) {
+                console.log(`[Stripe Checkout] Mapping Live Price -> Test Price: ${targetPriceId} -> ${PRICE_ID_MAP[targetPriceId]}`)
+                targetPriceId = PRICE_ID_MAP[targetPriceId]
+            }
         }
 
         // Stripe Checkout Session パラメータ

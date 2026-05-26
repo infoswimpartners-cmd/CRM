@@ -50,6 +50,7 @@ interface MembershipType {
     id: string
     name: string
     fee: number
+    pair_fee?: number | null
     active: boolean
     created_at: string
     default_lesson_master_id: string | null
@@ -95,6 +96,13 @@ function SortableRow({ type, toggleActive, setEditingType, setDeletingId }: {
             </TableCell>
             <TableCell>¥{type.fee.toLocaleString()}</TableCell>
             <TableCell>
+                {type.pair_fee !== undefined && type.pair_fee !== null ? (
+                    <span className="text-green-700 font-medium">¥{type.pair_fee.toLocaleString()}</span>
+                ) : (
+                    <span className="text-gray-400 text-xs">—</span>
+                )}
+            </TableCell>
+            <TableCell>
                 {type.default_lesson?.name || <span className="text-gray-400 text-xs">未設定</span>}
             </TableCell>
             <TableCell>
@@ -111,11 +119,13 @@ function SortableRow({ type, toggleActive, setEditingType, setDeletingId }: {
             <TableCell>
                 <div className="flex flex-col gap-0.5 max-w-[120px]">
                     <span className="text-[10px] text-gray-400 truncate" title={(type as any).stripe_product_id}>
-                        {(type as any).stripe_product_id || '-'}
+                        通常: {(type as any).stripe_product_id || '-'}
                     </span>
-                    <span className="text-[10px] text-gray-400 truncate" title={(type as any).stripe_price_id}>
-                        {(type as any).stripe_price_id || '-'}
-                    </span>
+                    {(type as any).stripe_pair_product_id && (
+                        <span className="text-[10px] text-green-600 truncate" title={(type as any).stripe_pair_product_id}>
+                            ペア: {(type as any).stripe_pair_product_id}
+                        </span>
+                    )}
                 </div>
             </TableCell>
             <TableCell className="text-right">
@@ -284,10 +294,11 @@ export function MembershipTypeTable({ types }: { types: MembershipType[] }) {
                                 onClick={() => handleSort('fee')}
                             >
                                 <div className="flex items-center">
-                                    会費
+                                    会費 (通常)
                                     <SortIcon column="fee" />
                                 </div>
                             </TableHead>
+                            <TableHead>会費 (ペア)</TableHead>
                             <TableHead>標準レッスン</TableHead>
                             <TableHead
                                 className="cursor-pointer hover:bg-slate-50 transition-colors"

@@ -41,7 +41,8 @@ export default function NewStudentPage() {
         coach_ids: [] as string[], // multiple coaches
         is_bank_transfer: false,
         is_two_person_lesson: false,
-        apply_pair_pricing: false
+        apply_pair_pricing: false,
+        apply_pair_membership_fee: true
     })
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -53,6 +54,7 @@ export default function NewStudentPage() {
             const hasName = value.trim().length > 0
             updates.is_two_person_lesson = hasName
             updates.apply_pair_pricing = hasName
+            updates.apply_pair_membership_fee = hasName
         }
 
         setFormData({ ...formData, ...updates })
@@ -319,6 +321,18 @@ export default function NewStudentPage() {
                             <Switch
                                 checked={formData.apply_pair_pricing}
                                 onCheckedChange={(checked) => setFormData({ ...formData, apply_pair_pricing: checked })}
+                            />
+                        </div>
+
+                        {/* 2名同時受講（月謝会費）フラグ */}
+                        <div className="mt-4 flex items-center justify-between p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                            <div className="space-y-0.5">
+                                <Label className="text-base font-bold text-blue-900">ペア月謝会費（1.5倍等）を適用する</Label>
+                                <p className="text-xs text-blue-700">有効にすると、マスタに登録された「ペア会費」（または通常会費の1.5倍）が適用されます（キャンペーン適用者の場合はオフにしてください）。</p>
+                            </div>
+                            <Switch
+                                checked={formData.apply_pair_membership_fee}
+                                onCheckedChange={(checked) => setFormData({ ...formData, apply_pair_membership_fee: checked })}
                             />
                         </div>
 

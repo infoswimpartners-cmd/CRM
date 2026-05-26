@@ -46,8 +46,11 @@ export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembe
 
     const [name, setName] = useState(type.name)
     const [fee, setFee] = useState(type.fee.toString())
+    const [pairFee, setPairFee] = useState((type as any).pair_fee?.toString() || '')
     const [stripeProductId, setStripeProductId] = useState((type as any).stripe_product_id || '')
     const [stripePriceId, setStripePriceId] = useState((type as any).stripe_price_id || '')
+    const [stripePairProductId, setStripePairProductId] = useState((type as any).stripe_pair_product_id || '')
+    const [stripePairPriceId, setStripePairPriceId] = useState((type as any).stripe_pair_price_id || '')
     // Map of lesson_id -> { reward: string, unit: string, pair: string }
     const [selectedLessons, setSelectedLessons] = useState<Map<string, { reward: string, unit: string, pair: string }>>(new Map())
     const [lessonMasters, setLessonMasters] = useState<LessonMaster[]>([])
@@ -101,8 +104,11 @@ export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembe
     useEffect(() => {
         setName(type.name)
         setFee(type.fee.toString())
+        setPairFee((type as any).pair_fee?.toString() || '')
         setStripeProductId((type as any).stripe_product_id || '')
         setStripePriceId((type as any).stripe_price_id || '')
+        setStripePairProductId((type as any).stripe_pair_product_id || '')
+        setStripePairPriceId((type as any).stripe_pair_price_id || '')
     }, [type])
 
     const toggleLesson = (id: string) => {
@@ -134,8 +140,11 @@ export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembe
                 .update({
                     name,
                     fee: parseInt(fee),
+                    pair_fee: pairFee ? parseInt(pairFee) : null,
                     stripe_product_id: stripeProductId || null,
                     stripe_price_id: stripePriceId || null,
+                    stripe_pair_product_id: stripePairProductId || null,
+                    stripe_pair_price_id: stripePairPriceId || null,
                     default_lesson_master_id: selectedLessons.size > 0 ? Array.from(selectedLessons.keys())[0] : null,
                 })
                 .eq('id', type.id)
@@ -219,6 +228,19 @@ export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembe
                             </p>
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="edit-pair-fee" className="text-right text-xs font-bold text-green-700 whitespace-nowrap">
+                                ペア会費 (任意)
+                            </Label>
+                            <Input
+                                id="edit-pair-fee"
+                                type="number"
+                                value={pairFee}
+                                onChange={(e) => setPairFee(e.target.value)}
+                                className="col-span-3 border-green-200 focus:border-green-500"
+                                placeholder="例: 26100"
+                            />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
                             <Label htmlFor="stripe-product-id" className="text-right whitespace-nowrap text-xs">
                                 Stripe商品ID
                             </Label>
@@ -238,6 +260,30 @@ export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembe
                                 id="stripe-price-id"
                                 value={stripePriceId}
                                 onChange={(e) => setStripePriceId(e.target.value)}
+                                className="col-span-3"
+                                placeholder="price_..."
+                            />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="stripe-pair-product-id" className="text-right whitespace-nowrap text-xs">
+                                Stripeペア商品ID
+                            </Label>
+                            <Input
+                                id="stripe-pair-product-id"
+                                value={stripePairProductId}
+                                onChange={(e) => setStripePairProductId(e.target.value)}
+                                className="col-span-3"
+                                placeholder="prod_..."
+                            />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="stripe-pair-price-id" className="text-right whitespace-nowrap text-xs">
+                                Stripeペア価格ID
+                            </Label>
+                            <Input
+                                id="stripe-pair-price-id"
+                                value={stripePairPriceId}
+                                onChange={(e) => setStripePairPriceId(e.target.value)}
                                 className="col-span-3"
                                 placeholder="price_..."
                             />

@@ -34,6 +34,7 @@ export function AddMembershipTypeDialog() {
 
     const [name, setName] = useState('')
     const [fee, setFee] = useState('0')
+    const [pairFee, setPairFee] = useState('')
     // Map of lesson_id -> custom reward price (null means use master price)
     const [selectedLessons, setSelectedLessons] = useState<Map<string, string>>(new Map())
     const [lessonMasters, setLessonMasters] = useState<LessonMaster[]>([])
@@ -83,6 +84,7 @@ export function AddMembershipTypeDialog() {
             const result = await createMembershipTypeAction({
                 name,
                 fee: parseInt(fee),
+                pairFee: pairFee ? parseInt(pairFee) : undefined,
                 selectedLessons: selectedLessonsArray
             })
 
@@ -94,6 +96,7 @@ export function AddMembershipTypeDialog() {
             setOpen(false)
             setName('')
             setFee('0')
+            setPairFee('')
             setSelectedLessons(new Map())
             router.refresh()
         } catch (error: any) {
@@ -150,6 +153,19 @@ export function AddMembershipTypeDialog() {
                                 ※0円より大きい場合: レッスン料は会費に含まれるとみなされ、別途請求されません。<br />
                                 ※0円の場合: 単発利用とみなされ、レッスン毎に都度請求されます。
                             </p>
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="pair-fee" className="text-right text-xs font-bold text-green-700 whitespace-nowrap">
+                                ペア会費 (任意)
+                            </Label>
+                            <Input
+                                id="pair-fee"
+                                type="number"
+                                value={pairFee}
+                                onChange={(e) => setPairFee(e.target.value)}
+                                className="col-span-3 border-green-200 focus:border-green-500"
+                                placeholder="例: 26100 (通常会費の1.5倍など)"
+                            />
                         </div>
                         <div className="grid grid-cols-4 items-start gap-4">
                             <Label className="text-right pt-2">
