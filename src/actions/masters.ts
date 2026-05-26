@@ -201,3 +201,116 @@ export async function createLessonMasterAction(data: {
         return { success: false, error: error.message || 'Failed to create lesson master' }
     }
 }
+
+export async function updateMembershipTypeAction(data: {
+    id: string
+    name: string
+    fee: number
+    pairFee?: number
+    stripeProductId?: string
+    stripePriceId?: string
+    stripePairProductId?: string
+    stripePairPriceId?: string
+    selectedLessons: { id: string, rewardPrice: number | null, unitPrice: number | null, pairUnitPrice: number | null }[]
+}) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { success: false, error: 'Unauthorized' }
+
+    try {
+        let stripeProductId = data.stripeProductId || null
+        let stripePriceId = data.stripePriceId || null
+        let stripePairProductId = data.stripePairProductId || null
+        let stripePairPriceId = data.stripePairPriceId || null
+
+        // 1. 通常プランの Stripe 同期（未設定の場合のみ自動作成）
+        if (data.fee > 0 && (!stripeProductId || !stripePriceId)) {
+            if (!stripeProductId) {
+                const product = await stripe.products.create({
+                    name: data.name,
+                    type: 'service',
+                })
+                stripeProductId = product.id
+            }
+            if (!stripePriceId) {
+                const price = await stripe.prices.create({
+                    product: stripeProductId,
+                    unit_amount: data.fee,
+                    currency: 'jpy',
+                    recurring: { interval: 'month' },
+                })
+                stripePriceId = price.id
+            }
+            console.log(`[UpdateMembershipType] Created Stripe Product/Price for normal plan: ${stripeProductId} / ${stripePriceId}`)
+        }
+
+        // 2. ペア会費の Stripe 同期（ペア会費が入力され、かつ価格IDが未設定の場合のみ自動作成）
+        if (data.pairFee && data.pairFee > 0 && (!stripePairProductId || !stripePairPriceId)) {
+            if (!stripePairProductId) {
+                const pairProduct = await stripe.products.create({
+                    name: `${data.name}（ペア）`,
+                    type: 'service',
+                })
+                stripePairProductId = pairProduct.id
+            }
+            if (!stripePairPriceId) {
+                const pairPrice = await stripe.prices.create({
+                    product: stripePairProductId,
+                    unit_amount: data.pairFee,
+                    currency: 'jpy',
+                    recurring: { interval: 'month' },
+                })
+                stripePairPriceId = pairPrice.id
+            }
+            console.log(`[UpdateMembershipType] Created Stripe Product/Price for pair plan: ${stripePairProductId} / ${stripePairPriceId}`)
+        }
+
+        // 3. DBの更新（membership_types テーブル）
+        const { error: baseError } = await supabase
+            .from('membership_types')
+            .update({
+                name: data.name,
+                fee: data.fee,
+                pair_fee: data.pairFee || null,
+                stripe_product_id: stripeProductId,
+                stripe_price_id: stripePriceId,
+                stripe_pair_product_id: stripePairProductId,
+                stripe_pair_price_id: stripePairPriceId,
+                default_lesson_master_id: data.selectedLessons.length > 0 ? data.selectedLessons[0].id : null,
+            })
+            .eq('id', data.id)
+
+        if (baseError) throw baseError
+
+        // 4. リレーションの更新（membership_type_lessons テーブル）
+        const { error: deleteError } = await supabase
+            .from('membership_type_lessons')
+            .delete()
+            .eq('membership_type_id', data.id)
+
+        if (deleteError) throw deleteError
+
+        if (data.selectedLessons.length > 0) {
+            const relations = data.selectedLessons.map(item => ({
+                membership_type_id: data.id,
+                lesson_master_id: item.id,
+                reward_price: item.rewardPrice,
+                unit_price: item.unitPrice,
+                pair_unit_price: item.pairUnitPrice
+            }))
+
+            const { error: relationError } = await supabase
+                .from('membership_type_lessons')
+                .insert(relations)
+
+            if (relationError) throw relationError
+        }
+
+        revalidatePath('/admin/masters')
+        revalidatePath('/admin/masters/membership-types')
+        return { success: true }
+    } catch (error: any) {
+        console.error('Update Membership Type Action Error:', error)
+        return { success: false, error: error.message || 'Failed to update membership type' }
+    }
+}

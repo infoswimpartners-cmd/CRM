@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog"
 import { Checkbox } from "@/components/ui/checkbox"
 import { toast } from 'sonner'
+import { updateMembershipTypeAction } from '@/actions/masters'
 
 interface MembershipType {
     id: string
@@ -131,56 +132,36 @@ export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembe
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setLoading(true)
-        const supabase = createClient()
 
         try {
-            // 1. Update Base Type
-            const { error: baseError } = await supabase
-                .from('membership_types')
-                .update({
-                    name,
-                    fee: parseInt(fee),
-                    pair_fee: pairFee ? parseInt(pairFee) : null,
-                    stripe_product_id: stripeProductId || null,
-                    stripe_price_id: stripePriceId || null,
-                    stripe_pair_product_id: stripePairProductId || null,
-                    stripe_pair_price_id: stripePairPriceId || null,
-                    default_lesson_master_id: selectedLessons.size > 0 ? Array.from(selectedLessons.keys())[0] : null,
-                })
-                .eq('id', type.id)
+            const formattedLessons = Array.from(selectedLessons.entries()).map(([lessonId, prices]) => ({
+                id: lessonId,
+                rewardPrice: prices.reward && !isNaN(parseInt(prices.reward)) ? parseInt(prices.reward) : null,
+                unitPrice: prices.unit && !isNaN(parseInt(prices.unit)) ? parseInt(prices.unit) : null,
+                pairUnitPrice: prices.pair && !isNaN(parseInt(prices.pair)) ? parseInt(prices.pair) : null
+            }))
 
-            if (baseError) throw baseError
+            const res = await updateMembershipTypeAction({
+                id: type.id,
+                name,
+                fee: parseInt(fee),
+                pairFee: pairFee ? parseInt(pairFee) : undefined,
+                stripeProductId: stripeProductId || undefined,
+                stripePriceId: stripePriceId || undefined,
+                stripePairProductId: stripePairProductId || undefined,
+                stripePairPriceId: stripePairPriceId || undefined,
+                selectedLessons: formattedLessons
+            })
 
-            // 2. Update Relations (Delete All + Insert All)
-            const { error: deleteError } = await supabase
-                .from('membership_type_lessons')
-                .delete()
-                .eq('membership_type_id', type.id)
-
-            if (deleteError) throw deleteError
-
-            if (selectedLessons.size > 0) {
-                const relations = Array.from(selectedLessons.entries()).map(([lessonId, prices]) => ({
-                    membership_type_id: type.id,
-                    lesson_master_id: lessonId,
-                    reward_price: prices.reward && !isNaN(parseInt(prices.reward)) ? parseInt(prices.reward) : null,
-                    unit_price: prices.unit && !isNaN(parseInt(prices.unit)) ? parseInt(prices.unit) : null,
-                    pair_unit_price: prices.pair && !isNaN(parseInt(prices.pair)) ? parseInt(prices.pair) : null
-                }))
-
-                const { error: insertError } = await supabase
-                    .from('membership_type_lessons')
-                    .insert(relations)
-
-                if (insertError) throw insertError
+            if (!res.success) {
+                throw new Error(res.error)
             }
 
-            toast.success('会員区分を更新しました')
+            toast.success('会員区分を更新し、Stripeと自動同期しました')
             onOpenChange(false)
             router.refresh()
-        } catch (error) {
-            console.error('Update Log Error Object:', JSON.stringify(error, null, 2))
-            // @ts-ignore
+        } catch (error: any) {
+            console.error('Update Log Error Object:', error)
             toast.error(`更新に失敗しました: ${error?.message || '不明なエラー'}`)
         } finally {
             setLoading(false)
