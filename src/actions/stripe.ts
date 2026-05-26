@@ -311,7 +311,7 @@ export async function assignMembership(studentId: string, membershipTypeId: stri
             const subscriptionParams: any = {
                 customer: student.stripe_customer_id,
                 items: [{ price: targetPriceId }],
-                billing_cycle_anchor: anchorTimestamp,
+                trial_end: anchorTimestamp,
                 proration_behavior: 'none',
                 payment_behavior: 'default_incomplete',
                 payment_settings: { save_default_payment_method: 'on_subscription' },

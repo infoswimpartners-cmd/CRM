@@ -200,8 +200,8 @@ export async function createEnrollmentCheckoutSession(planId: string, lineUserId
             const jstNextMonthFirstUnix = Math.floor((utcNextMonthFirst - (9 * 60 * 60 * 1000)) / 1000)
 
             sessionConfig.subscription_data = {
-                billing_cycle_anchor: jstNextMonthFirstUnix,
-                proration_behavior: 'none', // 日割り計算をスキップして翌月1日から全額引き落とし
+                trial_end: jstNextMonthFirstUnix,
+                proration_behavior: 'none', // 日割り計算をスキップ
                 metadata: {
                     type: 'membership_enrollment',
                     line_user_id: lineUserId,
