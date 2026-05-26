@@ -479,6 +479,7 @@ export function ScheduleCalendar({ adminView = false }: ScheduleCalendarProps) {
                                     <button
                                         key={day.toString()}
                                         onClick={() => setSelectedDate(day)}
+                                        onDoubleClick={() => handleDateDoubleClick(day)}
                                         className={cn(
                                             "relative bg-white min-h-[50px] md:min-h-[60px] p-0.5 md:p-1 flex flex-col items-center justify-start hover:bg-gray-50 transition-colors",
                                             !isCurrentMonth && "bg-gray-50/50 text-gray-400",
