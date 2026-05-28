@@ -1,4 +1,4 @@
-import { Bell, Mail, CreditCard } from 'lucide-react'
+import { Bell, CreditCard } from 'lucide-react'
 import { createAdminClient } from '@/lib/supabase/admin'
 import {
     Popover,
@@ -23,13 +23,7 @@ export async function NotificationBell({ isAdmin }: NotificationBellProps) {
         .select('*', { count: 'exact', head: true })
         .eq('billing_status', 'awaiting_approval')
 
-    // 2. Pending Reception Approvals (Inquiry Only)
-    const { count: receptionCount } = await supabase
-        .from('students')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'inquiry')
-
-    const totalCount = (billingCount || 0) + (receptionCount || 0)
+    const totalCount = billingCount || 0
     const hasNotifications = totalCount > 0
 
     return (
@@ -63,16 +57,6 @@ export async function NotificationBell({ isAdmin }: NotificationBellProps) {
                             新しい通知はありません
                         </div>
                     ) : (
-                        <>
-                            <div className="flex justify-between items-center text-sm">
-                                <div className="flex items-center gap-2 text-slate-600">
-                                    <Mail className="h-4 w-4" />
-                                    <span>申込承認待ち</span>
-                                </div>
-                                <span className={`font-bold ${receptionCount && receptionCount > 0 ? 'text-red-600' : 'text-slate-400'}`}>
-                                    {receptionCount || 0}件
-                                </span>
-                            </div>
                             <div className="flex justify-between items-center text-sm">
                                 <div className="flex items-center gap-2 text-slate-600">
                                     <CreditCard className="h-4 w-4" />
@@ -82,7 +66,6 @@ export async function NotificationBell({ isAdmin }: NotificationBellProps) {
                                     {billingCount || 0}件
                                 </span>
                             </div>
-                        </>
                     )}
                 </div>
                 <div className="p-3 bg-slate-50 border-t">
