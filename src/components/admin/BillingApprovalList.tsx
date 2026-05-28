@@ -306,7 +306,7 @@ export function BillingApprovalList({ unpaidSchedules, paidSchedules }: BillingA
                             </TabsTrigger>
                             <TabsTrigger value="paid" className="data-[state=active]:bg-white data-[state=active]:text-green-600 data-[state=active]:shadow-sm">
                                 <CheckCircle className="h-4 w-4 mr-2" />
-                                決済完了済み
+                                体験決済完了済み
                             </TabsTrigger>
                         </TabsList>
                     </div>

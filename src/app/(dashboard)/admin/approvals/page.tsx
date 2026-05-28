@@ -31,11 +31,13 @@ export default async function ApprovalsPage() {
                 full_name,
                 second_student_name
             ),
-            lesson_master:lesson_masters (
-                name
+            lesson_master:lesson_masters!inner (
+                name,
+                is_trial
             )
         `)
         .in('billing_status', ['paid', 'refunded', 'partially_refunded'])
+        .eq('lesson_master.is_trial', true)
         .order('start_time', { ascending: false })
         .limit(20)
 
