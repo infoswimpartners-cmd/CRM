@@ -98,6 +98,43 @@ export async function submitLessonReport(values: FormValues) {
             const { createAdminClient } = await import('@/lib/supabase/admin')
             const supabaseAdmin = createAdminClient()
             await supabaseAdmin.from('lesson_schedules').update({ is_reported: true }).eq('id', data.schedule_id)
+
+            // 単発レッスン・追加レッスンの自動請求追加
+            try {
+                const { data: schedule, error: scheduleError } = await supabaseAdmin
+                    .from('lesson_schedules')
+                    .select(`
+                        id,
+                        is_overage,
+                        lesson_master:lesson_masters (
+                            is_trial
+                        )
+                    `)
+                    .eq('id', data.schedule_id)
+                    .single()
+
+                if (scheduleError) {
+                    console.error('Error fetching schedule for auto-billing check:', scheduleError)
+                } else if (schedule) {
+                    const isOverage = schedule.is_overage
+                    const isTrial = (schedule.lesson_master as any)?.is_trial === true
+
+                    console.log(`[Auto-Billing Check] Schedule ${data.schedule_id}: isOverage=${isOverage}, isTrial=${isTrial}`)
+
+                    if (isOverage && !isTrial) {
+                        console.log(`[Auto-Billing] Triggering createStripeInvoiceItemOnly for schedule ${data.schedule_id}`)
+                        const { createStripeInvoiceItemOnly } = await import('@/actions/stripe')
+                        const billingResult = await createStripeInvoiceItemOnly(data.schedule_id)
+                        if (billingResult.success) {
+                            console.log(`[Auto-Billing] Successfully registered invoice item for schedule ${data.schedule_id}`)
+                        } else {
+                            console.error(`[Auto-Billing] Failed to register invoice item:`, billingResult.error)
+                        }
+                    }
+                }
+            } catch (autoBillingError) {
+                console.error('[Auto-Billing] Error in auto-billing process:', autoBillingError)
+            }
         }
 
         // 4. 管理者通知（メール設定のlesson_report_sentトリガー経由）

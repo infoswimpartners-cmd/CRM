@@ -452,7 +452,8 @@ export async function createImmediatePaymentInvoice(scheduleId: string) {
 }
 
 export async function createStripeInvoiceItemOnly(scheduleId: string) {
-    const supabase = await createClient()
+    const { createAdminClient } = await import('@/lib/supabase/admin')
+    const supabase = createAdminClient()
 
     try {
         // 1. Fetch Schedule & Student

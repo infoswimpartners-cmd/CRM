@@ -45,6 +45,45 @@ export default async function ApprovalsPage() {
         .order('start_time', { ascending: false })
         .limit(20)
 
+    // 3. Fetch Regular Lesson Billing Approvals (Unpaid / Deferred Overage)
+    const { data: unpaidRegularSchedules } = await supabase
+        .from('lesson_schedules')
+        .select(`
+            id, start_time, title, price, billing_status, stripe_invoice_item_id,
+            student:students (
+                full_name,
+                second_student_name
+            ),
+            lesson_master:lesson_masters!inner (
+                name,
+                is_trial
+            )
+        `)
+        .eq('is_overage', true)
+        .eq('lesson_master.is_trial', false)
+        .in('billing_status', ['ready_to_invoice', 'awaiting_payment', 'awaiting_approval', 'error', 'pending', 'approved'])
+        .order('start_time', { ascending: true })
+
+    // 4. Paid Regular Schedules (History)
+    const { data: paidRegularSchedules } = await supabase
+        .from('lesson_schedules')
+        .select(`
+            id, start_time, title, price, billing_status, status, stripe_invoice_item_id,
+            student:students (
+                full_name,
+                second_student_name
+            ),
+            lesson_master:lesson_masters!inner (
+                name,
+                is_trial
+            )
+        `)
+        .eq('is_overage', true)
+        .eq('lesson_master.is_trial', false)
+        .in('billing_status', ['paid', 'refunded', 'partially_refunded'])
+        .order('start_time', { ascending: false })
+        .limit(30)
+
     return (
         <div className="space-y-6">
             <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
@@ -55,6 +94,8 @@ export default async function ApprovalsPage() {
             <BillingApprovalList
                 unpaidSchedules={unpaidSchedules as any || []}
                 paidSchedules={paidSchedules as any || []}
+                unpaidRegularSchedules={unpaidRegularSchedules as any || []}
+                paidRegularSchedules={paidRegularSchedules as any || []}
             />
         </div>
     )

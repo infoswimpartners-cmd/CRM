@@ -48,11 +48,20 @@ interface BillingSchedule {
 interface BillingApprovalListProps {
     unpaidSchedules: BillingSchedule[]
     paidSchedules: BillingSchedule[]
+    unpaidRegularSchedules?: BillingSchedule[]
+    paidRegularSchedules?: BillingSchedule[]
 }
 
-export function BillingApprovalList({ unpaidSchedules, paidSchedules }: BillingApprovalListProps) {
+export function BillingApprovalList({
+    unpaidSchedules,
+    paidSchedules,
+    unpaidRegularSchedules = [],
+    paidRegularSchedules = []
+}: BillingApprovalListProps) {
     const [processingId, setProcessingId] = useState<string | null>(null)
     const [unpaidFilter, setUnpaidFilter] = useState<string>('awaiting_approval')
+    const [regularFilter, setRegularFilter] = useState<string>('ready_to_invoice')
+    const [activeTab, setActiveTab] = useState<'trial' | 'regular'>('trial')
     const searchParams = useSearchParams()
     const router = useRouter()
     const approveId = searchParams.get('approve_id')
@@ -68,7 +77,7 @@ export function BillingApprovalList({ unpaidSchedules, paidSchedules }: BillingA
                 toast.info('対象の請求を選択しました')
             }
         }
-    }, [approveId, unpaidSchedules])
+    }, [approveId, unpaidSchedules, unpaidRegularSchedules])
 
     const handleReject = async (id: string, name: string) => {
         if (!confirm(`${name}様の予約をキャンセルしますか？\n（請求も取り消されます）`)) return
@@ -78,6 +87,7 @@ export function BillingApprovalList({ unpaidSchedules, paidSchedules }: BillingA
             const result = await rejectLessonSchedule(id)
             if (result.success) {
                 toast.success('予約をキャンセルしました')
+                router.refresh()
             } else {
                 toast.error('キャンセルに失敗しました: ' + result.error)
             }
@@ -110,6 +120,11 @@ export function BillingApprovalList({ unpaidSchedules, paidSchedules }: BillingA
     const filteredUnpaidSchedules = unpaidSchedules.filter(schedule => {
         if (unpaidFilter === 'all') return true;
         return schedule.billing_status === unpaidFilter;
+    });
+
+    const filteredRegularSchedules = unpaidRegularSchedules.filter(schedule => {
+        if (regularFilter === 'all') return true;
+        return schedule.billing_status === regularFilter;
     });
 
     const handleApprove = async (id: string, name: string) => {
@@ -155,6 +170,7 @@ export function BillingApprovalList({ unpaidSchedules, paidSchedules }: BillingA
                         const isApprovalPending = schedule.billing_status === 'awaiting_approval'
                         const isPaymentPending = schedule.billing_status === 'awaiting_payment'
                         const isApproved = schedule.billing_status === 'approved'
+                        const isReadyToInvoice = schedule.billing_status === 'ready_to_invoice'
 
                         return (
                             <TableRow
@@ -188,6 +204,10 @@ export function BillingApprovalList({ unpaidSchedules, paidSchedules }: BillingA
                                         {isPaid ? (
                                             <span className="text-[10px] px-1.5 py-0.5 rounded border bg-green-50 text-green-600 border-green-200">
                                                 決済済み
+                                            </span>
+                                        ) : isReadyToInvoice ? (
+                                            <span className="text-[10px] px-1.5 py-0.5 rounded border bg-purple-50 text-purple-600 border-purple-200">
+                                                保留中（次月合算）
                                             </span>
                                         ) : isApprovalPending ? (
                                             <span className="text-[10px] px-1.5 py-0.5 rounded border bg-blue-50 text-blue-600 border-blue-200">
@@ -242,7 +262,22 @@ export function BillingApprovalList({ unpaidSchedules, paidSchedules }: BillingA
                                                         </Button>
                                                     </div>
                                                 )}
-                                                {!isApprovalPending && isPaymentPending && (
+                                                {isReadyToInvoice && (
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className="text-[10px] text-slate-500 italic block mb-1">自動請求登録済み</span>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={() => handleManualApprove(schedule.id, schedule.student?.full_name || '')}
+                                                            disabled={!!processingId}
+                                                            className="border-blue-600 text-blue-600 hover:bg-blue-50 h-7 text-[10px]"
+                                                        >
+                                                            <RefreshCw className="h-3 w-3 mr-1" />
+                                                            手動決済
+                                                        </Button>
+                                                    </div>
+                                                )}
+                                                {!isApprovalPending && !isReadyToInvoice && isPaymentPending && (
                                                     <Button
                                                         size="sm"
                                                         variant="outline"
@@ -277,66 +312,154 @@ export function BillingApprovalList({ unpaidSchedules, paidSchedules }: BillingA
     )
 
     return (
-        <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm overflow-hidden">
-            <CardHeader className="bg-gradient-to-r from-slate-50 to-white border-b border-slate-100 pb-2">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div>
-                        <CardTitle className="flex items-center gap-2 text-slate-800">
-                            <CreditCard className="h-5 w-5 text-slate-600" />
-                            体験決済管理
-                        </CardTitle>
-                        <CardDescription className="mt-1">
-                            体験レッスンの決済状況（完了・未完了）の管理
-                        </CardDescription>
-                    </div>
-                </div>
-            </CardHeader>
-            <CardContent className="p-0">
-                <Tabs defaultValue="unpaid" className="w-full">
-                    <div className="px-4 pt-4 pb-2 border-b border-slate-100 bg-slate-50/50">
-                        <TabsList className="grid w-full max-w-[400px] grid-cols-2">
-                            <TabsTrigger value="unpaid" className="data-[state=active]:bg-white data-[state=active]:text-orange-600 data-[state=active]:shadow-sm">
-                                <AlertCircle className="h-4 w-4 mr-2" />
-                                体験決済未完了
-                                {unpaidSchedules.length > 0 && (
-                                    <span className="ml-2 bg-orange-100 text-orange-600 text-xs px-1.5 py-0.5 rounded-full font-bold">
-                                        {unpaidSchedules.length}
-                                    </span>
-                                )}
-                            </TabsTrigger>
-                            <TabsTrigger value="paid" className="data-[state=active]:bg-white data-[state=active]:text-green-600 data-[state=active]:shadow-sm">
-                                <CheckCircle className="h-4 w-4 mr-2" />
-                                体験決済完了
-                            </TabsTrigger>
-                        </TabsList>
-                    </div>
+        <div className="space-y-6">
+            <div className="flex border-b border-slate-200">
+                <button
+                    onClick={() => setActiveTab('trial')}
+                    className={`py-3 px-6 font-medium text-sm border-b-2 transition-all flex items-center gap-2 ${
+                        activeTab === 'trial'
+                            ? 'border-cyan-600 text-cyan-600'
+                            : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                    }`}
+                >
+                    <CreditCard className="h-4 w-4" />
+                    体験レッスン決済管理
+                    {unpaidSchedules.length > 0 && (
+                        <span className="ml-1.5 bg-cyan-100 text-cyan-700 text-xs px-2 py-0.5 rounded-full font-semibold">
+                            {unpaidSchedules.length}
+                        </span>
+                    )}
+                </button>
+                <button
+                    onClick={() => setActiveTab('regular')}
+                    className={`py-3 px-6 font-medium text-sm border-b-2 transition-all flex items-center gap-2 ${
+                        activeTab === 'regular'
+                            ? 'border-cyan-600 text-cyan-600'
+                            : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                    }`}
+                >
+                    <RefreshCw className="h-4 w-4" />
+                    通常レッスン請求管理
+                    {unpaidRegularSchedules.filter(s => s.billing_status === 'ready_to_invoice').length > 0 && (
+                        <span className="ml-1.5 bg-cyan-100 text-cyan-700 text-xs px-2 py-0.5 rounded-full font-semibold">
+                            {unpaidRegularSchedules.filter(s => s.billing_status === 'ready_to_invoice').length}
+                        </span>
+                    )}
+                </button>
+            </div>
 
-                    <TabsContent value="unpaid" className="m-0">
-                        <div className="p-4 bg-orange-50/30 border-b border-orange-100 mb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                            <p className="text-xs text-orange-800 flex items-center gap-2">
-                                <AlertCircle className="h-4 w-4 shrink-0" />
-                                未払いの体験レッスンです。Stripe請求または手動で決済を完了してください。
-                            </p>
-                            <Select value={unpaidFilter} onValueChange={setUnpaidFilter}>
-                                <SelectTrigger className="w-[180px] bg-white text-xs h-8">
-                                    <SelectValue placeholder="絞り込み" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">すべて表示</SelectItem>
-                                    <SelectItem value="awaiting_approval">承認待ち</SelectItem>
-                                    <SelectItem value="approved">請求予約済み</SelectItem>
-                                    <SelectItem value="awaiting_payment">支払待ち</SelectItem>
-                                </SelectContent>
-                            </Select>
+            {activeTab === 'trial' ? (
+                <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm overflow-hidden">
+                    <CardHeader className="bg-gradient-to-r from-slate-50 to-white border-b border-slate-100 pb-2">
+                        <div>
+                            <CardTitle className="text-slate-800">体験決済管理</CardTitle>
+                            <CardDescription>体験レッスンの決済状況（完了・未完了）の管理</CardDescription>
                         </div>
-                        <TableContent schedules={filteredUnpaidSchedules} isPaid={false} />
-                    </TabsContent>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                        <Tabs defaultValue="unpaid" className="w-full">
+                            <div className="px-4 pt-4 pb-2 border-b border-slate-100 bg-slate-50/50">
+                                <TabsList className="grid w-full max-w-[400px] grid-cols-2">
+                                    <TabsTrigger value="unpaid" className="data-[state=active]:bg-white data-[state=active]:text-cyan-600 data-[state=active]:shadow-sm">
+                                        <AlertCircle className="h-4 w-4 mr-2" />
+                                        体験決済未完了
+                                        {unpaidSchedules.length > 0 && (
+                                            <span className="ml-2 bg-cyan-100 text-cyan-600 text-xs px-1.5 py-0.5 rounded-full font-bold">
+                                                {unpaidSchedules.length}
+                                            </span>
+                                        )}
+                                    </TabsTrigger>
+                                    <TabsTrigger value="paid" className="data-[state=active]:bg-white data-[state=active]:text-green-600 data-[state=active]:shadow-sm">
+                                        <CheckCircle className="h-4 w-4 mr-2" />
+                                        体験決済完了
+                                    </TabsTrigger>
+                                </TabsList>
+                            </div>
 
-                    <TabsContent value="paid" className="m-0">
-                        <TableContent schedules={paidSchedules} isPaid={true} />
-                    </TabsContent>
-                </Tabs>
-            </CardContent>
-        </Card>
+                            <TabsContent value="unpaid" className="m-0">
+                                <div className="p-4 bg-cyan-50/10 border-b border-cyan-100/50 mb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                    <p className="text-xs text-slate-600 flex items-center gap-2">
+                                        <AlertCircle className="h-4 w-4 shrink-0 text-cyan-600" />
+                                        未払いの体験レッスンです。Stripe請求または手動で決済を完了してください。
+                                    </p>
+                                    <Select value={unpaidFilter} onValueChange={setUnpaidFilter}>
+                                        <SelectTrigger className="w-[180px] bg-white text-xs h-8">
+                                            <SelectValue placeholder="絞り込み" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">すべて表示</SelectItem>
+                                            <SelectItem value="awaiting_approval">承認待ち</SelectItem>
+                                            <SelectItem value="approved">請求予約済み</SelectItem>
+                                            <SelectItem value="awaiting_payment">支払待ち</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <TableContent schedules={filteredUnpaidSchedules} isPaid={false} />
+                            </TabsContent>
+
+                            <TabsContent value="paid" className="m-0">
+                                <TableContent schedules={paidSchedules} isPaid={true} />
+                            </TabsContent>
+                        </Tabs>
+                    </CardContent>
+                </Card>
+            ) : (
+                <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm overflow-hidden">
+                    <CardHeader className="bg-gradient-to-r from-slate-50 to-white border-b border-slate-100 pb-2">
+                        <div>
+                            <CardTitle className="text-slate-800">通常レッスン（単発・追加）請求管理</CardTitle>
+                            <CardDescription>単発会員のレッスンおよび月2回・4回会員の追加レッスンの請求管理</CardDescription>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                        <Tabs defaultValue="unpaid" className="w-full">
+                            <div className="px-4 pt-4 pb-2 border-b border-slate-100 bg-slate-50/50">
+                                <TabsList className="grid w-full max-w-[440px] grid-cols-2">
+                                    <TabsTrigger value="unpaid" className="data-[state=active]:bg-white data-[state=active]:text-cyan-600 data-[state=active]:shadow-sm">
+                                        <AlertCircle className="h-4 w-4 mr-2" />
+                                        保留中（次月合算待ち）
+                                        {unpaidRegularSchedules.filter(s => s.billing_status === 'ready_to_invoice').length > 0 && (
+                                            <span className="ml-2 bg-cyan-100 text-cyan-600 text-xs px-1.5 py-0.5 rounded-full font-bold">
+                                                {unpaidRegularSchedules.filter(s => s.billing_status === 'ready_to_invoice').length}
+                                            </span>
+                                        )}
+                                    </TabsTrigger>
+                                    <TabsTrigger value="paid" className="data-[state=active]:bg-white data-[state=active]:text-green-600 data-[state=active]:shadow-sm">
+                                        <CheckCircle className="h-4 w-4 mr-2" />
+                                        請求・決済完了履歴
+                                    </TabsTrigger>
+                                </TabsList>
+                            </div>
+
+                            <TabsContent value="unpaid" className="m-0">
+                                <div className="p-4 bg-cyan-50/10 border-b border-cyan-100/50 mb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                    <p className="text-xs text-slate-600 flex items-center gap-2">
+                                        <AlertCircle className="h-4 w-4 shrink-0 text-cyan-600" />
+                                        コーチの報告により自動でStripeの保留中請求に追加されたレッスンです。翌月の定期決済時に合算されます。
+                                    </p>
+                                    <Select value={regularFilter} onValueChange={setRegularFilter}>
+                                        <SelectTrigger className="w-[180px] bg-white text-xs h-8">
+                                            <SelectValue placeholder="絞り込み" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">すべて表示</SelectItem>
+                                            <SelectItem value="ready_to_invoice">保留中（次月合算）</SelectItem>
+                                            <SelectItem value="awaiting_approval">承認待ち</SelectItem>
+                                            <SelectItem value="approved">請求予約済み</SelectItem>
+                                            <SelectItem value="awaiting_payment">支払待ち</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <TableContent schedules={filteredRegularSchedules} isPaid={false} />
+                            </TabsContent>
+
+                            <TabsContent value="paid" className="m-0">
+                                <TableContent schedules={paidRegularSchedules} isPaid={true} />
+                            </TabsContent>
+                        </Tabs>
+                    </CardContent>
+                </Card>
+            )}
+        </div>
     )
 }
