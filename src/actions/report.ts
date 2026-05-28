@@ -124,7 +124,7 @@ export async function submitLessonReport(values: FormValues) {
                     if (isOverage && !isTrial) {
                         console.log(`[Auto-Billing] Triggering createStripeInvoiceItemOnly for schedule ${data.schedule_id}`)
                         const { createStripeInvoiceItemOnly } = await import('@/actions/stripe')
-                        const billingResult = await createStripeInvoiceItemOnly(data.schedule_id)
+                        const billingResult = await createStripeInvoiceItemOnly(data.schedule_id, data.menu_description)
                         if (billingResult.success) {
                             console.log(`[Auto-Billing] Successfully registered invoice item for schedule ${data.schedule_id}`)
                         } else {

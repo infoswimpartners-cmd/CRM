@@ -65,16 +65,16 @@ async function calculateMonthlyUsage(
         }
     }
 
-    // 2. Current Month Usage (Scheduled frames only)
+    // 2. Current Month Usage (Scheduled frames before targetDate only to ensure chronological order)
     const start = startOfMonth(targetDate).toISOString()
-    const end = endOfMonth(targetDate).toISOString()
+    const end = targetDate.toISOString()
 
     const { count: scheduled } = await supabaseAdmin
         .from('lesson_schedules')
         .select('*', { count: 'exact', head: true })
         .eq('student_id', studentId)
         .gte('start_time', start)
-        .lte('start_time', end)
+        .lt('start_time', end)
 
     const currentTotal = scheduled || 0
 

@@ -451,7 +451,7 @@ export async function createImmediatePaymentInvoice(scheduleId: string) {
     }
 }
 
-export async function createStripeInvoiceItemOnly(scheduleId: string) {
+export async function createStripeInvoiceItemOnly(scheduleId: string, customDescription?: string) {
     const { createAdminClient } = await import('@/lib/supabase/admin')
     const supabase = createAdminClient()
 
@@ -481,7 +481,12 @@ export async function createStripeInvoiceItemOnly(scheduleId: string) {
         // 2. Create Invoice Item (Pending, will be picked up by the next invoice/subscription)
         // @ts-ignore
         const customerId = schedule.student.stripe_customer_id
-        const itemDescription = `追加レッスン料 (${new Date(schedule.start_time).toLocaleDateString('ja-JP')}): ${schedule.title}`
+        let itemDescription = `追加レッスン料 (${new Date(schedule.start_time).toLocaleDateString('ja-JP')}): ${schedule.title}`
+        
+        if (customDescription) {
+            const cleanDesc = customDescription.replace(/\n/g, ' ').substring(0, 300)
+            itemDescription += ` - 詳細: ${cleanDesc}`
+        }
 
         const invoiceItem = await stripe.invoiceItems.create({
             customer: customerId,
