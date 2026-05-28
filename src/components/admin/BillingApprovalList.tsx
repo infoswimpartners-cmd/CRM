@@ -283,10 +283,10 @@ export function BillingApprovalList({ unpaidSchedules, paidSchedules }: BillingA
                     <div>
                         <CardTitle className="flex items-center gap-2 text-slate-800">
                             <CreditCard className="h-5 w-5 text-slate-600" />
-                            請求・決済管理
+                            体験決済管理
                         </CardTitle>
                         <CardDescription className="mt-1">
-                            追加レッスンの承認および未決済項目の管理・返金処理
+                            体験レッスンの決済状況（完了・未完了）の管理
                         </CardDescription>
                     </div>
                 </div>
@@ -297,7 +297,7 @@ export function BillingApprovalList({ unpaidSchedules, paidSchedules }: BillingA
                         <TabsList className="grid w-full max-w-[400px] grid-cols-2">
                             <TabsTrigger value="unpaid" className="data-[state=active]:bg-white data-[state=active]:text-orange-600 data-[state=active]:shadow-sm">
                                 <AlertCircle className="h-4 w-4 mr-2" />
-                                承認・支払待ち
+                                体験決済未完了
                                 {unpaidSchedules.length > 0 && (
                                     <span className="ml-2 bg-orange-100 text-orange-600 text-xs px-1.5 py-0.5 rounded-full font-bold">
                                         {unpaidSchedules.length}
@@ -306,7 +306,7 @@ export function BillingApprovalList({ unpaidSchedules, paidSchedules }: BillingA
                             </TabsTrigger>
                             <TabsTrigger value="paid" className="data-[state=active]:bg-white data-[state=active]:text-green-600 data-[state=active]:shadow-sm">
                                 <CheckCircle className="h-4 w-4 mr-2" />
-                                体験決済完了済み
+                                体験決済完了
                             </TabsTrigger>
                         </TabsList>
                     </div>
@@ -315,7 +315,7 @@ export function BillingApprovalList({ unpaidSchedules, paidSchedules }: BillingA
                         <div className="p-4 bg-orange-50/30 border-b border-orange-100 mb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             <p className="text-xs text-orange-800 flex items-center gap-2">
                                 <AlertCircle className="h-4 w-4 shrink-0" />
-                                承認待ちのレッスンは「承認」ボタンを押すと請求書が送信されます。
+                                未払いの体験レッスンです。Stripe請求または手動で決済を完了してください。
                             </p>
                             <Select value={unpaidFilter} onValueChange={setUnpaidFilter}>
                                 <SelectTrigger className="w-[180px] bg-white text-xs h-8">

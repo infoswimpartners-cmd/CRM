@@ -8,8 +8,7 @@ export const dynamic = 'force-dynamic'
 export default async function ApprovalsPage() {
     const supabase = createAdminClient()
 
-    // 1. Fetch Billing Approvals (Unpaid / Awaiting Approval)
-    // Reusing logic from billing page
+    // 1. Fetch Billing Approvals (Unpaid / Awaiting Approval) - Trial Only
     const { data: unpaidSchedules } = await supabase
         .from('lesson_schedules')
         .select(`
@@ -17,9 +16,14 @@ export default async function ApprovalsPage() {
             student:students (
                 full_name,
                 second_student_name
+            ),
+            lesson_master:lesson_masters!inner (
+                name,
+                is_trial
             )
         `)
         .in('billing_status', ['awaiting_payment', 'awaiting_approval', 'error', 'pending', 'approved'])
+        .eq('lesson_master.is_trial', true)
         .order('start_time', { ascending: true })
 
     // 2. Paid Schedules (History) - for Billing List component compatibility
