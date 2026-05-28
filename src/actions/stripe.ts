@@ -451,7 +451,7 @@ export async function createImmediatePaymentInvoice(scheduleId: string) {
     }
 }
 
-export async function createStripeInvoiceItemOnly(scheduleId: string, customDescription?: string) {
+export async function createStripeInvoiceItemOnly(scheduleId: string) {
     const { createAdminClient } = await import('@/lib/supabase/admin')
     const supabase = createAdminClient()
 
@@ -481,12 +481,22 @@ export async function createStripeInvoiceItemOnly(scheduleId: string, customDesc
         // 2. Create Invoice Item (Pending, will be picked up by the next invoice/subscription)
         // @ts-ignore
         const customerId = schedule.student.stripe_customer_id
-        let itemDescription = `追加レッスン料 (${new Date(schedule.start_time).toLocaleDateString('ja-JP')}): ${schedule.title}`
-        
-        if (customDescription) {
-            const cleanDesc = customDescription.replace(/\n/g, ' ').substring(0, 300)
-            itemDescription += ` - 詳細: ${cleanDesc}`
-        }
+
+        // 日時フォーマットの構築 (例: 2026年5月28日(木) 10:00〜)
+        const startDate = new Date(schedule.start_time)
+        const dateStr = startDate.toLocaleDateString('ja-JP', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            weekday: 'short'
+        })
+        const timeStr = startDate.toLocaleTimeString('ja-JP', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+        })
+
+        const itemDescription = `追加レッスン料 [受講日時: ${dateStr} ${timeStr}〜]: ${schedule.title}`
 
         const invoiceItem = await stripe.invoiceItems.create({
             customer: customerId,
