@@ -456,7 +456,7 @@ export async function createStripeInvoiceItemOnly(scheduleId: string) {
     const supabase = createAdminClient()
 
     try {
-        // 1. Fetch Schedule & Student
+        // 1. Fetch Schedule, Lesson Master & Student Membership details
         const { data: schedule } = await supabase
             .from('lesson_schedules')
             .select(`
@@ -464,10 +464,16 @@ export async function createStripeInvoiceItemOnly(scheduleId: string) {
                 title,
                 start_time,
                 price,
+                lesson_master:lesson_masters (
+                    name
+                ),
                 student:students (
                     id,
                     stripe_customer_id,
-                    email:contact_email
+                    email:contact_email,
+                    membership:membership_types!students_membership_type_id_fkey (
+                        name
+                    )
                 )
             `)
             .eq('id', scheduleId)
@@ -496,7 +502,23 @@ export async function createStripeInvoiceItemOnly(scheduleId: string) {
             hour12: false
         })
 
-        const itemDescription = `追加レッスン料 [受講日時: ${dateStr} ${timeStr}〜]: ${schedule.title}`
+        // 単発会員かどうかの判定
+        // @ts-ignore
+        const membershipSource = schedule.student?.membership
+        const membership = Array.isArray(membershipSource) ? membershipSource[0] : membershipSource
+        const membershipName = membership?.name || ''
+        const isSinglePlan = membershipName.includes('単発')
+
+        let itemDescription = ''
+        if (isSinglePlan) {
+            // 単発会員の場合: 「レッスン種別 [受講日時: 〇〇〜]」 (3のタイトルは不要)
+            // @ts-ignore
+            const lessonTypeName = schedule.lesson_master?.name || 'レッスン'
+            itemDescription = `${lessonTypeName} [受講日時: ${dateStr} ${timeStr}〜]`
+        } else {
+            // 通常会員の追加レッスンの場合
+            itemDescription = `追加レッスン料 [受講日時: ${dateStr} ${timeStr}〜]: ${schedule.title}`
+        }
 
         const invoiceItem = await stripe.invoiceItems.create({
             customer: customerId,
