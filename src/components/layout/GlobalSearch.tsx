@@ -91,7 +91,7 @@ export function GlobalSearch({ students, coaches = [], isAdmin }: GlobalSearchPr
                             <>
                                 <CommandItem onSelect={() => runCommand(() => router.push('/admin/analytics'))}>
                                     <CreditCard className="mr-2 h-4 w-4" />
-                                    <span>売上・分析</span>
+                                    <span>分析・集計</span>
                                 </CommandItem>
                                 <CommandItem onSelect={() => runCommand(() => router.push('/customers'))}>
                                     <Users className="mr-2 h-4 w-4" />

@@ -66,7 +66,7 @@ export function UsageStatusCard({ studentId, initialUsageData, currentTickets }:
                         {format(currentDate, 'yyyy年 MM月', { locale: ja })}
                     </span>
                     {!isCurrentMonth && (
-                        <button 
+                        <button
                             onClick={handleResetMonth}
                             className="text-[10px] text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1"
                         >
@@ -79,7 +79,7 @@ export function UsageStatusCard({ studentId, initialUsageData, currentTickets }:
                 </Button>
             </div>
 
-            {usageData && (
+            {usageData && !usageData.isPackage && (
                 <div className={cn("space-y-2 transition-opacity", loading ? "opacity-50" : "opacity-100")}>
                     <div className="flex flex-col p-3 rounded-lg border border-indigo-100 bg-indigo-50/50">
                         <div className="flex items-center justify-between mb-2">
@@ -90,7 +90,7 @@ export function UsageStatusCard({ studentId, initialUsageData, currentTickets }:
                                 <Badge variant="destructive" className="text-[10px] h-4">上限超過</Badge>
                             )}
                         </div>
-                        
+
                         <div className="flex items-end justify-between">
                             <div className="text-2xl font-black text-indigo-900 leading-none">
                                 {usageData.count ?? 0} <span className="text-sm font-bold">/ {usageData.limit || '∞'} 回</span>
@@ -109,7 +109,7 @@ export function UsageStatusCard({ studentId, initialUsageData, currentTickets }:
 
                         {typeof usageData.limit === 'number' && usageData.limit > 0 && (
                             <div className="w-full bg-indigo-100 rounded-full h-1.5 mt-3 overflow-hidden">
-                                <div 
+                                <div
                                     className={cn(
                                         "h-full rounded-full transition-all",
                                         (usageData.count ?? 0) >= usageData.limit ? "bg-orange-500" : "bg-indigo-600"
@@ -129,7 +129,7 @@ export function UsageStatusCard({ studentId, initialUsageData, currentTickets }:
                         <Ticket className="h-4 w-4" />
                     </div>
                     <div>
-                        <div className="text-xs font-bold text-emerald-800">振替チケット残数</div>
+                        <div className="text-xs font-bold text-emerald-800">振替残数</div>
                         <div className="text-[10px] text-emerald-600">現在保持している未消化分</div>
                     </div>
                 </div>

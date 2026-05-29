@@ -8,6 +8,9 @@ import { CoachMonthlyPerformance } from '@/components/admin/analytics/CoachMonth
 import { AnalyticsFilters } from '@/components/admin/analytics/AnalyticsFilters'
 import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns'
 import { calculateCoachRate, calculateLessonReward, LessonData } from '@/lib/reward-system'
+import { TargetSettingsCard } from '@/components/admin/analytics/TargetSettingsCard'
+import { LessonCountChart } from '@/components/admin/analytics/LessonCountChart'
+import { getAppConfig } from '@/actions/app_configs'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -133,6 +136,12 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
         })
     }
 
+    // 月次レッスンコマ数集計
+    const monthlyLessonsMap = new Map<number, number>()
+    for (let m = 1; m <= 12; m++) {
+        monthlyLessonsMap.set(m, 0)
+    }
+
     yearLessons.forEach(l => {
         const date = new Date(l.lesson_date)
         const month = date.getMonth() + 1
@@ -148,14 +157,72 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
 
         monthlyRevenueMap.set(month, (monthlyRevenueMap.get(month) || 0) + price)
         monthlyProfitMap.set(month, (monthlyProfitMap.get(month) || 0) + profit)
+        monthlyLessonsMap.set(month, (monthlyLessonsMap.get(month) || 0) + 1)
     })
 
-    const finalGraphData = Array.from({ length: 12 }, (_, i) => {
+    // 目標値設定の取得
+    const targetsConfigKey = `analytics_targets_${selectedYear}`
+    const rawTargets = await getAppConfig(targetsConfigKey)
+    const monthlyTargets: Record<number, number> = rawTargets ? JSON.parse(rawTargets) : {}
+
+    // レッスン件数の伸び表示用データ
+    const finalLessonGraphData = Array.from({ length: 12 }, (_, i) => {
         const month = i + 1
         return {
             name: `${month}月`,
-            revenue: monthlyRevenueMap.get(month) || 0,
-            grossProfit: Math.max(0, monthlyProfitMap.get(month) || 0)
+            count: monthlyLessonsMap.get(month) || 0
+        }
+    })
+
+    // 予測値の計算
+    const today = new Date()
+    const isCurrentYear = selectedYear === today.getFullYear()
+    const currentMonth = today.getMonth() + 1
+    const currentDay = today.getDate()
+    const daysInCurrentMonth = new Date(today.getFullYear(), currentMonth, 0).getDate()
+
+    // 直近3ヶ月の実績売上平均を計算（未来月の予測ベース用）
+    const activeRevenues: number[] = []
+    const checkEndMonth = isCurrentYear ? currentMonth : 12
+    for (let m = 1; m <= checkEndMonth; m++) {
+        activeRevenues.push(monthlyRevenueMap.get(m) || 0)
+    }
+    const last3Months = activeRevenues.slice(-3)
+    const avgRecentRevenue = last3Months.length > 0 
+        ? Math.floor(last3Months.reduce((sum, val) => sum + val, 0) / last3Months.length)
+        : 0
+
+    const finalGraphData = Array.from({ length: 12 }, (_, i) => {
+        const month = i + 1
+        const revenue = monthlyRevenueMap.get(month) || 0
+        const grossProfit = Math.max(0, monthlyProfitMap.get(month) || 0)
+        const target = monthlyTargets[month] || 0
+        
+        let forecast = revenue // デフォルトは実績
+
+        if (selectedYear < today.getFullYear()) {
+            // 過去年度は実績＝予測
+            forecast = revenue
+        } else if (selectedYear > today.getFullYear()) {
+            // 未来年度は目標値があれば目標値、なければ0
+            forecast = target || 0
+        } else {
+            // 現在の年度
+            if (month === currentMonth) {
+                // 当月は経過日数での日割り着地予測
+                forecast = Math.floor((revenue / currentDay) * daysInCurrentMonth)
+            } else if (month > currentMonth) {
+                // 未来の月は直近3ヶ月の平均実績（実績がなければ目標値）
+                forecast = avgRecentRevenue > 0 ? avgRecentRevenue : (target || 0)
+            }
+        }
+
+        return {
+            name: `${month}月`,
+            revenue,
+            grossProfit,
+            forecast,
+            target
         }
     })
 
@@ -221,8 +288,8 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
                     </Link>
                 </Button>
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight">売上・LTV分析</h1>
-                    <p className="text-gray-500">事業全体の収益構造詳細分析</p>
+                    <h1 className="text-3xl font-bold tracking-tight">分析・集計</h1>
+                    <p className="text-gray-500">事業全体の収益構造詳細分析と目標管理</p>
                 </div>
             </div>
 
@@ -232,6 +299,12 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
                 selectedCoachId={selectedCoachId}
                 selectedYear={selectedYear}
                 availableYears={availableYears}
+            />
+
+            {/* 目標売上高設定カード（管理者のみ） */}
+            <TargetSettingsCard 
+                year={selectedYear}
+                initialTargets={monthlyTargets}
             />
 
             {/* KPI カード */}
@@ -276,17 +349,32 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
                 </Card>
             </div>
 
-            {/* 月次売上グラフ */}
-            <Card className="bg-white border-slate-200 shadow-sm">
-                <CardHeader>
-                    <CardTitle>{selectedYear}年 月次売上推移</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <div className="h-[400px]">
-                        <RevenueChart data={finalGraphData} />
-                    </div>
-                </CardContent>
-            </Card>
+            {/* 月次グラフエリア (売上予測とレッスン数) */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* 月次売上・予測・目標グラフ */}
+                <Card className="bg-white border-slate-200 shadow-sm">
+                    <CardHeader>
+                        <CardTitle>{selectedYear}年 月次売上推移・予測・目標</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="h-[400px]">
+                            <RevenueChart data={finalGraphData} />
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* レッスン数推移グラフ */}
+                <Card className="bg-white border-slate-200 shadow-sm">
+                    <CardHeader>
+                        <CardTitle>{selectedYear}年 レッスンコマ数（本数）の推移</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="h-[400px]">
+                            <LessonCountChart data={finalLessonGraphData} />
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
 
             {/* コーチ別月次売上推移 */}
             <CoachMonthlyPerformance data={coachMonthlyData} year={selectedYear} />

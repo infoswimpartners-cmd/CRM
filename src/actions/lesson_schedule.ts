@@ -656,6 +656,7 @@ export async function checkStudentLessonStatus(studentId: string, dateStr: strin
                     default_lesson_master_id,
                     monthly_lesson_limit,
                     max_rollover_limit,
+                    is_package,
                     default_lesson: lesson_masters!default_lesson_master_id (
                         id,
                         name,
@@ -747,19 +748,25 @@ export async function checkStudentLessonStatus(studentId: string, dateStr: strin
                 console.log(`[CheckStatus] No active membership. Setting to overage.`)
             }
 
+            const isPackage = !!membership?.is_package
+
             if (!isOverage) {
-                if (!membership || !limit || limit === 0 || (membershipName && membershipName.includes('単発'))) {
+                if (isPackage) {
+                    // パッケージプランは、チケット残数が0以下の場合は超過（単発扱い）
+                    isOverage = (student.current_tickets || 0) <= 0
+                } else if (!membership || !limit || limit === 0 || (membershipName && membershipName.includes('単発'))) {
+                    // 単発やプランなしは常に超過（単発扱い）
                     isOverage = true
                 } else if (limit > 0 && currentTotal >= effectiveLimit) {
-                    // プラン上限に達していても、振替チケットがあれば超過とはみなさない
+                    // 月謝プラン上限に達していても、振替チケットがあれば超過とはみなさない
                     isOverage = (student.current_tickets || 0) <= 0
                 }
             } else {
-                // すでに isOverage = true の場合（未入会期間など）も、チケットがあれば救済する
+                // すでに isOverage = true の場合（未入会期間など）も、チケットがあれば救済する（単発以外）
                 if (student.current_tickets && student.current_tickets > 0) {
-                    // 単発プラン以外の場合のみチケット救済を適用
                     const isSinglePlan = !membership || !limit || limit === 0 || (membershipName && membershipName.includes('単発'))
-                    if (!isSinglePlan) {
+                    // パッケージプラン、または通常の月謝プランの場合はチケットで救済可能
+                    if (!isSinglePlan || isPackage) {
                         isOverage = false
                         console.log(`[CheckStatus] Overage prevented by available tickets: ${student.current_tickets}`)
                     }
@@ -813,7 +820,8 @@ export async function checkStudentLessonStatus(studentId: string, dateStr: strin
             }
         }
 
-        const isSinglePlan = !membership || !limit || limit === 0 || (membershipName && membershipName.includes('単発'))
+        const isPackage = !!membership?.is_package
+        const isSinglePlan = !membership || !limit || limit === 0 || (membershipName && membershipName.includes('単発')) || isPackage
 
         return {
             success: true,
@@ -825,7 +833,8 @@ export async function checkStudentLessonStatus(studentId: string, dateStr: strin
             currentTickets: student.current_tickets || 0,
             membershipName,
             defaultLessonId: membership?.default_lesson_master_id,
-            availableLessons
+            availableLessons,
+            isPackage
         }
 
     } catch (error: any) {

@@ -314,3 +314,176 @@ export async function updateMembershipTypeAction(data: {
         return { success: false, error: error.message || 'Failed to update membership type' }
     }
 }
+
+// ---------------------------------------------------------
+// パッケージプラン専用 Actions
+// ---------------------------------------------------------
+
+export async function createPackageTypeAction(data: {
+    name: string
+    fee: number
+    ticketCount: number
+    stripeProductId: string
+    selectedLessons?: { id: string, rewardPrice: number | null }[]
+}) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { success: false, error: 'Unauthorized' }
+
+    try {
+        // 1. Stripe商品IDから既存のone_time価格を検索
+        const prices = await stripe.prices.list({
+            product: data.stripeProductId,
+            type: 'one_time',
+            active: true,
+            limit: 10,
+        })
+
+        let priceId: string
+
+        if (prices.data.length > 0) {
+            // 金額が一致する価格を優先して使用
+            const matchingPrice = prices.data.find(p => p.unit_amount === data.fee)
+            priceId = matchingPrice?.id || prices.data[0].id
+            console.log(`[CreatePackage] Using existing Stripe Price: ${priceId}`)
+        } else {
+            // 既存のone_time価格がなければ新規作成
+            const newPrice = await stripe.prices.create({
+                product: data.stripeProductId,
+                unit_amount: data.fee,
+                currency: 'jpy',
+                metadata: { type: 'package' }
+            })
+            priceId = newPrice.id
+            console.log(`[CreatePackage] Created new Stripe Price: ${priceId}`)
+        }
+
+        // 2. DBにINSERT
+        const { data: typeData, error } = await supabase
+            .from('membership_types')
+            .insert({
+                name: data.name,
+                fee: data.fee,
+                stripe_product_id: data.stripeProductId,
+                stripe_price_id: priceId,
+                is_package: true,
+                ticket_count: data.ticketCount,
+                default_lesson_master_id: data.selectedLessons && data.selectedLessons.length > 0 ? data.selectedLessons[0].id : null,
+            })
+            .select()
+            .single()
+
+        if (error) throw error
+
+        // 3. Create Relations
+        if (data.selectedLessons && data.selectedLessons.length > 0 && typeData) {
+            const relations = data.selectedLessons.map(item => ({
+                membership_type_id: typeData.id,
+                lesson_master_id: item.id,
+                reward_price: item.rewardPrice
+            }))
+
+            const { error: relationError } = await supabase
+                .from('membership_type_lessons')
+                .insert(relations)
+
+            if (relationError) throw relationError
+        }
+
+        revalidatePath('/admin/masters')
+        revalidatePath('/admin/masters/membership-types')
+        return { success: true }
+    } catch (error: any) {
+        console.error('Create Package Type Action Error:', error)
+        return { success: false, error: error.message || 'Failed to create package type' }
+    }
+}
+
+export async function updatePackageTypeAction(data: {
+    id: string
+    name: string
+    fee: number
+    ticketCount: number
+    stripeProductId: string
+    stripePriceId?: string
+    selectedLessons?: { id: string, rewardPrice: number | null, unitPrice: number | null, pairUnitPrice: number | null }[]
+}) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { success: false, error: 'Unauthorized' }
+
+    try {
+        let priceId = data.stripePriceId || ''
+
+        // 価格IDが未設定の場合は価格を再取得/作成
+        if (!priceId) {
+            const prices = await stripe.prices.list({
+                product: data.stripeProductId,
+                type: 'one_time',
+                active: true,
+                limit: 10,
+            })
+
+            if (prices.data.length > 0) {
+                const matchingPrice = prices.data.find(p => p.unit_amount === data.fee)
+                priceId = matchingPrice?.id || prices.data[0].id
+            } else {
+                const newPrice = await stripe.prices.create({
+                    product: data.stripeProductId,
+                    unit_amount: data.fee,
+                    currency: 'jpy',
+                    metadata: { type: 'package' }
+                })
+                priceId = newPrice.id
+            }
+        }
+
+        // 1. DBの更新（membership_types）
+        const { error } = await supabase
+            .from('membership_types')
+            .update({
+                name: data.name,
+                fee: data.fee,
+                stripe_product_id: data.stripeProductId,
+                stripe_price_id: priceId,
+                ticket_count: data.ticketCount,
+                default_lesson_master_id: data.selectedLessons && data.selectedLessons.length > 0 ? data.selectedLessons[0].id : null,
+            })
+            .eq('id', data.id)
+
+        if (error) throw error
+
+        // 2. リレーションの更新（membership_type_lessons）
+        if (data.selectedLessons) {
+            const { error: deleteError } = await supabase
+                .from('membership_type_lessons')
+                .delete()
+                .eq('membership_type_id', data.id)
+
+            if (deleteError) throw deleteError
+
+            if (data.selectedLessons.length > 0) {
+                const relations = data.selectedLessons.map(item => ({
+                    membership_type_id: data.id,
+                    lesson_master_id: item.id,
+                    reward_price: item.rewardPrice,
+                    unit_price: item.unitPrice,
+                    pair_unit_price: item.pairUnitPrice
+                }))
+
+                const { error: relationError } = await supabase
+                    .from('membership_type_lessons')
+                    .insert(relations)
+
+                if (relationError) throw relationError
+            }
+        }
+
+        revalidatePath('/admin/masters')
+        revalidatePath('/admin/masters/membership-types')
+        return { success: true }
+    } catch (error: any) {
+        console.error('Update Package Type Action Error:', error)
+        return { success: false, error: error.message || 'Failed to update package type' }
+    }
+}

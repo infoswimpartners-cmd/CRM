@@ -15,16 +15,18 @@ const defaultData = [
 ]
 
 interface RevenueChartProps {
-    data?: { name: string; revenue: number; grossProfit?: number; forecast?: number; isForecast?: boolean }[]
+    data?: { name: string; revenue: number; grossProfit?: number; forecast?: number; target?: number; isForecast?: boolean }[]
 }
 
 export function RevenueChart({ data = defaultData as any }: RevenueChartProps) {
     const [showRevenue, setShowRevenue] = useState(true)
     const [showGrossProfit, setShowGrossProfit] = useState(true)
+    const [showTarget, setShowTarget] = useState(true)
+    const [showForecast, setShowForecast] = useState(true)
 
     return (
         <div className="w-full h-full flex flex-col gap-4">
-            <div className="flex items-center gap-6 px-2">
+            <div className="flex flex-wrap items-center gap-6 px-2">
                 <div className="flex items-center space-x-2">
                     <Checkbox
                         id="showRevenue"
@@ -36,7 +38,7 @@ export function RevenueChart({ data = defaultData as any }: RevenueChartProps) {
                         className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex items-center gap-2"
                     >
                         <div className="w-3 h-3 rounded-full bg-[oklch(0.55_0.16_230)]" />
-                        売上
+                        売上実績
                     </Label>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -50,7 +52,35 @@ export function RevenueChart({ data = defaultData as any }: RevenueChartProps) {
                         className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex items-center gap-2"
                     >
                         <div className="w-3 h-3 rounded-full bg-[oklch(0.6_0.18_150)]" />
-                        粗利
+                        粗利実績
+                    </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                    <Checkbox
+                        id="showTarget"
+                        checked={showTarget}
+                        onCheckedChange={(checked) => setShowTarget(checked === true)}
+                    />
+                    <Label
+                        htmlFor="showTarget"
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex items-center gap-2"
+                    >
+                        <div className="w-3 h-3 rounded-full bg-[oklch(0.6_0.16_30)]" />
+                        売上目標
+                    </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                    <Checkbox
+                        id="showForecast"
+                        checked={showForecast}
+                        onCheckedChange={(checked) => setShowForecast(checked === true)}
+                    />
+                    <Label
+                        htmlFor="showForecast"
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex items-center gap-2"
+                    >
+                        <div className="w-3 h-3 rounded-full bg-[oklch(0.7_0.1_230)]" />
+                        着地予測
                     </Label>
                 </div>
             </div>
@@ -79,6 +109,10 @@ export function RevenueChart({ data = defaultData as any }: RevenueChartProps) {
                                 <stop offset="5%" stopColor="oklch(0.7 0.1 230)" stopOpacity={0.2} />
                                 <stop offset="95%" stopColor="oklch(0.7 0.1 230)" stopOpacity={0} />
                             </linearGradient>
+                            <linearGradient id="colorTarget" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="oklch(0.6 0.16 30)" stopOpacity={0.2} />
+                                <stop offset="95%" stopColor="oklch(0.6 0.16 30)" stopOpacity={0} />
+                            </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="oklch(0.2 0.05 240 / 0.1)" />
                         <XAxis
@@ -105,7 +139,13 @@ export function RevenueChart({ data = defaultData as any }: RevenueChartProps) {
                                 border: '1px solid white'
                             }}
                             formatter={(value: any, name?: string) => {
-                                const label = name === 'revenue' ? '売上' : (name === 'grossProfit' ? '粗利' : '予測')
+                                const label = name === 'revenue' 
+                                    ? '売上実績' 
+                                    : (name === 'grossProfit' 
+                                        ? '粗利実績' 
+                                        : (name === 'forecast' 
+                                            ? '着地予測' 
+                                            : (name === 'target' ? '売上目標' : '数値')))
                                 return [`¥${Number(value || 0).toLocaleString()}`, label]
                             }}
                             labelStyle={{ color: 'oklch(0.25 0.04 240)', fontWeight: 'bold', marginBottom: '8px' }}
@@ -142,17 +182,36 @@ export function RevenueChart({ data = defaultData as any }: RevenueChartProps) {
                         )}
 
                         {/* 予測データ */}
-                        <Area
-                            type="monotone"
-                            dataKey="forecast"
-                            stroke="oklch(0.7 0.1 230)"
-                            strokeWidth={2}
-                            strokeDasharray="5 5"
-                            fillOpacity={1}
-                            fill="url(#colorForecast)"
-                            activeDot={{ r: 4 }}
-                            connectNulls
-                        />
+                        {showForecast && (
+                            <Area
+                                type="monotone"
+                                dataKey="forecast"
+                                stroke="oklch(0.7 0.1 230)"
+                                strokeWidth={2}
+                                strokeDasharray="5 5"
+                                fillOpacity={1}
+                                fill="url(#colorForecast)"
+                                activeDot={{ r: 4 }}
+                                connectNulls
+                                animationDuration={1000}
+                            />
+                        )}
+
+                        {/* 目標データ */}
+                        {showTarget && (
+                            <Area
+                                type="monotone"
+                                dataKey="target"
+                                stroke="oklch(0.6 0.16 30)"
+                                strokeWidth={2}
+                                strokeDasharray="4 4"
+                                fillOpacity={1}
+                                fill="url(#colorTarget)"
+                                activeDot={{ r: 4 }}
+                                connectNulls
+                                animationDuration={1000}
+                            />
+                        )}
                     </AreaChart>
                 </ResponsiveContainer>
             </div>

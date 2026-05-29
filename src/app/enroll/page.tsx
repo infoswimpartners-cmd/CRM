@@ -12,14 +12,14 @@ export const metadata = {
 export default async function EnrollPage() {
   const supabase = createAdminClient();
   
-  // membership_types からアクティブなプランを取得
+  // membership_types からアクティブなプランを取得（月次・パッケージ両方）
   const { data: dbPlans } = await supabase
     .from('membership_types')
-    .select('id, name, fee, stripe_price_id, active, display_order')
+    .select('id, name, fee, stripe_price_id, active, display_order, is_package, ticket_count')
     .eq('active', true)
     .order('display_order', { ascending: true });
 
-  // 一般入会フォームに表示する標準プランおよび時間バリエーション
+  // 月次プランの対象名称
   const targetNames = [
     '月4回（60分）',
     '月4回（90分）',
@@ -30,9 +30,9 @@ export default async function EnrollPage() {
     '単発'
   ];
 
-  // 対象のプランのみを抽出
+  // 月次プラン（名称で絞り込み） + パッケージプラン（is_package=true）を統合
   const filteredPlans = (dbPlans || [])
-    .filter((plan) => targetNames.includes(plan.name));
+    .filter((plan: any) => targetNames.includes(plan.name) || plan.is_package === true);
 
   return <EnrollmentForm dbPlans={filteredPlans} />;
 }

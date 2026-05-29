@@ -52,12 +52,12 @@ export function DesktopSidebar({ role }: DesktopSidebarProps) {
                         <NavItem href="/admin" icon={LayoutDashboard} label="ダッシュボード" isActive={pathname === '/admin'} />
 
                         <NavHeading>分析・集計</NavHeading>
-                        <NavItem href="/admin/analytics" icon={DollarSign} label="売上詳細" isActive={pathname?.startsWith('/admin/analytics')} />
+                        <NavItem href="/admin/analytics" icon={DollarSign} label="分析・集計" isActive={pathname?.startsWith('/admin/analytics')} />
                         <NavItem href="/admin/reports" icon={Calendar} label="全レッスン報告" isActive={pathname?.startsWith('/admin/reports')} />
 
                         <NavHeading>財務管理</NavHeading>
                         <NavItem href="/admin/finance/payouts" icon={CreditCard} label="報酬支払管理" isActive={pathname?.startsWith('/admin/finance/payouts')} />
-                        <NavItem href="/admin/approvals" icon={FileCheck} label="承認管理" isActive={pathname?.startsWith('/admin/approvals')} />
+                        <NavItem href="/admin/approvals" icon={FileCheck} label="請求・決済管理" isActive={pathname?.startsWith('/admin/approvals')} />
 
                         <NavHeading>運営管理</NavHeading>
                         <NavItem href="/admin/inquiries" icon={MessageCircle} label="お問い合わせ" isActive={pathname?.startsWith('/admin/inquiries')} />

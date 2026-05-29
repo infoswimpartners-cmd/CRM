@@ -1,7 +1,7 @@
 'use client'
 // Force reload: 2026-05-09T10:20:00
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import {
@@ -118,6 +118,14 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
     const [currentTickets, setCurrentTickets] = useState<number>(0)
     const [isGoogleLinked, setIsGoogleLinked] = useState(false)
     const [checkingStatus, setCheckingStatus] = useState(false)
+    const lastCheckedRef = useRef<{ studentId: string; date: string; attendanceType: string } | null>(null)
+
+    // ダイアログを閉じた時にキャッシュをリセット
+    useEffect(() => {
+        if (!open) {
+            lastCheckedRef.current = null
+        }
+    }, [open])
 
     // Initial Data Fetch (User Role, Coaches, Lesson Masters)
     useEffect(() => {
@@ -265,47 +273,59 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
     useEffect(() => {
         const firstSlotDate = slots[0]?.date
         if (studentId && studentId !== 'none' && firstSlotDate) {
-            const check = async () => {
-                setCheckingStatus(true)
-                const { checkStudentLessonStatus } = await import('@/actions/lesson_schedule')
-                const res = await checkStudentLessonStatus(studentId, firstSlotDate.toISOString(), attendanceType)
+            const dateStr = firstSlotDate.toISOString()
 
-                if (res.success) {
-                    setIsOverage(!!res.isOverage)
-                    setMembershipName(res.membershipName)
-                    setMonthlyLimit(res.limit || 0)
-                    setCurrentCount(res.count || 0)
-                    setRolloverCount(res.rollover || 0)
-                    setCurrentTickets(res.currentTickets || 0)
-                    setAvailableLessons(res.availableLessons || [])
+            // 重複チェックを防止するガードロジック
+            const isSameCheck = lastCheckedRef.current &&
+                lastCheckedRef.current.studentId === studentId &&
+                lastCheckedRef.current.date === dateStr &&
+                lastCheckedRef.current.attendanceType === attendanceType
 
-                    const lessons = res.availableLessons || []
+            if (!isSameCheck) {
+                lastCheckedRef.current = { studentId, date: dateStr, attendanceType }
 
-                    // Auto-select logic
-                    if (lessons.length > 0) {
-                        let targetId = 'default'
+                const check = async () => {
+                    setCheckingStatus(true)
+                    const { checkStudentLessonStatus } = await import('@/actions/lesson_schedule')
+                    const res = await checkStudentLessonStatus(studentId, dateStr, attendanceType)
 
-                        // 1. Try Default ID match
-                        if (res.defaultLessonId) {
-                            const match = lessons.find((l: any) => l.id === res.defaultLessonId)
-                            if (match) targetId = res.defaultLessonId
+                    if (res.success) {
+                        setIsOverage(!!res.isOverage)
+                        setMembershipName(res.membershipName)
+                        setMonthlyLimit(res.limit || 0)
+                        setCurrentCount(res.count || 0)
+                        setRolloverCount(res.rollover || 0)
+                        setCurrentTickets(res.currentTickets || 0)
+                        setAvailableLessons(res.availableLessons || [])
+
+                        const lessons = res.availableLessons || []
+
+                        // Auto-select logic
+                        if (lessons.length > 0) {
+                            let targetId = 'default'
+
+                            // 1. Try Default ID match
+                            if (res.defaultLessonId) {
+                                const match = lessons.find((l: any) => l.id === res.defaultLessonId)
+                                if (match) targetId = res.defaultLessonId
+                            }
+
+                            // 2. Fallback to first item if still default
+                            if (targetId === 'default') {
+                                targetId = lessons[0].id
+                            }
+
+                            console.log('[AutoSelect] Selected:', targetId)
+                            // Use setTimeout to ensure availableLessons state update is processed by Select component
+                            setTimeout(() => setSelectedMasterId(targetId), 0)
+                        } else {
+                            setSelectedMasterId('default')
                         }
-
-                        // 2. Fallback to first item if still default
-                        if (targetId === 'default') {
-                            targetId = lessons[0].id
-                        }
-
-                        console.log('[AutoSelect] Selected:', targetId)
-                        // Use setTimeout to ensure availableLessons state update is processed by Select component
-                        setTimeout(() => setSelectedMasterId(targetId), 0)
-                    } else {
-                        setSelectedMasterId('default')
                     }
+                    setCheckingStatus(false)
                 }
-                setCheckingStatus(false)
+                check()
             }
-            check()
 
             // Title Auto-generation
             const student = students.find(s => s.id === studentId)
@@ -667,6 +687,10 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
                                                 (!membershipName || (membershipName && membershipName.includes('単発'))) ? (
                                                     <span className="text-red-600 font-bold block sm:inline w-full sm:w-auto mt-1 sm:mt-0">
                                                         ※レッスン種別を選択してください
+                                                    </span>
+                                                ) : (membershipName && membershipName.includes('パッケージ')) ? (
+                                                    <span className="text-red-600 font-bold block sm:inline w-full sm:w-auto mt-1 sm:mt-0">
+                                                        ※チケット残数不足 (単発扱い)
                                                     </span>
                                                 ) : (
                                                     <span className="text-red-600 font-bold block sm:inline w-full sm:w-auto mt-1 sm:mt-0">

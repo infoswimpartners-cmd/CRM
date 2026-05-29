@@ -11,6 +11,8 @@ interface DBPlan {
   stripe_price_id: string;
   active: boolean;
   display_order: number;
+  is_package?: boolean;
+  ticket_count?: number;
 }
 
 interface EnrollmentFormProps {
@@ -58,7 +60,7 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
           setIsLiffReady(true);
         } else {
           const redirectUri = window.location.origin + window.location.pathname;
-          setLiffError("LINEログインが必要です。ログイン画面へ移動します...");
+          setLiffError("LINEログインが必要です。ログイン画面へ遷移します...");
           setIsLiffReady(true);
           liff.login({ redirectUri });
         }
@@ -72,25 +74,33 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
     initLiff();
   }, []);
 
+  // DBから取得したパッケージプランの一覧
+  const packagePlans = dbPlans.filter(p => p.is_package);
+
+  // 固定プラン + DBパッケージプランを合わせたPARENT_PLANSリスト
   const PARENT_PLANS = [
     { id: 'monthly-4', name: '月4回継続プラン' },
     { id: 'monthly-2', name: '月2回継続プラン' },
     { id: 'single', name: '単発プラン' },
-    { id: 'package-25m', name: '25m完泳パッケージ（全12回）' }
+    // DBから取得したパッケージプランを動的に追加
+    ...packagePlans.map(p => ({ id: p.id, name: p.name }))
   ];
 
   // 選択された親プランと時間に基づいて、具体的なDBプランを取得する
   const activePlan = (() => {
     if (!selectedParentPlan) return null;
 
-    if (selectedParentPlan === 'package-25m') {
+    // DBパッケージプランの確認
+    const pkgPlan = packagePlans.find(p => p.id === selectedParentPlan);
+    if (pkgPlan) {
       return {
-        id: 'package-25m',
-        stripePriceId: 'price_1SwKVfP0UQGtpYXm9cgy3v1g',
-        name: '25m完泳パッケージ（全12回）',
-        price: 102000,
+        id: pkgPlan.id,
+        stripePriceId: pkgPlan.stripe_price_id,
+        name: pkgPlan.name,
+        price: pkgPlan.fee,
         period: '一括',
-        description: '夏までに絶対に泳ぎたい方向け！圧倒的安心の「完泳保証」が付いたパッケージです。',
+        isPackage: true,
+        description: '一括払いのパッケージプランです。決済完了後、チケットが自動的に付与されます。',
         rules: [
           'プロの完泳保証付き（万が一12回で泳げなかった場合、最大4回分の補講レッスンを無償提供）。',
           '1回あたり8,500円（月4回コースと同等の特別価格）で受講可能です。',
@@ -107,6 +117,7 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
         name: '単発プラン',
         price: dbPlan?.fee ?? 0,
         period: '月',
+        isPackage: false,
         description: '定期的に通うのが難しい方へ。月会費0円で、受講した分だけその都度決済されるプランです。',
         rules: [
           '入会金・年会費・月会費は一切かかりません（0円/月）。',
@@ -120,7 +131,6 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
     // 月2回 / 月4回
     const isMonthly4 = selectedParentPlan === 'monthly-4';
     const planName = isMonthly4 ? `月4回（${selectedDuration}分）` : `月2回（${selectedDuration}分）`;
-    // DB内の表記ゆれ対応（120分プランは ' (120分)' と半角スペースになっているため）
     const altPlanName = isMonthly4 ? `月4回 (${selectedDuration}分)` : `月2回 (${selectedDuration}分)`;
 
     const dbPlan = dbPlans.find(p => p.name === planName || p.name === altPlanName);
@@ -144,6 +154,7 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
       name: isMonthly4 ? `月4回継続プラン（${selectedDuration}分）` : `月2回継続プラン（${selectedDuration}分）`,
       price: dbPlan?.fee ?? 0,
       period: '月',
+      isPackage: false,
       description,
       rules,
     };
@@ -199,99 +210,77 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
   if (liffError) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-slate-100 p-8 text-center space-y-4">
-          <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto text-xl font-bold">⚠️</div>
-          <h2 className="text-base font-bold text-slate-800">エラーが発生しました</h2>
-          <p className="text-xs text-slate-500 leading-relaxed">{liffError}</p>
-          <p className="text-xs text-slate-400">LINEアプリから開き直すか、管理者に問い合わせてください。</p>
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-red-100 p-8 text-center space-y-4">
+          <div className="w-12 h-12 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto text-xl font-bold">!</div>
+          <p className="text-sm font-medium text-slate-700">{liffError}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 lg:px-8 font-sans">
-      <div className="max-w-md mx-auto bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
-
-        {/* ヘッダー */}
-        <div className="bg-gradient-to-r top-0 from-blue-700 to-cyan-500 p-6 text-center text-white">
-          <h1 className="text-xl font-bold tracking-wider">Swim Partners</h1>
-          <p className="text-xs opacity-90 mt-1">オンライン入会お手続き</p>
+    <div className="min-h-screen bg-slate-50 py-10 px-4 sm:px-6 lg:px-8 flex justify-center">
+      <div className="max-w-2xl w-full space-y-8 bg-white p-6 sm:p-10 rounded-3xl shadow-xl border border-slate-100 transition-all hover:shadow-2xl">
+        <div className="text-center space-y-2">
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+            オンライン入会お手続き
+          </h1>
+          <p className="text-xs sm:text-sm font-medium text-slate-500">
+            ご希望のプランを選択し、利用規約に同意の上、カード登録（安全なStripe決済）へ進んでください。
+          </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-
+        <form onSubmit={handleSubmit} className="space-y-6">
           {/* STEP 1: プラン選択 */}
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2">
-              ① ご希望の入会プランを選択してください
+          <div className="space-y-3">
+            <label className="block text-sm font-bold text-slate-700">
+              ① ご希望のプランを選択
             </label>
-
-            {/* 料金詳細ページへの美しいテキストリンク */}
-            <div className="mb-4">
-              <a
-                href="https://swim-partners.com/course-price"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center text-xs font-bold text-blue-600 hover:text-blue-700 hover:underline transition-colors"
-              >
-                <span className="mr-1">💡</span> 詳しい料金プランについてはこちら（料金表ページ） ➔
-              </a>
-            </div>
-
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 gap-2.5">
               {PARENT_PLANS.map((plan) => (
-                <div key={plan.id} className="space-y-2">
-                  <label
-                    className={`block p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedParentPlan === plan.id
-                        ? 'border-blue-500 bg-blue-50/50'
-                        : 'border-slate-200 hover:border-slate-300 bg-white'
-                      }`}
-                  >
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center space-x-3">
-                        <input
-                          type="radio"
-                          name="parentPlan"
-                          value={plan.id}
-                          checked={selectedParentPlan === plan.id}
-                          onChange={() => {
-                            setSelectedParentPlan(plan.id);
-                          }}
-                          className="h-4 w-4 text-blue-600 border-slate-300 focus:ring-blue-500"
-                        />
-                        <span className="font-bold text-slate-800 text-sm sm:text-base">{plan.name}</span>
-                      </div>
-                    </div>
-                  </label>
-
-                  {/* 時間選択サブオプション（月4回・月2回が選択された場合に出現） */}
-                  {selectedParentPlan === plan.id && (plan.id === 'monthly-4' || plan.id === 'monthly-2') && (
-                    <div className="ml-7 p-3 bg-slate-100/80 rounded-xl border border-slate-200/60 animate-fadeIn space-y-2">
-                      <span className="text-xs font-bold text-slate-500 block">⏱️ 1回のレッスン時間を選択してください</span>
-                      <div className="grid grid-cols-3 gap-2">
-                        {(['60', '90', '120'] as const).map((duration) => (
-                          <button
-                            key={duration}
-                            type="button"
-                            onClick={() => setSelectedDuration(duration)}
-                            className={`py-2 px-3 rounded-lg text-xs font-bold transition-all border ${selectedDuration === duration
-                                ? 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white border-transparent shadow-sm'
-                                : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-200'
-                              }`}
-                          >
-                            {duration}分
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+                <button
+                  key={plan.id}
+                  type="button"
+                  onClick={() => setSelectedParentPlan(plan.id)}
+                  className={`flex items-center justify-between p-4 rounded-2xl border text-left transition-all duration-300 ${
+                    selectedParentPlan === plan.id
+                      ? 'border-blue-600 bg-blue-50/50 shadow-md font-bold text-blue-900 ring-2 ring-blue-500/20'
+                      : 'bg-white hover:bg-slate-50 text-slate-600 border-slate-200'
+                  }`}
+                >
+                  <span className="font-bold text-slate-800 text-sm sm:text-base">{plan.name}</span>
+                  {selectedParentPlan === plan.id && (
+                    <span className="w-5 h-5 bg-blue-600 text-white rounded-full flex items-center justify-center text-[10px]">✓</span>
                   )}
-
-                  {/* 先行受講回数選択オプションは実績報告ベースに統一するため廃止 */}
-                </div>
+                </button>
               ))}
             </div>
           </div>
+
+          {/* 月2回 / 月4回プラン用のレッスン時間選択 */}
+          {(selectedParentPlan === 'monthly-4' || selectedParentPlan === 'monthly-2') && (
+            <div className="space-y-3 p-4 bg-slate-50 rounded-2xl border border-slate-100 animate-fadeIn">
+              <span className="text-xs font-bold text-slate-500 block">
+                【選択】1回あたりのレッスン時間を選択してください
+              </span>
+              <div className="grid grid-cols-3 gap-2">
+                {(['60', '90', '120'] as const).map((dur) => (
+                  <button
+                    key={dur}
+                    type="button"
+                    onClick={() => setSelectedDuration(dur)}
+                    className={`h-11 rounded-xl text-xs font-bold transition-all duration-300 ${
+                      selectedDuration === dur
+                        ? 'bg-blue-600 text-white shadow-md'
+                        : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200'
+                    }`}
+                  >
+                    {dur}分コース
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* STEP 2: ご本人確認 */}
           <div className="space-y-4 border-t border-slate-100 pt-5">
@@ -346,13 +335,13 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
                       </div>
                       <div className="mt-1 flex justify-between items-baseline">
                         <span className="text-xs font-bold text-slate-700">
-                          {selectedParentPlan === 'package-25m' ? '本日お支払い額 (税込)' : 'クレジットカード登録 (本日決済なし)'}
+                          {activePlan.isPackage ? '本日お支払い額 (税込)' : 'クレジットカード登録 (本日決済なし)'}
                         </span>
                         <span className="text-2xl font-black text-blue-600">
-                          ¥{((selectedParentPlan === 'package-25m') ? activePlan.price : 0).toLocaleString()}
+                          ¥{(activePlan.isPackage ? activePlan.price : 0).toLocaleString()}
                         </span>
                       </div>
-                      {selectedParentPlan !== 'package-25m' && (
+                      {!activePlan.isPackage && (
                         <p className="text-[10px] text-slate-500 mt-1.5 leading-relaxed">
                           ※本日は決済用クレジットカード情報の登録（安全なStripeシステム経由）のみを行います。本日時点で決済は発生いたしません。
                         </p>
@@ -362,13 +351,16 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
                     {/* 翌月1日以降のお支払い (継続月会費 ＆ 先行受講分合算) */}
                     <div className="bg-white p-3 rounded-lg border border-slate-200/80 shadow-sm">
                       <span className="text-xs text-slate-500 font-bold block mb-1">
-                        ② 翌月1日以降のお支払い (月謝 ＆ 先行受講分合算)
+                        ② お支払い形式（基本料金）
                       </span>
                       <div className="flex justify-between items-baseline">
-                        <span className="text-xs font-bold text-slate-700">基本月額料金 (税込)</span>
+                        <span className="text-xs font-bold text-slate-700">{activePlan.isPackage ? '一括請求額 (税込)' : '基本月額料金 (税込)'}</span>
                         <span className="text-xl font-bold text-slate-800">
-                          {selectedParentPlan === 'package-25m' ? (
-                            <span className="text-xs font-bold text-slate-500">一括（追加継続課金なし）</span>
+                          {activePlan.isPackage ? (
+                            <>
+                              ¥{activePlan.price.toLocaleString()}
+                              <span className="text-xs font-bold text-slate-500 ml-1">（追加自動継続課金なし）</span>
+                            </>
                           ) : (
                             <>
                               ¥{activePlan.price.toLocaleString()}
@@ -377,7 +369,7 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
                           )}
                         </span>
                       </div>
-                      {selectedParentPlan !== 'package-25m' && selectedParentPlan !== 'single' && (
+                      {!activePlan.isPackage && selectedParentPlan !== 'single' && (
                         <div className="mt-2 pt-2 border-t border-slate-100 space-y-1 text-[10px] text-slate-500 leading-relaxed">
                           <p className="font-bold text-amber-600">📅 体験レッスン後〜翌月1日までに先行受講された場合：</p>
                           <p>
@@ -390,95 +382,107 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
                       )}
                     </div>
 
+                    {/* プランの説明文 */}
                     <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">{activePlan.description}</p>
                   </div>
                 ) : (
-                  <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">このプラン・時間は現在データベースに登録されていないか、準備中です。</p>
+                  <p className="text-xs font-bold text-red-500 mt-2">
+                    ※選択された時間コースは現在調整中です。別のコースを選択するか、管理者までご連絡ください。
+                  </p>
                 )}
               </div>
 
               {activePlan.id && (
-                <div className="border-t border-slate-200 pt-3">
-                  <span className="text-xs font-bold text-slate-500 block mb-2">📋 このプランの受講ルール</span>
-                  <ul className="space-y-1.5">
+                <div className="pt-3 border-t border-slate-200 space-y-2">
+                  <span className="text-xs font-bold text-slate-500 block mb-2">
+                    【重要】このプランの受講ルール
+                  </span>
+                  <div className="space-y-1.5">
                     {activePlan.rules.map((rule, idx) => (
-                      <li key={idx} className="text-xs text-slate-700 flex items-start">
+                      <div key={idx} className="flex items-start text-[11px] text-slate-600 font-medium">
                         <span className="text-cyan-500 mr-1.5 font-bold">✓</span>
                         <span className="leading-normal">{rule}</span>
-                      </li>
+                      </div>
                     ))}
-                  </ul>
+                  </div>
                 </div>
               )}
             </div>
           )}
 
-          {/* STEP 4: 利用規約・同意事項 */}
-          <div className="space-y-3 border-t border-slate-100 pt-5">
-            <label className="block text-sm font-bold text-slate-700 mb-2">
-              ③ 利用規約および重要事項への同意
+          {/* STEP 4: 同意事項チェック */}
+          <div className="space-y-3.5 border-t border-slate-100 pt-5">
+            <label className="block text-sm font-bold text-slate-700">
+              ③ 同意事項の確認
             </label>
 
-            <div className="space-y-3">
-              <label className="flex items-start p-3 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={agreedTerms.billing}
-                  onChange={(e) => setAgreedTerms({ ...agreedTerms, billing: e.target.checked })}
-                  className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                />
-                <span className="ml-3 text-xs text-slate-600 leading-relaxed">
-                  <strong>月謝・決済に関する同意：</strong><br />
-                  継続プランの場合、毎月1日に当月分の月謝が登録クレジットカードより自動決済されることに同意します。（Stripeシステムを利用）
-                </span>
-              </label>
+            <div className="space-y-2.5">
+              {/* 同意 1: 決済について */}
+              {activePlan && (
+                <label className="flex items-start p-3 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100/70 border border-slate-100 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={agreedTerms.billing}
+                    onChange={(e) => setAgreedTerms({ ...agreedTerms, billing: e.target.checked })}
+                    className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="ml-3 text-xs text-slate-600 leading-relaxed font-semibold">
+                    {activePlan.isPackage
+                      ? "利用規約およびプライバシーポリシーに同意し、パッケージプランの一括決済（クレジットカード決済）を行うことに同意します。"
+                      : "利用規約およびプライバシーポリシーに同意し、クレジットカード決済による毎月の月謝の自動引き落とし（継続課金）を承諾します。"}
+                  </span>
+                </label>
+              )}
 
-              <label className="flex items-start p-3 bg-slate-50 rounded-lg cursor-pointer hover:bg-slate-100 transition-colors">
+              {/* 同意 2: キャンセル規定 */}
+              <label className="flex items-start p-3 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100/70 border border-slate-100 transition-colors">
                 <input
                   type="checkbox"
                   checked={agreedTerms.cancel}
                   onChange={(e) => setAgreedTerms({ ...agreedTerms, cancel: e.target.checked })}
                   className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                 />
-                <span className="ml-3 text-xs text-slate-600 leading-relaxed">
-                  <strong>変更・解約・受講ルールに関する同意：</strong><br />
-                  選択したプランに記載の受講ルール（振替期間等）を遵守し、休会または解約を希望する場合は【前月10日まで】に申請を行うことに同意します。
+                <span className="ml-3 text-xs text-slate-600 leading-relaxed font-semibold">
+                  前日18:00以降のレッスンキャンセルについては、理由を問わず「受講1回分の消化（またはキャンセル料100%）」の取り扱いとなることを承諾します。
                 </span>
               </label>
 
-              {(selectedParentPlan === 'monthly-4' || selectedParentPlan === 'monthly-2') && activePlan && (
-                <label className="flex items-start p-3 bg-blue-50/60 rounded-lg cursor-pointer hover:bg-blue-100/50 transition-colors border border-blue-200">
+              {/* 同意 3: 初回レッスン（月謝プランのみ） */}
+              {isInitialLessonsAgreementRequired && (
+                <label className="flex items-start p-3 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100/70 border border-slate-100 transition-colors animate-fadeIn">
                   <input
                     type="checkbox"
                     checked={agreedTerms.initialLessons}
                     onChange={(e) => setAgreedTerms({ ...agreedTerms, initialLessons: e.target.checked })}
                     className="mt-1 h-4 w-4 rounded border-blue-500 text-blue-600 focus:ring-blue-500"
                   />
-                  <span className="ml-3 text-xs text-slate-700 leading-relaxed">
-                    <strong>初月の先行受講および月謝の自動合算に関する同意（必須）：</strong><br />
-                    体験レッスン受講後、翌月1日の本格スタートまでに先行受講したレッスンについては、実際の受講実績に基づき、翌月1日の初回月謝引き落とし時に自動合算（追加課金）されることに同意します。また、本格的な月会費（月額 ¥{activePlan.price.toLocaleString()}）の自動引き落としは翌月1日から開始されることに同意します。
+                  <span className="ml-3 text-xs text-slate-600 leading-relaxed font-semibold">
+                    体験レッスン後、初回月謝プランによる正式な第1回目・第2回目のレッスン枠については、コーチの手配を迅速に行うために事務局による自動割り当て（または指定手配）となることを承諾します。
                   </span>
                 </label>
               )}
             </div>
           </div>
 
-          {/* 送信（決済）ボタン */}
+          {/* 送信ボタン */}
           <button
             type="submit"
             disabled={isSubmitDisabled}
-            className={`w-full py-4 px-4 rounded-xl font-bold text-center tracking-wider transition-all shadow-md ${isSubmitDisabled
+            className={`w-full h-13 rounded-2xl text-sm font-black shadow-lg transition-all duration-300 flex items-center justify-center gap-2 ${
+              isSubmitDisabled
                 ? 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
-                : 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white hover:opacity-95 active:scale-[0.98]'
-              }`}
+                : 'bg-blue-600 hover:bg-blue-700 text-white hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 active:shadow-md'
+            }`}
           >
-            {isSubmitting
-              ? '決済画面へ移動中...'
-              : selectedParentPlan
-                ? 'クレジットカード決済登録へ進む'
-                : 'プランを選択してください'}
+            {isSubmitting ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                <span>処理中...</span>
+              </>
+            ) : (
+              <span>決済・クレジットカード登録に進む</span>
+            )}
           </button>
-
         </form>
       </div>
     </div>

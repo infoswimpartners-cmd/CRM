@@ -126,7 +126,7 @@ export function MobileSidebar({ userProfile }: { userProfile: any }) {
 
                             <NavHeading>財務管理</NavHeading>
                             <NavItem href="/admin/finance/payouts" icon={CreditCard} label="報酬支払管理" isActive={pathname?.startsWith('/admin/finance/payouts')} />
-                            <NavItem href="/admin/approvals" icon={FileCheck} label="承認管理" isActive={pathname?.startsWith('/admin/approvals')} />
+                            <NavItem href="/admin/approvals" icon={FileCheck} label="請求・決済管理" isActive={pathname?.startsWith('/admin/approvals')} />
 
                             <NavHeading>運営管理</NavHeading>
                             <NavItem href="/admin/inquiries" icon={MessageCircle} label="お問い合わせ" isActive={pathname?.startsWith('/admin/inquiries')} />

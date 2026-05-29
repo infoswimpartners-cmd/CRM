@@ -8,7 +8,8 @@ import {
     Info,
     Menu,
     Coins,
-    ChevronRight
+    ChevronRight,
+    UserPlus
 } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -17,6 +18,7 @@ import { MembershipGuide } from '@/components/admin/manual/MembershipGuide'
 import { CoachManagementGuide } from '@/components/admin/manual/CoachManagementGuide'
 import { InternalOperationsGuide } from '@/components/admin/manual/InternalOperationsGuide'
 import { BillingSystemGuide } from '@/components/admin/manual/BillingSystemGuide'
+import { EnrollmentGuide } from '@/components/admin/manual/EnrollmentGuide'
 
 // Menu Items Configuration
 const menuItems = [
@@ -25,6 +27,12 @@ const menuItems = [
         title: '請求システム総合ガイド',
         icon: Coins,
         component: BillingSystemGuide
+    },
+    {
+        id: 'enrollment',
+        title: '顧客オンライン入会フロー',
+        icon: UserPlus,
+        component: EnrollmentGuide
     },
     {
         id: 'membership',

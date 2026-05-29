@@ -271,24 +271,49 @@ export async function POST(req: NextRequest) {
                         console.log(`[Stripe Webhook] Successfully added ${amount} TRIO tickets to Student ${studentId}. New Balance: ${newBalance}`);
                     }
                 } else if (type === 'membership_enrollment') {
+                    const studentId = session.metadata?.studentId
                     const lineUserId = line_user_id || session.metadata?.line_user_id
                     const planId = membership_type_id || session.metadata?.membership_type_id
-                    console.log(`[Stripe Webhook] Processing Membership Enrollment for LINE User: ${lineUserId}, Plan: ${planId}`)
+                    console.log(`[Stripe Webhook] Processing Membership Enrollment. studentId: ${studentId}, LINE User: ${lineUserId}, Plan: ${planId}`)
 
-                    if (lineUserId) {
-                        const { data: student } = await supabaseAdmin
-                            .from('students')
-                            .select('*')
-                            .eq('line_user_id', lineUserId)
+                    if ((studentId || lineUserId) && planId) {
+                        // DBからプランのis_package / ticket_countを取得
+                        const { data: planData } = await supabaseAdmin
+                            .from('membership_types')
+                            .select('is_package, ticket_count, name')
+                            .eq('id', planId)
                             .maybeSingle()
 
-                        const isPackage = planId === 'package-25m'
+                        const isPackage = planData?.is_package ?? false
+                        const ticketCount = planData?.ticket_count ?? 0
+                        const planDisplayName = planData?.name || (isPackage ? 'パッケージプラン（一括）入会' : 'Swim Partners 月謝プラン入会')
+
+                        let student = null
+                        if (studentId) {
+                            console.log(`[Stripe Webhook] Searching student by metadata studentId: ${studentId}`)
+                            const { data: fetchedStudent } = await supabaseAdmin
+                                .from('students')
+                                .select('*')
+                                .eq('id', studentId)
+                                .maybeSingle()
+                            student = fetchedStudent
+                        }
+
+                        if (!student && lineUserId) {
+                            console.log(`[Stripe Webhook] Student not found by studentId. Searching by lineUserId: ${lineUserId}`)
+                            const { data: fetchedStudent } = await supabaseAdmin
+                                .from('students')
+                                .select('*')
+                                .eq('line_user_id', lineUserId)
+                                .maybeSingle()
+                            student = fetchedStudent
+                        }
+
                         const nowStr = new Date().toISOString()
-                        const targetPlanId = isPackage ? null : planId
 
                         const updateData: any = {
                             status: 'active',
-                            membership_type_id: targetPlanId,
+                            membership_type_id: planId,  // 月次・パッケージ共通でDBのIDを設定
                             stripe_customer_id: session.customer as string || null,
                             stripe_subscription_id: session.subscription as string || null,
                             membership_started_at: nowStr,
@@ -297,6 +322,15 @@ export async function POST(req: NextRequest) {
 
                         if (student) {
                             console.log(`[Stripe Webhook] Found existing student: ${student.id} (${student.full_name}). Updating to active...`)
+
+                            // パッケージの場合はチケットも付与
+                            if (isPackage && ticketCount > 0) {
+                                const currentTickets = student.current_tickets || 0
+                                const newTickets = currentTickets + ticketCount
+                                updateData.current_tickets = newTickets
+                                console.log(`[Stripe Webhook] Granting ${ticketCount} tickets to Student ${student.id}. ${currentTickets} → ${newTickets}`)
+                            }
+
                             const { error: updateError } = await supabaseAdmin
                                 .from('students')
                                 .update(updateData)
@@ -307,11 +341,26 @@ export async function POST(req: NextRequest) {
                                 throw updateError
                             }
 
+                            // パッケージの場合はチケットトランザクション記録
+                            if (isPackage && ticketCount > 0) {
+                                const currentTickets = student.current_tickets || 0
+                                const newTickets = currentTickets + ticketCount
+                                await supabaseAdmin
+                                    .from('ticket_transactions')
+                                    .insert({
+                                        student_id: student.id,
+                                        change_amount: ticketCount,
+                                        balance_after: newTickets,
+                                        reason: `パッケージ入会（${planDisplayName}）`,
+                                        related_id: null
+                                    })
+                            }
+
                             if (student.contact_email) {
                                 try {
                                     await emailService.sendTriggerEmail('payment_success', student.contact_email, {
                                         name: student.full_name,
-                                        title: isPackage ? '25m完泳パッケージ（一括）入会' : 'Swim Partners 月謝プラン入会',
+                                        title: planDisplayName,
                                         amount: (session.amount_total || 0).toLocaleString() + '円'
                                     })
                                 } catch (e) {
@@ -325,7 +374,12 @@ export async function POST(req: NextRequest) {
                             const customerPhone = session.customer_details?.phone || ''
                             const tempStudentNumber = 'L' + Math.floor(1000 + Math.random() * 9000).toString()
 
-                            const { error: insertError } = await supabaseAdmin
+                            // パッケージの場合は初期チケット付与
+                            if (isPackage && ticketCount > 0) {
+                                updateData.current_tickets = ticketCount
+                            }
+
+                            const { data: newStudent, error: insertError } = await supabaseAdmin
                                 .from('students')
                                 .insert({
                                     full_name: customerName,
@@ -335,17 +389,32 @@ export async function POST(req: NextRequest) {
                                     student_number: tempStudentNumber,
                                     ...updateData
                                 })
+                                .select('id')
+                                .single()
 
                             if (insertError) {
                                 console.error('[Stripe Webhook] Failed to insert new student details:', insertError)
                                 throw insertError
                             }
 
+                            // 新規作成時もチケットトランザクション記録
+                            if (isPackage && ticketCount > 0 && newStudent) {
+                                await supabaseAdmin
+                                    .from('ticket_transactions')
+                                    .insert({
+                                        student_id: newStudent.id,
+                                        change_amount: ticketCount,
+                                        balance_after: ticketCount,
+                                        reason: `パッケージ入会（${planDisplayName}）`,
+                                        related_id: null
+                                    })
+                            }
+
                             if (customerEmail) {
                                 try {
                                     await emailService.sendTriggerEmail('payment_success', customerEmail, {
                                         name: customerName,
-                                        title: isPackage ? '25m完泳パッケージ（一括）入会' : 'Swim Partners 月謝プラン入会',
+                                        title: planDisplayName,
                                         amount: (session.amount_total || 0).toLocaleString() + '円'
                                     })
                                 } catch (e) {
