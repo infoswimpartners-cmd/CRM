@@ -96,7 +96,7 @@ export async function createEnrollmentCheckoutSession(planId: string, lineUserId
             }
 
             if (!targetStudentId) {
-                return { success: false, error: 'ご入力いただいた情報（メールアドレス・電話番号）に一致する体験お申し込みデータが見つかりませんでした。内容をご確認の上、正しい登録情報を入力してください。' }
+                console.log(`[Stripe Checkout] Student NOT identified via verification (email/phone). Proceeding as a new/unlinked student.`);
             }
         }
 
@@ -254,5 +254,41 @@ export async function createEnrollmentCheckoutSession(planId: string, lineUserId
     } catch (error: any) {
         console.error('Create Enrollment Checkout Session Error:', error)
         return { success: false, error: error.message || '決済画面の作成に失敗しました。' }
+    }
+}
+
+/**
+ * LINEユーザーIDがすでに登録されている（連携済み）生徒情報を取得する
+ */
+export async function getLinkedStudent(lineUserId: string) {
+    const supabase = createAdminClient()
+    try {
+        if (!lineUserId) return { success: false, isLinked: false }
+
+        const { data: student, error } = await supabase
+            .from('students')
+            .select('id, contact_email, contact_phone')
+            .eq('line_user_id', lineUserId)
+            .maybeSingle()
+
+        if (error) {
+            console.error('getLinkedStudent error:', error)
+            return { success: false, isLinked: false }
+        }
+
+        if (student) {
+            return {
+                success: true,
+                isLinked: true,
+                studentId: student.id,
+                email: student.contact_email || '',
+                phone: student.contact_phone || ''
+            }
+        }
+
+        return { success: true, isLinked: false }
+    } catch (err: any) {
+        console.error('getLinkedStudent exception:', err)
+        return { success: false, isLinked: false }
     }
 }

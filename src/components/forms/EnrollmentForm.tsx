@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import liff from '@line/liff';
-import { createEnrollmentCheckoutSession } from '@/actions/stripe_enrollment';
+import { createEnrollmentCheckoutSession, getLinkedStudent } from '@/actions/stripe_enrollment';
 
 interface DBPlan {
   id: string;
@@ -41,6 +41,7 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
   const [isLiffReady, setIsLiffReady] = useState(false);
   const [liffError, setLiffError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
+  const [isLinked, setIsLinked] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // LIFF初期化とLINE ユーザーID取得
@@ -57,6 +58,19 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
         if (liff.isLoggedIn()) {
           const profile = await liff.getProfile();
           setUserId(profile.userId);
+          
+          // すでに連携されているかチェック
+          try {
+            const linkRes = await getLinkedStudent(profile.userId);
+            if (linkRes.success && linkRes.isLinked) {
+              setIsLinked(true);
+              if (linkRes.email) setEmail(linkRes.email);
+              if (linkRes.phone) setPhone(linkRes.phone);
+            }
+          } catch (linkErr) {
+            console.error("LINE連携確認エラー:", linkErr);
+          }
+          
           setIsLiffReady(true);
         } else {
           const redirectUri = window.location.origin + window.location.pathname;
@@ -169,8 +183,7 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
     !agreedTerms.cancel ||
     (isInitialLessonsAgreementRequired && !agreedTerms.initialLessons) ||
     !userId ||
-    !email.trim() ||
-    !phone.trim() ||
+    (!isLinked && (!email.trim() || !phone.trim())) || // 未連携のときのみ入力必須
     isSubmitting;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -282,42 +295,58 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
             </div>
           )}
 
-          {/* STEP 2: ご本人確認 */}
+          {/* STEP 2: ご本人確認 / LINE連携状況 */}
           <div className="space-y-4 border-t border-slate-100 pt-5">
-            <label className="block text-sm font-bold text-slate-700 mb-1">
-              ② ご本人確認（体験お申し込み時の情報）
-            </label>
-            <p className="text-[10px] text-slate-500 leading-relaxed">
-              ※システムでお客様の体験お申し込みデータと安全に照合し、同時にLINEとのシステム連携（紐付け）を完了させるために必須となります。
-            </p>
-            
-            <div className="space-y-3">
-              <div className="space-y-1">
-                <label htmlFor="email" className="text-[11px] font-bold text-slate-500 ml-1">登録メールアドレス</label>
-                <input
-                  id="email"
-                  type="email"
-                  placeholder="example@mail.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="w-full bg-slate-50 border border-slate-200 h-11 px-4 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-medium"
-                />
+            {isLinked ? (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-start gap-3 animate-fadeIn">
+                <span className="w-5 h-5 bg-emerald-600 text-white rounded-full flex items-center justify-center text-[10px] flex-none mt-0.5">✓</span>
+                <div className="space-y-1 flex-1">
+                  <span className="block text-sm font-bold text-emerald-800">
+                    LINE公式アカウント連携済み
+                  </span>
+                  <p className="text-xs text-emerald-700 leading-relaxed font-semibold">
+                    すでにLINE公式アカウントと会員情報の連携が完了しております。本人確認の入力（メール・電話番号）は不要です。このまま手続きへお進みください。
+                  </p>
+                </div>
               </div>
+            ) : (
+              <>
+                <label className="block text-sm font-bold text-slate-700 mb-1">
+                  ② ご本人確認（体験お申し込み時の情報）
+                </label>
+                <p className="text-[10px] text-slate-500 leading-relaxed">
+                  ※システムでお客様の体験お申し込みデータと安全に照合し、同時にLINEとのシステム連携（紐付け）を完了させるために必須となります。
+                </p>
+                
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <label htmlFor="email" className="text-[11px] font-bold text-slate-500 ml-1">登録メールアドレス</label>
+                    <input
+                      id="email"
+                      type="email"
+                      placeholder="example@mail.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      className="w-full bg-slate-50 border border-slate-200 h-11 px-4 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-medium"
+                    />
+                  </div>
 
-              <div className="space-y-1">
-                <label htmlFor="phone" className="text-[11px] font-bold text-slate-500 ml-1">登録電話番号（ハイフンなし）</label>
-                <input
-                  id="phone"
-                  type="tel"
-                  placeholder="09012345678"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  required
-                  className="w-full bg-slate-50 border border-slate-200 h-11 px-4 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-medium"
-                />
-              </div>
-            </div>
+                  <div className="space-y-1">
+                    <label htmlFor="phone" className="text-[11px] font-bold text-slate-500 ml-1">登録電話番号（ハイフンなし）</label>
+                    <input
+                      id="phone"
+                      type="tel"
+                      placeholder="09012345678"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      required
+                      className="w-full bg-slate-50 border border-slate-200 h-11 px-4 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-medium"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           {/* STEP 3: 動的な料金・ルール表示（プラン選択時のみ出現） */}
