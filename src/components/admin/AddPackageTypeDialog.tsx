@@ -16,6 +16,7 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Textarea } from "@/components/ui/textarea"
 import { toast } from 'sonner'
 import { Plus, Package } from 'lucide-react'
 import { createPackageTypeAction } from '@/actions/masters'
@@ -36,6 +37,8 @@ export function AddPackageTypeDialog() {
     const [fee, setFee] = useState('')
     const [ticketCount, setTicketCount] = useState('')
     const [stripeProductId, setStripeProductId] = useState('')
+    const [description, setDescription] = useState('')
+    const [rules, setRules] = useState('')
 
     // 標準レッスン・報酬単価設定用のState
     const [selectedLessons, setSelectedLessons] = useState<Map<string, string>>(new Map())
@@ -89,7 +92,9 @@ export function AddPackageTypeDialog() {
                 fee: parseInt(fee),
                 ticketCount: parseInt(ticketCount),
                 stripeProductId: stripeProductId.trim(),
-                selectedLessons: selectedLessonsArray
+                selectedLessons: selectedLessonsArray,
+                description,
+                rules
             })
 
             if (!result.success) {
@@ -102,6 +107,8 @@ export function AddPackageTypeDialog() {
             setFee('')
             setTicketCount('')
             setStripeProductId('')
+            setDescription('')
+            setRules('')
             setSelectedLessons(new Map())
             router.refresh()
         } catch (error: any) {
@@ -205,6 +212,35 @@ export function AddPackageTypeDialog() {
                                     StripeのProduct IDを入力してください。one_time価格が自動で紐付けられます。
                                 </p>
                             </div>
+                        </div>
+
+                        {/* 説明文 */}
+                        <div className="grid grid-cols-4 items-start gap-4">
+                            <Label htmlFor="pkg-description" className="text-right pt-2">
+                                説明文
+                            </Label>
+                            <Textarea
+                                id="pkg-description"
+                                value={description}
+                                onChange={(e) => setDescription(e.target.value)}
+                                className="col-span-3"
+                                placeholder="入会フォームでプラン選択時に表示されるプランの説明文を入力します。"
+                            />
+                        </div>
+
+                        {/* 注意事項 */}
+                        <div className="grid grid-cols-4 items-start gap-4">
+                            <Label htmlFor="pkg-rules" className="text-right pt-2">
+                                注意事項 (改行区切り)
+                            </Label>
+                            <Textarea
+                                id="pkg-rules"
+                                value={rules}
+                                onChange={(e) => setRules(e.target.value)}
+                                className="col-span-3"
+                                placeholder="例：&#13;&#10;コーチの交通費・施設利用料がすべて含まれています。&#13;&#10;振替の有効期間は【2ヶ月間】となります。"
+                                rows={4}
+                            />
                         </div>
 
                         {/* 標準レッスンと報酬計算単価の選択 */}

@@ -54,6 +54,8 @@ export async function createMembershipTypeAction(data: {
     fee: number
     pairFee?: number
     selectedLessons: { id: string, rewardPrice: number | null }[]
+    description?: string | null
+    rules?: string | null
 }) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -105,6 +107,8 @@ export async function createMembershipTypeAction(data: {
                 stripe_pair_price_id: pairPriceId,
                 default_lesson_master_id: data.selectedLessons.length > 0 ? data.selectedLessons[0].id : null,
                 reward_master_id: null,
+                description: data.description || null,
+                rules: data.rules || null,
             })
             .select()
             .single()
@@ -212,6 +216,8 @@ export async function updateMembershipTypeAction(data: {
     stripePairProductId?: string
     stripePairPriceId?: string
     selectedLessons: { id: string, rewardPrice: number | null, unitPrice: number | null, pairUnitPrice: number | null }[]
+    description?: string | null
+    rules?: string | null
 }) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -277,6 +283,8 @@ export async function updateMembershipTypeAction(data: {
                 stripe_pair_product_id: stripePairProductId,
                 stripe_pair_price_id: stripePairPriceId,
                 default_lesson_master_id: data.selectedLessons.length > 0 ? data.selectedLessons[0].id : null,
+                description: data.description || null,
+                rules: data.rules || null,
             })
             .eq('id', data.id)
 
@@ -325,6 +333,8 @@ export async function createPackageTypeAction(data: {
     ticketCount: number
     stripeProductId: string
     selectedLessons?: { id: string, rewardPrice: number | null }[]
+    description?: string | null
+    rules?: string | null
 }) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -369,6 +379,8 @@ export async function createPackageTypeAction(data: {
                 is_package: true,
                 ticket_count: data.ticketCount,
                 default_lesson_master_id: data.selectedLessons && data.selectedLessons.length > 0 ? data.selectedLessons[0].id : null,
+                description: data.description || null,
+                rules: data.rules || null,
             })
             .select()
             .single()
@@ -407,6 +419,8 @@ export async function updatePackageTypeAction(data: {
     stripeProductId: string
     stripePriceId?: string
     selectedLessons?: { id: string, rewardPrice: number | null, unitPrice: number | null, pairUnitPrice: number | null }[]
+    description?: string | null
+    rules?: string | null
 }) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -448,6 +462,8 @@ export async function updatePackageTypeAction(data: {
                 stripe_price_id: priceId,
                 ticket_count: data.ticketCount,
                 default_lesson_master_id: data.selectedLessons && data.selectedLessons.length > 0 ? data.selectedLessons[0].id : null,
+                description: data.description || null,
+                rules: data.rules || null,
             })
             .eq('id', data.id)
 

@@ -15,6 +15,7 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Textarea } from "@/components/ui/textarea"
 import { toast } from 'sonner'
 import { updateMembershipTypeAction } from '@/actions/masters'
 
@@ -25,6 +26,8 @@ interface MembershipType {
     active: boolean
     default_lesson_master_id: string | null
     reward_master_id: string | null
+    description?: string | null
+    rules?: string | null
 }
 
 interface EditMembershipTypeDialogProps {
@@ -52,6 +55,8 @@ export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembe
     const [stripePriceId, setStripePriceId] = useState((type as any).stripe_price_id || '')
     const [stripePairProductId, setStripePairProductId] = useState((type as any).stripe_pair_product_id || '')
     const [stripePairPriceId, setStripePairPriceId] = useState((type as any).stripe_pair_price_id || '')
+    const [description, setDescription] = useState(type.description || '')
+    const [rules, setRules] = useState(type.rules || '')
     // Map of lesson_id -> { reward: string, unit: string, pair: string }
     const [selectedLessons, setSelectedLessons] = useState<Map<string, { reward: string, unit: string, pair: string }>>(new Map())
     const [lessonMasters, setLessonMasters] = useState<LessonMaster[]>([])
@@ -110,6 +115,8 @@ export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembe
         setStripePriceId((type as any).stripe_price_id || '')
         setStripePairProductId((type as any).stripe_pair_product_id || '')
         setStripePairPriceId((type as any).stripe_pair_price_id || '')
+        setDescription(type.description || '')
+        setRules(type.rules || '')
     }, [type])
 
     const toggleLesson = (id: string) => {
@@ -150,7 +157,9 @@ export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembe
                 stripePriceId: stripePriceId || undefined,
                 stripePairProductId: stripePairProductId || undefined,
                 stripePairPriceId: stripePairPriceId || undefined,
-                selectedLessons: formattedLessons
+                selectedLessons: formattedLessons,
+                description,
+                rules
             })
 
             if (!res.success) {
@@ -219,6 +228,31 @@ export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembe
                                 onChange={(e) => setPairFee(e.target.value)}
                                 className="col-span-3 border-green-200 focus:border-green-500"
                                 placeholder="例: 26100"
+                            />
+                        </div>
+                        <div className="grid grid-cols-4 items-start gap-4">
+                            <Label htmlFor="edit-description" className="text-right pt-2">
+                                説明文
+                            </Label>
+                            <Textarea
+                                id="edit-description"
+                                value={description}
+                                onChange={(e) => setDescription(e.target.value)}
+                                className="col-span-3"
+                                placeholder="入会フォームでプラン選択時に表示されるプランの説明文を入力します。"
+                            />
+                        </div>
+                        <div className="grid grid-cols-4 items-start gap-4">
+                            <Label htmlFor="edit-rules" className="text-right pt-2">
+                                注意事項 (改行区切り)
+                            </Label>
+                            <Textarea
+                                id="edit-rules"
+                                value={rules}
+                                onChange={(e) => setRules(e.target.value)}
+                                className="col-span-3"
+                                placeholder="例：&#13;&#10;コーチの交通費・施設利用料がすべて含まれています。&#13;&#10;振替の有効期間は【2ヶ月間】となります。"
+                                rows={4}
                             />
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">

@@ -16,6 +16,7 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Textarea } from "@/components/ui/textarea"
 import { toast } from 'sonner'
 import { Plus } from 'lucide-react'
 import { createMembershipTypeAction } from '@/actions/masters'
@@ -35,6 +36,8 @@ export function AddMembershipTypeDialog() {
     const [name, setName] = useState('')
     const [fee, setFee] = useState('0')
     const [pairFee, setPairFee] = useState('')
+    const [description, setDescription] = useState('')
+    const [rules, setRules] = useState('')
     // Map of lesson_id -> custom reward price (null means use master price)
     const [selectedLessons, setSelectedLessons] = useState<Map<string, string>>(new Map())
     const [lessonMasters, setLessonMasters] = useState<LessonMaster[]>([])
@@ -85,7 +88,9 @@ export function AddMembershipTypeDialog() {
                 name,
                 fee: parseInt(fee),
                 pairFee: pairFee ? parseInt(pairFee) : undefined,
-                selectedLessons: selectedLessonsArray
+                selectedLessons: selectedLessonsArray,
+                description,
+                rules
             })
 
             if (!result.success) {
@@ -97,6 +102,8 @@ export function AddMembershipTypeDialog() {
             setName('')
             setFee('0')
             setPairFee('')
+            setDescription('')
+            setRules('')
             setSelectedLessons(new Map())
             router.refresh()
         } catch (error: any) {
@@ -165,6 +172,31 @@ export function AddMembershipTypeDialog() {
                                 onChange={(e) => setPairFee(e.target.value)}
                                 className="col-span-3 border-green-200 focus:border-green-500"
                                 placeholder="例: 26100 (通常会費の1.5倍など)"
+                            />
+                        </div>
+                        <div className="grid grid-cols-4 items-start gap-4">
+                            <Label htmlFor="description" className="text-right pt-2">
+                                説明文
+                            </Label>
+                            <Textarea
+                                id="description"
+                                value={description}
+                                onChange={(e) => setDescription(e.target.value)}
+                                className="col-span-3"
+                                placeholder="入会フォームでプラン選択時に表示されるプランの説明文を入力します。"
+                            />
+                        </div>
+                        <div className="grid grid-cols-4 items-start gap-4">
+                            <Label htmlFor="rules" className="text-right pt-2">
+                                注意事項 (改行区切り)
+                            </Label>
+                            <Textarea
+                                id="rules"
+                                value={rules}
+                                onChange={(e) => setRules(e.target.value)}
+                                className="col-span-3"
+                                placeholder="例：&#13;&#10;コーチの交通費・施設利用料がすべて含まれています。&#13;&#10;振替の有効期間は【2ヶ月間】となります。"
+                                rows={4}
                             />
                         </div>
                         <div className="grid grid-cols-4 items-start gap-4">

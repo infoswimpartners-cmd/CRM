@@ -15,6 +15,7 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Textarea } from "@/components/ui/textarea"
 import { toast } from 'sonner'
 import { Package } from 'lucide-react'
 import { updatePackageTypeAction } from '@/actions/masters'
@@ -28,6 +29,8 @@ interface PackageType {
     stripe_price_id?: string | null
     active: boolean
     default_lesson_master_id: string | null
+    description?: string | null
+    rules?: string | null
 }
 
 interface EditPackageTypeDialogProps {
@@ -53,6 +56,8 @@ export function EditPackageTypeDialog({ type, open, onOpenChange }: EditPackageT
     const [ticketCount, setTicketCount] = useState(String(type.ticket_count || 0))
     const [stripeProductId, setStripeProductId] = useState(type.stripe_product_id || '')
     const [stripePriceId, setStripePriceId] = useState(type.stripe_price_id || '')
+    const [description, setDescription] = useState(type.description || '')
+    const [rules, setRules] = useState(type.rules || '')
 
     // 標準レッスン・報酬単価設定用のState
     const [selectedLessons, setSelectedLessons] = useState<Map<string, { reward: string, unit: string, pair: string }>>(new Map())
@@ -110,6 +115,8 @@ export function EditPackageTypeDialog({ type, open, onOpenChange }: EditPackageT
         setTicketCount(String(type.ticket_count || 0))
         setStripeProductId(type.stripe_product_id || '')
         setStripePriceId(type.stripe_price_id || '')
+        setDescription(type.description || '')
+        setRules(type.rules || '')
     }, [type])
 
     const toggleLesson = (id: string) => {
@@ -151,7 +158,9 @@ export function EditPackageTypeDialog({ type, open, onOpenChange }: EditPackageT
                 ticketCount: parseInt(ticketCount) || 0,
                 stripeProductId: stripeProductId.trim(),
                 stripePriceId: stripePriceId || undefined,
-                selectedLessons: formattedLessons
+                selectedLessons: formattedLessons,
+                description,
+                rules
             })
 
             if (!result.success) {
@@ -254,6 +263,35 @@ export function EditPackageTypeDialog({ type, open, onOpenChange }: EditPackageT
                                     </p>
                                 )}
                             </div>
+                        </div>
+
+                        {/* 説明文 */}
+                        <div className="grid grid-cols-4 items-start gap-4">
+                            <Label htmlFor="edit-pkg-description" className="text-right pt-2">
+                                説明文
+                            </Label>
+                            <Textarea
+                                id="edit-pkg-description"
+                                value={description}
+                                onChange={(e) => setDescription(e.target.value)}
+                                className="col-span-3"
+                                placeholder="入会フォームでプラン選択時に表示されるプランの説明文を入力します。"
+                            />
+                        </div>
+
+                        {/* 注意事項 */}
+                        <div className="grid grid-cols-4 items-start gap-4">
+                            <Label htmlFor="edit-pkg-rules" className="text-right pt-2">
+                                注意事項 (改行区切り)
+                            </Label>
+                            <Textarea
+                                id="edit-pkg-rules"
+                                value={rules}
+                                onChange={(e) => setRules(e.target.value)}
+                                className="col-span-3"
+                                placeholder="例：&#13;&#10;コーチの交通費・施設利用料がすべて含まれています。&#13;&#10;振替の有効期間は【2ヶ月間】となります。"
+                                rows={4}
+                            />
                         </div>
 
                         {/* 標準レッスンと報酬計算単価・各種単価の設定 */}

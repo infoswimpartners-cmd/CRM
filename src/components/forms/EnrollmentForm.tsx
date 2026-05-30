@@ -13,6 +13,8 @@ interface DBPlan {
   display_order: number;
   is_package?: boolean;
   ticket_count?: number;
+  description?: string | null;
+  rules?: string | null;
 }
 
 interface EnrollmentFormProps {
@@ -104,9 +106,21 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
   const activePlan = (() => {
     if (!selectedParentPlan) return null;
 
+    // 改行区切りテキストの注意事項を配列に変換するヘルパー
+    const parseRules = (rulesStr: string | null | undefined, defaultRules: string[]) => {
+      if (!rulesStr || !rulesStr.trim()) return defaultRules;
+      return rulesStr.split('\n').map(r => r.trim()).filter(Boolean);
+    };
+
     // DBパッケージプランの確認
     const pkgPlan = packagePlans.find(p => p.id === selectedParentPlan);
     if (pkgPlan) {
+      const defaultDesc = '一括払いのパッケージプランです。決済完了後、チケットが自動的に付与されます。';
+      const defaultRules = [
+        'プロの完泳保証付き（万が一12回で泳げなかった場合、最大4回分の補講レッスンを無償提供）。',
+        '1回あたり8,500円（月4回コースと同等の特別価格）で受講可能です。',
+        'コーチの交通費・施設利用料がすべて含まれています。'
+      ];
       return {
         id: pkgPlan.id,
         stripePriceId: pkgPlan.stripe_price_id,
@@ -114,17 +128,20 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
         price: pkgPlan.fee,
         period: '一括',
         isPackage: true,
-        description: '一括払いのパッケージプランです。決済完了後、チケットが自動的に付与されます。',
-        rules: [
-          'プロの完泳保証付き（万が一12回で泳げなかった場合、最大4回分の補講レッスンを無償提供）。',
-          '1回あたり8,500円（月4回コースと同等の特別価格）で受講可能です。',
-          'コーチの交通費・施設利用料がすべて含まれています。'
-        ],
+        description: pkgPlan.description || defaultDesc,
+        rules: parseRules(pkgPlan.rules, defaultRules),
       };
     }
 
     if (selectedParentPlan === 'single') {
       const dbPlan = dbPlans.find(p => p.name === '単発');
+      const defaultDesc = '定期的に通うのが難しい方へ。月会費0円で、受講した分だけその都度決済されるプランです。';
+      const defaultRules = [
+        '入会金・年会費・月会費は一切かかりません（0円/月）。',
+        'レッスンを受講する都度、レッスン料金が発生いたします。',
+        '初回手続き時にクレジットカード情報を登録いただきます（登録時の決済額は0円です）。',
+        '2回目以降のレッスン受講時は、登録カードから受講料が自動決済されます。'
+      ];
       return {
         id: dbPlan?.id || 'single',
         stripePriceId: dbPlan?.stripe_price_id || 'price_1SwKVdP0UQGtpYXmjXxiPSK6',
@@ -132,13 +149,8 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
         price: dbPlan?.fee ?? 0,
         period: '月',
         isPackage: false,
-        description: '定期的に通うのが難しい方へ。月会費0円で、受講した分だけその都度決済されるプランです。',
-        rules: [
-          '入会金・年会費・月会費は一切かかりません（0円/月）。',
-          'レッスンを受講する都度、レッスン料金が発生いたします。',
-          '初回手続き時にクレジットカード情報を登録いただきます（登録時の決済額は0円です）。',
-          '2回目以降のレッスン受講時は、登録カードから受講料が自動決済されます。'
-        ],
+        description: dbPlan?.description || defaultDesc,
+        rules: parseRules(dbPlan?.rules, defaultRules),
       };
     }
 
@@ -150,10 +162,10 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
     const dbPlan = dbPlans.find(p => p.name === planName || p.name === altPlanName);
 
     // デフォルトルール・説明の設定
-    let description = isMonthly4
+    const defaultDesc = isMonthly4
       ? `着実にステップアップしたい方へ。定期的にお得に通えるおすすめの月4回（${selectedDuration}分）プランです。`
       : `ご自身のペースで無理なく、コツコツと継続していきたい方向けの月2回（${selectedDuration}分）プランです。`;
-    let rules = [
+    const defaultRules = [
       'コーチの交通費・施設利用料がすべて含まれています。',
       isMonthly4
         ? `レッスンの追加・先行利用は「8,500円/回」で可能です。`
@@ -169,8 +181,8 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
       price: dbPlan?.fee ?? 0,
       period: '月',
       isPackage: false,
-      description,
-      rules,
+      description: dbPlan?.description || defaultDesc,
+      rules: parseRules(dbPlan?.rules, defaultRules),
     };
   })();
 

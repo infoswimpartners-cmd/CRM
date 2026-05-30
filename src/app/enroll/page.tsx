@@ -15,7 +15,7 @@ export default async function EnrollPage() {
   // membership_types からアクティブなプランを取得（月次・パッケージ両方）
   const { data: dbPlans } = await supabase
     .from('membership_types')
-    .select('id, name, fee, stripe_price_id, active, display_order, is_package, ticket_count')
+    .select('id, name, fee, stripe_price_id, active, display_order, is_package, ticket_count, description, rules')
     .eq('active', true)
     .order('display_order', { ascending: true });
 
