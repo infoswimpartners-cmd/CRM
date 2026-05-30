@@ -20,9 +20,10 @@ interface DBPlan {
 interface EnrollmentFormProps {
   dbPlans: DBPlan[];
   defaultPlanId?: string;
+  isPreview?: boolean;
 }
 
-export default function EnrollmentForm({ dbPlans, defaultPlanId = '' }: EnrollmentFormProps) {
+export default function EnrollmentForm({ dbPlans, defaultPlanId = '', isPreview = false }: EnrollmentFormProps) {
   const [selectedParentPlan, setSelectedParentPlan] = useState(defaultPlanId);
   const [selectedDuration, setSelectedDuration] = useState<'60' | '90' | '120'>('60');
   const [agreedTerms, setAgreedTerms] = useState({
@@ -49,6 +50,12 @@ export default function EnrollmentForm({ dbPlans, defaultPlanId = '' }: Enrollme
 
   // LIFF初期化とLINE ユーザーID取得
   useEffect(() => {
+    if (isPreview) {
+      // プレビューモード時はLINEログイン処理をスキップ
+      setIsLiffReady(true);
+      return;
+    }
+
     const initLiff = async () => {
       try {
         const liffId = process.env.NEXT_PUBLIC_ENROLL_LIFF_ID || process.env.NEXT_PUBLIC_LIFF_ID;
@@ -236,17 +243,22 @@ export default function EnrollmentForm({ dbPlans, defaultPlanId = '' }: Enrollme
     !agreedTerms.billing ||
     !agreedTerms.cancel ||
     (isInitialLessonsAgreementRequired && !agreedTerms.initialLessons) ||
-    !userId ||
-    (!isLinked && (!email.trim() || !phone.trim())) || // 未連携のときのみ入力必須
+    (!isPreview && !userId) || // プレビュー時はuserId不要
+    (!isLinked && !isPreview && (!email.trim() || !phone.trim())) || // プレビュー時は入力必須ではない
     isSubmitting;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitDisabled || !activePlan) return;
 
+    if (isPreview) {
+      alert("👁️ プレビューモードのため、実際の決済セッションは作成されません。");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      const res = await createEnrollmentCheckoutSession(activePlan.id, userId, email, phone);
+      const res = await createEnrollmentCheckoutSession(activePlan.id, userId || '', email, phone);
       if (res.success && res.url) {
         // Stripe Checkout画面へリダイレクト
         window.location.href = res.url;
@@ -286,8 +298,14 @@ export default function EnrollmentForm({ dbPlans, defaultPlanId = '' }: Enrollme
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 py-10 px-4 sm:px-6 lg:px-8 flex justify-center">
-      <div className="max-w-2xl w-full space-y-8 bg-white p-6 sm:p-10 rounded-3xl shadow-xl border border-slate-100 transition-all hover:shadow-2xl">
+    <div className="min-h-screen bg-slate-50 flex flex-col justify-between">
+      {isPreview && (
+        <div className="bg-amber-50 border-b border-amber-200 py-3 px-4 text-center text-amber-800 text-xs font-bold flex items-center justify-center gap-2 animate-in slide-in-from-top-1">
+          <span>👁️ 現在は管理者用の表示プレビューモードです。LINEログインをバイパスしており、実際の入会・決済登録は行われません。</span>
+        </div>
+      )}
+      <div className="py-10 px-4 sm:px-6 lg:px-8 flex justify-center flex-1">
+        <div className="max-w-2xl w-full space-y-8 bg-white p-6 sm:p-10 rounded-3xl shadow-xl border border-slate-100 transition-all hover:shadow-2xl">
         <div className="text-center space-y-2">
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
             オンライン入会お手続き
@@ -568,6 +586,7 @@ export default function EnrollmentForm({ dbPlans, defaultPlanId = '' }: Enrollme
           </button>
         </form>
       </div>
+    </div>
     </div>
   );
 }

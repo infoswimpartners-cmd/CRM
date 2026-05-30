@@ -160,7 +160,7 @@ export function PackageTypeTable({ types }: { types: PackageType[] }) {
                                         asChild
                                         title="入会フォームでプレビュー"
                                     >
-                                        <a href={`/enroll?plan=${type.id}`} target="_blank" rel="noopener noreferrer">
+                                        <a href={`/enroll?plan=${type.id}&preview=true`} target="_blank" rel="noopener noreferrer">
                                             <Eye className="h-4 w-4 text-slate-500 hover:text-slate-700" />
                                         </a>
                                     </Button>
