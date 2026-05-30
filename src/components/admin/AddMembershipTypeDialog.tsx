@@ -121,139 +121,141 @@ export function AddMembershipTypeDialog() {
                     <Plus className="mr-2 h-4 w-4" /> 新規追加
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px]">
-                <form onSubmit={handleSubmit}>
-                    <DialogHeader>
+            <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col p-0 overflow-hidden">
+                <form onSubmit={handleSubmit} className="flex flex-col h-full overflow-hidden">
+                    <DialogHeader className="p-6 pb-4 border-b flex-shrink-0">
                         <DialogTitle>会員区分の追加</DialogTitle>
                         <DialogDescription>
                             新しい会員区分と会費、標準レッスンを登録します。
                             月会費用の報酬単価を設定する場合は、レッスン選択後に入力してください。
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="name" className="text-right">
-                                名称
-                            </Label>
-                            <Input
-                                id="name"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                className="col-span-3"
-                                placeholder="正会員"
-                                required
-                            />
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="fee" className="text-right">
-                                会費
-                            </Label>
-                            <Input
-                                id="fee"
-                                type="number"
-                                value={fee}
-                                onChange={(e) => setFee(e.target.value)}
-                                className="col-span-3"
-                                required
-                            />
-                            <p className="col-start-2 col-span-3 text-xs text-muted-foreground">
-                                ※0円より大きい場合: レッスン料は会費に含まれるとみなされ、別途請求されません。<br />
-                                ※0円の場合: 単発利用とみなされ、レッスン毎に都度請求されます。
-                            </p>
-                        </div>
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="pair-fee" className="text-right text-xs font-bold text-green-700 whitespace-nowrap">
-                                ペア会費 (任意)
-                            </Label>
-                            <Input
-                                id="pair-fee"
-                                type="number"
-                                value={pairFee}
-                                onChange={(e) => setPairFee(e.target.value)}
-                                className="col-span-3 border-green-200 focus:border-green-500"
-                                placeholder="例: 26100 (通常会費の1.5倍など)"
-                            />
-                        </div>
-                        <div className="grid grid-cols-4 items-start gap-4">
-                            <Label htmlFor="description" className="text-right pt-2">
-                                説明文
-                            </Label>
-                            <Textarea
-                                id="description"
-                                value={description}
-                                onChange={(e) => setDescription(e.target.value)}
-                                className="col-span-3"
-                                placeholder="入会フォームでプラン選択時に表示されるプランの説明文を入力します。"
-                            />
-                        </div>
-                        <div className="grid grid-cols-4 items-start gap-4">
-                            <Label htmlFor="rules" className="text-right pt-2">
-                                注意事項 (改行区切り)
-                            </Label>
-                            <Textarea
-                                id="rules"
-                                value={rules}
-                                onChange={(e) => setRules(e.target.value)}
-                                className="col-span-3"
-                                placeholder="例：&#13;&#10;コーチの交通費・施設利用料がすべて含まれています。&#13;&#10;振替の有効期間は【2ヶ月間】となります。"
-                                rows={4}
-                            />
-                        </div>
-                        <div className="grid grid-cols-4 items-start gap-4">
-                            <Label className="text-right pt-2">
-                                標準レッスン
-                            </Label>
-                            <div className="col-span-3 border rounded-md p-3 h-[300px] overflow-y-auto space-y-4">
-                                {lessonMasters.map((master) => {
-                                    const isChecked = selectedLessons.has(master.id)
-                                    return (
-                                        <div key={master.id} className="flex flex-col space-y-2 border-b pb-2 last:border-0">
-                                            <div className="flex items-center space-x-2">
-                                                <Checkbox
-                                                    id={`lesson-${master.id}`}
-                                                    checked={isChecked}
-                                                    onCheckedChange={() => toggleLesson(master.id, master.unit_price)}
-                                                />
-                                                <label
-                                                    htmlFor={`lesson-${master.id}`}
-                                                    className="text-sm font-medium leading-none cursor-pointer flex-1"
-                                                >
-                                                    {master.name} <span className="text-gray-400 text-xs">(通常単価: ¥{master.unit_price.toLocaleString()})</span>
-                                                </label>
-                                            </div>
-
-                                            {isChecked && (
-                                                <div className="flex items-center gap-2 pl-6 animate-in slide-in-from-top-1 duration-200">
-                                                    <Label htmlFor={`price-${master.id}`} className="text-xs text-gray-500 whitespace-nowrap">
-                                                        報酬計算単価:
-                                                    </Label>
-                                                    <div className="relative w-32">
-                                                        <Input
-                                                            id={`price-${master.id}`}
-                                                            type="number"
-                                                            placeholder={master.unit_price.toString()}
-                                                            value={selectedLessons.get(master.id) || ''}
-                                                            onChange={(e) => handlePriceChange(master.id, e.target.value)}
-                                                            className="h-8 text-sm"
-                                                        />
-                                                    </div>
-                                                    <span className="text-xs text-gray-400">
-                                                        (空欄は {master.unit_price}円)
-                                                    </span>
+                    <div className="flex-1 overflow-y-auto p-6 space-y-4 max-h-[calc(90vh-160px)]">
+                        <div className="grid gap-4">
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="name" className="text-right">
+                                    名称
+                                </Label>
+                                <Input
+                                    id="name"
+                                    value={name}
+                                    onChange={(e) => setName(e.target.value)}
+                                    className="col-span-3"
+                                    placeholder="正会員"
+                                    required
+                                />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="fee" className="text-right">
+                                    会費
+                                </Label>
+                                <Input
+                                    id="fee"
+                                    type="number"
+                                    value={fee}
+                                    onChange={(e) => setFee(e.target.value)}
+                                    className="col-span-3"
+                                    required
+                                />
+                                <p className="col-start-2 col-span-3 text-xs text-muted-foreground">
+                                    ※0円より大きい場合: レッスン料は会費に含まれるとみなされ、別途請求されません。<br />
+                                    ※0円の場合: 単発利用とみなされ、レッスン毎に都度請求されます。
+                                </p>
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="pair-fee" className="text-right text-xs font-bold text-green-700 whitespace-nowrap">
+                                    ペア会費 (任意)
+                                </Label>
+                                <Input
+                                    id="pair-fee"
+                                    type="number"
+                                    value={pairFee}
+                                    onChange={(e) => setPairFee(e.target.value)}
+                                    className="col-span-3 border-green-200 focus:border-green-500"
+                                    placeholder="例: 26100 (通常会費の1.5倍など)"
+                                />
+                            </div>
+                            <div className="grid grid-cols-4 items-start gap-4">
+                                <Label htmlFor="description" className="text-right pt-2">
+                                    説明文
+                                </Label>
+                                <Textarea
+                                    id="description"
+                                    value={description}
+                                    onChange={(e) => setDescription(e.target.value)}
+                                    className="col-span-3"
+                                    placeholder="入会フォームでプラン選択時に表示されるプランの説明文を入力します。"
+                                />
+                            </div>
+                            <div className="grid grid-cols-4 items-start gap-4">
+                                <Label htmlFor="rules" className="text-right pt-2">
+                                    注意事項 (改行区切り)
+                                </Label>
+                                <Textarea
+                                    id="rules"
+                                    value={rules}
+                                    onChange={(e) => setRules(e.target.value)}
+                                    className="col-span-3"
+                                    placeholder="例：&#13;&#10;コーチの交通費・施設利用料がすべて含まれています。&#13;&#10;振替の有効期間は【2ヶ月間】となります。"
+                                    rows={4}
+                                />
+                            </div>
+                            <div className="grid grid-cols-4 items-start gap-4">
+                                <Label className="text-right pt-2">
+                                    標準レッスン
+                                </Label>
+                                <div className="col-span-3 border rounded-md p-3 max-h-[300px] overflow-y-auto space-y-4">
+                                    {lessonMasters.map((master) => {
+                                        const isChecked = selectedLessons.has(master.id)
+                                        return (
+                                            <div key={master.id} className="flex flex-col space-y-2 border-b pb-2 last:border-0">
+                                                <div className="flex items-center space-x-2">
+                                                    <Checkbox
+                                                        id={`lesson-${master.id}`}
+                                                        checked={isChecked}
+                                                        onCheckedChange={() => toggleLesson(master.id, master.unit_price)}
+                                                    />
+                                                    <label
+                                                        htmlFor={`lesson-${master.id}`}
+                                                        className="text-sm font-medium leading-none cursor-pointer flex-1"
+                                                    >
+                                                        {master.name} <span className="text-gray-400 text-xs">(通常単価: ¥{master.unit_price.toLocaleString()})</span>
+                                                    </label>
                                                 </div>
-                                            )}
+
+                                                {isChecked && (
+                                                    <div className="flex items-center gap-2 pl-6 animate-in slide-in-from-top-1 duration-200">
+                                                        <Label htmlFor={`price-${master.id}`} className="text-xs text-gray-500 whitespace-nowrap">
+                                                            報酬計算単価:
+                                                        </Label>
+                                                        <div className="relative w-32">
+                                                            <Input
+                                                                id={`price-${master.id}`}
+                                                                type="number"
+                                                                placeholder={master.unit_price.toString()}
+                                                                value={selectedLessons.get(master.id) || ''}
+                                                                onChange={(e) => handlePriceChange(master.id, e.target.value)}
+                                                                className="h-8 text-sm"
+                                                            />
+                                                        </div>
+                                                        <span className="text-xs text-gray-400">
+                                                            (空欄は {master.unit_price}円)
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )
+                                    })}
+                                    {lessonMasters.length === 0 && (
+                                        <div className="text-sm text-gray-500 text-center py-4">
+                                            有効なレッスンマスタがありません
                                         </div>
-                                    )
-                                })}
-                                {lessonMasters.length === 0 && (
-                                    <div className="text-sm text-gray-500 text-center py-4">
-                                        有効なレッスンマスタがありません
-                                    </div>
-                                )}
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>
-                    <DialogFooter>
+                    <DialogFooter className="p-6 pt-4 border-t bg-slate-50 flex-shrink-0">
                         <Button type="submit" disabled={loading}>
                             {loading ? '保存中...' : '保存'}
                         </Button>

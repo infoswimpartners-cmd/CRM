@@ -180,9 +180,9 @@ export function EditPackageTypeDialog({ type, open, onOpenChange }: EditPackageT
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
-                <form onSubmit={handleSubmit}>
-                    <DialogHeader>
+            <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col p-0 overflow-hidden">
+                <form onSubmit={handleSubmit} className="flex flex-col h-full overflow-hidden">
+                    <DialogHeader className="p-6 pb-4 border-b flex-shrink-0">
                         <DialogTitle className="flex items-center gap-2">
                             <Package className="h-5 w-5 text-amber-600" />
                             パッケージプランの編集
@@ -191,208 +191,210 @@ export function EditPackageTypeDialog({ type, open, onOpenChange }: EditPackageT
                             パッケージプランの情報を編集します。標準レッスンや報酬単価、各種レッスン料も変更可能です。
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="grid gap-5 py-5">
-                        {/* プラン名 */}
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="edit-pkg-name" className="text-right">
-                                プラン名
-                            </Label>
-                            <Input
-                                id="edit-pkg-name"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                className="col-span-3"
-                                required
-                            />
-                        </div>
-
-                        {/* 一括料金 */}
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="edit-pkg-fee" className="text-right">
-                                一括料金（円）
-                            </Label>
-                            <div className="col-span-3 relative">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">¥</span>
+                    <div className="flex-1 overflow-y-auto p-6 space-y-4 max-h-[calc(90vh-160px)]">
+                        <div className="grid gap-5">
+                            {/* プラン名 */}
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="edit-pkg-name" className="text-right">
+                                    プラン名
+                                </Label>
                                 <Input
-                                    id="edit-pkg-fee"
-                                    type="number"
-                                    value={fee}
-                                    onChange={(e) => setFee(e.target.value)}
-                                    className="pl-7"
+                                    id="edit-pkg-name"
+                                    value={name}
+                                    onChange={(e) => setName(e.target.value)}
+                                    className="col-span-3"
                                     required
-                                    min="1"
                                 />
                             </div>
-                        </div>
 
-                        {/* チケット枚数 */}
-                        <div className="grid grid-cols-4 items-start gap-4">
-                            <Label htmlFor="edit-pkg-tickets" className="text-right pt-2">
-                                付与チケット数
-                            </Label>
-                            <div className="col-span-3 space-y-1">
-                                <Input
-                                    id="edit-pkg-tickets"
-                                    type="number"
-                                    value={ticketCount}
-                                    onChange={(e) => setTicketCount(e.target.value)}
-                                    min="0"
-                                />
-                                <p className="text-xs text-muted-foreground">
-                                    ※ 決済完了時に自動付与される枚数です。
-                                </p>
+                            {/* 一括料金 */}
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="edit-pkg-fee" className="text-right">
+                                    一括料金（円）
+                                </Label>
+                                <div className="col-span-3 relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">¥</span>
+                                    <Input
+                                        id="edit-pkg-fee"
+                                        type="number"
+                                        value={fee}
+                                        onChange={(e) => setFee(e.target.value)}
+                                        className="pl-7"
+                                        required
+                                        min="1"
+                                    />
+                                </div>
                             </div>
-                        </div>
 
-                        {/* Stripe Product ID */}
-                        <div className="grid grid-cols-4 items-start gap-4">
-                            <Label htmlFor="edit-pkg-stripe" className="text-right pt-2">
-                                Stripe商品ID
-                            </Label>
-                            <div className="col-span-3 space-y-1">
-                                <Input
-                                    id="edit-pkg-stripe"
-                                    value={stripeProductId}
-                                    onChange={(e) => setStripeProductId(e.target.value)}
-                                    required
-                                    className="font-mono text-sm"
-                                />
-                                {type.stripe_price_id && (
-                                    <p className="text-[11px] text-muted-foreground font-mono">
-                                        Price ID: {type.stripe_price_id}
+                            {/* チケット枚数 */}
+                            <div className="grid grid-cols-4 items-start gap-4">
+                                <Label htmlFor="edit-pkg-tickets" className="text-right pt-2">
+                                    付与チケット数
+                                </Label>
+                                <div className="col-span-3 space-y-1">
+                                    <Input
+                                        id="edit-pkg-tickets"
+                                        type="number"
+                                        value={ticketCount}
+                                        onChange={(e) => setTicketCount(e.target.value)}
+                                        min="0"
+                                    />
+                                    <p className="text-xs text-muted-foreground">
+                                        ※ 決済完了時に自動付与される枚数です。
                                     </p>
-                                )}
+                                </div>
                             </div>
-                        </div>
 
-                        {/* 説明文 */}
-                        <div className="grid grid-cols-4 items-start gap-4">
-                            <Label htmlFor="edit-pkg-description" className="text-right pt-2">
-                                説明文
-                            </Label>
-                            <Textarea
-                                id="edit-pkg-description"
-                                value={description}
-                                onChange={(e) => setDescription(e.target.value)}
-                                className="col-span-3"
-                                placeholder="入会フォームでプラン選択時に表示されるプランの説明文を入力します。"
-                            />
-                        </div>
+                            {/* Stripe Product ID */}
+                            <div className="grid grid-cols-4 items-start gap-4">
+                                <Label htmlFor="edit-pkg-stripe" className="text-right pt-2">
+                                    Stripe商品ID
+                                </Label>
+                                <div className="col-span-3 space-y-1">
+                                    <Input
+                                        id="edit-pkg-stripe"
+                                        value={stripeProductId}
+                                        onChange={(e) => setStripeProductId(e.target.value)}
+                                        required
+                                        className="font-mono text-sm"
+                                    />
+                                    {type.stripe_price_id && (
+                                        <p className="text-xs text-muted-foreground">
+                                            価格ID: <code className="bg-slate-100 px-1 py-0.5 rounded font-mono text-[10px]">{type.stripe_price_id}</code>
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
 
-                        {/* 注意事項 */}
-                        <div className="grid grid-cols-4 items-start gap-4">
-                            <Label htmlFor="edit-pkg-rules" className="text-right pt-2">
-                                注意事項 (改行区切り)
-                            </Label>
-                            <Textarea
-                                id="edit-pkg-rules"
-                                value={rules}
-                                onChange={(e) => setRules(e.target.value)}
-                                className="col-span-3"
-                                placeholder="例：&#13;&#10;コーチの交通費・施設利用料がすべて含まれています。&#13;&#10;振替の有効期間は【2ヶ月間】となります。"
-                                rows={4}
-                            />
-                        </div>
+                            {/* 説明文 */}
+                            <div className="grid grid-cols-4 items-start gap-4">
+                                <Label htmlFor="edit-pkg-description" className="text-right pt-2">
+                                    説明文
+                                </Label>
+                                <Textarea
+                                    id="edit-pkg-description"
+                                    value={description}
+                                    onChange={(e) => setDescription(e.target.value)}
+                                    className="col-span-3"
+                                    placeholder="入会フォームでプラン選択時に表示されるプランの説明文を入力します。"
+                                />
+                            </div>
 
-                        {/* 標準レッスンと報酬計算単価・各種単価の設定 */}
-                        <div className="grid grid-cols-4 items-start gap-4">
-                            <Label className="text-right pt-2">
-                                標準レッスン<br />(複数選択可)
-                            </Label>
-                            <div className="col-span-3 border rounded-md p-3 h-[300px] overflow-y-auto space-y-4 bg-white">
-                                {lessonMasters.map((master) => {
-                                    const isChecked = selectedLessons.has(master.id)
-                                    return (
-                                        <div key={master.id} className="flex flex-col space-y-2 border-b pb-2 last:border-0">
-                                            <div className="flex items-center space-x-2">
-                                                <Checkbox
-                                                    id={`edit-pkg-lesson-${master.id}`}
-                                                    checked={isChecked}
-                                                    onCheckedChange={() => toggleLesson(master.id)}
-                                                />
-                                                <label
-                                                    htmlFor={`edit-pkg-lesson-${master.id}`}
-                                                    className="text-sm font-medium leading-none cursor-pointer flex-1"
-                                                >
-                                                    {master.name} <span className="text-gray-400 text-xs">(通常単価: ¥{master.unit_price?.toLocaleString() ?? '—'})</span>
-                                                </label>
-                                            </div>
+                            {/* 注意事項 */}
+                            <div className="grid grid-cols-4 items-start gap-4">
+                                <Label htmlFor="edit-pkg-rules" className="text-right pt-2">
+                                    注意事項 (改行区切り)
+                                </Label>
+                                <Textarea
+                                    id="edit-pkg-rules"
+                                    value={rules}
+                                    onChange={(e) => setRules(e.target.value)}
+                                    className="col-span-3"
+                                    placeholder="例：&#13;&#10;コーチの交通費・施設利用料がすべて含まれています。&#13;&#10;振替の有効期間は【2ヶ月間】となります。"
+                                    rows={4}
+                                />
+                            </div>
 
-                                            {isChecked && (
-                                                <div className="space-y-3 pl-6 pt-2 animate-in slide-in-from-top-1 duration-200">
-                                                    {/* 報酬計算単価 */}
-                                                    <div className="flex items-center gap-2">
-                                                        <Label htmlFor={`edit-pkg-reward-${master.id}`} className="text-xs text-orange-600 font-bold whitespace-nowrap w-20">
-                                                            コーチ報酬:
-                                                        </Label>
-                                                        <div className="relative w-32">
-                                                            <Input
-                                                                id={`edit-pkg-reward-${master.id}`}
-                                                                type="number"
-                                                                placeholder={master.unit_price?.toString() ?? '0'}
-                                                                value={selectedLessons.get(master.id)?.reward || ''}
-                                                                onChange={(e) => handlePriceChange(master.id, 'reward', e.target.value)}
-                                                                className="h-8 text-sm border-orange-200 focus:border-orange-500"
-                                                            />
-                                                        </div>
-                                                        <span className="text-xs text-gray-400">
-                                                            (空欄: {master.unit_price ?? 0}円)
-                                                        </span>
-                                                    </div>
-
-                                                    {/* 通常受講料 (単発用) */}
-                                                    <div className="flex items-center gap-2">
-                                                        <Label htmlFor={`edit-pkg-unit-${master.id}`} className="text-xs text-blue-600 font-bold whitespace-nowrap w-20">
-                                                            通常受講料:
-                                                        </Label>
-                                                        <div className="relative w-32">
-                                                            <Input
-                                                                id={`edit-pkg-unit-${master.id}`}
-                                                                type="number"
-                                                                placeholder={master.unit_price?.toString() ?? '0'}
-                                                                value={selectedLessons.get(master.id)?.unit || ''}
-                                                                onChange={(e) => handlePriceChange(master.id, 'unit', e.target.value)}
-                                                                className="h-8 text-sm border-blue-200 focus:border-blue-500"
-                                                            />
-                                                        </div>
-                                                        <span className="text-xs text-gray-400">
-                                                            (空欄: {master.unit_price ?? 0}円)
-                                                        </span>
-                                                    </div>
-
-                                                    {/* ペア受講料 (単発用) */}
-                                                    <div className="flex items-center gap-2">
-                                                        <Label htmlFor={`edit-pkg-pair-${master.id}`} className="text-xs text-green-600 font-bold whitespace-nowrap w-20">
-                                                            ペア受講料:
-                                                        </Label>
-                                                        <div className="relative w-32">
-                                                            <Input
-                                                                id={`edit-pkg-pair-${master.id}`}
-                                                                type="number"
-                                                                placeholder={master.pair_unit_price?.toString() ?? '0'}
-                                                                value={selectedLessons.get(master.id)?.pair || ''}
-                                                                onChange={(e) => handlePriceChange(master.id, 'pair', e.target.value)}
-                                                                className="h-8 text-sm border-green-200 focus:border-green-500"
-                                                            />
-                                                        </div>
-                                                        <span className="text-xs text-gray-400">
-                                                            (空欄: {master.pair_unit_price ?? 0}円)
-                                                        </span>
-                                                    </div>
+                            {/* 標準レッスンと報酬計算単価・各種単価の設定 */}
+                            <div className="grid grid-cols-4 items-start gap-4">
+                                <Label className="text-right pt-2">
+                                    標準レッスン<br />(複数選択可)
+                                </Label>
+                                <div className="col-span-3 border rounded-md p-3 max-h-[300px] overflow-y-auto space-y-4 bg-white">
+                                    {lessonMasters.map((master) => {
+                                        const isChecked = selectedLessons.has(master.id)
+                                        return (
+                                            <div key={master.id} className="flex flex-col space-y-2 border-b pb-2 last:border-0">
+                                                <div className="flex items-center space-x-2">
+                                                    <Checkbox
+                                                        id={`edit-pkg-lesson-${master.id}`}
+                                                        checked={isChecked}
+                                                        onCheckedChange={() => toggleLesson(master.id)}
+                                                    />
+                                                    <label
+                                                        htmlFor={`edit-pkg-lesson-${master.id}`}
+                                                        className="text-sm font-medium leading-none cursor-pointer flex-1"
+                                                    >
+                                                        {master.name} <span className="text-gray-400 text-xs">(通常単価: ¥{master.unit_price?.toLocaleString() ?? '—'})</span>
+                                                    </label>
                                                 </div>
-                                            )}
+
+                                                {isChecked && (
+                                                    <div className="space-y-3 pl-6 pt-2 animate-in slide-in-from-top-1 duration-200">
+                                                        {/* 報酬計算単価 */}
+                                                        <div className="flex items-center gap-2">
+                                                            <Label htmlFor={`edit-pkg-reward-${master.id}`} className="text-xs text-orange-600 font-bold whitespace-nowrap w-20">
+                                                                コーチ報酬:
+                                                            </Label>
+                                                            <div className="relative w-32">
+                                                                <Input
+                                                                    id={`edit-pkg-reward-${master.id}`}
+                                                                    type="number"
+                                                                    placeholder={master.unit_price?.toString() ?? '0'}
+                                                                    value={selectedLessons.get(master.id)?.reward || ''}
+                                                                    onChange={(e) => handlePriceChange(master.id, 'reward', e.target.value)}
+                                                                    className="h-8 text-sm border-orange-200 focus:border-orange-500"
+                                                                />
+                                                            </div>
+                                                            <span className="text-xs text-gray-400">
+                                                                (空欄: {master.unit_price ?? 0}円)
+                                                            </span>
+                                                        </div>
+
+                                                        {/* 通常受講料 (単発用) */}
+                                                        <div className="flex items-center gap-2">
+                                                            <Label htmlFor={`edit-pkg-unit-${master.id}`} className="text-xs text-blue-600 font-bold whitespace-nowrap w-20">
+                                                                通常受講料:
+                                                            </Label>
+                                                            <div className="relative w-32">
+                                                                <Input
+                                                                    id={`edit-pkg-unit-${master.id}`}
+                                                                    type="number"
+                                                                    placeholder={master.unit_price?.toString() ?? '0'}
+                                                                    value={selectedLessons.get(master.id)?.unit || ''}
+                                                                    onChange={(e) => handlePriceChange(master.id, 'unit', e.target.value)}
+                                                                    className="h-8 text-sm border-blue-200 focus:border-blue-500"
+                                                                />
+                                                            </div>
+                                                            <span className="text-xs text-gray-400">
+                                                                (空欄: {master.unit_price ?? 0}円)
+                                                            </span>
+                                                        </div>
+
+                                                        {/* ペア受講料 (単発用) */}
+                                                        <div className="flex items-center gap-2">
+                                                            <Label htmlFor={`edit-pkg-pair-${master.id}`} className="text-xs text-green-600 font-bold whitespace-nowrap w-20">
+                                                                ペア受講料:
+                                                            </Label>
+                                                            <div className="relative w-32">
+                                                                <Input
+                                                                    id={`edit-pkg-pair-${master.id}`}
+                                                                    type="number"
+                                                                    placeholder={master.pair_unit_price?.toString() ?? '0'}
+                                                                    value={selectedLessons.get(master.id)?.pair || ''}
+                                                                    onChange={(e) => handlePriceChange(master.id, 'pair', e.target.value)}
+                                                                    className="h-8 text-sm border-green-200 focus:border-green-500"
+                                                                />
+                                                            </div>
+                                                            <span className="text-xs text-gray-400">
+                                                                (空欄: {master.pair_unit_price ?? 0}円)
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )
+                                    })}
+                                    {lessonMasters.length === 0 && (
+                                        <div className="text-sm text-gray-500 text-center py-4">
+                                            有効なレッスンマスタがありません
                                         </div>
-                                    )
-                                })}
-                                {lessonMasters.length === 0 && (
-                                    <div className="text-sm text-gray-500 text-center py-4">
-                                        有効なレッスンマスタがありません
-                                    </div>
-                                )}
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>
-                    <DialogFooter>
+                    <DialogFooter className="p-6 pt-4 border-t bg-slate-50 flex-shrink-0 flex items-center justify-end gap-2">
                         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                             キャンセル
                         </Button>

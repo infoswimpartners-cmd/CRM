@@ -126,9 +126,9 @@ export function AddPackageTypeDialog() {
                     <Plus className="mr-2 h-4 w-4" /> パッケージ追加
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
-                <form onSubmit={handleSubmit}>
-                    <DialogHeader>
+            <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col p-0 overflow-hidden">
+                <form onSubmit={handleSubmit} className="flex flex-col h-full overflow-hidden">
+                    <DialogHeader className="p-6 pb-4 border-b flex-shrink-0">
                         <DialogTitle className="flex items-center gap-2">
                             <Package className="h-5 w-5 text-amber-600" />
                             パッケージプランの追加
@@ -137,168 +137,170 @@ export function AddPackageTypeDialog() {
                             一括払いのパッケージプランを登録します。標準レッスンとコーチの報酬計算単価も同時に設定可能です。
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="grid gap-5 py-5">
-                        {/* プラン名 */}
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="pkg-name" className="text-right">
-                                プラン名
-                            </Label>
-                            <Input
-                                id="pkg-name"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                className="col-span-3"
-                                placeholder="例: 25m完泳パッケージ【全12回】"
-                                required
-                            />
-                        </div>
-
-                        {/* 一括料金 */}
-                        <div className="grid grid-cols-4 items-center gap-4">
-                            <Label htmlFor="pkg-fee" className="text-right">
-                                一括料金（円）
-                            </Label>
-                            <div className="col-span-3 relative">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">¥</span>
+                    <div className="flex-1 overflow-y-auto p-6 space-y-4 max-h-[calc(90vh-160px)]">
+                        <div className="grid gap-5">
+                            {/* プラン名 */}
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="pkg-name" className="text-right">
+                                    プラン名
+                                </Label>
                                 <Input
-                                    id="pkg-fee"
-                                    type="number"
-                                    value={fee}
-                                    onChange={(e) => setFee(e.target.value)}
-                                    className="pl-7"
-                                    placeholder="例: 102000"
+                                    id="pkg-name"
+                                    value={name}
+                                    onChange={(e) => setName(e.target.value)}
+                                    className="col-span-3"
+                                    placeholder="例: 25m完泳パッケージ【全12回】"
                                     required
-                                    min="1"
                                 />
                             </div>
-                        </div>
 
-                        {/* チケット枚数 */}
-                        <div className="grid grid-cols-4 items-start gap-4">
-                            <Label htmlFor="pkg-tickets" className="text-right pt-2">
-                                付与チケット数
-                            </Label>
-                            <div className="col-span-3 space-y-1">
-                                <Input
-                                    id="pkg-tickets"
-                                    type="number"
-                                    value={ticketCount}
-                                    onChange={(e) => setTicketCount(e.target.value)}
-                                    placeholder="例: 12"
-                                    required
-                                    min="1"
-                                />
-                                <p className="text-xs text-muted-foreground">
-                                    ※ 決済完了時に自動付与される枚数です。
-                                </p>
+                            {/* 一括料金 */}
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="pkg-fee" className="text-right">
+                                    一括料金（円）
+                                </Label>
+                                <div className="col-span-3 relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">¥</span>
+                                    <Input
+                                        id="pkg-fee"
+                                        type="number"
+                                        value={fee}
+                                        onChange={(e) => setFee(e.target.value)}
+                                        className="pl-7"
+                                        placeholder="例: 102000"
+                                        required
+                                        min="1"
+                                    />
+                                </div>
                             </div>
-                        </div>
 
-                        {/* Stripe Product ID */}
-                        <div className="grid grid-cols-4 items-start gap-4">
-                            <Label htmlFor="pkg-stripe-product" className="text-right pt-2">
-                                Stripe商品ID
-                            </Label>
-                            <div className="col-span-3 space-y-1">
-                                <Input
-                                    id="pkg-stripe-product"
-                                    value={stripeProductId}
-                                    onChange={(e) => setStripeProductId(e.target.value)}
-                                    placeholder="例: prod_UbB6BsLLcaUgjX"
-                                    required
-                                    className="font-mono text-sm"
-                                />
-                                <p className="text-xs text-muted-foreground">
-                                    StripeのProduct IDを入力してください。one_time価格が自動で紐付けられます。
-                                </p>
+                            {/* チケット枚数 */}
+                            <div className="grid grid-cols-4 items-start gap-4">
+                                <Label htmlFor="pkg-tickets" className="text-right pt-2">
+                                    付与チケット数
+                                </Label>
+                                <div className="col-span-3 space-y-1">
+                                    <Input
+                                        id="pkg-tickets"
+                                        type="number"
+                                        value={ticketCount}
+                                        onChange={(e) => setTicketCount(e.target.value)}
+                                        placeholder="例: 12"
+                                        required
+                                        min="1"
+                                    />
+                                    <p className="text-xs text-muted-foreground">
+                                        ※ 決済完了時に自動付与される枚数です。
+                                    </p>
+                                </div>
                             </div>
-                        </div>
 
-                        {/* 説明文 */}
-                        <div className="grid grid-cols-4 items-start gap-4">
-                            <Label htmlFor="pkg-description" className="text-right pt-2">
-                                説明文
-                            </Label>
-                            <Textarea
-                                id="pkg-description"
-                                value={description}
-                                onChange={(e) => setDescription(e.target.value)}
-                                className="col-span-3"
-                                placeholder="入会フォームでプラン選択時に表示されるプランの説明文を入力します。"
-                            />
-                        </div>
+                            {/* Stripe Product ID */}
+                            <div className="grid grid-cols-4 items-start gap-4">
+                                <Label htmlFor="pkg-stripe-product" className="text-right pt-2">
+                                    Stripe商品ID
+                                </Label>
+                                <div className="col-span-3 space-y-1">
+                                    <Input
+                                        id="pkg-stripe-product"
+                                        value={stripeProductId}
+                                        onChange={(e) => setStripeProductId(e.target.value)}
+                                        placeholder="例: prod_UbB6BsLLcaUgjX"
+                                        required
+                                        className="font-mono text-sm"
+                                    />
+                                    <p className="text-xs text-muted-foreground">
+                                        StripeのProduct IDを入力してください。one_time価格が自動で紐付けられます。
+                                    </p>
+                                </div>
+                            </div>
 
-                        {/* 注意事項 */}
-                        <div className="grid grid-cols-4 items-start gap-4">
-                            <Label htmlFor="pkg-rules" className="text-right pt-2">
-                                注意事項 (改行区切り)
-                            </Label>
-                            <Textarea
-                                id="pkg-rules"
-                                value={rules}
-                                onChange={(e) => setRules(e.target.value)}
-                                className="col-span-3"
-                                placeholder="例：&#13;&#10;コーチの交通費・施設利用料がすべて含まれています。&#13;&#10;振替の有効期間は【2ヶ月間】となります。"
-                                rows={4}
-                            />
-                        </div>
+                            {/* 説明文 */}
+                            <div className="grid grid-cols-4 items-start gap-4">
+                                <Label htmlFor="pkg-description" className="text-right pt-2">
+                                    説明文
+                                </Label>
+                                <Textarea
+                                    id="pkg-description"
+                                    value={description}
+                                    onChange={(e) => setDescription(e.target.value)}
+                                    className="col-span-3"
+                                    placeholder="入会フォームでプラン選択時に表示されるプランの説明文を入力します。"
+                                />
+                            </div>
 
-                        {/* 標準レッスンと報酬計算単価の選択 */}
-                        <div className="grid grid-cols-4 items-start gap-4">
-                            <Label className="text-right pt-2">
-                                標準レッスン
-                            </Label>
-                            <div className="col-span-3 border rounded-md p-3 h-[250px] overflow-y-auto space-y-4 bg-white">
-                                {lessonMasters.map((master) => {
-                                    const isChecked = selectedLessons.has(master.id)
-                                    return (
-                                        <div key={master.id} className="flex flex-col space-y-2 border-b pb-2 last:border-0">
-                                            <div className="flex items-center space-x-2">
-                                                <Checkbox
-                                                    id={`pkg-lesson-${master.id}`}
-                                                    checked={isChecked}
-                                                    onCheckedChange={() => toggleLesson(master.id, master.unit_price)}
-                                                />
-                                                <label
-                                                    htmlFor={`pkg-lesson-${master.id}`}
-                                                    className="text-sm font-medium leading-none cursor-pointer flex-1"
-                                                >
-                                                    {master.name} <span className="text-gray-400 text-xs">(通常単価: ¥{master.unit_price.toLocaleString()})</span>
-                                                </label>
-                                            </div>
+                            {/* 注意事項 */}
+                            <div className="grid grid-cols-4 items-start gap-4">
+                                <Label htmlFor="pkg-rules" className="text-right pt-2">
+                                    注意事項 (改行区切り)
+                                </Label>
+                                <Textarea
+                                    id="pkg-rules"
+                                    value={rules}
+                                    onChange={(e) => setRules(e.target.value)}
+                                    className="col-span-3"
+                                    placeholder="例：&#13;&#10;コーチの交通費・施設利用料がすべて含まれています。&#13;&#10;振替の有効期間は【2ヶ月間】となります。"
+                                    rows={4}
+                                />
+                            </div>
 
-                                            {isChecked && (
-                                                <div className="flex items-center gap-2 pl-6 animate-in slide-in-from-top-1 duration-200">
-                                                    <Label htmlFor={`pkg-price-${master.id}`} className="text-xs text-gray-500 whitespace-nowrap">
-                                                        報酬計算単価:
-                                                    </Label>
-                                                    <div className="relative w-32">
-                                                        <Input
-                                                            id={`pkg-price-${master.id}`}
-                                                            type="number"
-                                                            placeholder={master.unit_price.toString()}
-                                                            value={selectedLessons.get(master.id) || ''}
-                                                            onChange={(e) => handlePriceChange(master.id, e.target.value)}
-                                                            className="h-8 text-sm"
-                                                        />
-                                                    </div>
-                                                    <span className="text-xs text-gray-400">
-                                                        (空欄は {master.unit_price}円)
-                                                    </span>
+                            {/* 標準レッスンと報酬計算単価の選択 */}
+                            <div className="grid grid-cols-4 items-start gap-4">
+                                <Label className="text-right pt-2">
+                                    標準レッスン
+                                </Label>
+                                <div className="col-span-3 border rounded-md p-3 max-h-[250px] overflow-y-auto space-y-4 bg-white">
+                                    {lessonMasters.map((master) => {
+                                        const isChecked = selectedLessons.has(master.id)
+                                        return (
+                                            <div key={master.id} className="flex flex-col space-y-2 border-b pb-2 last:border-0">
+                                                <div className="flex items-center space-x-2">
+                                                    <Checkbox
+                                                        id={`pkg-lesson-${master.id}`}
+                                                        checked={isChecked}
+                                                        onCheckedChange={() => toggleLesson(master.id, master.unit_price)}
+                                                    />
+                                                    <label
+                                                        htmlFor={`pkg-lesson-${master.id}`}
+                                                        className="text-sm font-medium leading-none cursor-pointer flex-1"
+                                                    >
+                                                        {master.name} <span className="text-gray-400 text-xs">(通常単価: ¥{master.unit_price.toLocaleString()})</span>
+                                                    </label>
                                                 </div>
-                                            )}
+
+                                                {isChecked && (
+                                                    <div className="flex items-center gap-2 pl-6 animate-in slide-in-from-top-1 duration-200">
+                                                        <Label htmlFor={`pkg-price-${master.id}`} className="text-xs text-gray-500 whitespace-nowrap">
+                                                            報酬計算単価:
+                                                        </Label>
+                                                        <div className="relative w-32">
+                                                            <Input
+                                                                id={`pkg-price-${master.id}`}
+                                                                type="number"
+                                                                placeholder={master.unit_price.toString()}
+                                                                value={selectedLessons.get(master.id) || ''}
+                                                                onChange={(e) => handlePriceChange(master.id, e.target.value)}
+                                                                className="h-8 text-sm"
+                                                            />
+                                                        </div>
+                                                        <span className="text-xs text-gray-400">
+                                                            (空欄は {master.unit_price}円)
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )
+                                    })}
+                                    {lessonMasters.length === 0 && (
+                                        <div className="text-sm text-gray-500 text-center py-4">
+                                            有効なレッスンマスタがありません
                                         </div>
-                                    )
-                                })}
-                                {lessonMasters.length === 0 && (
-                                    <div className="text-sm text-gray-500 text-center py-4">
-                                        有効なレッスンマスタがありません
-                                    </div>
-                                )}
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>
-                    <DialogFooter>
+                    <DialogFooter className="p-6 pt-4 border-t bg-slate-50 flex-shrink-0 flex items-center justify-end gap-2">
                         <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                             キャンセル
                         </Button>
