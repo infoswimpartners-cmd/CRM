@@ -24,6 +24,9 @@ interface EnrollmentFormProps {
 }
 
 export default function EnrollmentForm({ dbPlans, defaultPlanId = '', isPreview = false }: EnrollmentFormProps) {
+  // クライアントサイドとサーバーサイドの両方でプレビューモードを二重検知（堅牢なガード）
+  const activePreview = isPreview || (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('preview') === 'true');
+
   const [selectedParentPlan, setSelectedParentPlan] = useState(defaultPlanId);
   const [selectedDuration, setSelectedDuration] = useState<'60' | '90' | '120'>('60');
   const [agreedTerms, setAgreedTerms] = useState({
@@ -50,7 +53,7 @@ export default function EnrollmentForm({ dbPlans, defaultPlanId = '', isPreview 
 
   // LIFF初期化とLINE ユーザーID取得
   useEffect(() => {
-    if (isPreview) {
+    if (activePreview) {
       // プレビューモード時はLINEログイン処理をスキップ
       setIsLiffReady(true);
       return;
@@ -243,15 +246,15 @@ export default function EnrollmentForm({ dbPlans, defaultPlanId = '', isPreview 
     !agreedTerms.billing ||
     !agreedTerms.cancel ||
     (isInitialLessonsAgreementRequired && !agreedTerms.initialLessons) ||
-    (!isPreview && !userId) || // プレビュー時はuserId不要
-    (!isLinked && !isPreview && (!email.trim() || !phone.trim())) || // プレビュー時は入力必須ではない
+    (!activePreview && !userId) || // プレビュー時はuserId不要
+    (!isLinked && !activePreview && (!email.trim() || !phone.trim())) || // プレビュー時は入力必須ではない
     isSubmitting;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitDisabled || !activePlan) return;
 
-    if (isPreview) {
+    if (activePreview) {
       alert("👁️ プレビューモードのため、実際の決済セッションは作成されません。");
       return;
     }
@@ -299,7 +302,7 @@ export default function EnrollmentForm({ dbPlans, defaultPlanId = '', isPreview 
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-between">
-      {isPreview && (
+      {activePreview && (
         <div className="bg-amber-50 border-b border-amber-200 py-3 px-4 text-center text-amber-800 text-xs font-bold flex items-center justify-center gap-2 animate-in slide-in-from-top-1">
           <span>👁️ 現在は管理者用の表示プレビューモードです。LINEログインをバイパスしており、実際の入会・決済登録は行われません。</span>
         </div>
