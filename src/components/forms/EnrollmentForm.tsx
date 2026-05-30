@@ -19,10 +19,11 @@ interface DBPlan {
 
 interface EnrollmentFormProps {
   dbPlans: DBPlan[];
+  defaultPlanId?: string;
 }
 
-export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
-  const [selectedParentPlan, setSelectedParentPlan] = useState('');
+export default function EnrollmentForm({ dbPlans, defaultPlanId = '' }: EnrollmentFormProps) {
+  const [selectedParentPlan, setSelectedParentPlan] = useState(defaultPlanId);
   const [selectedDuration, setSelectedDuration] = useState<'60' | '90' | '120'>('60');
   const [agreedTerms, setAgreedTerms] = useState({
     billing: false,
@@ -89,6 +90,47 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
 
     initLiff();
   }, []);
+
+  // クエリパラメータで指定されたプランの初期自動選択処理
+  useEffect(() => {
+    if (defaultPlanId) {
+      // 1. パッケージプランの場合、IDが一致すればそのまま選択
+      const isPkg = dbPlans.some(p => p.is_package && p.id === defaultPlanId);
+      if (isPkg) {
+        setSelectedParentPlan(defaultPlanId);
+        return;
+      }
+
+      // 2. 単発プランの場合、マスタの単発プランIDと一致、または文字列'single'
+      const singlePlan = dbPlans.find(p => p.name === '単発');
+      if (defaultPlanId === 'single' || (singlePlan && singlePlan.id === defaultPlanId)) {
+        setSelectedParentPlan('single');
+        return;
+      }
+
+      // 3. 月次プランの場合、マスタのIDから、月4回か月2回かを判定してセット
+      const foundPlan = dbPlans.find(p => p.id === defaultPlanId);
+      if (foundPlan) {
+        if (foundPlan.name.includes('月4回')) {
+          setSelectedParentPlan('monthly-4');
+          // 時間も自動設定
+          const durationMatch = foundPlan.name.match(/(60|90|120)/);
+          if (durationMatch) {
+            setSelectedDuration(durationMatch[1] as any);
+          }
+        } else if (foundPlan.name.includes('月2回')) {
+          setSelectedParentPlan('monthly-2');
+          // 時間も自動設定
+          const durationMatch = foundPlan.name.match(/(60|90|120)/);
+          if (durationMatch) {
+            setSelectedDuration(durationMatch[1] as any);
+          }
+        }
+      } else if (defaultPlanId === 'monthly-4' || defaultPlanId === 'monthly-2') {
+        setSelectedParentPlan(defaultPlanId);
+      }
+    }
+  }, [defaultPlanId, dbPlans]);
 
   // DBから取得したパッケージプランの一覧
   const packagePlans = dbPlans.filter(p => p.is_package);

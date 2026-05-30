@@ -8,8 +8,13 @@ export const metadata = {
   title: 'オンライン入会お手続き | Swim Partners',
   description: 'Swim Partners のオンライン入会お手続きフォームです。ご希望のプランを選択し、利用規約に同意の上、クレジットカード決済登録へお進みください。',
 };
-
-export default async function EnrollPage() {
+export default async function EnrollPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ plan?: string }>;
+}) {
+  const params = await searchParams;
+  const defaultPlanId = params.plan || '';
   const supabase = createAdminClient();
   
   // membership_types からアクティブなプランを取得（月次・パッケージ両方）
@@ -34,5 +39,5 @@ export default async function EnrollPage() {
   const filteredPlans = (dbPlans || [])
     .filter((plan: any) => targetNames.includes(plan.name) || plan.is_package === true);
 
-  return <EnrollmentForm dbPlans={filteredPlans} />;
+  return <EnrollmentForm dbPlans={filteredPlans} defaultPlanId={defaultPlanId} />;
 }

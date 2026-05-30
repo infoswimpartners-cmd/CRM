@@ -14,7 +14,7 @@ import {
 import { toast } from 'sonner'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Trash2, Pencil, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
+import { Trash2, Pencil, ArrowUpDown, ArrowUp, ArrowDown, Eye } from 'lucide-react'
 import { EditMembershipTypeDialog } from './EditMembershipTypeDialog'
 import {
     AlertDialog,
@@ -130,6 +130,16 @@ function SortableRow({ type, toggleActive, setEditingType, setDeletingId }: {
             </TableCell>
             <TableCell className="text-right">
                 <div className="flex justify-end gap-2">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        asChild
+                        title="入会フォームでプレビュー"
+                    >
+                        <a href={`/enroll?plan=${type.id}`} target="_blank" rel="noopener noreferrer">
+                            <Eye className="h-4 w-4 text-slate-500 hover:text-slate-700" />
+                        </a>
+                    </Button>
                     <Button variant="ghost" size="icon" onClick={() => setEditingType(type)}>
                         <Pencil className="h-4 w-4" />
                     </Button>
