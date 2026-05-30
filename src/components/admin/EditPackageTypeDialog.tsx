@@ -148,7 +148,8 @@ export function EditPackageTypeDialog({ type, open, onOpenChange }: EditPackageT
                 id: lessonId,
                 rewardPrice: prices.reward && !isNaN(parseInt(prices.reward)) ? parseInt(prices.reward) : null,
                 unitPrice: prices.unit && !isNaN(parseInt(prices.unit)) ? parseInt(prices.unit) : null,
-                pairUnitPrice: prices.pair && !isNaN(parseInt(prices.pair)) ? parseInt(prices.pair) : null
+                pairUnitPrice: prices.pair && !isNaN(parseInt(prices.pair)) ? parseInt(prices.pair) : null,
+                showInEnroll: true
             }))
 
             const result = await updatePackageTypeAction({

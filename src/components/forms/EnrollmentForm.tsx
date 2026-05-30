@@ -17,31 +17,57 @@ interface DBPlan {
   rules?: string | null;
 }
 
+interface SingleLesson {
+  id: string;
+  name: string;
+  unit_price: number;
+}
+
 interface EnrollmentFormProps {
   dbPlans: DBPlan[];
   defaultPlanId?: string;
   isPreview?: boolean;
+  consentTermsJson?: string;
+  consentRulesJson?: string;
+  singleLessons?: SingleLesson[];
+  showSinglePrices?: boolean;
 }
 
-export default function EnrollmentForm({ dbPlans, defaultPlanId = '', isPreview = false }: EnrollmentFormProps) {
-  // クライアントサイドとサーバーサイドの両方でプレビューモードを二重検知（堅牢なガード）
-  const activePreview = isPreview || (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('preview') === 'true');
+export default function EnrollmentForm({
+  dbPlans,
+  defaultPlanId = '',
+  isPreview = false,
+  consentTermsJson = '[]',
+  consentRulesJson = '[]',
+  singleLessons = [],
+  showSinglePrices = true,
+}: EnrollmentFormProps) {
+  // サーバー・クライアント共通の初期値として props の isPreview を使用
+  const [activePreview, setActivePreview] = useState(isPreview);
+
+  // マウント後にクライアント側のURLパラメータをチェックして二重ガード（ハイドレーションエラー防止）
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const hasPreviewParam = new URLSearchParams(window.location.search).get('preview') === 'true';
+      if (hasPreviewParam) {
+        setActivePreview(true);
+      }
+    }
+  }, []);
 
   const [selectedParentPlan, setSelectedParentPlan] = useState(defaultPlanId);
   const [selectedDuration, setSelectedDuration] = useState<'60' | '90' | '120'>('60');
-  const [agreedTerms, setAgreedTerms] = useState({
-    billing: false,
-    cancel: false,
-    initialLessons: false,
-  });
 
   // 本人確認用の入力ステート
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
 
+  // 同意チェック済みのIDを管理するオブジェクト
+  const [agreedTermIds, setAgreedTermIds] = useState<Record<string, boolean>>({});
+
   // プラン・時間変更時に同意チェックをリセット
   useEffect(() => {
-    setAgreedTerms(prev => ({ ...prev, initialLessons: false }));
+    setAgreedTermIds({});
   }, [selectedParentPlan, selectedDuration]);
 
   // LIFF関連のステート
@@ -53,7 +79,10 @@ export default function EnrollmentForm({ dbPlans, defaultPlanId = '', isPreview 
 
   // LIFF初期化とLINE ユーザーID取得
   useEffect(() => {
-    if (activePreview) {
+    // マウント時のURLパラメータも含めたプレビューモードの最終確認
+    const isPreviewMode = isPreview || (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('preview') === 'true');
+
+    if (isPreviewMode) {
       // プレビューモード時はLINEログイン処理をスキップ
       setIsLiffReady(true);
       return;
@@ -112,7 +141,7 @@ export default function EnrollmentForm({ dbPlans, defaultPlanId = '', isPreview 
       }
 
       // 2. 単発プランの場合、マスタの単発プランIDと一致、または文字列'single'
-      const singlePlan = dbPlans.find(p => p.name === '単発');
+      const singlePlan = dbPlans.find(p => p.name === '単発' || p.name === '単発プラン');
       if (defaultPlanId === 'single' || (singlePlan && singlePlan.id === defaultPlanId)) {
         setSelectedParentPlan('single');
         return;
@@ -164,14 +193,33 @@ export default function EnrollmentForm({ dbPlans, defaultPlanId = '', isPreview 
       return rulesStr.split('\n').map(r => r.trim()).filter(Boolean);
     };
 
-    // DBパッケージプランの確認
     const pkgPlan = packagePlans.find(p => p.id === selectedParentPlan);
+
+    // データベースから取得した受講ルールJSONをパース
+    const parsedConsentRules = (() => {
+      try {
+        const allRules: any[] = JSON.parse(consentRulesJson);
+        const isPkg = pkgPlan ? true : false;
+        const isSingle = selectedParentPlan === 'single';
+        
+        return allRules.filter(r => {
+          if (r.target === 'all') return true;
+          if (isPkg && r.target === 'package') return true;
+          if (!isPkg && !isSingle && r.target === 'monthly') return true;
+          return false;
+        }).map(r => r.text);
+      } catch (e) {
+        console.error("Failed to parse consentRulesJson:", e);
+        return [];
+      }
+    })();
+
+    // DBパッケージプランの確認
     if (pkgPlan) {
       const defaultDesc = '一括払いのパッケージプランです。決済完了後、チケットが自動的に付与されます。';
       const defaultRules = [
-        'プロの完泳保証付き（万が一12回で泳げなかった場合、最大4回分の補講レッスンを無償提供）。',
-        '1回あたり8,500円（月4回コースと同等の特別価格）で受講可能です。',
-        'コーチの交通費・施設利用料がすべて含まれています。'
+        ...parsedConsentRules,
+        '1回あたり8,500円（月4回コースと同等の特別価格）で受講可能です。'
       ];
       return {
         id: pkgPlan.id,
@@ -186,13 +234,17 @@ export default function EnrollmentForm({ dbPlans, defaultPlanId = '', isPreview 
     }
 
     if (selectedParentPlan === 'single') {
-      const dbPlan = dbPlans.find(p => p.name === '単発');
+      const dbPlan = dbPlans.find(p => p.name === '単発' || p.name === '単発プラン');
       const defaultDesc = '定期的に通うのが難しい方へ。月会費0円で、受講した分だけその都度決済されるプランです。';
+      
+      // 動的レッスン料金を整形してルールに追加（表示設定が有効な場合のみ）
+      const lessonPriceRules = showSinglePrices
+        ? singleLessons.map(lesson => `${lesson.name.replace('【単発】', '')}レッスン: 1回あたり ¥${lesson.unit_price.toLocaleString()} (税込)`)
+        : [];
+
       const defaultRules = [
-        '入会金・年会費・月会費は一切かかりません（0円/月）。',
-        'レッスンを受講する都度、レッスン料金が発生いたします。',
-        '初回手続き時にクレジットカード情報を登録いただきます（登録時の決済額は0円です）。',
-        '2回目以降のレッスン受講時は、登録カードから受講料が自動決済されます。'
+        ...parsedConsentRules,
+        ...lessonPriceRules
       ];
       return {
         id: dbPlan?.id || 'single',
@@ -208,10 +260,17 @@ export default function EnrollmentForm({ dbPlans, defaultPlanId = '', isPreview 
 
     // 月2回 / 月4回
     const isMonthly4 = selectedParentPlan === 'monthly-4';
-    const planName = isMonthly4 ? `月4回（${selectedDuration}分）` : `月2回（${selectedDuration}分）`;
-    const altPlanName = isMonthly4 ? `月4回 (${selectedDuration}分)` : `月2回 (${selectedDuration}分)`;
-
-    const dbPlan = dbPlans.find(p => p.name === planName || p.name === altPlanName);
+    const dbPlan = dbPlans.find(p => {
+      const name = p.name;
+      // 月4回 / 月2回 の判定
+      const matchesParent = isMonthly4 ? name.includes('月4回') : name.includes('月2回');
+      // 時間の判定 (例: 60分, 90分, 120分)
+      const matchesDuration = name.includes(`${selectedDuration}分`) || name.includes(selectedDuration);
+      // テストプランやTRIOなど無関係なプランを除外
+      const isTestOrOther = name.includes('テスト') || name.includes('TRIO');
+      
+      return matchesParent && matchesDuration && !isTestOrOther;
+    });
 
     // デフォルトルール・説明の設定
     const defaultDesc = isMonthly4
@@ -238,14 +297,32 @@ export default function EnrollmentForm({ dbPlans, defaultPlanId = '', isPreview 
     };
   })();
 
+  // 表示対象の同意項目をフィルタリング
+  const activeConsentTerms = (() => {
+    try {
+      const allTerms: any[] = JSON.parse(consentTermsJson);
+      const isPkg = activePlan?.isPackage; // true or false
+      
+      return allTerms.filter(t => {
+        if (t.target === 'all') return true;
+        if (isPkg && t.target === 'package') return true;
+        if (!isPkg && t.target === 'monthly') return true;
+        return false;
+      });
+    } catch (e) {
+      console.error("Failed to parse consentTermsJson:", e);
+      return [];
+    }
+  })();
+
+  // 表示されているすべての同意項目がチェックされているか検証
+  const allTermsAgreed = activeConsentTerms.every(term => agreedTermIds[term.id] === true);
+
   // すべての規約に同意し、プランが正しく選ばれているかチェック（ボタンの活性化条件）
-  const isInitialLessonsAgreementRequired = selectedParentPlan === 'monthly-4' || selectedParentPlan === 'monthly-2';
   const isSubmitDisabled =
     !selectedParentPlan ||
     (activePlan && !activePlan.id) ||
-    !agreedTerms.billing ||
-    !agreedTerms.cancel ||
-    (isInitialLessonsAgreementRequired && !agreedTerms.initialLessons) ||
+    !allTermsAgreed || // 動的チェック状態を検証
     (!activePreview && !userId) || // プレビュー時はuserId不要
     (!isLinked && !activePreview && (!email.trim() || !phone.trim())) || // プレビュー時は入力必須ではない
     isSubmitting;
@@ -486,6 +563,26 @@ export default function EnrollmentForm({ dbPlans, defaultPlanId = '', isPreview 
                       )}
                     </div>
 
+                    {/* 単発プラン選択時の標準レッスン料金表示 */}
+                    {selectedParentPlan === 'single' && showSinglePrices && singleLessons.length > 0 && (
+                      <div className="bg-white p-3 rounded-lg border border-slate-200/80 shadow-sm space-y-1.5 animate-fadeIn">
+                        <span className="text-[11px] text-slate-500 font-bold block mb-1">
+                          ③ 登録されている標準レッスン受講料 (1回あたり)
+                        </span>
+                        <div className="divide-y divide-slate-100">
+                          {singleLessons.map(lesson => (
+                            <div key={lesson.id} className="flex justify-between items-center py-1.5 text-[11px]">
+                              <span className="font-bold text-slate-600">{lesson.name.replace('【単発】', '')} コース</span>
+                              <span className="font-black text-slate-800">¥{lesson.unit_price.toLocaleString()} (税込)</span>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-[10px] text-slate-400 leading-relaxed mt-1">
+                          ※初期決済（クレジットカード登録時）の請求は0円ですが、レッスン受講ごとに上記の料金が自動決済されます。
+                        </p>
+                      </div>
+                    )}
+
                     {/* プランの説明文 */}
                     <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">{activePlan.description}</p>
                   </div>
@@ -515,58 +612,32 @@ export default function EnrollmentForm({ dbPlans, defaultPlanId = '', isPreview 
           )}
 
           {/* STEP 4: 同意事項チェック */}
-          <div className="space-y-3.5 border-t border-slate-100 pt-5">
-            <label className="block text-sm font-bold text-slate-700">
-              ③ 同意事項の確認
-            </label>
-
-            <div className="space-y-2.5">
-              {/* 同意 1: 決済について */}
-              {activePlan && (
-                <label className="flex items-start p-3 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100/70 border border-slate-100 transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={agreedTerms.billing}
-                    onChange={(e) => setAgreedTerms({ ...agreedTerms, billing: e.target.checked })}
-                    className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="ml-3 text-xs text-slate-600 leading-relaxed font-semibold">
-                    {activePlan.isPackage
-                      ? "利用規約およびプライバシーポリシーに同意し、パッケージプランの一括決済（クレジットカード決済）を行うことに同意します。"
-                      : "利用規約およびプライバシーポリシーに同意し、クレジットカード決済による毎月の月謝の自動引き落とし（継続課金）を承諾します。"}
-                  </span>
-                </label>
-              )}
-
-              {/* 同意 2: キャンセル規定 */}
-              <label className="flex items-start p-3 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100/70 border border-slate-100 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={agreedTerms.cancel}
-                  onChange={(e) => setAgreedTerms({ ...agreedTerms, cancel: e.target.checked })}
-                  className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                />
-                <span className="ml-3 text-xs text-slate-600 leading-relaxed font-semibold">
-                  前日18:00以降のレッスンキャンセルについては、理由を問わず「受講1回分の消化（またはキャンセル料100%）」の取り扱いとなることを承諾します。
-                </span>
+          {activeConsentTerms.length > 0 && (
+            <div className="space-y-3.5 border-t border-slate-100 pt-5 animate-fadeIn">
+              <label className="block text-sm font-bold text-slate-700">
+                ③ 同意事項の確認
               </label>
 
-              {/* 同意 3: 初回レッスン（月謝プランのみ） */}
-              {isInitialLessonsAgreementRequired && (
-                <label className="flex items-start p-3 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100/70 border border-slate-100 transition-colors animate-fadeIn">
-                  <input
-                    type="checkbox"
-                    checked={agreedTerms.initialLessons}
-                    onChange={(e) => setAgreedTerms({ ...agreedTerms, initialLessons: e.target.checked })}
-                    className="mt-1 h-4 w-4 rounded border-blue-500 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="ml-3 text-xs text-slate-600 leading-relaxed font-semibold">
-                    体験レッスン後、初回月謝プランによる正式な第1回目・第2回目のレッスン枠については、コーチの手配を迅速に行うために事務局による自動割り当て（または指定手配）となることを承諾します。
-                  </span>
-                </label>
-              )}
+              <div className="space-y-2.5">
+                {activeConsentTerms.map((term) => (
+                  <label
+                    key={term.id}
+                    className="flex items-start p-3 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100/70 border border-slate-100 transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={!!agreedTermIds[term.id]}
+                      onChange={(e) => setAgreedTermIds(prev => ({ ...prev, [term.id]: e.target.checked }))}
+                      className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="ml-3 text-xs text-slate-600 leading-relaxed font-semibold">
+                      {term.text}
+                    </span>
+                  </label>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* 送信ボタン */}
           <button

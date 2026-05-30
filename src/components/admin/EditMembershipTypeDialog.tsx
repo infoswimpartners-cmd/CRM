@@ -57,8 +57,8 @@ export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembe
     const [stripePairPriceId, setStripePairPriceId] = useState((type as any).stripe_pair_price_id || '')
     const [description, setDescription] = useState(type.description || '')
     const [rules, setRules] = useState(type.rules || '')
-    // Map of lesson_id -> { reward: string, unit: string, pair: string }
-    const [selectedLessons, setSelectedLessons] = useState<Map<string, { reward: string, unit: string, pair: string }>>(new Map())
+    // Map of lesson_id -> { reward: string, unit: string, pair: string, showInEnroll: boolean }
+    const [selectedLessons, setSelectedLessons] = useState<Map<string, { reward: string, unit: string, pair: string, showInEnroll: boolean }>>(new Map())
     const [lessonMasters, setLessonMasters] = useState<LessonMaster[]>([])
 
     // Fetch Masters and Existing Relations
@@ -78,24 +78,25 @@ export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembe
             if (type.id) {
                 const { data: relations } = await supabase
                     .from('membership_type_lessons')
-                    .select('lesson_master_id, reward_price, unit_price, pair_unit_price')
+                    .select('lesson_master_id, reward_price, unit_price, pair_unit_price, show_in_enroll')
                     .eq('membership_type_id', type.id)
 
                 if (relations && relations.length > 0) {
-                    const newMap = new Map<string, { reward: string, unit: string, pair: string }>()
+                    const newMap = new Map<string, { reward: string, unit: string, pair: string, showInEnroll: boolean }>()
                     relations.forEach((r: any) => {
                         newMap.set(r.lesson_master_id, {
                             reward: r.reward_price !== null ? String(r.reward_price) : '',
                             unit: r.unit_price !== null ? String(r.unit_price) : '',
-                            pair: r.pair_unit_price !== null ? String(r.pair_unit_price) : ''
+                            pair: r.pair_unit_price !== null ? String(r.pair_unit_price) : '',
+                            showInEnroll: r.show_in_enroll !== false
                         })
                     })
                     setSelectedLessons(newMap)
                 } else {
                     // Fallback to legacy field
                     if (type.default_lesson_master_id) {
-                        const newMap = new Map<string, { reward: string, unit: string, pair: string }>()
-                        newMap.set(type.default_lesson_master_id, { reward: '', unit: '', pair: '' })
+                        const newMap = new Map<string, { reward: string, unit: string, pair: string, showInEnroll: boolean }>()
+                        newMap.set(type.default_lesson_master_id, { reward: '', unit: '', pair: '', showInEnroll: true })
                         setSelectedLessons(newMap)
                     } else {
                         setSelectedLessons(new Map())
@@ -124,14 +125,14 @@ export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembe
         if (newMap.has(id)) {
             newMap.delete(id)
         } else {
-            newMap.set(id, { reward: '', unit: '', pair: '' })
+            newMap.set(id, { reward: '', unit: '', pair: '', showInEnroll: true })
         }
         setSelectedLessons(newMap)
     }
 
-    const handlePriceChange = (id: string, field: 'reward' | 'unit' | 'pair', value: string) => {
+    const handlePriceChange = (id: string, field: 'reward' | 'unit' | 'pair' | 'showInEnroll', value: any) => {
         const newMap = new Map(selectedLessons)
-        const current = newMap.get(id) || { reward: '', unit: '', pair: '' }
+        const current = newMap.get(id) || { reward: '', unit: '', pair: '', showInEnroll: true }
         newMap.set(id, { ...current, [field]: value })
         setSelectedLessons(newMap)
     }
@@ -145,7 +146,8 @@ export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembe
                 id: lessonId,
                 rewardPrice: prices.reward && !isNaN(parseInt(prices.reward)) ? parseInt(prices.reward) : null,
                 unitPrice: prices.unit && !isNaN(parseInt(prices.unit)) ? parseInt(prices.unit) : null,
-                pairUnitPrice: prices.pair && !isNaN(parseInt(prices.pair)) ? parseInt(prices.pair) : null
+                pairUnitPrice: prices.pair && !isNaN(parseInt(prices.pair)) ? parseInt(prices.pair) : null,
+                showInEnroll: prices.showInEnroll
             }))
 
             const res = await updateMembershipTypeAction({
@@ -329,6 +331,21 @@ export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembe
 
                                                 {isChecked && (
                                                     <div className="space-y-3 pl-6 pt-2 animate-in slide-in-from-top-1 duration-200">
+                                                        {/* 入会フォーム表示設定 */}
+                                                        <div className="flex items-center space-x-2 pb-1 border-b border-slate-100">
+                                                            <Checkbox
+                                                                id={`edit-show-enroll-${master.id}`}
+                                                                checked={selectedLessons.get(master.id)?.showInEnroll ?? true}
+                                                                onCheckedChange={(checked) => handlePriceChange(master.id, 'showInEnroll', !!checked)}
+                                                            />
+                                                            <Label
+                                                                htmlFor={`edit-show-enroll-${master.id}`}
+                                                                className="text-xs text-slate-600 font-bold leading-none cursor-pointer"
+                                                            >
+                                                                入会フォームに表示する
+                                                            </Label>
+                                                        </div>
+
                                                         {/* 報酬計算単価 */}
                                                         <div className="flex items-center gap-2">
                                                             <Label htmlFor={`edit-reward-${master.id}`} className="text-xs text-orange-600 font-bold whitespace-nowrap w-20">

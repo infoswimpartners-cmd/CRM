@@ -53,7 +53,7 @@ export async function createMembershipTypeAction(data: {
     name: string
     fee: number
     pairFee?: number
-    selectedLessons: { id: string, rewardPrice: number | null }[]
+    selectedLessons: { id: string, rewardPrice: number | null, showInEnroll?: boolean }[]
     description?: string | null
     rules?: string | null
 }) {
@@ -120,7 +120,8 @@ export async function createMembershipTypeAction(data: {
             const relations = data.selectedLessons.map(item => ({
                 membership_type_id: typeData.id,
                 lesson_master_id: item.id,
-                reward_price: item.rewardPrice
+                reward_price: item.rewardPrice,
+                show_in_enroll: item.showInEnroll ?? true
             }))
 
             const { error: relationError } = await supabase
@@ -215,7 +216,7 @@ export async function updateMembershipTypeAction(data: {
     stripePriceId?: string
     stripePairProductId?: string
     stripePairPriceId?: string
-    selectedLessons: { id: string, rewardPrice: number | null, unitPrice: number | null, pairUnitPrice: number | null }[]
+    selectedLessons: { id: string, rewardPrice: number | null, unitPrice: number | null, pairUnitPrice: number | null, showInEnroll?: boolean }[]
     description?: string | null
     rules?: string | null
 }) {
@@ -304,7 +305,8 @@ export async function updateMembershipTypeAction(data: {
                 lesson_master_id: item.id,
                 reward_price: item.rewardPrice,
                 unit_price: item.unitPrice,
-                pair_unit_price: item.pairUnitPrice
+                pair_unit_price: item.pairUnitPrice,
+                show_in_enroll: item.showInEnroll ?? true
             }))
 
             const { error: relationError } = await supabase
@@ -332,7 +334,7 @@ export async function createPackageTypeAction(data: {
     fee: number
     ticketCount: number
     stripeProductId: string
-    selectedLessons?: { id: string, rewardPrice: number | null }[]
+    selectedLessons?: { id: string, rewardPrice: number | null, showInEnroll?: boolean }[]
     description?: string | null
     rules?: string | null
 }) {
@@ -392,7 +394,8 @@ export async function createPackageTypeAction(data: {
             const relations = data.selectedLessons.map(item => ({
                 membership_type_id: typeData.id,
                 lesson_master_id: item.id,
-                reward_price: item.rewardPrice
+                reward_price: item.rewardPrice,
+                show_in_enroll: item.showInEnroll ?? true
             }))
 
             const { error: relationError } = await supabase
@@ -418,7 +421,7 @@ export async function updatePackageTypeAction(data: {
     ticketCount: number
     stripeProductId: string
     stripePriceId?: string
-    selectedLessons?: { id: string, rewardPrice: number | null, unitPrice: number | null, pairUnitPrice: number | null }[]
+    selectedLessons?: { id: string, rewardPrice: number | null, unitPrice: number | null, pairUnitPrice: number | null, showInEnroll?: boolean }[]
     description?: string | null
     rules?: string | null
 }) {
@@ -484,7 +487,8 @@ export async function updatePackageTypeAction(data: {
                     lesson_master_id: item.id,
                     reward_price: item.rewardPrice,
                     unit_price: item.unitPrice,
-                    pair_unit_price: item.pairUnitPrice
+                    pair_unit_price: item.pairUnitPrice,
+                    show_in_enroll: item.showInEnroll ?? true
                 }))
 
                 const { error: relationError } = await supabase

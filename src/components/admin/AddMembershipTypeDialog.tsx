@@ -38,8 +38,8 @@ export function AddMembershipTypeDialog() {
     const [pairFee, setPairFee] = useState('')
     const [description, setDescription] = useState('')
     const [rules, setRules] = useState('')
-    // Map of lesson_id -> custom reward price (null means use master price)
-    const [selectedLessons, setSelectedLessons] = useState<Map<string, string>>(new Map())
+    // Map of lesson_id -> { reward: string, showInEnroll: boolean }
+    const [selectedLessons, setSelectedLessons] = useState<Map<string, { reward: string, showInEnroll: boolean }>>(new Map())
     const [lessonMasters, setLessonMasters] = useState<LessonMaster[]>([])
 
     useEffect(() => {
@@ -60,16 +60,22 @@ export function AddMembershipTypeDialog() {
         if (newMap.has(id)) {
             newMap.delete(id)
         } else {
-            // Default to empty string (implies master price) or maybe pre-fill?
-            // User requested explicit config. Let's default to empty (placeholder will show master price)
-            newMap.set(id, '')
+            newMap.set(id, { reward: '', showInEnroll: true })
         }
         setSelectedLessons(newMap)
     }
 
     const handlePriceChange = (id: string, value: string) => {
         const newMap = new Map(selectedLessons)
-        newMap.set(id, value)
+        const current = newMap.get(id) || { reward: '', showInEnroll: true }
+        newMap.set(id, { ...current, reward: value })
+        setSelectedLessons(newMap)
+    }
+
+    const handleShowInEnrollChange = (id: string, checked: boolean) => {
+        const newMap = new Map(selectedLessons)
+        const current = newMap.get(id) || { reward: '', showInEnroll: true }
+        newMap.set(id, { ...current, showInEnroll: checked })
         setSelectedLessons(newMap)
     }
 
@@ -78,9 +84,10 @@ export function AddMembershipTypeDialog() {
         setLoading(true)
         try {
             // Prepare data for Server Action
-            const selectedLessonsArray = Array.from(selectedLessons.entries()).map(([lessonId, priceStr]) => ({
+            const selectedLessonsArray = Array.from(selectedLessons.entries()).map(([lessonId, item]) => ({
                 id: lessonId,
-                rewardPrice: priceStr && !isNaN(parseInt(priceStr)) ? parseInt(priceStr) : null
+                rewardPrice: item.reward && !isNaN(parseInt(item.reward)) ? parseInt(item.reward) : null,
+                showInEnroll: item.showInEnroll
             }))
 
             // Call Server Action
@@ -224,23 +231,40 @@ export function AddMembershipTypeDialog() {
                                                 </div>
 
                                                 {isChecked && (
-                                                    <div className="flex items-center gap-2 pl-6 animate-in slide-in-from-top-1 duration-200">
-                                                        <Label htmlFor={`price-${master.id}`} className="text-xs text-gray-500 whitespace-nowrap">
-                                                            報酬計算単価:
-                                                        </Label>
-                                                        <div className="relative w-32">
-                                                            <Input
-                                                                id={`price-${master.id}`}
-                                                                type="number"
-                                                                placeholder={master.unit_price.toString()}
-                                                                value={selectedLessons.get(master.id) || ''}
-                                                                onChange={(e) => handlePriceChange(master.id, e.target.value)}
-                                                                className="h-8 text-sm"
+                                                    <div className="space-y-3 pl-6 pt-2 animate-in slide-in-from-top-1 duration-200">
+                                                        {/* 入会フォーム表示設定 */}
+                                                        <div className="flex items-center space-x-2">
+                                                            <Checkbox
+                                                                id={`show-enroll-${master.id}`}
+                                                                checked={selectedLessons.get(master.id)?.showInEnroll ?? true}
+                                                                onCheckedChange={(checked) => handleShowInEnrollChange(master.id, !!checked)}
                                                             />
+                                                            <Label
+                                                                htmlFor={`show-enroll-${master.id}`}
+                                                                className="text-xs text-slate-600 font-bold leading-none cursor-pointer"
+                                                            >
+                                                                入会フォームに表示する
+                                                            </Label>
                                                         </div>
-                                                        <span className="text-xs text-gray-400">
-                                                            (空欄は {master.unit_price}円)
-                                                        </span>
+
+                                                        <div className="flex items-center gap-2">
+                                                            <Label htmlFor={`price-${master.id}`} className="text-xs text-gray-500 whitespace-nowrap">
+                                                                報酬計算単価:
+                                                            </Label>
+                                                            <div className="relative w-32">
+                                                                <Input
+                                                                    id={`price-${master.id}`}
+                                                                    type="number"
+                                                                    placeholder={master.unit_price.toString()}
+                                                                    value={selectedLessons.get(master.id)?.reward || ''}
+                                                                    onChange={(e) => handlePriceChange(master.id, e.target.value)}
+                                                                    className="h-8 text-sm"
+                                                                />
+                                                            </div>
+                                                            <span className="text-xs text-gray-400">
+                                                                (空欄は {master.unit_price}円)
+                                                            </span>
+                                                        </div>
                                                     </div>
                                                 )}
                                             </div>

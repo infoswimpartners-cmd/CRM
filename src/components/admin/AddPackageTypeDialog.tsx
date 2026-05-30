@@ -84,7 +84,8 @@ export function AddPackageTypeDialog() {
             // 選択された標準レッスンと報酬単価の配列化
             const selectedLessonsArray = Array.from(selectedLessons.entries()).map(([lessonId, priceStr]) => ({
                 id: lessonId,
-                rewardPrice: priceStr && !isNaN(parseInt(priceStr)) ? parseInt(priceStr) : null
+                rewardPrice: priceStr && !isNaN(parseInt(priceStr)) ? parseInt(priceStr) : null,
+                showInEnroll: true
             }))
 
             const result = await createPackageTypeAction({
