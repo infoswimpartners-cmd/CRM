@@ -77,8 +77,7 @@ export async function POST(req: Request) {
             .map(([key, value]) => {
               if (typeof value === "string") {
                 const sanitized = value
-                  .replace(/\r\n/g, "\\\\\\\\n")
-                  .replace(/[\n\r\u2028\u2029]/g, "\\\\\\\\n")
+                  .replace(/[\r\n\u2028\u2029]/g, "　") // 原因切り分けのため、一時的に全角スペースに置換
                   .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ""); // 危険な非表示制御文字を安全に除去
                 return [key, sanitized];
               }
