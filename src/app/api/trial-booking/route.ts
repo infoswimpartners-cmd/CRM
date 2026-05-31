@@ -67,10 +67,18 @@ export async function POST(req: Request) {
     // 2. Make Webhook へ送信
     if (webhookUrl) {
       try {
-        // MakeのWebhookでスキーマエラーが起きるのを防ぐため、
-        // 空文字 ("") のプロパティを null にするのではなく、項目自体を削除して送信する
+        // MakeのWebhookでスキーマエラーやJSONパース時の「Bad control character」エラーを防ぐため、
+        // 1. 空文字 ("") のプロパティは削除する。
+        // 2. 文字列内の改行コード (\r\n や \n) は \\n に二重エスケープして送信する。
         const cleanPayload = Object.fromEntries(
-          Object.entries(payload).filter(([_, value]) => value !== "" && value !== null)
+          Object.entries(payload)
+            .map(([key, value]) => {
+              if (typeof value === "string") {
+                return [key, value.replace(/\r?\n/g, "\\n")];
+              }
+              return [key, value];
+            })
+            .filter(([_, value]) => value !== "" && value !== null)
         );
 
         const response = await fetch(webhookUrl, {
