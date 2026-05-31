@@ -18,7 +18,7 @@ async function main() {
 
     console.log("All Membership Types:")
     for (const t of data) {
-        console.log(`${t.id} | ${t.name} | fee=${t.fee} | stripe_price=${t.stripe_price_id} | active=${t.active} | display_order=${t.display_order}`)
+        console.log(`${t.id} | ${t.name} | fee=${t.fee} | stripe_price=${t.stripe_price_id} | active=${t.active} | is_package=${t.is_package} | ticket_count=${t.ticket_count}`)
     }
 }
 main()
