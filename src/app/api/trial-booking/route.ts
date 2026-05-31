@@ -69,12 +69,13 @@ export async function POST(req: Request) {
       try {
         // MakeのWebhookでスキーマエラーやJSONパース時の「Bad control character」エラーを防ぐため、
         // 1. 空文字 ("") のプロパティは削除する。
-        // 2. 文字列内の改行コード (\r\n や \n) は \\n に二重エスケープして送信する。
+        // 2. 文字列内の改行コード (\r\n や \n) は \\\\n (二重エスケープ) して送信する。
+        // ※MakeがWebhook受信時に自動でデコードして生の改行に戻すため、もう一段エスケープが必要となります。
         const cleanPayload = Object.fromEntries(
           Object.entries(payload)
             .map(([key, value]) => {
               if (typeof value === "string") {
-                return [key, value.replace(/\r?\n/g, "\\n")];
+                return [key, value.replace(/\r?\n/g, "\\\\n")];
               }
               return [key, value];
             })
