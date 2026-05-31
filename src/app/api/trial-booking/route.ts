@@ -69,13 +69,18 @@ export async function POST(req: Request) {
       try {
         // MakeのWebhookでスキーマエラーやJSONパース時の「Bad control character」エラーを防ぐため、
         // 1. 空文字 ("") のプロパティは削除する。
-        // 2. 文字列内の改行コード (\r\n や \n) は \\\\n (二重エスケープ) して送信する。
+        // 2. 文字列内の改行コード (\r\n, \n, \r, \u2028, \u2029) は \\\\n (二重エスケープ) して送信する。
+        // 3. その他JSONを破壊する非表示制御文字を完全に除去し、安全性を極限まで高める。
         // ※これにより、Make側の設定（モジュール追加や記述）を変更することなく、一撃で「改行付き表示」のままエラーを永久防止します。
         const cleanPayload = Object.fromEntries(
           Object.entries(payload)
             .map(([key, value]) => {
               if (typeof value === "string") {
-                return [key, value.replace(/\r?\n/g, "\\\\n")];
+                const sanitized = value
+                  .replace(/\r\n/g, "\\\\n")
+                  .replace(/[\n\r\u2028\u2029]/g, "\\\\n")
+                  .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ""); // 危険な非表示制御文字を安全に除去
+                return [key, sanitized];
               }
               return [key, value];
             })
