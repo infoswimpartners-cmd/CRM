@@ -66,7 +66,12 @@ async function calculateMonthlyUsage(
     }
 
     // 2. Current Month Usage (Scheduled frames before targetDate only to ensure chronological order)
-    const start = startOfMonth(targetDate).toISOString()
+    const targetJstDateForUsage = new Date(targetDate.getTime() + JST_OFFSET)
+    const jstYear = targetJstDateForUsage.getUTCFullYear()
+    const jstMonth = targetJstDateForUsage.getUTCMonth()
+
+    // JSTの月初(1日0時0分0秒)
+    const start = new Date(Date.UTC(jstYear, jstMonth, 1, -9, 0, 0)).toISOString()
     const end = targetDate.toISOString()
 
     const { count: scheduled } = await supabaseAdmin
@@ -89,9 +94,7 @@ async function calculateMonthlyUsage(
     }
 
     if (monthlyLimit > 0 && appliedMaxRollover > 0) {
-        const prevDate = addMonths(targetDate, -1)
-        const prevStart = startOfMonth(prevDate).toISOString()
-        const prevEnd = endOfMonth(prevDate).toISOString()
+        const prevStart = new Date(Date.UTC(jstYear, jstMonth - 1, 1, -9, 0, 0)).toISOString()
 
         let canHaveRollover = true
         if (membershipStartedAt) {
@@ -124,7 +127,7 @@ async function calculateMonthlyUsage(
                 .select('*', { count: 'exact', head: true })
                 .eq('student_id', studentId)
                 .gte('start_time', prevStart)
-                .lte('start_time', prevEnd)
+                .lt('start_time', start)
 
             const prevTotal = prevScheduled || 0
 
