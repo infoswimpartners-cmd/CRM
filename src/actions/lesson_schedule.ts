@@ -760,7 +760,7 @@ export async function checkStudentLessonStatus(studentId: string, dateStr: strin
                     isOverage = true
                     console.log(`[CheckStatus] Pre-membership lesson. Date: ${date.toISOString()}, Start: ${startDate.toISOString()}`)
                 }
-            } else if (student.status !== 'trial_pending' && student.status !== 'trial_confirmed') {
+            } else if (!membership && student.status !== 'trial_pending' && student.status !== 'trial_confirmed') {
                 // [NEW] No active membership and not a trial -> Definitely Overage (Visitor or Next Month Starter)
                 isOverage = true
                 console.log(`[CheckStatus] No active membership. Setting to overage.`)
