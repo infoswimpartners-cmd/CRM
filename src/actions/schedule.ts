@@ -334,7 +334,19 @@ export async function getPendingSchedulesAction(coachId: string) {
     const supabaseAdmin = createAdminClient()
 
     try {
-        // 1. 未報告（is_reported = false）のスケジュールを取得
+        // 日本時間 (JST) での「当月1日の00:00:00」を取得し、前月以前の予定を除外する
+        const nowUtc = new Date()
+        const nowJst = new Date(nowUtc.getTime() + 9 * 60 * 60 * 1000)
+        const jstFirstOfCurrentMonth = new Date(Date.UTC(
+            nowJst.getFullYear(),
+            nowJst.getMonth(),
+            1,
+            -9, // JST 00:00 = UTC -9時間
+            0,
+            0
+        ))
+
+        // 1. 未報告（is_reported = false）かつ当月1日以降のスケジュールを日付昇順で取得
         const { data: schedules, error } = await supabaseAdmin
             .from('lesson_schedules')
             .select(`
@@ -349,7 +361,8 @@ export async function getPendingSchedulesAction(coachId: string) {
             `)
             .eq('coach_id', coachId)
             .eq('is_reported', false)
-            .order('start_time', { ascending: false })
+            .gte('start_time', jstFirstOfCurrentMonth.toISOString())
+            .order('start_time', { ascending: true })
 
         if (error) throw error
         if (!schedules || schedules.length === 0) return { success: true, data: [] }
