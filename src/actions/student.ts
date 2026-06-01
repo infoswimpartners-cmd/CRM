@@ -137,7 +137,14 @@ export async function updateStudent(id: string, formData: any) {
 
                 const now = new Date()
                 const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1) // 1st of next month
-                const trialEndTimestamp = Math.floor(nextMonth.getTime() / 1000)
+                let trialEndTimestamp = Math.floor(nextMonth.getTime() / 1000)
+
+                const nowUnix = Math.floor(now.getTime() / 1000)
+                const minTrialEnd = nowUnix + (48 * 60 * 60) + 3600 // 48時間 + 1時間バッファ
+                if (trialEndTimestamp < minTrialEnd) {
+                    console.log(`[UpdateStudent] trial_end (${trialEndTimestamp}) is less than 48 hours away. Shifting to minTrialEnd (${minTrialEnd}).`)
+                    trialEndTimestamp = minTrialEnd
+                }
 
                 if (startTiming === 'next') {
                     startDateStr = nextMonth.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })

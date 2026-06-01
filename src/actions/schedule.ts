@@ -334,7 +334,8 @@ export async function getPendingSchedulesAction(coachId: string) {
     const supabaseAdmin = createAdminClient()
 
     try {
-        const { data, error } = await supabaseAdmin
+        // 1. 未報告（is_reported = false）のスケジュールを取得
+        const { data: schedules, error } = await supabaseAdmin
             .from('lesson_schedules')
             .select(`
                 *,
@@ -351,8 +352,57 @@ export async function getPendingSchedulesAction(coachId: string) {
             .order('start_time', { ascending: false })
 
         if (error) throw error
+        if (!schedules || schedules.length === 0) return { success: true, data: [] }
 
-        return { success: true, data }
+        // 2. 二重報告を防ぐため、すでに lessons テーブルに報告データが存在するスケジュールを除外する
+        // 日本時間(JST)ベースでの開始日 (YYYY-MM-DD) を安全に生成
+        const dateStrings = schedules.map(s => {
+            if (!s.start_time) return ''
+            const d = new Date(s.start_time)
+            const formatter = new Intl.DateTimeFormat('ja-JP', {
+                timeZone: 'Asia/Tokyo',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit'
+            })
+            return formatter.format(d).replace(/\//g, '-')
+        }).filter(Boolean)
+
+        const studentIds = schedules.map(s => s.student_id).filter(Boolean) as string[]
+
+        if (studentIds.length > 0 && dateStrings.length > 0) {
+            // 同じコーチ、同じ生徒、同じ日付のレッスン報告を検索
+            const { data: reportedLessons } = await supabaseAdmin
+                .from('lessons')
+                .select('student_id, lesson_date')
+                .eq('coach_id', coachId)
+                .in('student_id', studentIds)
+                .in('lesson_date', dateStrings)
+
+            if (reportedLessons && reportedLessons.length > 0) {
+                // すでに報告が存在する日付・生徒のスケジュールを除外
+                const filteredSchedules = schedules.filter(s => {
+                    if (!s.start_time) return true
+                    const d = new Date(s.start_time)
+                    const formatter = new Intl.DateTimeFormat('ja-JP', {
+                        timeZone: 'Asia/Tokyo',
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit'
+                    })
+                    const sDateStr = formatter.format(d).replace(/\//g, '-')
+
+                    const hasReport = reportedLessons.some(l => 
+                        l.student_id === s.student_id && 
+                        l.lesson_date === sDateStr
+                    )
+                    return !hasReport
+                })
+                return { success: true, data: filteredSchedules }
+            }
+        }
+
+        return { success: true, data: schedules }
     } catch (error: any) {
         console.error('getPendingSchedulesAction Error:', error)
         return { success: false, error: error.message }

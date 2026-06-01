@@ -67,18 +67,23 @@ export async function POST(req: Request) {
     // 2. Make Webhook へ送信
     if (webhookUrl) {
       try {
-        // MakeのWebhookでスキーマエラーやJSONパース時の「Bad control character」エラーを防ぐため、
-        // 1. 空文字 ("") のプロパティは削除する。
-        // 2. 文字列内の改行コード (\r\n, \n, \r, \u2028, \u2029) は \\\\n (二重エスケープ) して送信する。
-        // 3. その他JSONを破壊する非表示制御文字を完全に除去し、安全性を極限まで高める。
-        // ※これにより、Make側の設定（モジュール追加や記述）を変更することなく、一撃で「改行付き表示」のままエラーを永久防止します。
+        // MakeのWebhook経由で直接JSONテンプレートに埋め込まれるため、
+        // 制御文字（改行、タブなど）やダブルクォーテーションを「JSONのエスケープ文字列」に変換して送信する
+        // これにより、Make側の設定変更一切なしで、改行付きのままエラーを完全防止できます。
         const cleanPayload = Object.fromEntries(
           Object.entries(payload)
             .map(([key, value]) => {
               if (typeof value === "string") {
-                const sanitized = value
-                  .replace(/[\r\n\u2028\u2029]/g, "　") // 原因切り分けのため、一時的に全角スペースに置換
-                  .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ""); // 危険な非表示制御文字を安全に除去
+                let sanitized = value
+                  .replace(/\\/g, "\\\\") // バックスラッシュをエスケープ
+                  .replace(/"/g, "\\\"")  // ダブルクォートをエスケープ
+                  .replace(/\n/g, "\\n")  // 改行を \n にエスケープ（Make側で改行として機能する）
+                  .replace(/\r/g, "")     // CRは削除
+                  .replace(/\t/g, "\\t"); // タブを \t にエスケープ
+                  
+                // 残りの見えない制御文字（JSONを破壊する原因）は完全に削除
+                sanitized = sanitized.replace(/[\x00-\x1F\x7F]/g, "");
+                
                 return [key, sanitized];
               }
               return [key, value];

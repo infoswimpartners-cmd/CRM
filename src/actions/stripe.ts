@@ -297,7 +297,6 @@ export async function assignMembership(studentId: string, membershipTypeId: stri
             })
         } else {
             // Create new subscription
-            // Calculate Billing Anchor
             const nowUtc = new Date();
             const nowJst = new Date(nowUtc.getTime() + 9 * 60 * 60 * 1000);
             const nextMonthJst = new Date(Date.UTC(
@@ -306,7 +305,14 @@ export async function assignMembership(studentId: string, membershipTypeId: stri
                 1,                        // 1日
                 -9, 0, 0                  // UTC基準で -9時間 = JSTの0時
             ));
-            const anchorTimestamp = Math.floor(nextMonthJst.getTime() / 1000);
+            let anchorTimestamp = Math.floor(nextMonthJst.getTime() / 1000);
+
+            const nowUnix = Math.floor(Date.now() / 1000);
+            const minTrialEnd = nowUnix + (48 * 60 * 60) + 3600; // 48時間 + 1時間バッファ
+            if (anchorTimestamp < minTrialEnd) {
+                debugLog(`[AssignMembership] trial_end (${anchorTimestamp}) is less than 48 hours away. Shifting to minTrialEnd (${minTrialEnd}).`);
+                anchorTimestamp = minTrialEnd;
+            }
 
             const subscriptionParams: any = {
                 customer: student.stripe_customer_id,

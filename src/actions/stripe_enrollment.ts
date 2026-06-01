@@ -233,7 +233,17 @@ export async function createEnrollmentCheckoutSession(planId: string, lineUserId
             
             // JSTの翌月1日0:00:00は、UTCでは前日（当月末日）の15:00:00
             const utcNextMonthFirst = Date.UTC(nextYear, nextMonth - 1, 1, 0, 0, 0)
-            const jstNextMonthFirstUnix = Math.floor((utcNextMonthFirst - (9 * 60 * 60 * 1000)) / 1000)
+            let jstNextMonthFirstUnix = Math.floor((utcNextMonthFirst - (9 * 60 * 60 * 1000)) / 1000)
+
+            // Stripeの制限「trial_endは少なくとも48時間未来でなければならない」への対応
+            // 月末に入会した場合、翌月1日が48時間以内になるためエラーが発生します。
+            const nowUnix = Math.floor(Date.now() / 1000)
+            const minTrialEnd = nowUnix + (48 * 60 * 60) + 3600 // 48時間 + 1時間の安全バッファ
+
+            if (jstNextMonthFirstUnix < minTrialEnd) {
+                console.log(`[Stripe Checkout] trial_end (${jstNextMonthFirstUnix}) is less than 48 hours away. Shifting to minTrialEnd (${minTrialEnd}).`)
+                jstNextMonthFirstUnix = minTrialEnd
+            }
 
             sessionConfig.subscription_data = {
                 trial_end: jstNextMonthFirstUnix,
