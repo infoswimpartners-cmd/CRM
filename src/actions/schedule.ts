@@ -354,52 +354,75 @@ export async function getPendingSchedulesAction(coachId: string) {
         if (error) throw error
         if (!schedules || schedules.length === 0) return { success: true, data: [] }
 
-        // 2. 二重報告を防ぐため、すでに lessons テーブルに報告データが存在するスケジュールを除外する
-        // 日本時間(JST)ベースでの開始日 (YYYY-MM-DD) を安全に生成
-        const dateStrings = schedules.map(s => {
-            if (!s.start_time) return ''
-            const d = new Date(s.start_time)
-            const formatter = new Intl.DateTimeFormat('ja-JP', {
-                timeZone: 'Asia/Tokyo',
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit'
-            })
-            return formatter.format(d).replace(/\//g, '-')
-        }).filter(Boolean)
-
-        const studentIds = schedules.map(s => s.student_id).filter(Boolean) as string[]
-
-        if (studentIds.length > 0 && dateStrings.length > 0) {
-            // 同じコーチ、同じ生徒、同じ日付のレッスン報告を検索
-            const { data: reportedLessons } = await supabaseAdmin
-                .from('lessons')
-                .select('student_id, lesson_date')
-                .eq('coach_id', coachId)
-                .in('student_id', studentIds)
-                .in('lesson_date', dateStrings)
-
-            if (reportedLessons && reportedLessons.length > 0) {
-                // すでに報告が存在する日付・生徒のスケジュールを除外
-                const filteredSchedules = schedules.filter(s => {
-                    if (!s.start_time) return true
-                    const d = new Date(s.start_time)
-                    const formatter = new Intl.DateTimeFormat('ja-JP', {
-                        timeZone: 'Asia/Tokyo',
-                        year: 'numeric',
-                        month: '2-digit',
-                        day: '2-digit'
-                    })
-                    const sDateStr = formatter.format(d).replace(/\//g, '-')
-
-                    const hasReport = reportedLessons.some(l => 
-                        l.student_id === s.student_id && 
-                        l.lesson_date === sDateStr
-                    )
-                    return !hasReport
+        // 日本時間 (JST) ベースの日付文字列 (YYYY-MM-DD) に安全に変換するヘルパー
+        const toJstDateString = (dateInput: string | Date | null | undefined): string => {
+            if (!dateInput) return ''
+            try {
+                const d = new Date(dateInput)
+                if (isNaN(d.getTime())) return ''
+                const formatter = new Intl.DateTimeFormat('ja-JP', {
+                    timeZone: 'Asia/Tokyo',
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit'
                 })
-                return { success: true, data: filteredSchedules }
+                return formatter.format(d).replace(/\//g, '-')
+            } catch (e) {
+                return ''
             }
+        }
+
+        // 2. 二重報告を防ぐため、すでに lessons テーブルに報告データが存在するスケジュールを除外する
+        // コーチに関連する直近のレッスン報告を最大1000件取得
+        const { data: reportedLessons } = await supabaseAdmin
+            .from('lessons')
+            .select('student_id, student_name, lesson_date')
+            .eq('coach_id', coachId)
+            .order('lesson_date', { ascending: false })
+            .limit(1000)
+
+        if (reportedLessons && reportedLessons.length > 0) {
+            // 報告レッスン側の日付をすべて JST ベースの YYYY-MM-DD に変換
+            const reportsWithJstDate = reportedLessons.map(l => ({
+                ...l,
+                jst_lesson_date: toJstDateString(l.lesson_date)
+            })).filter(l => l.jst_lesson_date)
+
+            // 報告が存在するスケジュールを除外
+            const filteredSchedules = schedules.filter(s => {
+                if (!s.start_time) return true
+                const sDateStr = toJstDateString(s.start_time)
+                if (!sDateStr) return true
+
+                const hasReport = reportsWithJstDate.some(l => {
+                    // 日付が一致していることを前提とする
+                    if (l.jst_lesson_date !== sDateStr) return false
+
+                    // 1. student_idが一致している場合
+                    if (s.student_id && l.student_id === s.student_id) {
+                        return true
+                    }
+
+                    // 2. student_idがnullまたは一致しない場合の生徒名によるフォールバック
+                    const sName = s.students?.full_name || ''
+                    const sSecondName = s.students?.second_student_name || ''
+                    const lName = l.student_name || ''
+
+                    if (lName && sName) {
+                        if (lName === sName || lName.includes(sName) || sName.includes(lName)) {
+                            return true
+                        }
+                        if (sSecondName && (lName === sSecondName || lName.includes(sSecondName) || sSecondName.includes(lName))) {
+                            return true
+                        }
+                    }
+                    return false
+                })
+
+                return !hasReport
+            })
+
+            return { success: true, data: filteredSchedules }
         }
 
         return { success: true, data: schedules }
