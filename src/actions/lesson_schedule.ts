@@ -185,6 +185,7 @@ export async function createLessonSchedule(params: CreateLessonScheduleParams) {
                         max_rollover_limit,
                         fee,
                         name,
+                        is_package,
                         default_lesson:lesson_masters!default_lesson_master_id(unit_price, pair_unit_price)
                     ),
                     next_membership:membership_types!students_next_membership_type_id_fkey (
@@ -192,8 +193,10 @@ export async function createLessonSchedule(params: CreateLessonScheduleParams) {
                         max_rollover_limit,
                         fee,
                         name,
+                        is_package,
                         default_lesson:lesson_masters!default_lesson_master_id(unit_price, pair_unit_price)
-                    )
+                    ),
+                    current_tickets
                 `)
                 .eq('id', studentId)
                 .single()
@@ -241,6 +244,18 @@ export async function createLessonSchedule(params: CreateLessonScheduleParams) {
                     // Treat as Overage if limit is 0.
                     if (!limit || limit === 0) {
                         checkOverage = true
+                    }
+                }
+
+                // 2.6 チケット残数による超過救済処理
+                if (checkOverage) {
+                    const isSinglePlan = !membership || !limit || limit === 0 || (membershipName && membershipName.includes('単発'))
+                    const isPackage = !!membership?.is_package
+                    if (student.current_tickets && student.current_tickets > 0) {
+                        if (!isSinglePlan || isPackage) {
+                            checkOverage = false
+                            console.log(`[CreateLesson] Overage prevented by available tickets: ${student.current_tickets}`)
+                        }
                     }
                 }
 
