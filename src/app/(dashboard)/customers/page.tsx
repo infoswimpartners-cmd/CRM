@@ -66,23 +66,39 @@ export default function StudentListPage() {
     const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'created_at', direction: 'desc' })
     const [loading, setLoading] = useState(true)
     const [isAdmin, setIsAdmin] = useState(false)
+    const [statuses, setStatuses] = useState<any[]>([])
+    const [coaches, setCoaches] = useState<any[]>([])
     const [statusLabels, setStatusLabels] = useState<Record<string, string>>({})
 
     useEffect(() => {
         checkUserRole()
         fetchStatuses()
+        fetchCoaches()
         fetchStudents()
     }, [])
 
     const fetchStatuses = async () => {
         const supabase = createClient()
-        const { data } = await supabase.from('student_statuses').select('id, name').order('display_order', { ascending: true })
+        const { data } = await supabase.from('student_statuses').select('id, name, color_class').order('display_order', { ascending: true })
         if (data) {
+            setStatuses(data)
             const labels = data.reduce((acc, s) => {
                 acc[s.id] = s.name
                 return acc
             }, {} as Record<string, string>)
             setStatusLabels(labels)
+        }
+    }
+
+    const fetchCoaches = async () => {
+        const supabase = createClient()
+        const { data } = await supabase
+            .from('profiles')
+            .select('id, full_name, avatar_url')
+            .in('role', ['coach', 'admin', 'owner'])
+            .order('full_name', { ascending: true })
+        if (data) {
+            setCoaches(data)
         }
     }
 
@@ -148,8 +164,8 @@ export default function StudentListPage() {
 
             // Custom sorting logic
             if (key === 'membership_name') {
-                aValue = a.membership_types?.name || ''
-                bValue = b.membership_types?.name || ''
+                aValue = (Array.isArray(a.membership_types) ? a.membership_types[0]?.name : a.membership_types?.name) || ''
+                bValue = (Array.isArray(b.membership_types) ? b.membership_types[0]?.name : b.membership_types?.name) || ''
             } else if (key === 'coach_name') {
                 aValue = a.profiles?.full_name || ''
                 bValue = b.profiles?.full_name || ''
@@ -273,22 +289,28 @@ export default function StudentListPage() {
                                     <TableCell>
                                         <div onClick={(e) => e.stopPropagation()}>
                                             <StudentStatusSelect
+                                                key={`status-${student.id}`}
                                                 studentId={student.id}
                                                 initialStatus={student.status}
+                                                statuses={statuses}
                                             />
                                         </div>
                                     </TableCell>
                                     <TableCell>
                                         <div className="px-3 py-1 text-xs font-medium rounded-full bg-blue-50 text-blue-700 inline-block">
-                                            {student.membership_types?.name || '未設定'}
+                                            {(Array.isArray(student.membership_types)
+                                                ? student.membership_types[0]?.name
+                                                : student.membership_types?.name) || '未設定'}
                                         </div>
                                     </TableCell>
                                     <TableCell>
                                         <div onClick={(e) => e.stopPropagation()}>
                                             <StudentMultiCoachSelect
+                                                key={`coach-${student.id}`}
                                                 studentId={student.id}
                                                 initialAssignedCoaches={student.student_coaches || []}
                                                 initialMainCoachId={student.coach_id}
+                                                coaches={coaches}
                                             />
                                         </div>
                                     </TableCell>

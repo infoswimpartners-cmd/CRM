@@ -40,6 +40,40 @@ export async function updateCoachRewardAction(coachId: string, distantRewardFee:
     }
 }
 
+export async function updateCoachLineFriendUrlAction(coachId: string, lineFriendUrl: string) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { success: false, error: 'Unauthorized' }
+
+    // Ensure the user is an admin
+    const { data: adminCheck } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+
+    if (adminCheck?.role !== 'admin') {
+        return { success: false, error: 'Unauthorized: Admins only' }
+    }
+
+    try {
+        const { error } = await supabase
+            .from('profiles')
+            .update({
+                line_friend_url: lineFriendUrl || null
+            })
+            .eq('id', coachId)
+
+        if (error) throw error
+
+        revalidatePath(`/admin/coaches/${coachId}`)
+        return { success: true }
+    } catch (error: any) {
+        console.error('Update Coach Line Friend URL Error:', error)
+        return { success: false, error: error.message || 'Failed to update coach LINE friend URL' }
+    }
+}
+
 export async function getCurrentCoachRewardRate(coachId: string) {
     const supabaseAdmin = createAdminClient()
 

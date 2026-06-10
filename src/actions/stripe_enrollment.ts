@@ -137,12 +137,14 @@ export async function createEnrollmentCheckoutSession(planId: string, lineUserId
 
         // 環境に応じた価格IDのマッピング（テスト環境で本番用価格IDを差し替える）
         let targetPriceId = priceId
-        const isStripeTestKey = process.env.STRIPE_SECRET_KEY?.startsWith('sk_test_') || process.env.STRIPE_SECRET_KEY_TEST?.startsWith('sk_test_')
+        // ※ STRIPE_SECRET_KEY_TEST が設定されていること自体はテストモードの条件には含めない（本番環境でもテスト用に設定されているため）
+        const isStripeTestKey = process.env.STRIPE_SECRET_KEY?.startsWith('sk_test_')
         
-        // 堅牢なテストモード判定（ローカル環境、テストキーの存在、テスト太郎、またはテスト用の価格ID）
+        // 堅牢なテストモード判定（ローカル環境、またはテスト用の価格ID）
+        // ※「テスト太郎」や管理者メールアドレスでの強制テストモード切り替え機能を一時的に無効化し、本番の決済テストができるようにします。
         const isTestStudent = student?.full_name?.includes('テスト太郎') || student?.contact_email === 'shinshin980312kodai@gmail.com'
         const isTestPrice = targetPriceId.startsWith('price_1Tc4') || targetPriceId.startsWith('price_1TSX')
-        const isTestMode = process.env.NODE_ENV !== 'production' || isStripeTestKey || isTestStudent || isTestPrice
+        const isTestMode = process.env.NODE_ENV !== 'production' || isStripeTestKey || isTestPrice
         
         if (isTestMode) {
             if (PRICE_ID_MAP[targetPriceId]) {

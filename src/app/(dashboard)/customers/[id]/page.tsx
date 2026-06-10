@@ -9,6 +9,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { ChevronLeft } from 'lucide-react'
 import { StudentCoachAssigner } from '@/components/admin/StudentCoachAssigner'
+import { CoachChangeButton } from '@/components/admin/CoachChangeButton'
 import { StudentStatusSelect } from '@/components/admin/StudentStatusSelect'
 import { TrialConfirmButton } from '@/components/admin/TrialConfirmButton'
 import { StripeManager } from '@/components/admin/students/StripeManager'
@@ -358,9 +359,10 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
                         <CardHeader className="pb-3 flex flex-row items-center justify-between">
                             <CardTitle className="text-base font-bold">担当コーチ</CardTitle>
                             {isAdmin && (
-                                <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" asChild>
-                                    <Link href={`/customers/${student.id}/edit`}>変更</Link>
-                                </Button>
+                                <CoachChangeButton
+                                    studentId={student.id}
+                                    currentCoachId={student.coach_id}
+                                />
                             )}
                         </CardHeader>
                         <CardContent>
@@ -368,7 +370,7 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
                                 {assignedCoaches && assignedCoaches.length > 0 ? (
                                     assignedCoaches.map((ac: any) => (
                                         <div key={ac.profiles.id} className="flex items-center gap-3 p-2 rounded-lg bg-gray-50 border border-gray-100">
-                                            {/* Avatar placeholder if needed */}
+                                            {/* アバタープレースホルダー */}
                                             <div className="h-8 w-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-500">
                                                 {ac.profiles.full_name.slice(0, 1)}
                                             </div>

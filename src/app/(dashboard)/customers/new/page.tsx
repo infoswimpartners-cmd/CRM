@@ -41,7 +41,7 @@ export default function NewStudentPage() {
         coach_ids: [] as string[], // multiple coaches
         is_bank_transfer: false,
         is_two_person_lesson: false,
-        apply_pair_membership_fee: true
+        apply_pair_membership_fee: false
     })
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {

@@ -53,8 +53,9 @@ export class LineService {
         }
     }
 
-    async pushMessage(lineUserId: string, message: string): Promise<boolean> {
-        if (!this.accessToken) {
+    async pushMessage(lineUserId: string, message: string, customAccessToken?: string): Promise<boolean> {
+        const token = customAccessToken || this.accessToken
+        if (!token) {
             console.error('Cannot send LINE message: Access Token missing')
             return false
         }
@@ -67,7 +68,7 @@ export class LineService {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${this.accessToken}`
+                    'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify({
                     to: lineUserId,

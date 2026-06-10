@@ -23,10 +23,14 @@ export default async function DashboardLayout({
 }) {
     const supabase = await createClient()
 
+    const headersList = await headers()
+    const pathname = headersList.get('x-pathname') || ''
+
     const { data: { user }, error: userError } = await supabase.auth.getUser()
 
     if (!user || userError) {
-        redirect('/login')
+        const redirectUrl = pathname ? `/login?redirectTo=${encodeURIComponent(pathname)}` : '/login'
+        redirect(redirectUrl)
     }
 
     const { data: profile } = await supabase
@@ -39,9 +43,6 @@ export default async function DashboardLayout({
     if (!profile) {
         redirect('/')
     }
-
-    const headersList = await headers()
-    const pathname = headersList.get('x-pathname') || ''
 
     if (profile.must_change_password && !pathname.includes('/change-password')) {
         redirect('/change-password')

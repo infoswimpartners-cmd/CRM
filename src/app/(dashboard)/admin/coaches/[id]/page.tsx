@@ -10,6 +10,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { CoachBankInfoForm } from '@/components/admin/CoachBankInfoForm'
 import { CoachTaxSettingsForm } from '@/components/admin/CoachTaxSettingsForm'
 import { CoachRewardSettingsForm } from '@/components/admin/CoachRewardSettingsForm'
+import { CoachLineSettingsForm } from '@/components/admin/CoachLineSettingsForm'
+import { CoachAvailabilitySettings } from '@/components/admin/CoachAvailabilitySettings'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,6 +42,13 @@ export default async function CoachDetailPage({ params }: PageProps) {
         .select('*')
         .eq('coach_id', id)
         .order('created_at', { ascending: false })
+
+    // Fetch coach availabilities
+    const { data: availabilities } = await supabase
+        .from('coach_availabilities')
+        .select('*')
+        .eq('coach_id', id)
+        .order('created_at', { ascending: true })
 
     return (
         <div className="space-y-8">
@@ -114,7 +123,24 @@ export default async function CoachDetailPage({ params }: PageProps) {
                         />
                     </CardContent>
                 </Card>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>LINE設定</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <CoachLineSettingsForm
+                            coachId={coach.id}
+                            initialLineFriendUrl={coach.line_friend_url || ''}
+                        />
+                    </CardContent>
+                </Card>
             </div>
+
+            <CoachAvailabilitySettings
+                coachId={coach.id}
+                initialAvailabilities={availabilities || []}
+                baseArea={coach.base_area || null}
+            />
 
             <AssignedStudentsTable
                 coachId={coach.id}

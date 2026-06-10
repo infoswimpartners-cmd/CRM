@@ -48,7 +48,7 @@ export default function EditStudentPage({ params }: { params: Promise<{ id: stri
         coach_ids: [] as string[], // all assigned coaches
         is_bank_transfer: false,
         is_two_person_lesson: false,
-        apply_pair_membership_fee: true,
+        apply_pair_membership_fee: false,
         start_timing: 'current', // 'current' | 'next'
         line_user_id: ''
     })
@@ -119,7 +119,7 @@ export default function EditStudentPage({ params }: { params: Promise<{ id: stri
                 coach_ids: [], // will fetch below
                 is_bank_transfer: data.is_bank_transfer || false,
                 is_two_person_lesson: data.is_two_person_lesson || false,
-                apply_pair_membership_fee: data.apply_pair_membership_fee !== false,
+                apply_pair_membership_fee: data.apply_pair_membership_fee === true || (data.apply_pair_membership_fee === null && !!data.second_student_name),
                 start_timing: 'current',
                 line_user_id: data.line_user_id || ''
             })

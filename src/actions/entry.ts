@@ -49,6 +49,8 @@ export async function submitEntry(values: EntryFormValues) {
                 birth_date: data.birth_date || null,
                 status: 'trial_pending', // Waiting for admin approval
                 registered_date: new Date().toISOString(),
+                apply_pair_pricing: false,
+                apply_pair_membership_fee: false
             })
             .select()
             .single()

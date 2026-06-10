@@ -153,15 +153,15 @@ export default function BookingForm() {
           // LIFF環境下ではアラートを出さずに即座に閉じる
           liff.closeWindow();
         } else {
-          alert("お申し込みを受け付けました！画面を閉じてください。");
+          alert("お申し込みを受け付けました！画面を閉してください。");
         }
       } else {
         alert("送信に失敗しました。もう一度お試しください。");
+        setIsSubmitting(false);
       }
     } catch (error) {
       console.error("送信エラー:", error);
       alert("通信エラーが発生しました。");
-    } finally {
       setIsSubmitting(false);
     }
   };

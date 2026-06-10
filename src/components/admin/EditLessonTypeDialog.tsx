@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { updateLessonMasterAction } from '@/actions/masters'
 import {
     Dialog,
     DialogContent,
@@ -56,7 +57,6 @@ export function EditLessonTypeDialog({ master, open, onOpenChange, onUpdate }: E
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setLoading(true)
-        const supabase = createClient()
 
         try {
             const parsedUnitPrice = parseInt(price)
@@ -66,21 +66,21 @@ export function EditLessonTypeDialog({ master, open, onOpenChange, onUpdate }: E
                 throw new Error('通常単価を正しく入力してください')
             }
 
-            const { error } = await supabase
-                .from('lesson_masters')
-                .update({
-                    name,
-                    unit_price: parsedUnitPrice,
-                    pair_unit_price: parsedPairPrice,
-                    is_trial: isTrial,
-                    stripe_product_id: stripeProductId || null,
-                    stripe_price_id: stripePriceId || null,
-                    stripe_pair_product_id: stripePairProductId || null,
-                    stripe_pair_price_id: stripePairPriceId || null,
-                })
-                .eq('id', master.id)
+            const res = await updateLessonMasterAction({
+                id: master.id,
+                name,
+                price: parsedUnitPrice,
+                pairPrice: parsedPairPrice,
+                isTrial: isTrial,
+                stripeProductId: stripeProductId || null,
+                stripePriceId: stripePriceId || null,
+                stripePairProductId: stripePairProductId || null,
+                stripePairPriceId: stripePairPriceId || null,
+            })
 
-            if (error) throw error
+            if (!res.success) {
+                throw new Error(res.error)
+            }
 
             // Update local state immediately for smooth UX
             if (onUpdate) {
@@ -100,9 +100,9 @@ export function EditLessonTypeDialog({ master, open, onOpenChange, onUpdate }: E
             toast.success('レッスンタイプを更新しました')
             onOpenChange(false)
             router.refresh()
-        } catch (error) {
+        } catch (error: any) {
             console.error(error)
-            toast.error('更新に失敗しました')
+            toast.error(`更新に失敗しました: ${error.message || '不明なエラー'}`)
         } finally {
             setLoading(false)
         }

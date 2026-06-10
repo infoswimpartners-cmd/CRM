@@ -12,6 +12,7 @@ const loginSchema = z.object({
 
 export async function login(prevState: any, formData: FormData) {
     const remember = formData.get('remember') === 'true'
+    const redirectTo = formData.get('redirectTo') as string || ''
     const supabase = await createClient(remember)
 
     // Validate form data
@@ -52,9 +53,10 @@ export async function login(prevState: any, formData: FormData) {
     revalidatePath('/coach', 'layout')
     revalidatePath('/member', 'layout')
 
-    if (role === 'admin') {
-        redirect('/admin')
-    } else {
-        redirect('/coach')
+    let targetUrl = redirectTo
+    if (!targetUrl || !targetUrl.startsWith('/')) {
+        targetUrl = role === 'admin' ? '/admin' : '/coach'
     }
+
+    redirect(targetUrl)
 }

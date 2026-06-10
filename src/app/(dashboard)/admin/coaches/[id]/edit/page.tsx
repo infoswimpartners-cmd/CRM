@@ -43,7 +43,9 @@ export default async function EditCoachPage({ params }: PageProps) {
                     full_name_kana: coach.full_name_kana,
                     avatar_url: coach.avatar_url,
                     role: coach.role,
-                    override_coach_rank: coach.override_coach_rank
+                    override_coach_rank: coach.override_coach_rank,
+                    line_friend_url: coach.line_friend_url,
+                    base_area: coach.base_area
                 }}
                 enableRoleEdit={true}
                 redirectPath={`/admin/coaches/${id}`}

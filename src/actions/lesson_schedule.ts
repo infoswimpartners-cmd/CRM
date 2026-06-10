@@ -74,14 +74,27 @@ async function calculateMonthlyUsage(
     const start = new Date(Date.UTC(jstYear, jstMonth, 1, -9, 0, 0)).toISOString()
     const end = targetDate.toISOString()
 
-    const { count: scheduled } = await supabaseAdmin
+    const { data: scheduledList, error: schedError } = await supabaseAdmin
         .from('lesson_schedules')
-        .select('*', { count: 'exact', head: true })
+        .select(`
+            id,
+            lesson_master:lesson_masters (
+                is_trial
+            )
+        `)
         .eq('student_id', studentId)
         .gte('start_time', start)
         .lt('start_time', end)
 
-    const currentTotal = scheduled || 0
+    if (schedError) throw schedError
+
+    // 体験レッスン(is_trial === true)はカウントから除外する
+    const nonTrialScheduled = (scheduledList || []).filter((s: any) => {
+        const isTrial = s.lesson_master?.is_trial === true
+        return !isTrial
+    })
+
+    const currentTotal = nonTrialScheduled.length
 
     // 3. Previous Month Rollover calculation
     let rollover = 0
@@ -122,15 +135,26 @@ async function calculateMonthlyUsage(
         console.log(`[CalcUsage] canHaveRollover: ${canHaveRollover}, StartedAt: ${membershipStartedAt}`)
 
         if (canHaveRollover) {
-            const { count: prevScheduled } = await supabaseAdmin
+            const { data: prevSchedulesList, error: prevError } = await supabaseAdmin
                 .from('lesson_schedules')
-                .select('*', { count: 'exact', head: true })
+                .select(`
+                    id,
+                    lesson_master:lesson_masters (
+                        is_trial
+                    )
+                `)
                 .eq('student_id', studentId)
                 .gte('start_time', prevStart)
                 .lt('start_time', start)
 
-            const prevTotal = prevScheduled || 0
+            if (prevError) throw prevError
 
+            const prevNonTrialScheduled = (prevSchedulesList || []).filter((s: any) => {
+                const isTrial = s.lesson_master?.is_trial === true
+                return !isTrial
+            })
+
+            const prevTotal = prevNonTrialScheduled.length
             const unused = Math.max(0, monthlyLimit - prevTotal)
             rollover = Math.min(unused, appliedMaxRollover)
         }

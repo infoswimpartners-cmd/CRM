@@ -1,14 +1,13 @@
 'use client'
 
-import { useActionState, useState } from 'react'
+import { useActionState, useState, useEffect, Suspense } from 'react'
 import { login } from './actions'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { AlertCircle, Loader2, Eye, EyeOff, Waves } from 'lucide-react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import Image from 'next/image'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -17,10 +16,12 @@ const initialState = {
     error: '',
 }
 
-export default function LoginPage() {
+function LoginForm() {
     const [state, formAction, isPending] = useActionState(login, initialState)
     const [showPassword, setShowPassword] = useState(false)
     const router = useRouter()
+    const searchParams = useSearchParams()
+    const redirectTo = searchParams.get('redirectTo') || ''
 
     useEffect(() => {
         router.prefetch('/admin')
@@ -51,6 +52,7 @@ export default function LoginPage() {
                 </div>
 
                 <form action={formAction} className="space-y-6">
+                    <input type="hidden" name="redirectTo" value={redirectTo} />
                     <div className="space-y-4">
                         <div className="space-y-2">
                             <Label htmlFor="email" className="text-slate-600 text-xs uppercase tracking-wider font-semibold ml-1">メールアドレス</Label>
@@ -137,6 +139,18 @@ export default function LoginPage() {
                 </div>
             </div >
         </div >
+    )
+}
+
+export default function LoginPage() {
+    return (
+        <Suspense fallback={
+            <div className="relative min-h-screen flex items-center justify-center p-4 bg-slate-50 font-sans">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        }>
+            <LoginForm />
+        </Suspense>
     )
 }
 

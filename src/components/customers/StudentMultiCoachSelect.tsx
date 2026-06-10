@@ -30,17 +30,28 @@ interface Props {
     studentId: string
     initialAssignedCoaches: AssignedCoach[]
     initialMainCoachId: string | null
+    coaches?: Coach[]
 }
 
-export function StudentMultiCoachSelect({ studentId, initialAssignedCoaches, initialMainCoachId }: Props) {
+export function StudentMultiCoachSelect({ studentId, initialAssignedCoaches, initialMainCoachId, coaches: propCoaches }: Props) {
     const [assignedCoaches, setAssignedCoaches] = useState<string[]>(initialAssignedCoaches.map(c => c.coach_id))
     const [mainCoachId, setMainCoachId] = useState<string | null>(initialMainCoachId)
-    const [coaches, setCoaches] = useState<Coach[]>([])
+    const [localCoaches, setLocalCoaches] = useState<Coach[]>([])
     const [loading, setLoading] = useState(false)
     const [open, setOpen] = useState(false)
     const supabase = createClient()
 
     useEffect(() => {
+        setAssignedCoaches(initialAssignedCoaches.map(c => c.coach_id))
+        setMainCoachId(initialMainCoachId)
+    }, [initialAssignedCoaches, initialMainCoachId])
+
+    useEffect(() => {
+        if (propCoaches && propCoaches.length > 0) {
+            setLocalCoaches(propCoaches)
+            return
+        }
+
         const fetchCoaches = async () => {
             const { data } = await supabase
                 .from('profiles')
@@ -49,11 +60,11 @@ export function StudentMultiCoachSelect({ studentId, initialAssignedCoaches, ini
                 .order('full_name', { ascending: true })
 
             if (data) {
-                setCoaches(data)
+                setLocalCoaches(data)
             }
         }
         fetchCoaches()
-    }, [])
+    }, [propCoaches])
 
     const handleSave = async () => {
         setLoading(true)
@@ -113,7 +124,7 @@ export function StudentMultiCoachSelect({ studentId, initialAssignedCoaches, ini
         }
     }
 
-    const mainCoach = coaches.find(c => c.id === mainCoachId)
+    const mainCoach = localCoaches.find(c => c.id === mainCoachId)
     const subCount = assignedCoaches.length > 1 ? assignedCoaches.length - 1 : 0
 
     return (
@@ -138,7 +149,7 @@ export function StudentMultiCoachSelect({ studentId, initialAssignedCoaches, ini
                 <div className="space-y-2">
                     <div className="text-xs font-bold text-gray-500 px-1 pt-1 ml-1">担当コーチを選択</div>
                     <div className="max-h-[300px] overflow-y-auto space-y-0.5 p-1">
-                        {coaches.map((coach) => (
+                        {localCoaches.map((coach) => (
                             <div key={coach.id} className="flex items-center gap-2 p-1.5 rounded-md hover:bg-gray-50 transition-colors">
                                 <Checkbox
                                     id={`coach-${coach.id}`}

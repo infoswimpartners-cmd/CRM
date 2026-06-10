@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, Settings } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
@@ -34,12 +34,20 @@ export default async function AdminAnnouncementsPage() {
                         全コーチ向けのお知らせを作成・管理します。
                     </p>
                 </div>
-                <Button asChild>
-                    <Link href="/admin/announcements/create">
-                        <Plus className="mr-2 h-4 w-4" />
-                        新規作成
-                    </Link>
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" asChild>
+                        <Link href="/admin/announcements/webhooks">
+                            <Settings className="mr-2 h-4 w-4 text-indigo-600" />
+                            Google Chat連携設定
+                        </Link>
+                    </Button>
+                    <Button asChild>
+                        <Link href="/admin/announcements/create">
+                            <Plus className="mr-2 h-4 w-4" />
+                            新規作成
+                        </Link>
+                    </Button>
+                </div>
             </div>
 
             <div className="rounded-md border bg-white">

@@ -26,6 +26,8 @@ interface ProfileFormProps {
         avatar_url: string | null
         role?: string
         override_coach_rank?: number | null
+        line_friend_url?: string | null
+        base_area?: string | null
     }
     redirectPath: string
     title?: string
@@ -43,6 +45,8 @@ export function ProfileForm({ profileId, initialData, redirectPath, title = "プ
         avatar_url: initialData.avatar_url || '',
         role: initialData.role || 'coach',
         override_coach_rank: initialData.override_coach_rank ?? 'auto', // use string 'auto' for null in select
+        line_friend_url: initialData.line_friend_url || '',
+        base_area: initialData.base_area || '',
     })
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -108,6 +112,8 @@ export function ProfileForm({ profileId, initialData, redirectPath, title = "プ
                 full_name: formData.full_name,
                 full_name_kana: formData.full_name_kana || null,
                 avatar_url: formData.avatar_url || null,
+                line_friend_url: formData.line_friend_url || null,
+                base_area: formData.base_area || null,
             }
 
             if (enableRoleEdit) {
@@ -174,6 +180,10 @@ export function ProfileForm({ profileId, initialData, redirectPath, title = "プ
                     <div className="space-y-2">
                         <Label htmlFor="full_name_kana">フリガナ</Label>
                         <Input id="full_name_kana" value={formData.full_name_kana} onChange={handleChange} placeholder="ヤマダ タロウ" />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="line_friend_url">LINE友達追加URL</Label>
+                        <Input id="line_friend_url" value={formData.line_friend_url} onChange={handleChange} placeholder="https://line.me/ti/p/..." />
                     </div>
 
                     {enableRoleEdit && (

@@ -158,7 +158,7 @@ export function EditPackageTypeDialog({ type, open, onOpenChange }: EditPackageT
                 fee: parseInt(fee),
                 ticketCount: parseInt(ticketCount) || 0,
                 stripeProductId: stripeProductId.trim(),
-                stripePriceId: stripePriceId || undefined,
+                stripePriceId: stripePriceId || null,
                 selectedLessons: formattedLessons,
                 description,
                 rules
@@ -259,11 +259,25 @@ export function EditPackageTypeDialog({ type, open, onOpenChange }: EditPackageT
                                         required
                                         className="font-mono text-sm"
                                     />
-                                    {type.stripe_price_id && (
-                                        <p className="text-xs text-muted-foreground">
-                                            価格ID: <code className="bg-slate-100 px-1 py-0.5 rounded font-mono text-[10px]">{type.stripe_price_id}</code>
-                                        </p>
-                                    )}
+                                </div>
+                            </div>
+
+                            {/* Stripe Price ID */}
+                            <div className="grid grid-cols-4 items-start gap-4">
+                                <Label htmlFor="edit-pkg-stripe-price" className="text-right pt-2">
+                                    Stripe価格ID (任意)
+                                </Label>
+                                <div className="col-span-3 space-y-1">
+                                    <Input
+                                        id="edit-pkg-stripe-price"
+                                        value={stripePriceId}
+                                        onChange={(e) => setStripePriceId(e.target.value)}
+                                        className="font-mono text-sm"
+                                        placeholder="price_..."
+                                    />
+                                    <p className="text-[10px] text-muted-foreground">
+                                        ※空欄または商品IDを変更した場合は、Stripe同期により自動設定されます。
+                                    </p>
                                 </div>
                             </div>
 

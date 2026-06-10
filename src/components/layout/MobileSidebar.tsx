@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Menu, X, LayoutDashboard, Users, Calendar, DollarSign, Settings, LogOut, History, PlusCircle, Mail, FileCheck, Megaphone, MessageCircle, CreditCard, BookOpen, Crown, Timer, User } from 'lucide-react'
+import { Menu, X, LayoutDashboard, Users, Calendar, DollarSign, Settings, LogOut, History, PlusCircle, Mail, FileCheck, Megaphone, MessageCircle, CreditCard, BookOpen, Crown, Timer, User, UserPlus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { usePathname } from 'next/navigation'
 import Image from 'next/image'
@@ -129,7 +129,7 @@ export function MobileSidebar({ userProfile }: { userProfile: any }) {
                             <NavItem href="/admin/approvals" icon={FileCheck} label="請求・決済管理" isActive={pathname?.startsWith('/admin/approvals')} />
 
                             <NavHeading>運営管理</NavHeading>
-                            <NavItem href="/admin/inquiries" icon={MessageCircle} label="お問い合わせ" isActive={pathname?.startsWith('/admin/inquiries')} />
+                            <NavItem href="/admin/leads" icon={UserPlus} label="体験申込リード管理" isActive={pathname?.startsWith('/admin/leads')} />
                             <NavItem href="/admin/schedule" icon={Calendar} label="全体スケジュール" isActive={pathname?.startsWith('/admin/schedule')} />
                             <NavItem href="/customers" icon={Users} label="会員管理" isActive={pathname?.startsWith('/customers')} />
                             <NavItem href="/admin/trio" icon={Crown} label="TRIO管理" isActive={pathname?.startsWith('/admin/trio')} />
@@ -155,6 +155,7 @@ export function MobileSidebar({ userProfile }: { userProfile: any }) {
 
                             <NavHeading>運営管理</NavHeading>
                             <NavItem href="/students" icon={Users} label="生徒管理" isActive={pathname?.startsWith('/students')} />
+                            <NavItem href="/coach/leads" icon={UserPlus} label="案件紹介一覧" isActive={pathname?.startsWith('/coach/leads')} />
 
                             <NavHeading>実務メニュー</NavHeading>
                             <NavItem href="/coach/schedule" icon={Calendar} label="スケジュール管理" isActive={pathname === '/coach/schedule'} />

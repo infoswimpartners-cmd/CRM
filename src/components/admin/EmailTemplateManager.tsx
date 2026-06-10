@@ -135,6 +135,13 @@ const TRIGGER_VARIABLES: Record<string, { key: string; label: string }[]> = {
         { key: 'title', label: '内容/プラン名' },
         { key: 'amount', label: '金額' },
     ],
+    lead_assigned: [
+        { key: 'name', label: '顧客氏名' },
+        { key: 'coach_name', label: '担当コーチ名' },
+        { key: 'lesson_date', label: '確定体験日時' },
+        { key: 'location', label: '確定レッスン場所' },
+        { key: 'second_student_info', label: '2人目の顧客情報' },
+    ],
 }
 
 export interface TrialMaster { id: string; name: string; email_template_id: string | null }

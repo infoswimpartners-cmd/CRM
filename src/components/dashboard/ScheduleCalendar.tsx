@@ -22,7 +22,6 @@ import { Card, CardContent } from '@/components/ui/card'
 import { createClient } from '@/lib/supabase/client'
 import { AddScheduleDialog } from './AddScheduleDialog'
 import { EditScheduleDialog } from './EditScheduleDialog'
-import { AddOpenSlotsDialog } from './AddOpenSlotsDialog' // [NEW]
 import { formatStudentNames } from '@/lib/utils'
 
 
@@ -42,11 +41,17 @@ interface Schedule {
     location?: string
     notes?: string
     status?: string
-    student?: { full_name: string, second_student_name?: string | null } // Joined data structure
+    students?: { 
+        full_name: string, 
+        second_student_name?: string | null,
+        membership_types?: { id: string, name: string, is_package: boolean } | null
+    } | null // Joined data structure
     coach_id: string
     profiles?: { full_name: string, avatar_url: string } // Joined Coach data
     student_id?: string
     billing_status?: string
+    is_overage?: boolean
+    lesson_master?: { id: string, name: string, is_trial: boolean } | null
 }
 
 interface ScheduleCalendarProps {
@@ -54,29 +59,40 @@ interface ScheduleCalendarProps {
 }
 
 const getStatusColor = (schedule: Schedule) => {
-    if (!schedule.student_id) {
-        // 空き枠（生徒なし）
-        return 'bg-gray-400'
+    // 体験レッスン
+    const isTrial = schedule.lesson_master?.is_trial === true
+    if (isTrial) {
+        return 'bg-orange-500' // オレンジ
     }
-    // 登録された予定（生徒あり）
-    if (schedule.billing_status === 'paid') {
-        return 'bg-blue-600'
+
+    // 単発レッスン (枠外超過、または会員プラン名に「単発」が含まれる、またはパッケージプラン)
+    const isSinglePlan = schedule.students?.membership_types?.name?.includes('単発') || 
+                         schedule.students?.membership_types?.is_package === true
+    const isSingle = schedule.is_overage === true || isSinglePlan
+
+    if (isSingle) {
+        return 'bg-purple-500' // パープル
     }
-    if (schedule.billing_status === 'pending') {
-        return 'bg-orange-500' // 体験など未決済・調整中の場合
-    }
-    return 'bg-blue-500'
+
+    // 定期レッスン (それ以外)
+    return 'bg-blue-600' // ブルー
 }
 
 const getStatusBorder = (schedule: Schedule) => {
-    if (!schedule.student_id) {
-        // 空き枠（生徒なし）
-        return 'border-l-4 border-l-gray-300 bg-gray-50/50'
+    const isTrial = schedule.lesson_master?.is_trial === true
+    if (isTrial) {
+        return 'border-l-4 border-l-orange-500 bg-orange-50/10'
     }
-    if (schedule.billing_status === 'paid') {
-        return 'border-l-4 border-l-blue-600'
+
+    const isSinglePlan = schedule.students?.membership_types?.name?.includes('単発') || 
+                         schedule.students?.membership_types?.is_package === true
+    const isSingle = schedule.is_overage === true || isSinglePlan
+
+    if (isSingle) {
+        return 'border-l-4 border-l-purple-500 bg-purple-50/10'
     }
-    return 'border-l-4 border-l-orange-500'
+
+    return 'border-l-4 border-l-blue-600'
 }
 
 /** Googleカレンダーのイベント事前入力URLを生成（APIキー不要） */
@@ -119,7 +135,6 @@ export function ScheduleCalendar({ adminView = false }: ScheduleCalendarProps) {
     // Edit Dialog State
     const [selectedSchedule, setSelectedSchedule] = React.useState<Schedule | null>(null)
     const [isEditOpen, setIsEditOpen] = React.useState(false)
-    const [isOpenSlotsOpen, setIsOpenSlotsOpen] = React.useState(false) // [NEW]
 
     const handleScheduleClick = (schedule: Schedule) => {
         setSelectedSchedule(schedule)
@@ -176,11 +191,25 @@ export function ScheduleCalendar({ adminView = false }: ScheduleCalendarProps) {
                 .from('lesson_schedules')
                 .select(`
                     *,
-                    students ( full_name, second_student_name ),
-                    profiles ( full_name, avatar_url )
+                    students ( 
+                        full_name, 
+                        second_student_name,
+                        membership_types!students_membership_type_id_fkey (
+                            id,
+                            name,
+                            is_package
+                        )
+                    ),
+                    profiles ( full_name, avatar_url ),
+                    lesson_master:lesson_masters (
+                        id,
+                        name,
+                        is_trial
+                    )
                 `)
                 .gte('start_time', start)
                 .lte('start_time', end)
+                .not('student_id', 'is', null) // 空き枠はカレンダーに表示しない
 
             // Apply Filters
             if (adminView) {
@@ -220,10 +249,24 @@ export function ScheduleCalendar({ adminView = false }: ScheduleCalendarProps) {
                 .from('lesson_schedules')
                 .select(`
                     *,
-                    students ( full_name, second_student_name ),
-                    profiles ( full_name, avatar_url )
+                    students ( 
+                        full_name, 
+                        second_student_name,
+                        membership_types!students_membership_type_id_fkey (
+                            id,
+                            name,
+                            is_package
+                        )
+                    ),
+                    profiles ( full_name, avatar_url ),
+                    lesson_master:lesson_masters (
+                        id,
+                        name,
+                        is_trial
+                    )
                 `)
                 .gte('start_time', now)
+                .not('student_id', 'is', null) // 空き枠はリストに表示しない
                 .order('start_time', { ascending: true })
                 .limit(50)
 
@@ -420,19 +463,6 @@ export function ScheduleCalendar({ adminView = false }: ScheduleCalendarProps) {
                             </Select>
                         </div>
                     )}
-
-
-                    {/* Hidden if linked as per request */}
-
-                    {/* Open Slots Add Button */}
-                    <Button
-                        onClick={() => setIsOpenSlotsOpen(true)}
-                        variant="outline"
-                        className="h-10 rounded-xl border-cyan-200 text-cyan-700 hover:bg-cyan-50 text-xs md:text-sm px-4 shadow-sm cursor-pointer"
-                    >
-                        <Plus className="mr-1.5 h-4 w-4" />
-                        空き枠登録
-                    </Button>
                 </div>
             </div>
 
@@ -563,12 +593,6 @@ export function ScheduleCalendar({ adminView = false }: ScheduleCalendarProps) {
                 schedule={selectedSchedule}
                 open={isEditOpen}
                 onOpenChange={setIsEditOpen}
-                onSuccess={handleSuccess}
-            />
-
-            <AddOpenSlotsDialog
-                open={isOpenSlotsOpen}
-                onOpenChange={setIsOpenSlotsOpen}
                 onSuccess={handleSuccess}
             />
         </div>

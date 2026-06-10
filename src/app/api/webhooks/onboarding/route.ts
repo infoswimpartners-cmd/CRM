@@ -188,6 +188,7 @@ export async function POST(req: NextRequest) {
         }
 
         // 4. Create Student in Supabase (CMS) - NO STRIPE YET
+        const hasSecondStudent = !!second_name
         console.log(`[Onboarding] Creating Student Record (Status: inquiry_pending)...`)
         const { data: newStudent, error: dbError } = await supabaseAdmin
             .from('students')
@@ -204,7 +205,9 @@ export async function POST(req: NextRequest) {
                 contact_phone: phone,
                 notes: notes || null,
                 status: 'inquiry', // Use existing 'inquiry' status
-                stripe_customer_id: null
+                stripe_customer_id: null,
+                apply_pair_pricing: hasSecondStudent,
+                apply_pair_membership_fee: hasSecondStudent
             })
             .select()
             .single()

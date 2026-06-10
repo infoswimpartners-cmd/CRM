@@ -16,26 +16,38 @@ interface Props {
     studentId: string
     initialStatus: string | null
     compact?: boolean
+    statuses?: any[]
 }
 
-export function StudentStatusSelect({ studentId, initialStatus, compact = false }: Props) {
+export function StudentStatusSelect({ studentId, initialStatus, compact = false, statuses: propStatuses }: Props) {
     const [status, setStatus] = useState(initialStatus || 'trial_pending')
     const [loading, setLoading] = useState(false)
-    const [statuses, setStatuses] = useState<any[]>([])
+    const [localStatuses, setLocalStatuses] = useState<any[]>([])
     const supabase = createClient()
 
     useEffect(() => {
+        if (initialStatus) {
+            setStatus(initialStatus)
+        }
+    }, [initialStatus])
+
+    useEffect(() => {
+        if (propStatuses && propStatuses.length > 0) {
+            setLocalStatuses(propStatuses)
+            return
+        }
+
         const fetchStatuses = async () => {
             const { data } = await supabase
                 .from('student_statuses')
                 .select('*')
                 .order('display_order', { ascending: true })
-            if (data) setStatuses(data)
+            if (data) setLocalStatuses(data)
         }
         fetchStatuses()
-    }, [])
+    }, [propStatuses])
 
-    const currentStatusConfig = statuses.find(s => s.id === status)
+    const currentStatusConfig = localStatuses.find(s => s.id === status)
     const displayColor = currentStatusConfig?.color_class || 'bg-gray-100 text-gray-800'
 
     const handleStatusChange = async (newStatus: string) => {
@@ -78,7 +90,7 @@ export function StudentStatusSelect({ studentId, initialStatus, compact = false 
                 </div>
             </SelectTrigger>
             <SelectContent>
-                {statuses.map((s) => (
+                {localStatuses.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
                         {s.name}
                     </SelectItem>
