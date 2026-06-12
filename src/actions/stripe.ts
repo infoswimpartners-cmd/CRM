@@ -318,7 +318,6 @@ export async function assignMembership(studentId: string, membershipTypeId: stri
                 customer: student.stripe_customer_id,
                 items: [{ price: targetPriceId }],
                 trial_end: anchorTimestamp,
-                proration_behavior: 'none',
                 payment_behavior: 'default_incomplete',
                 payment_settings: { save_default_payment_method: 'on_subscription' },
                 expand: ['latest_invoice.payment_intent'],

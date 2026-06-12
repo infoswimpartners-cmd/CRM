@@ -9,7 +9,8 @@ import {
     Menu,
     Coins,
     ChevronRight,
-    UserPlus
+    UserPlus,
+    UserCheck
 } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -19,6 +20,7 @@ import { CoachManagementGuide } from '@/components/admin/manual/CoachManagementG
 import { InternalOperationsGuide } from '@/components/admin/manual/InternalOperationsGuide'
 import { BillingSystemGuide } from '@/components/admin/manual/BillingSystemGuide'
 import { EnrollmentGuide } from '@/components/admin/manual/EnrollmentGuide'
+import { LeadAssignmentGuide } from '@/components/admin/manual/LeadAssignmentGuide'
 
 // Menu Items Configuration
 const menuItems = [
@@ -27,6 +29,12 @@ const menuItems = [
         title: '請求システム総合ガイド',
         icon: Coins,
         component: BillingSystemGuide
+    },
+    {
+        id: 'leads',
+        title: '体験案件・アサイン管理',
+        icon: UserCheck,
+        component: LeadAssignmentGuide
     },
     {
         id: 'enrollment',

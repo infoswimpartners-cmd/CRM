@@ -1,6 +1,7 @@
 'use server'
 
 import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient } from '@/lib/supabase/server'
 import { randomUUID } from 'crypto'
 import { addDays } from 'date-fns'
 import { revalidatePath } from 'next/cache'
@@ -68,7 +69,7 @@ export async function verifySignupToken(token: string): Promise<{ valid: boolean
 /**
  * Registers a coach using a generic invitation token.
  */
-export async function registerCoachWithToken(prevState: any, formData: FormData): Promise<{ success?: boolean; error?: string }> {
+export async function registerCoachWithToken(prevState: any, formData: FormData): Promise<{ success?: boolean; error?: string; autoLoginFailed?: boolean }> {
     const token = formData.get('token') as string
     const fullName = formData.get('fullName') as string
     const email = formData.get('email') as string
@@ -132,7 +133,24 @@ export async function registerCoachWithToken(prevState: any, formData: FormData)
             .update({ is_used: true })
             .eq('token', token)
 
-        return { success: true }
+        // 5. Auto Login
+        try {
+            const userSupabase = await createClient()
+            const { error: signInError } = await userSupabase.auth.signInWithPassword({
+                email,
+                password
+            })
+            if (signInError) {
+                console.error('Auto login failed:', signInError)
+                return { success: true, autoLoginFailed: true }
+            }
+            
+            revalidatePath('/coach', 'layout')
+            return { success: true }
+        } catch (loginErr) {
+            console.error('Auto login exception:', loginErr)
+            return { success: true, autoLoginFailed: true }
+        }
 
     } catch (err: any) {
         console.error('Registration Error:', err)

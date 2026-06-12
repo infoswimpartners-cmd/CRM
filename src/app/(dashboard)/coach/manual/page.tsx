@@ -1,8 +1,10 @@
+'use client'
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { BookOpen, Calendar, DollarSign, FileText, User, Settings, Info } from "lucide-react"
+import { BookOpen, Calendar, DollarSign, FileText, User, Settings, Info, UserCheck } from "lucide-react"
 
 export default function CoachManualPage() {
     return (
@@ -18,13 +20,73 @@ export default function CoachManualPage() {
             </div>
 
             <Tabs defaultValue="dashboard" className="w-full">
-                <TabsList className="grid w-full grid-cols-2 lg:grid-cols-5 h-auto p-1 bg-slate-100/50">
+                <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 h-auto p-1 bg-slate-100/50">
                     <TabsTrigger value="dashboard" className="py-2.5">ダッシュボード</TabsTrigger>
+                    <TabsTrigger value="leads" className="py-2.5">案件アサイン</TabsTrigger>
                     <TabsTrigger value="schedule" className="py-2.5">予定管理</TabsTrigger>
                     <TabsTrigger value="report" className="py-2.5">レッスン報告</TabsTrigger>
                     <TabsTrigger value="students" className="py-2.5">生徒一覧</TabsTrigger>
                     <TabsTrigger value="finance" className="py-2.5">売上・報酬</TabsTrigger>
                 </TabsList>
+
+                {/* Leads (Assignment) Section */}
+                <TabsContent value="leads" className="space-y-4 mt-6">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <UserCheck className="h-5 w-5 text-emerald-500" />
+                                体験案件アサイン
+                            </CardTitle>
+                            <CardDescription>お客様から申し込まれた体験レッスンの案件を担当するフローです。</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            {/* 全体プロセス図解 */}
+                            <div className="flex flex-col items-center border rounded-xl p-4 bg-slate-50/30">
+                                <h4 className="font-bold text-sm text-slate-700 mb-4 text-center">体験レッスンお申し込み〜連絡開始までの流れ</h4>
+                                <img 
+                                    src="/images/flow_diagram.png" 
+                                    alt="体験レッスンアサインの流れ" 
+                                    className="max-w-full h-auto rounded-lg shadow-sm border border-slate-100 max-h-[400px] object-contain"
+                                />
+                                <p className="text-[10px] text-slate-500 mt-2">※申込から連絡開始までのシステム自動連携図</p>
+                            </div>
+
+                            {/* 詳細フロー */}
+                            <div className="space-y-4">
+                                <h3 className="font-bold text-slate-800">体験レッスンアサインの全体フロー</h3>
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    <div className="bg-slate-50 p-4 rounded-lg text-sm space-y-2">
+                                        <h4 className="font-semibold text-emerald-700">【前半】案件の発生からマッチング</h4>
+                                        <ol className="list-decimal list-inside text-slate-700 space-y-1.5">
+                                            <li><strong>案件申し込み（顧客）:</strong> お客様がWEBから体験希望を送信。</li>
+                                            <li><strong>場所の選定提案（管理者）:</strong> 管理者が適切なプール等を選定。</li>
+                                            <li><strong>案件通知（システム）:</strong> Google Chatの案件通知スペースへ自動配信。</li>
+                                            <li><strong>案件アサイン（コーチ）:</strong> あなたが「アサインする」ボタンをクリックして確定。</li>
+                                        </ol>
+                                    </div>
+                                    <div className="bg-slate-50 p-4 rounded-lg text-sm space-y-2">
+                                        <h4 className="font-semibold text-indigo-700">【後半】日程確定から直接連絡開始</h4>
+                                        <ol className="list-decimal list-inside text-slate-700 space-y-1.5" start={5}>
+                                            <li><strong>場所・日程の確定（コーチ）:</strong> スケジュール登録にて日時を最終決定。</li>
+                                            <li><strong>LINE確定送信（システム）:</strong> 事務局LINEから生徒へ、あなたの「個人LINE友達追加URL」を自動送信。</li>
+                                            <li><strong>LINE連絡開始（顧客）:</strong> お客様がURLからあなたを追加し、直接連絡がスタート！</li>
+                                        </ol>
+                                    </div>
+                                </div>
+                            </div>
+
+
+                            <Alert className="border-amber-200 bg-amber-50/20">
+                                <Info className="h-4 w-4 text-amber-600" />
+                                <AlertTitle className="text-amber-800">重要：アサイン前の絶対ルール</AlertTitle>
+                                <AlertDescription className="text-xs text-amber-700">
+                                    案件をアサインする前に,必ず「設定」→「プロフィール」または管理者を通じて,ご自身の<b>「LINE友達追加用URL」が正しく登録されていること</b>を確認してください。
+                                    これが登録されていない,または誤っている場合,生徒へ送信されるアサイン通知にURLが反映されず,生徒からの連絡を受けることができません。
+                                </AlertDescription>
+                            </Alert>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
 
                 {/* Dashboard Section */}
                 <TabsContent value="dashboard" className="space-y-4 mt-6">

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -15,9 +15,18 @@ interface CoachSignupFormProps {
 
 export function CoachSignupForm({ token }: CoachSignupFormProps) {
     const [isPending, startTransition] = useTransition()
-    const [state, setState] = useState<{ success?: boolean; error?: string }>({})
+    const [state, setState] = useState<{ success?: boolean; error?: string; autoLoginFailed?: boolean }>({})
     const [showPassword, setShowPassword] = useState(false)
     const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+
+    useEffect(() => {
+        if (state.success && !state.autoLoginFailed) {
+            const timer = setTimeout(() => {
+                window.location.href = '/coach'
+            }, 1500)
+            return () => clearTimeout(timer)
+        }
+    }, [state.success, state.autoLoginFailed])
 
     const handleSubmit = (formData: FormData) => {
         // Append token manually or ensure it's in a hidden field
@@ -31,27 +40,40 @@ export function CoachSignupForm({ token }: CoachSignupFormProps) {
 
     if (state.success) {
         return (
-            <Card className="w-full max-w-md mx-auto shadow-lg">
+            <Card className="w-full max-w-md mx-auto shadow-lg border-slate-100/80">
                 <CardHeader>
                     <div className="flex justify-center mb-4">
-                        <CheckCircle className="h-12 w-12 text-green-500" />
+                        <CheckCircle className="h-12 w-12 text-emerald-500" />
                     </div>
-                    <CardTitle className="text-center text-2xl">登録完了</CardTitle>
-                    <CardDescription className="text-center">
+                    <CardTitle className="text-center text-2xl text-slate-800">登録完了</CardTitle>
+                    <CardDescription className="text-center text-slate-500">
                         コーチアカウントの作成が完了しました。
                     </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4 text-center text-sm text-gray-600">
-                    <p>
-                        ご登録ありがとうございます。<br />
-                        ログイン画面より、設定したメールアドレスとパスワードでログインしてください。
-                    </p>
+                <CardContent className="space-y-4 text-center text-sm text-slate-600 pb-6">
+                    {!state.autoLoginFailed ? (
+                        <div className="space-y-3">
+                            <p className="font-medium text-slate-700">ご登録ありがとうございます！</p>
+                            <p className="text-xs text-slate-400">
+                                管理システムへ自動ログインしています...<br />
+                                そのままお待ちください。
+                            </p>
+                            <div className="flex justify-center pt-2">
+                                <Loader2 className="h-6 w-6 text-emerald-500 animate-spin" />
+                            </div>
+                        </div>
+                    ) : (
+                        <div>
+                            <p className="mb-4">
+                                ご登録ありがとうございました。<br />
+                                自動ログインに失敗したため、お手数ですが下記のボタンからログインしてください。
+                            </p>
+                            <Button asChild className="w-full bg-cyan-600 hover:bg-cyan-700">
+                                <Link href="/login">ログイン画面へ進む</Link>
+                            </Button>
+                        </div>
+                    )}
                 </CardContent>
-                <CardFooter className="flex justify-center">
-                    <Button asChild className="w-full">
-                        <Link href="/login">ログイン画面へ進む</Link>
-                    </Button>
-                </CardFooter>
             </Card>
         )
     }

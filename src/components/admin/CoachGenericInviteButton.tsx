@@ -96,14 +96,14 @@ export function CoachGenericInviteButton() {
                                 <p className="text-green-800 font-bold">発行しました</p>
                             </div>
 
-                            <div className="flex items-center gap-2">
-                                <div className="bg-slate-100 p-2 rounded border flex-1 overflow-hidden">
-                                    <code className="text-xs text-slate-600 whitespace-nowrap">
+                            <div className="flex items-center gap-2 w-full">
+                                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 flex-1 min-w-0 break-all">
+                                    <code className="text-xs text-slate-600 select-all font-mono break-all whitespace-pre-wrap">
                                         {inviteUrl}
                                     </code>
                                 </div>
-                                <Button size="icon" onClick={handleCopy}>
-                                    {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                                <Button size="icon" variant="outline" onClick={handleCopy} className="shrink-0 h-10 w-10">
+                                    {copied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
                                 </Button>
                             </div>
                             <p className="text-xs text-slate-500 text-center">

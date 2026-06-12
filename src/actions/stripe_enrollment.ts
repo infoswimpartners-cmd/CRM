@@ -249,7 +249,6 @@ export async function createEnrollmentCheckoutSession(planId: string, lineUserId
 
             sessionConfig.subscription_data = {
                 trial_end: jstNextMonthFirstUnix,
-                proration_behavior: 'none', // 日割り計算をスキップ
                 metadata: {
                     type: 'membership_enrollment',
                     line_user_id: lineUserId,
