@@ -25,6 +25,19 @@ import {
 import { toast } from 'sonner'
 import { assignLeadAction, getDisplaySettingsAction } from '@/actions/leads'
 
+interface Student {
+    id: string
+    full_name: string
+    full_name_kana: string | null
+    line_user_id: string | null
+    contact_email: string | null
+    contact_phone: string | null
+    status: string | null
+    student_number: string | null
+    membership_type_id: string | null
+    membership_types: { name: string } | null
+}
+
 interface Lead {
     id: string
     name: string
@@ -48,6 +61,7 @@ interface Lead {
     second_student_full_name_kana: string | null
     second_student_gender: string | null
     second_student_birth_date: string | null
+    student?: Student | null
 }
 
 function calculateAge(birthDateString: string | null | undefined): number | null {
@@ -99,7 +113,45 @@ export default function CoachLeadsPage() {
                 setDisplaySettings(settingsRes.value)
             }
 
-            if (leadsData) setLeads(leadsData)
+            // 既存生徒情報を会員区分名付きで取得
+            const { data: studentsData } = await supabase
+                .from('students')
+                .select(`
+                    id,
+                    full_name,
+                    full_name_kana,
+                    line_user_id,
+                    contact_email,
+                    contact_phone,
+                    status,
+                    student_number,
+                    membership_type_id,
+                    membership_types:membership_types!students_membership_type_id_fkey (
+                        name
+                    )
+                `)
+
+            // 生徒情報と案件（リード）の紐付けマッピング
+            const matchedLeads = (leadsData || []).map(lead => {
+                let matchedStudent: any = null
+                if (studentsData) {
+                    if (lead.line_user_id) {
+                        matchedStudent = studentsData.find(s => s.line_user_id === lead.line_user_id)
+                    }
+                    if (!matchedStudent && lead.email) {
+                        matchedStudent = studentsData.find(s => s.contact_email === lead.email)
+                    }
+                    if (!matchedStudent && lead.name) {
+                        matchedStudent = studentsData.find(s => s.full_name === lead.name)
+                    }
+                }
+                return {
+                    ...lead,
+                    student: matchedStudent
+                }
+            })
+
+            setLeads(matchedLeads)
         } catch (error) {
             console.error('Error fetching leads:', error)
             toast.error('データの取得に失敗しました')
@@ -549,103 +601,134 @@ export default function CoachLeadsPage() {
                                         </Button>
                                     </DialogTrigger>
                                     <DialogContent className="sm:max-w-[425px] bg-white">
-                                        <DialogHeader>
-                                            <DialogTitle>案件のアサイン</DialogTitle>
-                                            <DialogDescription>
-                                                この体験レッスン案件をご自身が担当すること（アサイン）を確定します。
-                                            </DialogDescription>
-                                        </DialogHeader>
-                                        <div className="grid gap-4 py-4">
-                                            <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-md p-3 text-xs text-blue-800">
-                                                <Info className="h-4 w-4 shrink-0 mt-0.5" />
-                                                <div>
-                                                    確定後、お客様へ自動的に「担当コーチ決定通知」メールが送信されます。<br/>
-                                                    また、案件はあなたの担当としてCRMに連動登録されます。
-                                                </div>
-                                            </div>
-                                            <div className="space-y-3.5">
-                                                <div className="space-y-1.5">
-                                                    <label className="text-xs font-semibold text-gray-700">
-                                                        希望日の選択
-                                                    </label>
-                                                    <Select
-                                                        value={selectedDateKey}
-                                                        onValueChange={(key) => handleDateKeyChange(key, lead)}
-                                                    >
-                                                        <SelectTrigger className="h-9 text-xs bg-gray-50/50 border-gray-200">
-                                                            <SelectValue placeholder="希望日を選択してください" />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            {lead.datetime1 && (
-                                                                <SelectItem value="datetime1" className="text-xs">
-                                                                    ① {formatDateLabel(lead.datetime1)}
-                                                                </SelectItem>
-                                                            )}
-                                                            {lead.datetime2 && (
-                                                                <SelectItem value="datetime2" className="text-xs">
-                                                                    ② {formatDateLabel(lead.datetime2)}
-                                                                </SelectItem>
-                                                            )}
-                                                            {lead.datetime3 && (
-                                                                <SelectItem value="datetime3" className="text-xs">
-                                                                    ③ {formatDateLabel(lead.datetime3)}
-                                                                </SelectItem>
-                                                            )}
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>
+                                        {(() => {
+                                            const isExisting = selectedLead?.student ? (() => {
+                                                const s = selectedLead.student
+                                                const isStatusTrialDoneOrActive = s.status === 'trial_done' || s.status === 'active'
+                                                const hasStudentNumber = !!s.student_number?.trim()
+                                                const isNotTrialMembership = s.membership_types?.name ? !s.membership_types.name.includes('体験') : false
+                                                return isStatusTrialDoneOrActive || hasStudentNumber || isNotTrialMembership
+                                            })() : false
 
-                                                <div className="space-y-1.5">
-                                                    <label className="text-xs font-semibold text-gray-700">
-                                                        体験時間の決定
-                                                    </label>
-                                                    <Select
-                                                        value={selectedDate}
-                                                        onValueChange={setSelectedDate}
-                                                    >
-                                                        <SelectTrigger className="h-9 text-xs bg-gray-50/50 border-gray-200">
-                                                            <SelectValue placeholder="時間を選択してください" />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            {generateTimeOptions(lead[selectedDateKey as keyof Lead] as string | null).map((opt, idx) => (
-                                                                <SelectItem key={idx} value={opt.value} className="text-xs">
-                                                                    {opt.label}
-                                                                </SelectItem>
-                                                            ))}
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>
+                                            return (
+                                                <>
+                                                    <DialogHeader>
+                                                        <DialogTitle>{isExisting ? 'レッスン案件のアサイン（既存顧客）' : '案件のアサイン'}</DialogTitle>
+                                                        <DialogDescription>
+                                                            {isExisting 
+                                                                ? '既存のレッスン案件をご自身が担当すること（アサイン）を確定します。'
+                                                                : 'この体験レッスン案件をご自身が担当すること（アサイン）を確定します。'}
+                                                        </DialogDescription>
+                                                    </DialogHeader>
+                                                    <div className="grid gap-4 py-4">
+                                                        {isExisting ? (
+                                                            <div className="flex flex-col gap-1.5 bg-amber-50 border border-amber-100 rounded-md p-3 text-xs text-amber-800">
+                                                                <div className="flex items-center gap-1.5 font-bold">
+                                                                    <Info className="h-4 w-4 shrink-0 text-amber-600" />
+                                                                    <span>【体験終了済み・既存顧客情報】</span>
+                                                                </div>
+                                                                <div className="space-y-1 pl-6">
+                                                                    <div>・現在のステータス: <span className="font-semibold">{selectedLead?.student?.status === 'trial_done' ? '体験終了' : selectedLead?.student?.status === 'active' ? '本会員' : selectedLead?.student?.status || '未設定'}</span></div>
+                                                                    <div>・会員番号: <span className="font-semibold">{selectedLead?.student?.student_number || '未発行'}</span></div>
+                                                                    <div>・会員区分: <span className="font-semibold">{selectedLead?.student?.membership_types?.name || '未設定'}</span></div>
+                                                                    <div className="text-[10px] text-amber-700/80 mt-1">※この顧客は体験レッスンが終了しているため、通常レッスン日時として確定されます。</div>
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-md p-3 text-xs text-blue-800">
+                                                                <Info className="h-4 w-4 shrink-0 mt-0.5 text-blue-600" />
+                                                                <div>
+                                                                    確定後、お客様へ自動的に「担当コーチ決定通知」メールが送信されます。<br/>
+                                                                    また、案件はあなたの担当としてCRMに連動登録されます。
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                        <div className="space-y-3.5">
+                                                            <div className="space-y-1.5">
+                                                                <label className="text-xs font-semibold text-gray-700">
+                                                                    {isExisting ? '希望レッスン日の選択' : '希望日の選択'}
+                                                                </label>
+                                                                <Select
+                                                                    value={selectedDateKey}
+                                                                    onValueChange={(key) => handleDateKeyChange(key, lead)}
+                                                                >
+                                                                    <SelectTrigger className="h-9 text-xs bg-gray-50/50 border-gray-200">
+                                                                        <SelectValue placeholder="希望日を選択してください" />
+                                                                    </SelectTrigger>
+                                                                    <SelectContent>
+                                                                        {lead.datetime1 && (
+                                                                            <SelectItem value="datetime1" className="text-xs">
+                                                                                ① {formatDateLabel(lead.datetime1)}
+                                                                            </SelectItem>
+                                                                        )}
+                                                                        {lead.datetime2 && (
+                                                                            <SelectItem value="datetime2" className="text-xs">
+                                                                                ② {formatDateLabel(lead.datetime2)}
+                                                                            </SelectItem>
+                                                                        )}
+                                                                        {lead.datetime3 && (
+                                                                            <SelectItem value="datetime3" className="text-xs">
+                                                                                ③ {formatDateLabel(lead.datetime3)}
+                                                                            </SelectItem>
+                                                                        )}
+                                                                    </SelectContent>
+                                                                </Select>
+                                                            </div>
 
-                                                <div className="space-y-1.5">
-                                                    <label className="text-xs font-semibold text-gray-700">
-                                                        レッスン場所の決定
-                                                    </label>
-                                                    <Select
-                                                        value={selectedLocation}
-                                                        onValueChange={setSelectedLocation}
-                                                    >
-                                                        <SelectTrigger className="h-9 text-xs bg-gray-50/50 border-gray-200">
-                                                            <SelectValue placeholder="場所を選択してください" />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            {(lead.lesson_location?.split(',').map(s => s.trim()).filter(Boolean) || []).map((loc, idx) => (
-                                                                <SelectItem key={idx} value={loc} className="text-xs">
-                                                                    {loc}
-                                                                </SelectItem>
-                                                            ))}
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <DialogFooter>
-                                            <Button variant="ghost" size="sm" onClick={() => setDialogOpen(false)} disabled={assigning}>
-                                                キャンセル
-                                            </Button>
-                                            <Button size="sm" onClick={handleAssign} disabled={assigning}>
-                                                {assigning ? '処理中...' : 'アサインを確定する'}
-                                            </Button>
-                                        </DialogFooter>
+                                                            <div className="space-y-1.5">
+                                                                <label className="text-xs font-semibold text-gray-700">
+                                                                    {isExisting ? 'レッスン時間の決定' : '体験時間の決定'}
+                                                                </label>
+                                                                <Select
+                                                                    value={selectedDate}
+                                                                    onValueChange={setSelectedDate}
+                                                                >
+                                                                    <SelectTrigger className="h-9 text-xs bg-gray-50/50 border-gray-200">
+                                                                        <SelectValue placeholder="時間を選択してください" />
+                                                                    </SelectTrigger>
+                                                                    <SelectContent>
+                                                                        {generateTimeOptions(lead[selectedDateKey as keyof Lead] as string | null).map((opt, idx) => (
+                                                                            <SelectItem key={idx} value={opt.value} className="text-xs">
+                                                                                {opt.label}
+                                                                            </SelectItem>
+                                                                        ))}
+                                                                    </SelectContent>
+                                                                </Select>
+                                                            </div>
+
+                                                            <div className="space-y-1.5">
+                                                                <label className="text-xs font-semibold text-gray-700">
+                                                                    レッスン場所の決定
+                                                                </label>
+                                                                <Select
+                                                                    value={selectedLocation}
+                                                                    onValueChange={setSelectedLocation}
+                                                                >
+                                                                    <SelectTrigger className="h-9 text-xs bg-gray-50/50 border-gray-200">
+                                                                        <SelectValue placeholder="場所を選択してください" />
+                                                                    </SelectTrigger>
+                                                                    <SelectContent>
+                                                                        {(lead.lesson_location?.split(',').map(s => s.trim()).filter(Boolean) || []).map((loc, idx) => (
+                                                                            <SelectItem key={idx} value={loc} className="text-xs">
+                                                                                {loc}
+                                                                            </SelectItem>
+                                                                        ))}
+                                                                    </SelectContent>
+                                                                </Select>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <DialogFooter>
+                                                        <Button variant="ghost" size="sm" onClick={() => setDialogOpen(false)} disabled={assigning}>
+                                                            キャンセル
+                                                        </Button>
+                                                        <Button size="sm" onClick={handleAssign} disabled={assigning}>
+                                                            {assigning ? '処理中...' : isExisting ? 'アサインを確定する（既存生徒）' : 'アサインを確定する'}
+                                                        </Button>
+                                                    </DialogFooter>
+                                                </>
+                                            )
+                                        })()}
                                     </DialogContent>
                                 </Dialog>
                             </CardFooter>
