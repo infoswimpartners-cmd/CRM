@@ -84,3 +84,87 @@ export async function createAnnouncementAction(data: CreateAnnouncementInput) {
 
     return { success: true, announcement }
 }
+
+export type UpdateAnnouncementInput = {
+    id: string
+    title: string
+    content: string
+    priority: 'normal' | 'high'
+}
+
+export async function updateAnnouncementAction(data: UpdateAnnouncementInput) {
+    const supabase = await createClient()
+
+    // 1. Verify Admin
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+        return { success: false, error: 'Unauthorized' }
+    }
+
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+
+    if (profile?.role !== 'admin') {
+        return { success: false, error: 'Forbidden: Admin only' }
+    }
+
+    // 2. Update Announcement
+    const { data: announcement, error: updateError } = await supabase
+        .from('announcements')
+        .update({
+            title: data.title,
+            content: data.content,
+            priority: data.priority,
+            // updated_at は DB にあれば更新される
+        })
+        .eq('id', data.id)
+        .select()
+        .single()
+
+    if (updateError) {
+        console.error('Error updating announcement:', updateError)
+        return { success: false, error: 'Failed to update announcement' }
+    }
+
+    revalidatePath('/admin/announcements')
+    revalidatePath('/coach')
+    return { success: true, announcement }
+}
+
+export async function deleteAnnouncementAction(id: string) {
+    const supabase = await createClient()
+
+    // 1. Verify Admin
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+        return { success: false, error: 'Unauthorized' }
+    }
+
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+
+    if (profile?.role !== 'admin') {
+        return { success: false, error: 'Forbidden: Admin only' }
+    }
+
+    // 2. Delete Announcement
+    const { error: deleteError } = await supabase
+        .from('announcements')
+        .delete()
+        .eq('id', id)
+
+    if (deleteError) {
+        console.error('Error deleting announcement:', deleteError)
+        return { success: false, error: 'Failed to delete announcement' }
+    }
+
+    revalidatePath('/admin/announcements')
+    revalidatePath('/coach')
+    return { success: true }
+}

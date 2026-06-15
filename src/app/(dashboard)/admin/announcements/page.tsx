@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
-import { Plus, Settings } from "lucide-react";
+import { Plus, Settings, Pencil } from "lucide-react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
@@ -13,6 +13,7 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { DeleteAnnouncementButton } from "./DeleteButton";
 
 export default async function AdminAnnouncementsPage() {
     const supabase = await createClient();
@@ -58,6 +59,7 @@ export default async function AdminAnnouncementsPage() {
                             <TableHead>タイトル</TableHead>
                             <TableHead className="w-[100px]">優先度</TableHead>
                             <TableHead className="w-[150px]">作成者</TableHead>
+                            <TableHead className="w-[120px] text-right">操作</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -86,6 +88,16 @@ export default async function AdminAnnouncementsPage() {
                                     <TableCell>
                                         {/* @ts-ignore */}
                                         {item.profiles?.full_name || '不明'}
+                                    </TableCell>
+                                    <TableCell className="text-right">
+                                        <div className="flex justify-end gap-1">
+                                            <Button variant="ghost" size="icon" asChild className="h-8 w-8 text-slate-500 hover:text-slate-700">
+                                                <Link href={`/admin/announcements/${item.id}/edit`}>
+                                                    <Pencil className="h-4 w-4" />
+                                                </Link>
+                                            </Button>
+                                            <DeleteAnnouncementButton id={item.id} />
+                                        </div>
                                     </TableCell>
                                 </TableRow>
                             ))
