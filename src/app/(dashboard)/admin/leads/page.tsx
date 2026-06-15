@@ -33,8 +33,18 @@ import {
     saveDisplaySettingsAction,
     getLineConfigAction,
     saveLineConfigAction,
-    completeLeadManuallyAction
+    completeLeadManuallyAction,
+    createLeadManuallyAction
 } from '@/actions/leads'
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+    DialogFooter,
+} from "@/components/ui/dialog"
+import { Textarea } from "@/components/ui/textarea"
 
 const itemLabels: Record<string, string> = {
     name: '氏名',
@@ -95,6 +105,21 @@ interface Webhook {
     created_at: string
 }
 
+interface Student {
+    id: string
+    full_name: string
+    full_name_kana: string | null
+    birth_date: string | null
+    gender: string | null
+    contact_email: string | null
+    contact_phone: string | null
+    line_user_id: string | null
+    second_student_name: string | null
+    second_student_name_kana: string | null
+    second_student_birth_date: string | null
+    second_student_gender: string | null
+}
+
 export default function AdminLeadsPage() {
     const [leads, setLeads] = useState<Lead[]>([])
     const [facilities, setFacilities] = useState<Facility[]>([])
@@ -129,11 +154,168 @@ export default function AdminLeadsPage() {
     const [savingLineConfig, setSavingLineConfig] = useState(false)
     const [showLineToken, setShowLineToken] = useState(false)
 
+    // 新規手動案件作成用のステート
+    const [students, setStudents] = useState<Student[]>([])
+    const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
+    const [creatingLead, setCreatingLead] = useState(false)
+    const [studentSearchOpen, setStudentSearchOpen] = useState(false)
+    const [studentSearchQuery, setStudentSearchQuery] = useState('')
+    const [facilitySearchOpen, setFacilitySearchOpen] = useState(false)
+
+    const [formStudentId, setFormStudentId] = useState<string>('')
+    const [formName, setFormName] = useState('')
+    const [formFullNameKana, setFormFullNameKana] = useState('')
+    const [formGender, setFormGender] = useState('')
+    const [formBirthDate, setFormBirthDate] = useState('')
+    const [formEmail, setFormEmail] = useState('')
+    const [formPhone, setFormPhone] = useState('')
+    const [formLineUserId, setFormLineUserId] = useState('')
+    const [formArea, setFormArea] = useState('')
+    const [formLessonLocation, setFormLessonLocation] = useState('')
+    const [formDatetime1, setFormDatetime1] = useState('')
+    const [formDatetime2, setFormDatetime2] = useState('')
+    const [formDatetime3, setFormDatetime3] = useState('')
+    const [formAvailableTimes, setFormAvailableTimes] = useState('')
+    const [formFrequency, setFormFrequency] = useState('')
+    const [formSkillLevel, setFormSkillLevel] = useState('')
+    const [formNotes, setFormNotes] = useState('')
+    
+    // 2人目情報
+    const [formSecondStudentName, setFormSecondStudentName] = useState('')
+    const [formSecondStudentKana, setFormSecondStudentKana] = useState('')
+    const [formSecondStudentGender, setFormSecondStudentGender] = useState('')
+    const [formSecondStudentBirthDate, setFormSecondStudentBirthDate] = useState('')
+    const [formSendCustomerNotification, setFormSendCustomerNotification] = useState(true)
+
     const supabase = createClient()
 
     useEffect(() => {
         fetchData()
     }, [])
+
+    const handleSelectStudent = (studentId: string) => {
+        const student = students.find(s => s.id === studentId)
+        if (!student) return
+
+        const normalizeGender = (g: string | null | undefined): string => {
+            if (!g) return ''
+            if (g.includes('男')) return '男'
+            if (g.includes('女')) return '女'
+            return 'その他'
+        }
+
+        setFormStudentId(student.id)
+        setFormName(student.full_name || '')
+        setFormFullNameKana(student.full_name_kana || '')
+        setFormGender(normalizeGender(student.gender))
+        setFormBirthDate(student.birth_date || '')
+        setFormEmail(student.contact_email || '')
+        setFormPhone(student.contact_phone || '')
+        setFormLineUserId(student.line_user_id || '')
+        setFormSecondStudentName(student.second_student_name || '')
+        setFormSecondStudentKana(student.second_student_name_kana || '')
+        setFormSecondStudentGender(normalizeGender(student.second_student_gender))
+        setFormSecondStudentBirthDate(student.second_student_birth_date || '')
+        
+        setStudentSearchOpen(false)
+        setStudentSearchQuery(student.full_name || '')
+    }
+
+    const resetForm = () => {
+        setFormStudentId('')
+        setFormName('')
+        setFormFullNameKana('')
+        setFormGender('')
+        setFormBirthDate('')
+        setFormEmail('')
+        setFormPhone('')
+        setFormLineUserId('')
+        setFormArea('')
+        setFormLessonLocation('')
+        setFormDatetime1('')
+        setFormDatetime2('')
+        setFormDatetime3('')
+        setFormAvailableTimes('')
+        setFormFrequency('')
+        setFormSkillLevel('')
+        setFormNotes('')
+        setFormSecondStudentName('')
+        setFormSecondStudentKana('')
+        setFormSecondStudentGender('')
+        setFormSecondStudentBirthDate('')
+        setFormSendCustomerNotification(true)
+        setStudentSearchQuery('')
+    }
+
+    const formatJapaneseDate = (dateStr: string) => {
+        if (!dateStr) return ''
+        const date = new Date(dateStr)
+        if (isNaN(date.getTime())) return ''
+        const weekdays = ['日', '月', '火', '水', '木', '金', '土']
+        const m = date.getMonth() + 1
+        const d = date.getDate()
+        const w = weekdays[date.getDay()]
+        return `${m}月${d}日(${w})`
+    }
+
+    const appendToDatetime = (num: 1 | 2 | 3, text: string) => {
+        if (num === 1) setFormDatetime1(prev => (prev ? prev + ' ' : '') + text)
+        if (num === 2) setFormDatetime2(prev => (prev ? prev + ' ' : '') + text)
+        if (num === 3) setFormDatetime3(prev => (prev ? prev + ' ' : '') + text)
+    }
+
+    const appendToAvailableTimes = (text: string) => {
+        setFormAvailableTimes(prev => (prev ? prev + ', ' : '') + text)
+    }
+
+    const handleCreateLead = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!formName.trim()) {
+            toast.error('名前を入力してください')
+            return
+        }
+
+        setCreatingLead(true)
+        try {
+            const res = await createLeadManuallyAction({
+                name: formName.trim(),
+                full_name_kana: formFullNameKana.trim() || null,
+                gender: formGender || null,
+                birth_date: formBirthDate || null,
+                email: formEmail.trim() || null,
+                phone: formPhone.trim() || null,
+                line_user_id: formLineUserId.trim() || null,
+                area: formArea.trim() || null,
+                lesson_location: formLessonLocation.trim() || null,
+                datetime1: formDatetime1.trim() || null,
+                datetime2: formDatetime2.trim() || null,
+                datetime3: formDatetime3.trim() || null,
+                available_times: formAvailableTimes.trim() || null,
+                frequency: formFrequency.trim() || null,
+                skill_level: formSkillLevel.trim() || null,
+                notes: formNotes.trim() || null,
+                second_student_name: formSecondStudentName.trim() || null,
+                second_student_kana: formSecondStudentKana.trim() || null,
+                second_student_gender: formSecondStudentGender || null,
+                second_student_birth_date: formSecondStudentBirthDate || null,
+                send_customer_notification: formSendCustomerNotification,
+            })
+
+            if (res.success) {
+                toast.success('案件（リード）を手動作成しました')
+                setIsCreateDialogOpen(false)
+                resetForm()
+                await fetchData()
+            } else {
+                toast.error(res.error || '作成に失敗しました')
+            }
+        } catch (error) {
+            console.error(error)
+            toast.error('エラーが発生しました')
+        } finally {
+            setCreatingLead(false)
+        }
+    }
 
     const fetchData = async () => {
         setLoading(true)
@@ -156,6 +338,13 @@ export default function AdminLeadsPage() {
                 .from('google_chat_webhooks')
                 .select('*')
                 .order('space_name', { ascending: true })
+
+            // 既存生徒を取得
+            const { data: studentsData } = await supabase
+                .from('students')
+                .select('*')
+                .order('full_name', { ascending: true })
+            if (studentsData) setStudents(studentsData)
 
             // テンプレートマスタを取得
             const templateRes = await getLeadNotificationTemplateAction()
@@ -417,6 +606,504 @@ export default function AdminLeadsPage() {
                 </TabsList>
 
                 <TabsContent value="leads" className="outline-none space-y-4">
+                    <div className="flex justify-between items-center gap-4">
+                        <p className="text-xs text-gray-500">
+                            ※ 現在アサイン待ちの案件です。レッスン場所を決定して「案件通知」を行ってください。
+                        </p>
+                        <Dialog open={isCreateDialogOpen} onOpenChange={(open) => {
+                            setIsCreateDialogOpen(open)
+                            if (!open) resetForm()
+                        }}>
+                            <DialogTrigger asChild>
+                                <Button size="sm" className="gap-1 text-xs font-semibold whitespace-nowrap">
+                                    <Plus className="h-4 w-4" />
+                                    手動で案件を作成
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                                <DialogHeader>
+                                    <DialogTitle>手動で案件（体験リード）を作成</DialogTitle>
+                                </DialogHeader>
+                                <form onSubmit={handleCreateLead} className="space-y-6 py-4">
+                                    {/* 既存顧客の選択 */}
+                                    <div className="space-y-2">
+                                        <Label className="text-xs font-semibold text-gray-700">対象顧客を選択（既存顧客の場合のみ。新規は空欄のまま手入力）</Label>
+                                        <div className="relative">
+                                            <Input
+                                                placeholder="既存顧客から検索（名前・フリガナ）..."
+                                                className="text-xs h-9 bg-gray-50/50 border-gray-200"
+                                                value={studentSearchQuery}
+                                                onChange={(e) => {
+                                                    setStudentSearchQuery(e.target.value)
+                                                    setStudentSearchOpen(true)
+                                                }}
+                                                onFocus={() => setStudentSearchOpen(true)}
+                                            />
+                                            {formStudentId && (
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="absolute right-2 top-1.5 h-6 text-[10px] text-gray-500 hover:bg-gray-100"
+                                                    onClick={() => {
+                                                        resetForm()
+                                                    }}
+                                                >
+                                                    選択解除
+                                                </Button>
+                                            )}
+                                        </div>
+                                        {studentSearchOpen && (
+                                            <>
+                                                <div 
+                                                    className="fixed inset-0 z-40" 
+                                                    onClick={() => setStudentSearchOpen(false)}
+                                                />
+                                                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-[200px] overflow-y-auto">
+                                                    {students
+                                                        .filter(s => {
+                                                            const query = studentSearchQuery.toLowerCase().trim()
+                                                            if (!query) return true
+                                                            return (
+                                                                s.full_name.toLowerCase().includes(query) ||
+                                                                (s.full_name_kana && s.full_name_kana.toLowerCase().includes(query))
+                                                            )
+                                                        })
+                                                        .map((student) => (
+                                                            <div
+                                                                key={student.id}
+                                                                className="text-xs px-3 py-2 hover:bg-gray-100 cursor-pointer flex justify-between items-center border-b border-gray-50 last:border-b-0"
+                                                                onClick={() => handleSelectStudent(student.id)}
+                                                            >
+                                                                <span className="font-semibold text-gray-800">{student.full_name}</span>
+                                                                <span className="text-[10px] text-gray-400 font-mono">{student.full_name_kana || '-'}</span>
+                                                            </div>
+                                                        ))}
+                                                    {students.filter(s => {
+                                                        const query = studentSearchQuery.toLowerCase().trim()
+                                                        if (!query) return true
+                                                        return (
+                                                            s.full_name.toLowerCase().includes(query) ||
+                                                            (s.full_name_kana && s.full_name_kana.toLowerCase().includes(query))
+                                                        )
+                                                    }).length === 0 && (
+                                                        <div className="text-xs text-gray-500 text-center py-4">
+                                                            顧客が見つかりません
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+
+                                    {/* 基本情報 */}
+                                    <div className="border border-gray-100 rounded-lg p-4 bg-gray-50/20 space-y-4">
+                                        <h3 className="text-xs font-bold text-gray-800">基本情報（生徒情報）</h3>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div className="space-y-1.5">
+                                                <Label htmlFor="formName" className="text-xs font-semibold text-gray-700">氏名 <span className="text-rose-500">*</span></Label>
+                                                <Input
+                                                    id="formName"
+                                                    required
+                                                    value={formName}
+                                                    onChange={(e) => setFormName(e.target.value)}
+                                                    placeholder="例: 山田 太郎"
+                                                    className="text-xs h-9"
+                                                />
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <Label htmlFor="formFullNameKana" className="text-xs font-semibold text-gray-700">フリガナ</Label>
+                                                <Input
+                                                    id="formFullNameKana"
+                                                    value={formFullNameKana}
+                                                    onChange={(e) => setFormFullNameKana(e.target.value)}
+                                                    placeholder="例: ヤマダ タロウ"
+                                                    className="text-xs h-9"
+                                                />
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <Label htmlFor="formGender" className="text-xs font-semibold text-gray-700">性別</Label>
+                                                <Select value={formGender} onValueChange={setFormGender}>
+                                                    <SelectTrigger id="formGender" className="h-9 text-xs">
+                                                        <SelectValue placeholder="性別を選択" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="男" className="text-xs">男</SelectItem>
+                                                        <SelectItem value="女" className="text-xs">女</SelectItem>
+                                                        <SelectItem value="その他" className="text-xs">その他</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <Label htmlFor="formBirthDate" className="text-xs font-semibold text-gray-700">生年月日</Label>
+                                                <Input
+                                                    id="formBirthDate"
+                                                    type="date"
+                                                    value={formBirthDate}
+                                                    onChange={(e) => setFormBirthDate(e.target.value)}
+                                                    className="text-xs h-9"
+                                                />
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <Label htmlFor="formEmail" className="text-xs font-semibold text-gray-700">メールアドレス</Label>
+                                                <Input
+                                                    id="formEmail"
+                                                    type="email"
+                                                    value={formEmail}
+                                                    onChange={(e) => setFormEmail(e.target.value)}
+                                                    placeholder="example@email.com"
+                                                    className="text-xs h-9"
+                                                />
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <Label htmlFor="formPhone" className="text-xs font-semibold text-gray-700">電話番号</Label>
+                                                <Input
+                                                    id="formPhone"
+                                                    value={formPhone}
+                                                    onChange={(e) => setFormPhone(e.target.value)}
+                                                    placeholder="090-0000-0000"
+                                                    className="text-xs h-9"
+                                                />
+                                            </div>
+                                            <div className="space-y-1.5 md:col-span-2">
+                                                <Label htmlFor="formLineUserId" className="text-xs font-semibold text-gray-700">LINE User ID (任意)</Label>
+                                                <Input
+                                                    id="formLineUserId"
+                                                    value={formLineUserId}
+                                                    onChange={(e) => setFormLineUserId(e.target.value)}
+                                                    placeholder="Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                                                    className="text-xs h-9"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* 2人目の情報（ペアレッスン用） */}
+                                    <div className="border border-gray-100 rounded-lg p-4 bg-gray-50/20 space-y-4">
+                                        <h3 className="text-xs font-bold text-gray-800">2人目の情報（ペアレッスンの場合のみ入力）</h3>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div className="space-y-1.5">
+                                                <Label htmlFor="formSecondStudentName" className="text-xs font-semibold text-gray-700">2人目氏名</Label>
+                                                <Input
+                                                    id="formSecondStudentName"
+                                                    value={formSecondStudentName}
+                                                    onChange={(e) => setFormSecondStudentName(e.target.value)}
+                                                    placeholder="例: 山田 次郎"
+                                                    className="text-xs h-9"
+                                                />
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <Label htmlFor="formSecondStudentKana" className="text-xs font-semibold text-gray-700">2人目フリガナ</Label>
+                                                <Input
+                                                    id="formSecondStudentKana"
+                                                    value={formSecondStudentKana}
+                                                    onChange={(e) => setFormSecondStudentKana(e.target.value)}
+                                                    placeholder="例: ヤマダ ジロウ"
+                                                    className="text-xs h-9"
+                                                />
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <Label htmlFor="formSecondStudentGender" className="text-xs font-semibold text-gray-700">2人目性別</Label>
+                                                <Select value={formSecondStudentGender} onValueChange={setFormSecondStudentGender}>
+                                                    <SelectTrigger id="formSecondStudentGender" className="h-9 text-xs">
+                                                        <SelectValue placeholder="性別を選択" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="男" className="text-xs">男</SelectItem>
+                                                        <SelectItem value="女" className="text-xs">女</SelectItem>
+                                                        <SelectItem value="その他" className="text-xs">その他</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <Label htmlFor="formSecondStudentBirthDate" className="text-xs font-semibold text-gray-700">2人目生年月日</Label>
+                                                <Input
+                                                    id="formSecondStudentBirthDate"
+                                                    type="date"
+                                                    value={formSecondStudentBirthDate}
+                                                    onChange={(e) => setFormSecondStudentBirthDate(e.target.value)}
+                                                    className="text-xs h-9"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* 体験レッスン希望条件 */}
+                                    <div className="border border-gray-100 rounded-lg p-4 bg-gray-50/20 space-y-4">
+                                        <h3 className="text-xs font-bold text-gray-800">体験レッスン希望条件</h3>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div className="space-y-1.5">
+                                                <Label htmlFor="formArea" className="text-xs font-semibold text-gray-700">希望エリア/最寄駅</Label>
+                                                <Input
+                                                    id="formArea"
+                                                    value={formArea}
+                                                    onChange={(e) => setFormArea(e.target.value)}
+                                                    placeholder="例: 新宿駅、目黒区周辺"
+                                                    className="text-xs h-9"
+                                                />
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <Label className="text-xs font-semibold text-gray-700">レッスン予定場所の選定 (複数可)</Label>
+                                                <Popover open={facilitySearchOpen} onOpenChange={setFacilitySearchOpen} modal={false}>
+                                                    <PopoverTrigger asChild>
+                                                        <Button variant="outline" className="w-full justify-between h-9 text-xs bg-gray-50/50 border-gray-200">
+                                                            <span className="truncate">{formLessonLocation || '施設を選択...'}</span>
+                                                        </Button>
+                                                    </PopoverTrigger>
+                                                    <PopoverContent className="w-[300px] p-0" align="start">
+                                                        <Command>
+                                                            <CommandInput placeholder="施設を検索..." className="h-8 text-xs" />
+                                                            <CommandList>
+                                                                <CommandEmpty className="py-2 text-center text-xs text-gray-500">見つかりません</CommandEmpty>
+                                                                <CommandGroup>
+                                                                    {facilities.map((facility) => {
+                                                                        const selectedList = formLessonLocation.split(',').map(s => s.trim()).filter(Boolean)
+                                                                        const isChecked = selectedList.includes(facility.name)
+                                                                        return (
+                                                                            <CommandItem
+                                                                                key={facility.id}
+                                                                                value={facility.name}
+                                                                                onSelect={() => {
+                                                                                    let newList = [...selectedList]
+                                                                                    if (isChecked) {
+                                                                                        newList = newList.filter(n => n !== facility.name)
+                                                                                    } else {
+                                                                                        newList.push(facility.name)
+                                                                                    }
+                                                                                    setFormLessonLocation(newList.join(', '))
+                                                                                }}
+                                                                                className="text-xs flex items-center justify-between cursor-pointer py-1.5 px-2"
+                                                                            >
+                                                                                <span>{facility.name}</span>
+                                                                                {isChecked && <span className="text-primary font-bold">✓</span>}
+                                                                            </CommandItem>
+                                                                        )
+                                                                    })}
+                                                                </CommandGroup>
+                                                            </CommandList>
+                                                        </Command>
+                                                    </PopoverContent>
+                                                </Popover>
+                                                <Input
+                                                    value={formLessonLocation}
+                                                    onChange={(e) => setFormLessonLocation(e.target.value)}
+                                                    placeholder="直接入力も可能です"
+                                                    className="text-[11px] h-8 mt-1"
+                                                />
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <Label htmlFor="formFrequency" className="text-xs font-semibold text-gray-700">希望頻度</Label>
+                                                <Input
+                                                    id="formFrequency"
+                                                    value={formFrequency}
+                                                    onChange={(e) => setFormFrequency(e.target.value)}
+                                                    placeholder="例: 月4回、単発"
+                                                    className="text-xs h-9"
+                                                />
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <Label htmlFor="formSkillLevel" className="text-xs font-semibold text-gray-700">泳力レベル・目標</Label>
+                                                <Input
+                                                    id="formSkillLevel"
+                                                    value={formSkillLevel}
+                                                    onChange={(e) => setFormSkillLevel(e.target.value)}
+                                                    placeholder="例: クロールで25m泳げるようになりたい"
+                                                    className="text-xs h-9"
+                                                />
+                                            </div>
+
+                                            {/* 希望日時1 */}
+                                            <div className="space-y-1.5 md:col-span-2 border-t pt-3 mt-1">
+                                                <div className="flex justify-between items-center">
+                                                    <Label htmlFor="formDatetime1" className="text-xs font-bold text-gray-800">希望日時①</Label>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <Input
+                                                            type="date"
+                                                            className="h-7 text-xs w-[130px] p-1 py-0.5"
+                                                            onChange={(e) => {
+                                                                const jDate = formatJapaneseDate(e.target.value)
+                                                                if (jDate) appendToDatetime(1, jDate)
+                                                                e.target.value = '' // リセットして再選択可能に
+                                                            }}
+                                                        />
+                                                        <span className="text-[10px] text-gray-400">←日付追加</span>
+                                                    </div>
+                                                </div>
+                                                <Input
+                                                    id="formDatetime1"
+                                                    value={formDatetime1}
+                                                    onChange={(e) => setFormDatetime1(e.target.value)}
+                                                    placeholder="例: 6月20日(土) 10:00〜12:00"
+                                                    className="text-xs h-9"
+                                                />
+                                                <div className="flex flex-wrap gap-1 mt-1">
+                                                    {['10:00〜12:00', '13:00〜15:00', '15:00〜17:00', '18:00〜20:00', '午前中', '午後'].map((t) => (
+                                                        <Button
+                                                            key={t}
+                                                            type="button"
+                                                            variant="outline"
+                                                            onClick={() => appendToDatetime(1, t)}
+                                                            className="h-5 text-[9px] px-1.5 text-gray-500 border-gray-200"
+                                                        >
+                                                            +{t}
+                                                        </Button>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            {/* 希望日時2 */}
+                                            <div className="space-y-1.5 md:col-span-2 border-t pt-3">
+                                                <div className="flex justify-between items-center">
+                                                    <Label htmlFor="formDatetime2" className="text-xs font-bold text-gray-800">希望日時②</Label>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <Input
+                                                            type="date"
+                                                            className="h-7 text-xs w-[130px] p-1 py-0.5"
+                                                            onChange={(e) => {
+                                                                const jDate = formatJapaneseDate(e.target.value)
+                                                                if (jDate) appendToDatetime(2, jDate)
+                                                                e.target.value = ''
+                                                            }}
+                                                        />
+                                                        <span className="text-[10px] text-gray-400">←日付追加</span>
+                                                    </div>
+                                                </div>
+                                                <Input
+                                                    id="formDatetime2"
+                                                    value={formDatetime2}
+                                                    onChange={(e) => setFormDatetime2(e.target.value)}
+                                                    placeholder="例: 6月21日(日) 13:00〜15:00"
+                                                    className="text-xs h-9"
+                                                />
+                                                <div className="flex flex-wrap gap-1 mt-1">
+                                                    {['10:00〜12:00', '13:00〜15:00', '15:00〜17:00', '18:00〜20:00', '午前中', '午後'].map((t) => (
+                                                        <Button
+                                                            key={t}
+                                                            type="button"
+                                                            variant="outline"
+                                                            onClick={() => appendToDatetime(2, t)}
+                                                            className="h-5 text-[9px] px-1.5 text-gray-500 border-gray-200"
+                                                        >
+                                                            +{t}
+                                                        </Button>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            {/* 希望日時3 */}
+                                            <div className="space-y-1.5 md:col-span-2 border-t pt-3">
+                                                <div className="flex justify-between items-center">
+                                                    <Label htmlFor="formDatetime3" className="text-xs font-bold text-gray-800">希望日時③</Label>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <Input
+                                                            type="date"
+                                                            className="h-7 text-xs w-[130px] p-1 py-0.5"
+                                                            onChange={(e) => {
+                                                                const jDate = formatJapaneseDate(e.target.value)
+                                                                if (jDate) appendToDatetime(3, jDate)
+                                                                e.target.value = ''
+                                                            }}
+                                                        />
+                                                        <span className="text-[10px] text-gray-400">←日付追加</span>
+                                                    </div>
+                                                </div>
+                                                <Input
+                                                    id="formDatetime3"
+                                                    value={formDatetime3}
+                                                    onChange={(e) => setFormDatetime3(e.target.value)}
+                                                    placeholder="例: 6月24日(水) 18:00〜20:00"
+                                                    className="text-xs h-9"
+                                                />
+                                                <div className="flex flex-wrap gap-1 mt-1">
+                                                    {['10:00〜12:00', '13:00〜15:00', '15:00〜17:00', '18:00〜20:00', '午前中', '午後'].map((t) => (
+                                                        <Button
+                                                            key={t}
+                                                            type="button"
+                                                            variant="outline"
+                                                            onClick={() => appendToDatetime(3, t)}
+                                                            className="h-5 text-[9px] px-1.5 text-gray-500 border-gray-200"
+                                                        >
+                                                            +{t}
+                                                        </Button>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            {/* 可能な曜日・時間帯 */}
+                                            <div className="space-y-1.5 md:col-span-2 border-t pt-3">
+                                                <Label htmlFor="formAvailableTimes" className="text-xs font-semibold text-gray-700">可能な曜日・時間帯 (自由入力可)</Label>
+                                                <Textarea
+                                                    id="formAvailableTimes"
+                                                    value={formAvailableTimes}
+                                                    onChange={(e) => setFormAvailableTimes(e.target.value)}
+                                                    placeholder="例: 土日の午前中、平日の夜19時以降 など"
+                                                    className="text-xs min-h-[60px]"
+                                                />
+                                                <div className="flex flex-wrap gap-1 mt-1">
+                                                    {['月曜', '火曜', '水曜', '木曜', '金曜', '土曜', '日曜', '平日', '土日祝', '午前', '午後', '夕方', '夜', '終日'].map((w) => (
+                                                        <Button
+                                                            key={w}
+                                                            type="button"
+                                                            variant="outline"
+                                                            onClick={() => appendToAvailableTimes(w)}
+                                                            className="h-5 text-[9px] px-1.5 text-gray-500 border-gray-200"
+                                                        >
+                                                            +{w}
+                                                        </Button>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            {/* その他要望・メモ */}
+                                            <div className="space-y-1.5 md:col-span-2 border-t pt-3">
+                                                <Label htmlFor="formNotes" className="text-xs font-semibold text-gray-700">その他要望・メモ</Label>
+                                                <Textarea
+                                                    id="formNotes"
+                                                    value={formNotes}
+                                                    onChange={(e) => setFormNotes(e.target.value)}
+                                                    placeholder="特記事項があれば入力してください"
+                                                    className="text-xs min-h-[60px]"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* 顧客通知設定 */}
+                                    <div className="flex items-center space-x-2 border-t pt-4">
+                                        <Switch
+                                            id="formSendCustomerNotification"
+                                            checked={formSendCustomerNotification}
+                                            onCheckedChange={setFormSendCustomerNotification}
+                                        />
+                                        <Label htmlFor="formSendCustomerNotification" className="text-xs font-semibold text-gray-700 cursor-pointer">
+                                            アサイン確定時に顧客へ自動LINE通知を送信する（デフォルトON）
+                                        </Label>
+                                    </div>
+
+                                    <DialogFooter className="border-t pt-4">
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            className="text-xs h-9 px-4 font-semibold"
+                                            onClick={() => setIsCreateDialogOpen(false)}
+                                        >
+                                            キャンセル
+                                        </Button>
+                                        <Button
+                                            type="submit"
+                                            size="sm"
+                                            disabled={creatingLead}
+                                            className="text-xs h-9 px-5 font-semibold"
+                                        >
+                                            {creatingLead ? '作成中...' : '案件を作成する'}
+                                        </Button>
+                                    </DialogFooter>
+                                </form>
+                            </DialogContent>
+                        </Dialog>
+                    </div>
+
                     <div className="border rounded-lg bg-white shadow-xs overflow-hidden">
                         <div className="overflow-x-auto">
                             <Table className="min-w-[1020px] table-fixed">

@@ -33,91 +33,69 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
     const { id } = await params
     const supabase = await createClient()
 
-    // Fetch Student
-    const { data: student } = await supabase
-        .from('students')
-        .select(`
-            *,
-            membership_types:membership_types!students_membership_type_id_fkey (
-                name
-            )
-        `)
-        .eq('id', id)
-        .single()
+    // 1. Fetch Student and User in parallel
+    const [studentRes, userRes] = await Promise.all([
+        supabase
+            .from('students')
+            .select(`
+                *,
+                membership_types:membership_types!students_membership_type_id_fkey (
+                    name
+                )
+            `)
+            .eq('id', id)
+            .single(),
+        supabase.auth.getUser()
+    ])
+
+    const student = studentRes.data
+    const user = userRes.data.user
 
     if (!student) {
         notFound()
     }
 
-    // Fetch Lesson History via RPC (Bypasses RLS)
-    const { data: lessons, error: lessonsError } = await supabase
-        .rpc('get_student_lesson_history_public', {
+    const supabaseAdmin = createAdminClient()
+
+    // 2. Fetch all other data in parallel
+    const [
+        lessonsRes,
+        statusRes,
+        roleRes,
+        coachesRes,
+        trialMastersRes,
+        paymentMethodStatus,
+        studentStatusMastersRes,
+        assignedCoachesRes,
+        schedulesRes
+    ] = await Promise.all([
+        // Fetch Lesson History via RPC (Bypasses RLS)
+        supabase.rpc('get_student_lesson_history_public', {
             p_student_id: student.id
-        })
-
-    if (lessonsError) {
-        console.error('Error fetching student lesson history via RPC:', lessonsError.message, lessonsError)
-    }
-
-    // Fetch Usage Status for Current Month
-    const statusRes = await checkStudentLessonStatus(student.id, new Date().toISOString())
-    const usageData = statusRes.success ? statusRes : null
-
-    // Fetch User Role
-    const { data: { user } } = await supabase.auth.getUser()
-    const isAdmin = user ? (await supabase.from('profiles').select('role').eq('id', user.id).single()).data?.role === 'admin' : false
-
-    // Fetch Coaches for Trial Confirm
-    const { data: coaches } = await supabase
-        .from('profiles')
-        .select('id, full_name')
-        .in('role', ['coach', 'admin', 'owner'])
-        .order('full_name')
-
-    // Fetch Trial Masters
-    const { data: trialMasters } = await supabase
-        .from('lesson_masters')
-        .select('id, name, unit_price, pair_unit_price, email_template_id')
-        .eq('is_trial', true)
-        .eq('active', true)
-        .order('display_order', { ascending: true })
-
-    // Fetch Stripe Status
-    let paymentMethodStatus = null
-    if (student.stripe_customer_id) {
-        paymentMethodStatus = await getStripeCustomerStatus(student.stripe_customer_id)
-    }
-
-    // Fetch Student Status Master
-    const { data: studentStatusMasters } = await supabase
-        .from('student_statuses')
-        .select('id, name, color_class')
-    const statusLabels: Record<string, string> = {}
-    const statusColors: Record<string, string> = {}
-    studentStatusMasters?.forEach((s) => {
-        statusLabels[s.id] = s.name
-        statusColors[s.id] = s.color_class
-    })
-
-    // Fetch All Assigned Coaches
-    const { data: assignedCoaches } = await supabase
-        .from('student_coaches')
-        .select(`
+        }),
+        // Fetch Usage Status for Current Month
+        checkStudentLessonStatus(student.id, new Date().toISOString()),
+        // Fetch User Role
+        user ? supabase.from('profiles').select('role').eq('id', user.id).single() : Promise.resolve({ data: null }),
+        // Fetch Coaches for Trial Confirm
+        supabase.from('profiles').select('id, full_name').in('role', ['coach', 'admin', 'owner']).order('full_name'),
+        // Fetch Trial Masters
+        supabase.from('lesson_masters').select('id, name, unit_price, pair_unit_price, email_template_id').eq('is_trial', true).eq('active', true).order('display_order', { ascending: true }),
+        // Fetch Stripe Status
+        student.stripe_customer_id ? getStripeCustomerStatus(student.stripe_customer_id) : Promise.resolve(null),
+        // Fetch Student Status Master
+        supabase.from('student_statuses').select('id, name, color_class'),
+        // Fetch All Assigned Coaches
+        supabase.from('student_coaches').select(`
             role,
             profiles (
                 id,
                 full_name,
                 avatar_url
             )
-        `)
-        .eq('student_id', student.id)
-
-    const supabaseAdmin = createAdminClient()
-
-    // Fetch Student Schedules (予定一覧)
-    const { data: schedules } = await supabaseAdmin
-        .from('lesson_schedules')
-        .select(`
+        `).eq('student_id', student.id),
+        // Fetch Student Schedules (予定一覧)
+        supabaseAdmin.from('lesson_schedules').select(`
             id,
             title,
             start_time,
@@ -130,10 +108,29 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
             profiles (
                 full_name
             )
-        `)
-        .eq('student_id', student.id)
-        .order('start_time', { ascending: false })
-        .limit(100)
+        `).eq('student_id', student.id).order('start_time', { ascending: false }).limit(100)
+    ])
+
+    const lessons = lessonsRes.data
+    const lessonsError = lessonsRes.error
+    if (lessonsError) {
+        console.error('Error fetching student lesson history via RPC:', lessonsError.message, lessonsError)
+    }
+
+    const usageData = statusRes.success ? statusRes : null
+    const isAdmin = roleRes.data?.role === 'admin'
+    const coaches = coachesRes.data
+    const trialMasters = trialMastersRes.data
+    const studentStatusMasters = studentStatusMastersRes.data
+    const assignedCoaches = assignedCoachesRes.data
+    const schedules = schedulesRes.data
+
+    const statusLabels: Record<string, string> = {}
+    const statusColors: Record<string, string> = {}
+    studentStatusMasters?.forEach((s) => {
+        statusLabels[s.id] = s.name
+        statusColors[s.id] = s.color_class
+    })
 
     // プロフィール名をフラット化
     const formattedSchedules = (schedules || []).map((s: any) => ({

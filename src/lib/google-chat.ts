@@ -16,13 +16,23 @@ export interface GoogleChatCardSection {
  */
 export async function sendGoogleChatMessage(
     webhookUrl: string,
-    text: string
+    text: string,
+    threadKey?: string
 ): Promise<boolean> {
     try {
-        const res = await fetch(webhookUrl, {
+        let targetUrl = webhookUrl
+        const payload: any = { text }
+
+        if (threadKey) {
+            const separator = targetUrl.includes('?') ? '&' : '?'
+            targetUrl = `${targetUrl}${separator}threadKey=${encodeURIComponent(threadKey)}&messageReplyOption=REPLY_MESSAGE_FALLBACK_TO_NEW_THREAD`
+            payload.thread = { threadKey }
+        }
+
+        const res = await fetch(targetUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text })
+            body: JSON.stringify(payload)
         })
         if (!res.ok) {
             console.error('[GoogleChat] Failed to send message:', res.status, await res.text())

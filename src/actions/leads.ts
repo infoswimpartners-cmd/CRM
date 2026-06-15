@@ -56,7 +56,8 @@ export async function sendLeadNotificationAction(
             .from('leads')
             .update({
                 lesson_location: location,
-                status: '募集開始'
+                status: '募集開始',
+                notification_webhook_id: webhookId
             })
             .eq('id', leadId)
 
@@ -126,7 +127,7 @@ export async function sendLeadNotificationAction(
             .replace(/\{\{available_times\}\}/g, lead.available_times || '未設定')
 
         // メッセージ送信
-        const sent = await sendGoogleChatMessage(webhook.webhook_url, message)
+        const sent = await sendGoogleChatMessage(webhook.webhook_url, message, `lead_${leadId}`)
         if (!sent) {
             throw new Error('Google Chatへの通知送信に失敗しました')
         }
@@ -272,7 +273,7 @@ export async function assignLeadAction(leadId: string, confirmedDate: string, co
         }
 
         // 4. 顧客への自動確定通知（LINEプッシュメッセージ）の送信
-        if (lead.line_user_id) {
+        if (lead.line_user_id && lead.send_customer_notification !== false) {
             // app_configs から設定を取得
             const { data: tokenConfig } = await supabase
                 .from('app_configs')
@@ -324,6 +325,34 @@ Swim Partners`
             const success = await lineService.pushMessage(lead.line_user_id, message, token)
             if (!success) {
                 console.error('Failed to send LINE push notification to client')
+            }
+        }
+
+        // 5. アサイン確定の Google Chat 通知を、通知元スペースに送信（スレッド返信）
+        if (lead.notification_webhook_id) {
+            try {
+                const { data: webhook } = await supabase
+                    .from('google_chat_webhooks')
+                    .select('webhook_url')
+                    .eq('id', lead.notification_webhook_id)
+                    .single()
+                
+                if (webhook?.webhook_url) {
+                    let secondStudentNameInfo = ''
+                    if (lead.second_student_name) {
+                        secondStudentNameInfo = `\n・2人目の名前： ${lead.second_student_name} 様`
+                    }
+
+                    const gchatMessage = `✅ *【体験レッスンアサイン確定】*
+案件のアサインが確定いたしました。
+
+*■ 確定顧客*
+・名前： ${lead.name || '未設定'} 様${secondStudentNameInfo}`
+
+                    await sendGoogleChatMessage(webhook.webhook_url, gchatMessage, `lead_${leadId}`)
+                }
+            } catch (gchatErr) {
+                console.error('Failed to send assign notification to Google Chat:', gchatErr)
             }
         }
 
@@ -700,3 +729,76 @@ export async function completeLeadManuallyAction(leadId: string) {
         return { success: false, error: error.message || '完了処理に失敗しました' }
     }
 }
+
+// 15. 体験レッスン案件（リード）を手動で新規作成する
+export async function createLeadManuallyAction(leadData: {
+    name: string
+    full_name_kana?: string | null
+    gender?: string | null
+    birth_date?: string | null
+    email?: string | null
+    phone?: string | null
+    line_user_id?: string | null
+    area?: string | null
+    lesson_location?: string | null
+    datetime1?: string | null
+    datetime2?: string | null
+    datetime3?: string | null
+    available_times?: string | null
+    frequency?: string | null
+    skill_level?: string | null
+    notes?: string | null
+    second_student_name?: string | null
+    second_student_kana?: string | null
+    second_student_gender?: string | null
+    second_student_birth_date?: string | null
+    send_customer_notification?: boolean
+}) {
+    const supabase = await createClient()
+
+    try {
+        // 管理者チェック
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        if (authError || !user) throw new Error('認証エラー: ログインしてください')
+
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single()
+
+        if (profile?.role !== 'admin') {
+            throw new Error('管理者権限が必要です')
+        }
+
+        // 空文字列はnullに置換するクリーンアップ処理（boolean値はそのまま保持）
+        const cleanData: any = {}
+        for (const [key, value] of Object.entries(leadData)) {
+            if (typeof value === 'boolean') {
+                cleanData[key] = value
+            } else {
+                cleanData[key] = value === '' ? null : value
+            }
+        }
+
+        // leadsにインサート
+        const { data, error } = await supabase
+            .from('leads')
+            .insert({
+                ...cleanData,
+                status: '新規',
+                created_at: new Date().toISOString()
+            })
+            .select()
+            .single()
+
+        if (error) throw error
+
+        revalidatePath('/admin/leads')
+        return { success: true, lead: data }
+    } catch (error: any) {
+        console.error('Failed to create lead manually:', error)
+        return { success: false, error: error.message || '手動案件の作成に失敗しました' }
+    }
+}
+
