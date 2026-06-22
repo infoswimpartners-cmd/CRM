@@ -5,10 +5,12 @@ export type LessonData = {
     lesson_date: string
     price: number
     coach_id: string
+    attendance_type?: string
     student_id?: string
     lesson_masters?: {
         id: string
         unit_price: number
+        pair_unit_price?: number | null
         is_trial: boolean
     }
     students?: {
@@ -100,14 +102,18 @@ export function calculateLessonReward(
 
     if (!master) return 0
 
-    let basePrice = master.unit_price
+    // ペアレッスンか判定
+    const isPair = !!lesson.students?.is_two_person_lesson && (!lesson.attendance_type || lesson.attendance_type === 'both')
+    const expectedBasePrice = (isPair && master.pair_unit_price) ? master.pair_unit_price : master.unit_price
+
+    let basePrice = expectedBasePrice
 
     let facilityFee = 0;
-    if (typeof lesson.price === 'number' && lesson.price > master.unit_price) {
+    if (typeof lesson.price === 'number' && lesson.price > expectedBasePrice) {
         // If master has fixed price but lesson record says more, we assume facility fee is the difference 
         // OR we use the predefined facility fee constant if it's a fixed amount system.
         // Current logic assumes the difference is the fee.
-        facilityFee = lesson.price - master.unit_price;
+        facilityFee = lesson.price - expectedBasePrice;
     }
 
     // Check for custom reward price in membership configuration
@@ -147,7 +153,8 @@ export function calculateLessonReward(
     }
 
     // Add 2-person simultaneous lesson bonus
-    if (lesson.students?.is_two_person_lesson && !master.is_trial) {
+    // ペア会員であっても、出席区分が 'both' (または未指定) の場合のみペア手当を加算する
+    if (lesson.students?.is_two_person_lesson && !master.is_trial && (!lesson.attendance_type || lesson.attendance_type === 'both')) {
         reward += settings.pair_bonus
     }
 

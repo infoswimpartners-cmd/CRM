@@ -54,6 +54,7 @@ const formSchema = z.object({
     menu_description: z.string().optional(),
     price: z.coerce.number().min(0, '金額は0円以上である必要があります'),
     schedule_id: z.string().optional(),
+    attendance_type: z.string().optional(),
 })
 
 interface LessonMaster {
@@ -152,6 +153,7 @@ export function LessonReportForm() {
             location: '',
             price: 0,
             schedule_id: scheduleIdFromUrl || '',
+            attendance_type: 'both',
         },
     })
 
@@ -182,6 +184,7 @@ export function LessonReportForm() {
             supabase.from('facilities').select('is_facility_fee_applied').eq('name', schedule.location).single()
                 .then(({ data }) => setIsFacilityFeeApplied(!!data?.is_facility_fee_applied))
         }
+        form.setValue('attendance_type', schedule.attendance_type || 'both')
         setIsTwoPersonLesson(!!student?.is_two_person_lesson)
         setIsDefaultDistantOption(!!student?.is_default_distant_option)
     }
@@ -330,6 +333,7 @@ export function LessonReportForm() {
         // Use core calculation logic to ensure consistency
         const mockLesson: any = {
             price: currentPrice,
+            attendance_type: form.watch('attendance_type') || 'both',
             lesson_masters: masterRaw,
             students: {
                 is_two_person_lesson: isTwoPersonLesson,

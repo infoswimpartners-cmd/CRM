@@ -86,7 +86,7 @@ export async function calculateHistoricalPayments(
     const { data: allLessons, error } = await supabase
         .from('lessons')
         .select(`
-            id, price, lesson_date, coach_id,
+            id, price, lesson_date, coach_id, attendance_type,
             lesson_masters (id, unit_price, is_trial),
             profiles ( distant_reward_fee, role ),
             students (

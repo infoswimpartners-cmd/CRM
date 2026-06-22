@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
@@ -33,6 +33,7 @@ import { LocationSelect } from '@/components/forms/LocationSelect'
 import { updateLessonReport } from '@/actions/report'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { createClient } from '@/lib/supabase/client'
 import {
     Select,
     SelectContent,
@@ -53,6 +54,7 @@ const formSchema = z.object({
     coach_comment: z.string().optional(),
     price: z.number().min(0),
     billing_price: z.number().min(0),
+    attendance_type: z.string().optional(),
 })
 
 interface EditReportDialogProps {
@@ -67,6 +69,16 @@ export function EditReportDialog({ report, lessonMasters, open, onOpenChange, on
     const [loading, setLoading] = useState(false)
     const router = useRouter()
 
+    // 生徒がペア会員（second_student_name または is_two_person_lesson が有効）か判定
+    const studentRaw = report.students
+    const student = Array.isArray(studentRaw) ? studentRaw[0] : studentRaw
+    const isTwoPersonLesson = !!student?.second_student_name || !!student?.is_two_person_lesson
+    const membershipRaw = student?.membership_types
+    const membership = Array.isArray(membershipRaw) ? membershipRaw[0] : membershipRaw
+    const isMonthlyMember = membership && membership.fee > 0
+
+    const [isFacilityFeeApplied, setIsFacilityFeeApplied] = useState(false)
+
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
         defaultValues: {
@@ -79,15 +91,79 @@ export function EditReportDialog({ report, lessonMasters, open, onOpenChange, on
             coach_comment: report.coach_comment || '',
             price: report.price,
             billing_price: report.billing_price !== null && report.billing_price !== undefined ? report.billing_price : report.price,
+            attendance_type: report.attendance_type || 'both',
         },
     })
 
-    const handleLessonMasterChange = (value: string) => {
-        const selectedMaster = lessonMasters.find(m => m.id === value)
-        if (selectedMaster) {
-            form.setValue('price', selectedMaster.unit_price)
-            form.setValue('billing_price', selectedMaster.unit_price)
+    // 場所を監視して施設利用料フラグを更新
+    const selectedLocation = form.watch('location')
+    useEffect(() => {
+        if (!selectedLocation) {
+            setIsFacilityFeeApplied(false)
+            return
         }
+        const fetchFacility = async () => {
+            const supabase = createClient()
+            const { data } = await supabase
+                .from('facilities')
+                .select('is_facility_fee_applied')
+                .eq('name', selectedLocation)
+                .single()
+            setIsFacilityFeeApplied(!!data?.is_facility_fee_applied)
+        }
+        fetchFacility()
+    }, [selectedLocation])
+
+    // 価格再計算処理
+    const recalculatePrices = (
+        masterId: string,
+        attendanceType: string,
+        facilityFeeApplied: boolean
+    ) => {
+        const selectedMaster = lessonMasters.find(m => m.id === masterId)
+        if (!selectedMaster) return
+
+        const facilityFee = facilityFeeApplied ? 1500 : 0
+        
+        // ペア単価の適用判定
+        const applyPairPrice = !!student?.apply_pair_pricing && attendanceType === 'both'
+        
+        let basePrice = selectedMaster.unit_price
+        if (applyPairPrice && selectedMaster.pair_unit_price) {
+            basePrice = selectedMaster.pair_unit_price
+        }
+
+        const totalPrice = basePrice + facilityFee
+        const billingPrice = isMonthlyMember ? facilityFee : totalPrice
+
+        form.setValue('price', totalPrice)
+        form.setValue('billing_price', billingPrice)
+    }
+
+    // 施設利用料変更時の再計算
+    useEffect(() => {
+        const masterId = form.getValues('lesson_master_id')
+        const attendanceType = form.getValues('attendance_type') || 'both'
+        recalculatePrices(masterId, attendanceType, isFacilityFeeApplied)
+    }, [isFacilityFeeApplied])
+
+    const handleLessonMasterChange = (value: string) => {
+        const attendanceType = form.getValues('attendance_type') || 'both'
+        recalculatePrices(value, attendanceType, isFacilityFeeApplied)
+    }
+
+    const handleAttendanceTypeChange = (value: string) => {
+        if (student) {
+            if (value === 'student1') {
+                form.setValue('student_name', student.full_name)
+            } else if (value === 'student2' && student.second_student_name) {
+                form.setValue('student_name', student.second_student_name)
+            } else if (value === 'both' && student.second_student_name) {
+                form.setValue('student_name', `${student.full_name} & ${student.second_student_name}`)
+            }
+        }
+        const masterId = form.getValues('lesson_master_id')
+        recalculatePrices(masterId, value, isFacilityFeeApplied)
     }
 
     const onSubmit = async (values: z.infer<typeof formSchema>) => {
@@ -149,6 +225,37 @@ export function EditReportDialog({ report, lessonMasters, open, onOpenChange, on
                                 </FormItem>
                             )}
                         />
+
+                        {isTwoPersonLesson && (
+                            <FormField
+                                control={form.control}
+                                name="attendance_type"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>出席区分</FormLabel>
+                                        <Select
+                                            onValueChange={(value) => {
+                                                field.onChange(value)
+                                                handleAttendanceTypeChange(value)
+                                            }}
+                                            value={field.value}
+                                        >
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="出席区分を選択" />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                <SelectItem value="both">2名とも出席 (ペア)</SelectItem>
+                                                <SelectItem value="student1">{student?.full_name || '1人目'} のみ出席 (単体)</SelectItem>
+                                                <SelectItem value="student2">{student?.second_student_name || '2人目'} のみ出席 (単体)</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        )}
 
                         <div className="grid grid-cols-2 gap-4">
                             <FormField

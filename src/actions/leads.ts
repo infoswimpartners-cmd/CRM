@@ -338,18 +338,68 @@ Swim Partners`
                     .single()
                 
                 if (webhook?.webhook_url) {
-                    let secondStudentNameInfo = ''
-                    if (lead.second_student_name) {
-                        secondStudentNameInfo = `\n・2人目の名前： ${lead.second_student_name} 様`
-                    }
+                    const { data: templateConfig } = await supabase
+                        .from('app_configs')
+                        .select('value')
+                        .eq('key', 'lead_assigned_notification_template')
+                        .maybeSingle()
 
-                    const gchatMessage = `✅ *【体験レッスンアサイン確定】*
+                    const defaultTemplate = `✅ *【体験レッスンアサイン確定】*
 案件のアサインが確定いたしました。
 
+*■ アサインコーチ*
+・名前： {{coach_name}}
+・確定体験日時： {{confirmed_datetime}}
+・確定体験場所： {{confirmed_location}}
+
 *■ 確定顧客*
-・名前： ${lead.name || '未設定'} 様${secondStudentNameInfo}`
+・名前： {{name}} 様{{second_student_info}}`
+
+                    const bodyTemplate = templateConfig?.value || defaultTemplate
+
+                    let secondStudentNameInfo = ''
+                    if (lead.second_student_name) {
+                        secondStudentNameInfo = `\n·2人目の名前： ${lead.second_student_name} 様`
+                    }
+
+                    const gchatMessage = bodyTemplate
+                        .replace(/\{\{name\}\}/g, lead.name || '未設定')
+                        .replace(/\{\{coach_name\}\}/g, profile.full_name || '未設定')
+                        .replace(/\{\{confirmed_datetime\}\}/g, confirmedDate || '未設定')
+                        .replace(/\{\{confirmed_location\}\}/g, confirmedLocation || '未設定')
+                        .replace(/\{\{second_student_info\}\}/g, secondStudentNameInfo)
 
                     await sendGoogleChatMessage(webhook.webhook_url, gchatMessage, `lead_${leadId}`)
+
+                    // 指定のWebhook（追加通知先）への新規送信
+                    try {
+                        const { data: assignedWebhookConfig } = await supabase
+                            .from('app_configs')
+                            .select('value')
+                            .eq('key', 'lead_assigned_webhook_url')
+                            .maybeSingle()
+
+                        if (assignedWebhookConfig?.value) {
+                            // 追加通知用のテンプレートを取得
+                            const { data: additionalTemplateConfig } = await supabase
+                                .from('app_configs')
+                                .select('value')
+                                .eq('key', 'lead_assigned_additional_webhook_template')
+                                .maybeSingle()
+
+                            const additionalTemplate = additionalTemplateConfig?.value || bodyTemplate
+                            const additionalGchatMessage = additionalTemplate
+                                .replace(/\{\{name\}\}/g, lead.name || '未設定')
+                                .replace(/\{\{coach_name\}\}/g, profile.full_name || '未設定')
+                                .replace(/\{\{confirmed_datetime\}\}/g, confirmedDate || '未設定')
+                                .replace(/\{\{confirmed_location\}\}/g, confirmedLocation || '未設定')
+                                .replace(/\{\{second_student_info\}\}/g, secondStudentNameInfo)
+
+                            await sendGoogleChatMessage(assignedWebhookConfig.value, additionalGchatMessage)
+                        }
+                    } catch (additionalGchatErr) {
+                        console.error('Failed to send additional assign notification:', additionalGchatErr)
+                    }
                 }
             } catch (gchatErr) {
                 console.error('Failed to send assign notification to Google Chat:', gchatErr)
@@ -439,6 +489,163 @@ export async function getLeadNotificationTemplateAction() {
         return { success: false, error: error.message || 'テンプレートの取得に失敗しました' }
     }
 }
+
+// 6.5. 体験レッスンアサイン確定通知（Google Chat）のメッセージテンプレートの取得
+export async function getLeadAssignedNotificationTemplateAction() {
+    const supabase = await createClient()
+
+    try {
+        const { data, error } = await supabase
+            .from('app_configs')
+            .select('value')
+            .eq('key', 'lead_assigned_notification_template')
+            .single()
+
+        if (error && error.code !== 'PGRST116') throw error // PGRST116 is single row empty
+        return { success: true, value: data?.value || '' }
+    } catch (error: any) {
+        console.error('Failed to get lead assigned template:', error)
+        return { success: false, error: error.message || 'アサイン確定通知テンプレートの取得に失敗しました' }
+    }
+}
+
+// 6.6. 体験レッスンアサイン確定通知（Google Chat）のメッセージテンプレートの保存
+export async function saveLeadAssignedNotificationTemplateAction(template: string) {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user?.id || '')
+            .single()
+
+        if (profile?.role !== 'admin') {
+            return { success: false, error: '管理者権限が必要です。' }
+        }
+
+        const supabaseAdmin = createAdminClient()
+        const { error } = await supabaseAdmin
+            .from('app_configs')
+            .upsert({ 
+                key: 'lead_assigned_notification_template', 
+                value: template,
+                description: '体験レッスンアサイン確定時のGoogle Chat向け通知メッセージテンプレート（変数: {{name}}, {{coach_name}}, {{confirmed_datetime}}, {{confirmed_location}}, {{second_student_info}}）'
+            }, { onConflict: 'key' })
+
+        if (error) throw error
+        revalidatePath('/admin/leads')
+        return { success: true }
+    } catch (error: any) {
+        console.error('Failed to save lead assigned template:', error)
+        return { success: false, error: error.message || 'アサイン確定通知テンプレートの保存に失敗しました' }
+    }
+}
+
+// 6.6.5. 体験レッスンアサイン確定追加通知（Google Chat指定Webhook）のメッセージテンプレートの取得
+export async function getLeadAssignedAdditionalWebhookTemplateAction() {
+    const supabase = await createClient()
+
+    try {
+        const { data, error } = await supabase
+            .from('app_configs')
+            .select('value')
+            .eq('key', 'lead_assigned_additional_webhook_template')
+            .single()
+
+        if (error && error.code !== 'PGRST116') throw error // PGRST116 is single row empty
+        return { success: true, value: data?.value || '' }
+    } catch (error: any) {
+        console.error('Failed to get lead assigned additional template:', error)
+        return { success: false, error: error.message || '追加通知テンプレートの取得に失敗しました' }
+    }
+}
+
+// 6.6.6. 体験レッスンアサイン確定追加通知（Google Chat指定Webhook）のメッセージテンプレートの保存
+export async function saveLeadAssignedAdditionalWebhookTemplateAction(template: string) {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user?.id || '')
+            .single()
+
+        if (profile?.role !== 'admin') {
+            return { success: false, error: '管理者権限が必要です。' }
+        }
+
+        const supabaseAdmin = createAdminClient()
+        const { error } = await supabaseAdmin
+            .from('app_configs')
+            .upsert({ 
+                key: 'lead_assigned_additional_webhook_template', 
+                value: template,
+                description: '体験レッスンアサイン確定追加通知（指定Webhook）のメッセージテンプレート（変数: {{name}}, {{coach_name}}, {{confirmed_datetime}}, {{confirmed_location}}, {{second_student_info}}）'
+            }, { onConflict: 'key' })
+
+        if (error) throw error
+        revalidatePath('/admin/leads')
+        return { success: true }
+    } catch (error: any) {
+        console.error('Failed to save lead assigned additional template:', error)
+        return { success: false, error: error.message || '追加通知テンプレートの保存に失敗しました' }
+    }
+}
+
+// 6.7. アサイン確定追加通知先 Webhook URL の取得
+export async function getLeadAssignedWebhookUrlAction() {
+    const supabase = await createClient()
+
+    try {
+        const { data, error } = await supabase
+            .from('app_configs')
+            .select('value')
+            .eq('key', 'lead_assigned_webhook_url')
+            .single()
+
+        if (error && error.code !== 'PGRST116') throw error // PGRST116 is single row empty
+        return { success: true, value: data?.value || '' }
+    } catch (error: any) {
+        console.error('Failed to get lead assigned webhook url:', error)
+        return { success: false, error: error.message || '追加通知先Webhook URLの取得に失敗しました' }
+    }
+}
+
+// 6.8. アサイン確定追加通知先 Webhook URL の保存
+export async function saveLeadAssignedWebhookUrlAction(url: string) {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user?.id || '')
+            .single()
+
+        if (profile?.role !== 'admin') {
+            return { success: false, error: '管理者権限が必要です。' }
+        }
+
+        const supabaseAdmin = createAdminClient()
+        const { error } = await supabaseAdmin
+            .from('app_configs')
+            .upsert({ 
+                key: 'lead_assigned_webhook_url', 
+                value: url,
+                description: '体験レッスンアサイン確定時の追加送信先Google Chat Webhook URL（スレッド指定なしで新規送信されます）'
+            }, { onConflict: 'key' })
+
+        if (error) throw error
+        revalidatePath('/admin/leads')
+        return { success: true }
+    } catch (error: any) {
+        console.error('Failed to save lead assigned webhook url:', error)
+        return { success: false, error: error.message || '追加通知先Webhook URLの保存に失敗しました' }
+    }
+}
+
 
 // 7. 体験レッスン案件通知テンプレートの保存
 export async function saveLeadNotificationTemplateAction(template: string) {
@@ -799,6 +1006,78 @@ export async function createLeadManuallyAction(leadData: {
     } catch (error: any) {
         console.error('Failed to create lead manually:', error)
         return { success: false, error: error.message || '手動案件の作成に失敗しました' }
+    }
+}
+
+// 16. 体験レッスン案件（リード）を手動で更新する
+export async function updateLeadAction(leadId: string, leadData: {
+    name: string
+    full_name_kana?: string | null
+    gender?: string | null
+    birth_date?: string | null
+    email?: string | null
+    phone?: string | null
+    line_user_id?: string | null
+    area?: string | null
+    lesson_location?: string | null
+    datetime1?: string | null
+    datetime2?: string | null
+    datetime3?: string | null
+    available_times?: string | null
+    frequency?: string | null
+    skill_level?: string | null
+    notes?: string | null
+    second_student_name?: string | null
+    second_student_kana?: string | null
+    second_student_gender?: string | null
+    second_student_birth_date?: string | null
+    send_customer_notification?: boolean
+    status?: string | null
+}) {
+    const supabase = await createClient()
+
+    try {
+        // 管理者チェック
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        if (authError || !user) throw new Error('認証エラー: ログインしてください')
+
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single()
+
+        if (profile?.role !== 'admin') {
+            throw new Error('管理者権限が必要です')
+        }
+
+        // 空文字列はnullに置換するクリーンアップ処理（boolean値はそのまま保持）
+        const cleanData: any = {}
+        for (const [key, value] of Object.entries(leadData)) {
+            if (typeof value === 'boolean') {
+                cleanData[key] = value
+            } else {
+                cleanData[key] = value === '' ? null : value
+            }
+        }
+
+        // leadsを更新
+        const { data, error } = await supabase
+            .from('leads')
+            .update({
+                ...cleanData
+            })
+            .eq('id', leadId)
+            .select()
+            .single()
+
+        if (error) throw error
+
+        revalidatePath('/admin/leads')
+        return { success: true, lead: data }
+    } catch (error: any) {
+        console.error('Failed to update lead manually:', error)
+        return { success: false, error: error.message || '案件の更新に失敗しました' }
     }
 }
 

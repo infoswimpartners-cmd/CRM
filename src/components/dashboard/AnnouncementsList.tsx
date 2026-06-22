@@ -12,7 +12,8 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 
 type Announcement = {
     id: string
@@ -24,6 +25,30 @@ type Announcement = {
 
 export function AnnouncementsList({ announcements }: { announcements: Announcement[] }) {
     const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
+    const searchParams = useSearchParams();
+
+    useEffect(() => {
+        const announcementId = searchParams.get('announcementId');
+        if (announcementId) {
+            const found = announcements.find(a => a.id === announcementId);
+            if (found) {
+                setSelectedAnnouncement(found);
+            }
+        }
+    }, [searchParams, announcements]);
+
+    const handleOpenChange = (open: boolean, item: Announcement) => {
+        if (open) {
+            setSelectedAnnouncement(item);
+        } else {
+            setSelectedAnnouncement(null);
+            if (typeof window !== 'undefined') {
+                const url = new URL(window.location.href);
+                url.searchParams.delete('announcementId');
+                window.history.replaceState({}, '', url.pathname + url.search);
+            }
+        }
+    };
 
     return (
         <Card className="border-slate-200 shadow-sm overflow-hidden w-full">
@@ -41,7 +66,7 @@ export function AnnouncementsList({ announcements }: { announcements: Announceme
                 ) : (
                     <div className="divide-y divide-slate-100">
                         {announcements.map((item) => (
-                            <Dialog key={item.id}>
+                            <Dialog key={item.id} open={selectedAnnouncement?.id === item.id} onOpenChange={(open) => handleOpenChange(open, item)}>
                                 <DialogTrigger asChild>
                                     <div
                                         className="p-4 hover:bg-slate-50 transition-colors cursor-pointer group text-left w-full"

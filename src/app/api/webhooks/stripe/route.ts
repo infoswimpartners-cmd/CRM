@@ -288,6 +288,19 @@ export async function POST(req: NextRequest) {
                         const ticketCount = planData?.ticket_count ?? 0
                         const planDisplayName = planData?.name || (isPackage ? 'パッケージプラン（一括）入会' : 'Swim Partners 月謝プラン入会')
 
+                        // 適用開始日（翌月1日）の文字列を計算（パッケージの場合は本日）
+                        const now = new Date()
+                        const jstNow = new Date(now.getTime() + (9 * 60 * 60 * 1000))
+                        let nextYear = jstNow.getUTCFullYear()
+                        let nextMonth = jstNow.getUTCMonth() + 2
+                        if (nextMonth > 12) {
+                            nextMonth = 1
+                            nextYear += 1
+                        }
+                        const startDateStr = isPackage 
+                            ? `${jstNow.getUTCFullYear()}年${jstNow.getUTCMonth() + 1}月${jstNow.getUTCDate()}日`
+                            : `${nextYear}年${nextMonth}月1日`
+
                         let student = null
                         if (studentId) {
                             console.log(`[Stripe Webhook] Searching student by metadata studentId: ${studentId}`)
@@ -358,13 +371,13 @@ export async function POST(req: NextRequest) {
 
                             if (student.contact_email) {
                                 try {
-                                    await emailService.sendTriggerEmail('payment_success', student.contact_email, {
+                                    await emailService.sendTriggerEmail('enrollment_completed', student.contact_email, {
                                         name: student.full_name,
-                                        title: planDisplayName,
-                                        amount: (session.amount_total || 0).toLocaleString() + '円'
+                                        plan_name: planDisplayName,
+                                        start_date: startDateStr
                                     })
                                 } catch (e) {
-                                    console.error('[Stripe Webhook] Failed to send email:', e)
+                                    console.error('[Stripe Webhook] Failed to send enrollment email:', e)
                                 }
                             }
                         } else {
@@ -412,13 +425,13 @@ export async function POST(req: NextRequest) {
 
                             if (customerEmail) {
                                 try {
-                                    await emailService.sendTriggerEmail('payment_success', customerEmail, {
+                                    await emailService.sendTriggerEmail('enrollment_completed', customerEmail, {
                                         name: customerName,
-                                        title: planDisplayName,
-                                        amount: (session.amount_total || 0).toLocaleString() + '円'
+                                        plan_name: planDisplayName,
+                                        start_date: startDateStr
                                     })
                                 } catch (e) {
-                                    console.error('[Stripe Webhook] Failed to send email to new student:', e)
+                                    console.error('[Stripe Webhook] Failed to send enrollment email to new student:', e)
                                 }
                             }
                         }

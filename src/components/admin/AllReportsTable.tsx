@@ -32,7 +32,19 @@ export async function AllReportsTable() {
             lesson_masters (
                 name,
                 is_trial,
-                unit_price
+                unit_price,
+                pair_unit_price
+            ),
+            students (
+                id,
+                full_name,
+                second_student_name,
+                is_two_person_lesson,
+                apply_pair_pricing,
+                membership_types (
+                    id,
+                    fee
+                )
             )
         `)
 

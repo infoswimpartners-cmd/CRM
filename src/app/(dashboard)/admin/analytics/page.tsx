@@ -42,6 +42,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
         .select(`
             id,
             price,
+            attendance_type,
             coach_id,
             lesson_date,
             student_id,

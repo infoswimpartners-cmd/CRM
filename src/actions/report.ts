@@ -18,6 +18,7 @@ const formSchema = z.object({
     price: z.number().min(0),
     billing_price: z.number().min(0).optional(),
     schedule_id: z.string().optional(),
+    attendance_type: z.string().optional(),
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -83,6 +84,7 @@ export async function submitLessonReport(values: FormValues) {
             location: data.location,
             menu_description: data.menu_description || '',
             price: data.price,
+            attendance_type: data.attendance_type || 'both',
             // billing_price: billingPrice, // Temporarily disabled due to schema mismatch
         }).select('id').single()
 
@@ -307,7 +309,7 @@ export async function updateLessonReport(lessonId: string, values: FormValues) {
 
     const { data: master } = await supabaseAdmin
         .from('lesson_masters')
-        .select('unit_price')
+        .select('unit_price, pair_unit_price')
         .eq('id', data.lesson_master_id)
         .single()
 
@@ -318,7 +320,23 @@ export async function updateLessonReport(lessonId: string, values: FormValues) {
         .single()
 
     const facilityFee = facility?.is_facility_fee_applied ? 1500 : 0
-    data.price = (master?.unit_price ?? data.price) + facilityFee
+
+    // ペア価格を適用するか判定
+    let basePrice = master?.unit_price ?? data.price
+    if (data.student_id) {
+        const { data: student } = await supabaseAdmin
+            .from('students')
+            .select('apply_pair_pricing')
+            .eq('id', data.student_id)
+            .single()
+
+        const applyPairPrice = !!student?.apply_pair_pricing && (data.attendance_type === 'both' || !data.attendance_type)
+        if (applyPairPrice && master?.pair_unit_price) {
+            basePrice = master.pair_unit_price
+        }
+    }
+
+    data.price = basePrice + facilityFee
 
     // Recalculate billing price only if not provided
     let billingPrice = data.billing_price
@@ -346,7 +364,8 @@ export async function updateLessonReport(lessonId: string, values: FormValues) {
         console.log('Updating lesson report:', lessonId, {
             lesson_master_id: data.lesson_master_id,
             price: data.price,
-            billing_price: billingPrice
+            billing_price: billingPrice,
+            attendance_type: data.attendance_type
         })
 
         const { error } = await supabaseAdmin.from('lessons').update({
@@ -358,7 +377,8 @@ export async function updateLessonReport(lessonId: string, values: FormValues) {
             menu_description: data.menu_description || '',
             coach_comment: data.coach_comment || '',
             price: data.price,
-            billing_price: billingPrice
+            billing_price: billingPrice,
+            attendance_type: data.attendance_type || 'both'
         }).eq('id', lessonId)
 
         if (error) {
@@ -579,6 +599,7 @@ const adminProxySchema = z.object({
     menu_description: z.string().optional(),
     coach_comment: z.string().optional(),
     price: z.number().min(0),
+    attendance_type: z.string().optional(),
 })
 
 type AdminProxyValues = z.infer<typeof adminProxySchema>
@@ -618,10 +639,25 @@ export async function submitAdminProxyReport(values: AdminProxyValues) {
     // 5. レッスン単価を取得して最終金額を計算
     const { data: master } = await supabaseAdmin
         .from('lesson_masters')
-        .select('unit_price, is_trial, name')
+        .select('unit_price, pair_unit_price, is_trial, name')
         .eq('id', data.lesson_master_id)
         .single()
-    const finalPrice = (master?.unit_price ?? data.price) + facilityFee
+
+    // ペア価格を適用するか判定
+    let basePrice = master?.unit_price ?? data.price
+    if (data.student_id) {
+        const { data: student } = await supabaseAdmin
+            .from('students')
+            .select('apply_pair_pricing')
+            .eq('id', data.student_id)
+            .single()
+
+        const applyPairPrice = !!student?.apply_pair_pricing && (data.attendance_type === 'both' || !data.attendance_type)
+        if (applyPairPrice && master?.pair_unit_price) {
+            basePrice = master.pair_unit_price
+        }
+    }
+    const finalPrice = basePrice + facilityFee
 
     // 6. 請求金額計算（月会員は施設利用料のみ）
     let billingPrice = finalPrice
@@ -652,6 +688,7 @@ export async function submitAdminProxyReport(values: AdminProxyValues) {
             coach_comment: data.coach_comment || '',
             price: finalPrice,
             billing_price: billingPrice,
+            attendance_type: data.attendance_type || 'both',
         })
 
         if (error) throw new Error(error.message)

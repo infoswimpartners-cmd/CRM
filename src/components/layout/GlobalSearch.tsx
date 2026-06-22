@@ -11,7 +11,15 @@ import {
     Search,
     PlusCircle,
     LogOut,
-    ShieldCheck
+    ShieldCheck,
+    DollarSign,
+    FileCheck,
+    UserPlus,
+    Crown,
+    History,
+    Megaphone,
+    Mail,
+    BookOpen
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 
@@ -31,8 +39,11 @@ interface GlobalSearchProps {
     students: {
         id: string
         full_name: string
+        full_name_kana?: string | null
         avatar_url: string | null
         student_number?: string | null
+        contact_email?: string | null
+        contact_phone?: string | null
     }[]
     coaches?: {
         id: string
@@ -40,12 +51,62 @@ interface GlobalSearchProps {
         avatar_url: string | null
         coach_number?: string | null
     }[]
+    leads?: {
+        id: string
+        name: string | null
+        full_name_kana: string | null
+        email: string | null
+        phone: string | null
+    }[]
+    announcements?: {
+        id: string
+        title: string
+        content: string | null
+        published_at?: string | null
+    }[]
     isAdmin: boolean
 }
 
-export function GlobalSearch({ students, coaches = [], isAdmin }: GlobalSearchProps) {
+export function GlobalSearch({ students, coaches = [], leads = [], announcements = [], isAdmin }: GlobalSearchProps) {
     const [open, setOpen] = React.useState(false)
     const router = useRouter()
+
+    const pages = React.useMemo(() => {
+        if (isAdmin) {
+            return [
+                { title: "ダッシュボード", path: "/admin", icon: LayoutDashboard },
+                { title: "分析・集計", path: "/admin/analytics", icon: DollarSign },
+                { title: "全レッスン報告", path: "/admin/reports", icon: Calendar },
+                { title: "報酬支払管理", path: "/admin/finance/payouts", icon: CreditCard },
+                { title: "請求・決済管理", path: "/admin/approvals", icon: FileCheck },
+                { title: "体験申込リード管理", path: "/admin/leads", icon: UserPlus },
+                { title: "全体スケジュール", path: "/admin/schedule", icon: Calendar },
+                { title: "会員管理", path: "/customers", icon: Users },
+                { title: "TRIO管理", path: "/admin/trio", icon: Crown },
+                { title: "コーチ管理", path: "/admin/coaches", icon: User },
+                { title: "レッスン履歴", path: "/coach/history", icon: History },
+                { title: "レッスン報告", path: "/coach/report", icon: PlusCircle },
+                { title: "マスタ設定", path: "/admin/masters", icon: Settings },
+                { title: "お知らせ管理", path: "/admin/announcements", icon: Megaphone },
+                { title: "メール設定", path: "/admin/email-templates", icon: Mail },
+                { title: "全体設定", path: "/admin/settings", icon: Settings },
+                { title: "管理者マニュアル", path: "/admin/manual", icon: BookOpen },
+                { title: "コーチマニュアル", path: "/coach/manual", icon: BookOpen },
+            ]
+        } else {
+            return [
+                { title: "ダッシュボード", path: "/coach", icon: LayoutDashboard },
+                { title: "生徒一覧", path: "/students", icon: Users },
+                { title: "案件紹介一覧", path: "/coach/leads", icon: UserPlus },
+                { title: "スケジュール管理", path: "/coach/schedule", icon: Calendar },
+                { title: "レッスン履歴", path: "/coach/history", icon: History },
+                { title: "レッスン報告", path: "/coach/report", icon: PlusCircle },
+                { title: "支払い通知書一覧", path: "/finance", icon: DollarSign },
+                { title: "アカウント設定", path: "/settings", icon: Settings },
+                { title: "コーチマニュアル", path: "/coach/manual", icon: BookOpen },
+            ]
+        }
+    }, [isAdmin])
 
     React.useEffect(() => {
         const down = (e: KeyboardEvent) => {
@@ -78,52 +139,61 @@ export function GlobalSearch({ students, coaches = [], isAdmin }: GlobalSearchPr
                 </kbd>
             </Button>
             <CommandDialog open={open} onOpenChange={setOpen}>
-                <CommandInput placeholder="名前、ID、ページ名で検索..." />
+                <CommandInput placeholder="名前、ID、ページ名、お知らせで検索..." />
                 <CommandList className="max-h-[450px]">
                     <CommandEmpty>結果が見つかりませんでした。</CommandEmpty>
 
-                    <CommandGroup heading="クイックアクセス">
-                        <CommandItem onSelect={() => runCommand(() => router.push(isAdmin ? '/admin' : '/coach'))}>
-                            <LayoutDashboard className="mr-2 h-4 w-4" />
-                            <span>ダッシュボード</span>
-                        </CommandItem>
-                        {isAdmin ? (
-                            <>
-                                <CommandItem onSelect={() => runCommand(() => router.push('/admin/analytics'))}>
-                                    <CreditCard className="mr-2 h-4 w-4" />
-                                    <span>分析・集計</span>
-                                </CommandItem>
-                                <CommandItem onSelect={() => runCommand(() => router.push('/customers'))}>
-                                    <Users className="mr-2 h-4 w-4" />
-                                    <span>会員管理</span>
-                                </CommandItem>
-                            </>
-                        ) : (
-                            <>
-                                <CommandItem onSelect={() => runCommand(() => router.push('/students'))}>
-                                    <Users className="mr-2 h-4 w-4" />
-                                    <span>生徒一覧</span>
-                                </CommandItem>
-                                <CommandItem onSelect={() => runCommand(() => router.push('/finance'))}>
-                                    <CreditCard className="mr-2 h-4 w-4" />
-                                    <span>売上確認</span>
-                                </CommandItem>
-                            </>
-                        )}
-                        <CommandItem onSelect={() => runCommand(() => router.push('/coach/schedule'))}>
-                            <Calendar className="mr-2 h-4 w-4" />
-                            <span>スケジュール</span>
-                        </CommandItem>
+                    <CommandGroup heading="ページ・機能">
+                        {pages.map((page) => (
+                            <CommandItem
+                                key={page.path}
+                                onSelect={() => runCommand(() => router.push(page.path))}
+                                value={page.title}
+                            >
+                                <page.icon className="mr-2 h-4 w-4 text-slate-500" />
+                                <span>{page.title}</span>
+                            </CommandItem>
+                        ))}
                     </CommandGroup>
 
                     <CommandSeparator />
 
-                    <CommandGroup heading="生徒・顧客">
+                    {announcements.length > 0 && (
+                        <>
+                            <CommandGroup heading="お知らせ">
+                                {announcements.map((announcement) => (
+                                    <CommandItem
+                                        key={announcement.id}
+                                        onSelect={() => runCommand(() => {
+                                            const targetUrl = isAdmin
+                                                ? `/admin/announcements/${announcement.id}/edit`
+                                                : `/coach?announcementId=${announcement.id}`
+                                            router.push(targetUrl)
+                                        })}
+                                        value={`${announcement.title} ${announcement.content || ''}`}
+                                    >
+                                        <Megaphone className="mr-2 h-4 w-4 text-blue-500 shrink-0" />
+                                        <div className="flex flex-col min-w-0">
+                                            <span className="font-medium truncate">{announcement.title}</span>
+                                            {announcement.content && (
+                                                <span className="text-[10px] text-slate-400 line-clamp-1 truncate">
+                                                    {announcement.content}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </CommandItem>
+                                ))}
+                            </CommandGroup>
+                            <CommandSeparator />
+                        </>
+                    )}
+
+                    <CommandGroup heading="生徒・既存顧客">
                         {students.map((student) => (
                             <CommandItem
                                 key={student.id}
                                 onSelect={() => runCommand(() => router.push(isAdmin ? `/customers/${student.id}` : `/students/${student.id}`))}
-                                value={`${student.full_name} ${student.student_number || ''}`}
+                                value={`${student.full_name} ${student.full_name_kana || ''} ${student.student_number || ''} ${student.contact_email || ''} ${student.contact_phone || ''}`}
                             >
                                 <Avatar className="mr-2 h-6 w-6">
                                     <AvatarImage src={student.avatar_url || undefined} />
@@ -131,15 +201,53 @@ export function GlobalSearch({ students, coaches = [], isAdmin }: GlobalSearchPr
                                         {student.full_name[0]}
                                     </AvatarFallback>
                                 </Avatar>
-                                <div className="flex flex-col">
-                                    <span className="font-medium">{student.full_name}</span>
-                                    {student.student_number && (
-                                        <span className="text-[10px] text-slate-400 font-mono">#{student.student_number}</span>
-                                    )}
+                                <div className="flex flex-col min-w-0">
+                                    <span className="font-medium truncate flex items-center gap-2">
+                                        {student.full_name}
+                                        {student.full_name_kana && (
+                                            <span className="text-[10px] text-slate-400 font-normal">({student.full_name_kana})</span>
+                                        )}
+                                    </span>
+                                    <div className="flex gap-2 text-[10px] text-slate-400">
+                                        {student.student_number && <span className="font-mono">#{student.student_number}</span>}
+                                        {student.contact_phone && <span>{student.contact_phone}</span>}
+                                    </div>
                                 </div>
                             </CommandItem>
                         ))}
                     </CommandGroup>
+
+                    <CommandSeparator />
+
+                    {leads.length > 0 && (
+                        <>
+                            <CommandGroup heading="体験申込リード（見込み顧客）">
+                                {leads.map((lead) => (
+                                    <CommandItem
+                                        key={lead.id}
+                                        onSelect={() => runCommand(() => router.push(isAdmin ? `/admin/leads?search=${encodeURIComponent(lead.name || '')}` : `/coach/leads`))}
+                                        value={`${lead.name || ''} ${lead.full_name_kana || ''} ${lead.email || ''} ${lead.phone || ''}`}
+                                    >
+                                        <UserPlus className="mr-2 h-4 w-4 text-emerald-500 shrink-0" />
+                                        <div className="flex flex-col min-w-0">
+                                            <span className="font-medium truncate flex items-center gap-2">
+                                                {lead.name || '名前未設定'}
+                                                {lead.full_name_kana && (
+                                                    <span className="text-[10px] text-slate-400 font-normal">({lead.full_name_kana})</span>
+                                                )}
+                                            </span>
+                                            {(lead.email || lead.phone) && (
+                                                <span className="text-[10px] text-slate-400 truncate">
+                                                    {[lead.phone, lead.email].filter(Boolean).join(' | ')}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </CommandItem>
+                                ))}
+                            </CommandGroup>
+                            <CommandSeparator />
+                        </>
+                    )}
 
                     {isAdmin && coaches.length > 0 && (
                         <>
