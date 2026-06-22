@@ -41,7 +41,7 @@ export async function AllReportsTable() {
                 second_student_name,
                 is_two_person_lesson,
                 apply_pair_pricing,
-                membership_types (
+                membership_types!students_membership_type_id_fkey (
                     id,
                     fee
                 )

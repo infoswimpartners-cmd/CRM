@@ -37,9 +37,39 @@ export function AllReportsTableClient({ initialReports, lessonMasters }: AllRepo
     const [studentFilter, setStudentFilter] = useState('')
     const [menuFilter, setMenuFilter] = useState('')
     const [typeFilter, setTypeFilter] = useState('all')
+    const [searchQuery, setSearchQuery] = useState('')
+    const [selectedMonth, setSelectedMonth] = useState('all')
+
+    // レッスン報告が存在する月の一覧（重複なし、降順）を取得
+    const months = useMemo(() => {
+        const set = new Set<string>()
+        initialReports.forEach(report => {
+            if (report.lesson_date) {
+                set.add(format(new Date(report.lesson_date), 'yyyy-MM'))
+            }
+        })
+        return Array.from(set).sort((a, b) => b.localeCompare(a))
+    }, [initialReports])
 
     const filteredReports = useMemo(() => {
         return initialReports.filter(report => {
+            // 全体検索（生徒名・コーチ名・メニュー内容を部分一致検索）
+            if (searchQuery) {
+                const query = searchQuery.toLowerCase()
+                const studentName = (report.student_name || '').toLowerCase()
+                const coachName = (report.profiles?.full_name || '').toLowerCase()
+                const menuDesc = (report.menu_description || '').toLowerCase()
+                if (!studentName.includes(query) && !coachName.includes(query) && !menuDesc.includes(query)) {
+                    return false
+                }
+            }
+
+            // 月選択フィルタ
+            if (selectedMonth !== 'all') {
+                const reportMonth = format(new Date(report.lesson_date), 'yyyy-MM')
+                if (reportMonth !== selectedMonth) return false
+            }
+
             // 日付フィルタ
             const formattedDate = format(new Date(report.lesson_date), 'yyyy/MM/dd', { locale: ja })
             if (dateFilter && !formattedDate.includes(dateFilter)) return false
@@ -65,7 +95,7 @@ export function AllReportsTableClient({ initialReports, lessonMasters }: AllRepo
 
             return true
         })
-    }, [initialReports, dateFilter, coachFilter, studentFilter, menuFilter, typeFilter])
+    }, [initialReports, searchQuery, selectedMonth, dateFilter, coachFilter, studentFilter, menuFilter, typeFilter])
 
     const resetFilters = () => {
         setDateFilter('')
@@ -73,25 +103,54 @@ export function AllReportsTableClient({ initialReports, lessonMasters }: AllRepo
         setStudentFilter('')
         setMenuFilter('')
         setTypeFilter('all')
+        setSearchQuery('')
+        setSelectedMonth('all')
     }
 
-    const hasFilters = dateFilter || coachFilter || studentFilter || menuFilter || typeFilter !== 'all'
+    const hasFilters = dateFilter || coachFilter || studentFilter || menuFilter || typeFilter !== 'all' || searchQuery || selectedMonth !== 'all'
 
     return (
         <div className="space-y-4">
-            {hasFilters && (
-                <div className="flex justify-end">
+            <div className="flex flex-col sm:flex-row gap-3 items-end sm:items-center justify-between pb-2">
+                <div className="flex flex-1 flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                    <div className="relative flex-1 sm:max-w-xs">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                        <Input
+                            placeholder="生徒名、コーチ名、メニューで検索..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="pl-9 h-10 bg-white border-slate-200 focus-visible:ring-blue-400"
+                        />
+                    </div>
+                    <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                        <SelectTrigger className="w-full sm:w-[180px] h-10 bg-white border-slate-200">
+                            <SelectValue placeholder="対象月を選択" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">すべての月</SelectItem>
+                            {months.map(m => {
+                                const [year, month] = m.split('-')
+                                return (
+                                    <SelectItem key={m} value={m}>
+                                        {year}年{month}月
+                                    </SelectItem>
+                                )
+                            })}
+                        </SelectContent>
+                    </Select>
+                </div>
+                {hasFilters && (
                     <Button 
                         variant="ghost" 
                         size="sm" 
                         onClick={resetFilters}
-                        className="text-slate-500 hover:text-slate-900 h-8 px-2 text-xs"
+                        className="text-slate-500 hover:text-slate-900 h-8 px-2 text-xs self-end sm:self-auto"
                     >
                         <X className="h-3 w-3 mr-1" />
                         フィルタをクリア
                     </Button>
-                </div>
-            )}
+                )}
+            </div>
             
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm transition-all duration-300">
                 <Table>
