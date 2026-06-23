@@ -53,6 +53,7 @@ const formSchema = z.object({
     menu_description: z.string().optional(),
     coach_comment: z.string().optional(),
     price: z.number().min(0),
+    attendance_type: z.string().optional(),
 })
 
 interface AdminCreateReportDialogProps {
@@ -66,6 +67,8 @@ export function AdminCreateReportDialog({ open, onOpenChange }: AdminCreateRepor
     const [lessonMasters, setLessonMasters] = useState<any[]>([])
     const [students, setStudents] = useState<any[]>([])
     const [restrictedLessonIds, setRestrictedLessonIds] = useState<string[] | null>(null)
+    const [isTwoPersonLesson, setIsTwoPersonLesson] = useState(false)
+    const [selectedStudent, setSelectedStudent] = useState<any>(null)
     const router = useRouter()
 
     const form = useForm<z.infer<typeof formSchema>>({
@@ -81,6 +84,7 @@ export function AdminCreateReportDialog({ open, onOpenChange }: AdminCreateRepor
             menu_description: '',
             coach_comment: '',
             price: 0,
+            attendance_type: 'both',
         },
     })
 
@@ -100,6 +104,8 @@ export function AdminCreateReportDialog({ open, onOpenChange }: AdminCreateRepor
         form.reset()
         setStudents([])
         setRestrictedLessonIds(null)
+        setIsTwoPersonLesson(false)
+        setSelectedStudent(null)
     }, [open, form])
 
     // コーチが変わったら担当生徒を再フェッチ
@@ -126,6 +132,8 @@ export function AdminCreateReportDialog({ open, onOpenChange }: AdminCreateRepor
             // コーチ変更時に生徒選択をリセット
             form.setValue('student_id', '')
             form.setValue('student_name', '')
+            setIsTwoPersonLesson(false)
+            setSelectedStudent(null)
         }
         fetchStudents()
     }, [selectedCoachId, form])
@@ -176,6 +184,18 @@ export function AdminCreateReportDialog({ open, onOpenChange }: AdminCreateRepor
         ? lessonMasters.filter(m => restrictedLessonIds.includes(m.id))
         : lessonMasters
 
+    const handleAttendanceTypeChange = (value: string) => {
+        if (selectedStudent) {
+            if (value === 'student1') {
+                form.setValue('student_name', selectedStudent.full_name)
+            } else if (value === 'student2' && selectedStudent.second_student_name) {
+                form.setValue('student_name', selectedStudent.second_student_name)
+            } else if (value === 'both' && selectedStudent.second_student_name) {
+                form.setValue('student_name', `${selectedStudent.full_name} & ${selectedStudent.second_student_name}`)
+            }
+        }
+    }
+
     const onSubmit = async (values: z.infer<typeof formSchema>) => {
         setLoading(true)
         try {
@@ -190,6 +210,7 @@ export function AdminCreateReportDialog({ open, onOpenChange }: AdminCreateRepor
                 menu_description: values.menu_description || '',
                 coach_comment: values.coach_comment || '',
                 price: values.price,
+                attendance_type: values.attendance_type || 'both',
             })
 
             if (!result.success) throw new Error(result.error)
@@ -257,9 +278,11 @@ export function AdminCreateReportDialog({ open, onOpenChange }: AdminCreateRepor
                                     <div className="flex gap-2">
                                         <Select
                                             value={form.watch('student_id') || ''}
-                                            onValueChange={(val) => {
+                                            onValueChange={async (val) => {
                                                 if (val === '__manual__') {
                                                     form.setValue('student_id', '')
+                                                    setIsTwoPersonLesson(false)
+                                                    setSelectedStudent(null)
                                                 } else {
                                                     const s = students.find(s => s.id === val)
                                                     form.setValue('student_id', val)
@@ -267,6 +290,21 @@ export function AdminCreateReportDialog({ open, onOpenChange }: AdminCreateRepor
                                                         ? `${s.full_name} & ${s.second_student_name}`
                                                         : s?.full_name || ''
                                                     form.setValue('student_name', displayName)
+
+                                                    const supabase = createClient()
+                                                    const { data: studentData } = await supabase
+                                                        .from('students')
+                                                        .select('is_two_person_lesson, apply_pair_pricing, full_name, second_student_name')
+                                                        .eq('id', val)
+                                                        .single()
+
+                                                    if (studentData) {
+                                                        setSelectedStudent(studentData)
+                                                        setIsTwoPersonLesson(!!studentData.is_two_person_lesson)
+                                                    } else {
+                                                        setIsTwoPersonLesson(false)
+                                                        setSelectedStudent(null)
+                                                    }
                                                 }
                                             }}
                                             disabled={!selectedCoachId}
@@ -296,6 +334,37 @@ export function AdminCreateReportDialog({ open, onOpenChange }: AdminCreateRepor
                                 </FormItem>
                             )}
                         />
+
+                        {isTwoPersonLesson && (
+                            <FormField
+                                control={form.control}
+                                name="attendance_type"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>出席区分</FormLabel>
+                                        <Select
+                                            onValueChange={(value) => {
+                                                field.onChange(value)
+                                                handleAttendanceTypeChange(value)
+                                            }}
+                                            value={field.value}
+                                        >
+                                            <FormControl>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="出席区分を選択" />
+                                                </SelectTrigger>
+                                            </FormControl>
+                                            <SelectContent>
+                                                <SelectItem value="both">2名とも出席 (ペア)</SelectItem>
+                                                <SelectItem value="student1">{selectedStudent?.full_name || '1人目'} のみ出席 (単体)</SelectItem>
+                                                <SelectItem value="student2">{selectedStudent?.second_student_name || '2人目'} のみ出席 (単体)</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                        )}
 
                         <div className="grid grid-cols-2 gap-4">
                             {/* レッスン種類 */}

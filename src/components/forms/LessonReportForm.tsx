@@ -61,6 +61,7 @@ interface LessonMaster {
     id: string
     name: string
     unit_price: number
+    pair_unit_price?: number | null
     is_trial: boolean
 }
 
@@ -77,6 +78,7 @@ export function LessonReportForm() {
     const [isCancellation, setIsCancellation] = useState(false)
     const [coachRate, setCoachRate] = useState<number>(0.5)
     const [isAdminRole, setIsAdminRole] = useState(false)
+    const [student, setStudent] = useState<any>(null)
     const [isTwoPersonLesson, setIsTwoPersonLesson] = useState(false)
     const [isDefaultDistantOption, setIsDefaultDistantOption] = useState(false)
     const [coachDistantFee, setCoachDistantFee] = useState(0)
@@ -95,7 +97,7 @@ export function LessonReportForm() {
             // Fetch masters
             const { data: masters } = await supabase
                 .from('lesson_masters')
-                .select('id, name, unit_price, is_trial')
+                .select('id, name, unit_price, pair_unit_price, is_trial')
                 .eq('active', true)
 
             if (masters) setLessonMasters(masters as any)
@@ -187,6 +189,7 @@ export function LessonReportForm() {
         form.setValue('attendance_type', schedule.attendance_type || 'both')
         setIsTwoPersonLesson(!!student?.is_two_person_lesson)
         setIsDefaultDistantOption(!!student?.is_default_distant_option)
+        setStudent(student)
     }
 
     // Load schedule data if scheduleIdFromUrl is provided
@@ -204,7 +207,12 @@ export function LessonReportForm() {
                         full_name,
                         second_student_name,
                         is_two_person_lesson,
-                        is_default_distant_option
+                        is_default_distant_option,
+                        membership_type_id,
+                        membership_types!students_membership_type_id_fkey (
+                            id,
+                            membership_type_lessons (lesson_master_id, reward_price)
+                        )
                     )
                 `)
                 .eq('id', scheduleIdFromUrl)
@@ -217,14 +225,24 @@ export function LessonReportForm() {
         fetchSchedule()
     }, [scheduleIdFromUrl, coachId])
 
-    // Watch lesson_master_id to auto-update price
+    // Watch lesson_master_id and student to auto-update price
     const selectedMasterId = form.watch('lesson_master_id')
+    const attendanceType = form.watch('attendance_type') || 'both'
     useEffect(() => {
         const master = lessonMasters.find(m => m.id === selectedMasterId)
-        if (master) {
-            form.setValue('price', master.unit_price)
+        if (!master) return
+
+        const facilityFee = isFacilityFeeApplied ? 1500 : 0
+        const isPair = !!student?.is_two_person_lesson && attendanceType === 'both'
+        const applyPairPrice = !!student?.apply_pair_pricing && isPair
+
+        let basePrice = master.unit_price
+        if (applyPairPrice && master.pair_unit_price) {
+            basePrice = master.pair_unit_price
         }
-    }, [selectedMasterId, lessonMasters, form])
+
+        form.setValue('price', basePrice + facilityFee)
+    }, [selectedMasterId, student, attendanceType, isFacilityFeeApplied, lessonMasters, form])
 
     useEffect(() => {
         if (isCancellation) {
@@ -245,24 +263,41 @@ export function LessonReportForm() {
         const fetchAllowedLessons = async () => {
             if (!selectedStudentId) {
                 setRestrictedLessonIds(null)
+                setStudent(null)
                 return
             }
 
             const supabase = createClient()
 
             // 1. Get Student's Membership Type ID and Pair flag
-            const { data: student } = await supabase
+            const { data: studentData } = await supabase
                 .from('students')
-                .select('membership_type_id, is_two_person_lesson, is_default_distant_option')
+                .select(`
+                    membership_type_id, 
+                    is_two_person_lesson, 
+                    is_default_distant_option, 
+                    full_name, 
+                    second_student_name, 
+                    apply_pair_pricing,
+                    membership_types!students_membership_type_id_fkey (
+                        id,
+                        membership_type_lessons (lesson_master_id, reward_price)
+                    )
+                `)
                 .eq('id', selectedStudentId)
                 .single()
 
-            if (student) {
-                setIsTwoPersonLesson(!!student.is_two_person_lesson)
-                setIsDefaultDistantOption(!!student.is_default_distant_option)
+            if (studentData) {
+                setStudent(studentData)
+                setIsTwoPersonLesson(!!studentData.is_two_person_lesson)
+                setIsDefaultDistantOption(!!studentData.is_default_distant_option)
             }
 
-            if (!student?.membership_type_id) {
+            const membership = Array.isArray(studentData?.membership_types)
+                ? studentData.membership_types[0]
+                : studentData?.membership_types
+
+            if (!membership?.id) {
                 setRestrictedLessonIds(null)
                 return
             }
@@ -271,7 +306,7 @@ export function LessonReportForm() {
             const { data: allowed } = await supabase
                 .from('membership_type_lessons')
                 .select('lesson_master_id')
-                .eq('membership_type_id', student.membership_type_id)
+                .eq('membership_type_id', membership.id)
 
             if (allowed && allowed.length > 0) {
                 const ids = allowed.map(a => a.lesson_master_id)
@@ -337,7 +372,8 @@ export function LessonReportForm() {
             lesson_masters: masterRaw,
             students: {
                 is_two_person_lesson: isTwoPersonLesson,
-                is_default_distant_option: isDefaultDistantOption
+                is_default_distant_option: isDefaultDistantOption,
+                membership_types: student?.membership_types
             },
             profiles: {
                 role: isAdminRole ? 'admin' : 'coach',
@@ -351,6 +387,18 @@ export function LessonReportForm() {
     const displayMasters = restrictedLessonIds !== null
         ? lessonMasters.filter(m => restrictedLessonIds.includes(m.id))
         : lessonMasters
+
+    const handleAttendanceTypeChange = (value: string) => {
+        if (student) {
+            if (value === 'student1') {
+                form.setValue('student_name', student.full_name)
+            } else if (value === 'student2' && student.second_student_name) {
+                form.setValue('student_name', student.second_student_name)
+            } else if (value === 'both' && student.second_student_name) {
+                form.setValue('student_name', `${student.full_name} & ${student.second_student_name}`)
+            }
+        }
+    }
 
     async function onSubmit(values: FormValues) {
         setIsSubmitting(true)
@@ -468,6 +516,37 @@ export function LessonReportForm() {
                         </FormItem>
                     )}
                 />
+
+                {isTwoPersonLesson && (
+                    <FormField
+                        control={form.control as any}
+                        name="attendance_type"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>出席区分</FormLabel>
+                                <Select
+                                    onValueChange={(value) => {
+                                        field.onChange(value)
+                                        handleAttendanceTypeChange(value)
+                                    }}
+                                    value={field.value}
+                                >
+                                    <FormControl>
+                                        <SelectTrigger className="w-full">
+                                            <SelectValue placeholder="出席区分を選択" />
+                                        </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        <SelectItem value="both">2名とも出席 (ペア)</SelectItem>
+                                        <SelectItem value="student1">{student?.full_name || '1人目'} のみ出席 (単体)</SelectItem>
+                                        <SelectItem value="student2">{student?.second_student_name || '2人目'} のみ出席 (単体)</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+                )}
 
                 <FormField
                     control={form.control as any}

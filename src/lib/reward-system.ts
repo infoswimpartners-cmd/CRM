@@ -116,7 +116,14 @@ export function calculateLessonReward(
         facilityFee = lesson.price - expectedBasePrice;
     }
 
-    // Check for custom reward price in membership configuration
+    // 会員区分設定によるカスタム報酬（プランのコーチ報酬）があるか確認
+    let hasCustomRewardPrice = false
+    let customRewardPrice = 0
+    const isSingleAttendance = !!lesson.attendance_type && lesson.attendance_type !== 'both'
+    const isPairStudent = !!lesson.students?.is_two_person_lesson
+
+    let planBaseRewardPrice: number | null = null
+
     if (membership?.membership_type_lessons) {
         const configs = Array.isArray(membership.membership_type_lessons)
             ? membership.membership_type_lessons
@@ -126,7 +133,13 @@ export function calculateLessonReward(
             (l: any) => l.lesson_master_id === master.id
         )
         if (config && config.reward_price !== null && config.reward_price !== undefined) {
-            basePrice = config.reward_price
+            // ペア受講対象で1名出席の場合はプラン報酬設定額を計算の基本単価として使う
+            if (isPairStudent && isSingleAttendance) {
+                planBaseRewardPrice = config.reward_price
+            } else {
+                hasCustomRewardPrice = true
+                customRewardPrice = config.reward_price
+            }
         }
     }
 
@@ -148,6 +161,12 @@ export function calculateLessonReward(
         } else {
             reward = settings.trial_standard
         }
+    } else if (hasCustomRewardPrice) {
+        // プランのコーチ報酬が登録されている場合は、レートを掛けずにそのまま適用（2名受講時）
+        reward = customRewardPrice
+    } else if (planBaseRewardPrice !== null) {
+        // 1名受講のときはプラン報酬設定額にコーチの報酬率を適用する
+        reward = Math.floor(planBaseRewardPrice * rate)
     } else {
         reward = Math.floor(basePrice * rate)
     }

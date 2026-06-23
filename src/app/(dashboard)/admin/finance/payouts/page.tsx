@@ -52,7 +52,7 @@ export default async function PayoutsPage({ searchParams }: { searchParams: Prom
     const { data: allLessons } = await supabase
         .from('lessons')
         .select(`
-            id, price, lesson_date, coach_id,
+            id, price, lesson_date, coach_id, attendance_type,
             lesson_masters (id, unit_price, is_trial),
             profiles ( distant_reward_fee ),
             students (full_name, is_two_person_lesson, is_default_distant_option, membership_types!students_membership_type_id_fkey (id, membership_type_lessons (lesson_master_id, reward_price)))

@@ -5,6 +5,164 @@ import { revalidatePath } from 'next/cache'
 import * as z from 'zod'
 import { emailService } from '@/lib/email'
 import { stripe } from '@/lib/stripe'
+import { calculateCoachRate, LessonData } from '@/lib/reward-system'
+import { startOfMonth, endOfMonth, subMonths } from 'date-fns'
+
+export async function getCalculatedLessonAmounts(
+    supabaseAdmin: any,
+    coachId: string,
+    studentId: string | null | undefined,
+    lessonMasterId: string,
+    lessonDate: string,
+    location: string,
+    attendanceType: string
+) {
+    // 1. コーチの情報を取得
+    const { data: coachProfile } = await supabaseAdmin
+        .from('profiles')
+        .select('role, override_coach_rank, distant_reward_fee')
+        .eq('id', coachId)
+        .single()
+
+    // 2. 施設情報を取得
+    const { data: facility } = await supabaseAdmin
+        .from('facilities')
+        .select('id, is_facility_fee_applied')
+        .eq('name', location)
+        .maybeSingle()
+
+    const facilityId = facility?.id || null
+    const facilityFee = facility?.is_facility_fee_applied ? 1500 : 0
+
+    // 3. レッスンマスタの取得
+    const { data: master } = await supabaseAdmin
+        .from('lesson_masters')
+        .select('id, unit_price, pair_unit_price, is_trial')
+        .eq('id', lessonMasterId)
+        .single()
+
+    if (!master) {
+        throw new Error('指定されたレッスンマスタが見つかりません')
+    }
+
+    // 4. 生徒情報およびプランコーチ報酬の取得
+    let studentInfo: any = null
+    let customRewardPrice: number | null = null
+    let planBaseRewardPrice: number | null = null
+
+    if (studentId) {
+        const { data: student } = await supabaseAdmin
+            .from('students')
+            .select(`
+                id,
+                apply_pair_pricing,
+                is_two_person_lesson,
+                is_default_distant_option,
+                membership_type_id
+            `)
+            .eq('id', studentId)
+            .single()
+
+        studentInfo = student
+
+        const isSingleAttendance = attendanceType !== 'both' && !!attendanceType
+        const isPairStudent = !!student?.is_two_person_lesson
+
+        if (student?.membership_type_id) {
+            const { data: config } = await supabaseAdmin
+                .from('membership_type_lessons')
+                .select('reward_price')
+                .eq('membership_type_id', student.membership_type_id)
+                .eq('lesson_master_id', lessonMasterId)
+                .maybeSingle()
+
+            if (config && config.reward_price !== null && config.reward_price !== undefined) {
+                // ペア受講対象で1名出席の場合はプラン報酬設定額を計算の基本単価として使う
+                if (isPairStudent && isSingleAttendance) {
+                    planBaseRewardPrice = config.reward_price
+                } else {
+                    customRewardPrice = config.reward_price
+                }
+            }
+        }
+    }
+
+    // 5. コーチの適用レート計算
+    let rate = 0.50
+    const referenceDate = new Date(lessonDate)
+    const rankStart = startOfMonth(subMonths(referenceDate, 3))
+    const rankEnd = endOfMonth(subMonths(referenceDate, 1))
+
+    if (coachProfile?.role === 'admin' || coachProfile?.role === 'owner') {
+        rate = 1.0
+    } else {
+        // 過去3ヶ月の実績をロード
+        const { data: pastLessons } = await supabaseAdmin
+            .from('lessons')
+            .select('coach_id, lesson_date')
+            .eq('coach_id', coachId)
+            .gte('lesson_date', rankStart.toISOString())
+            .lte('lesson_date', rankEnd.toISOString())
+
+        rate = calculateCoachRate(
+            coachId,
+            (pastLessons as any) || [],
+            referenceDate,
+            coachProfile?.override_coach_rank
+        )
+    }
+
+    // 6. 基本受講料（base_price）の決定
+    let basePrice = master.unit_price
+    const isPair = !!studentInfo?.is_two_person_lesson && (attendanceType === 'both' || !attendanceType)
+    const applyPairPrice = !!studentInfo?.apply_pair_pricing && isPair
+    if (applyPairPrice && master.pair_unit_price) {
+        basePrice = master.pair_unit_price
+    }
+
+    // 7. 基本報酬（base_reward）の決定
+    let baseReward = 0
+    if (coachProfile?.role === 'admin' || coachProfile?.role === 'owner') {
+        baseReward = basePrice + facilityFee
+    } else if (master.is_trial) {
+        // 体験レッスン
+        if (rate === 1.0) {
+            baseReward = basePrice
+        } else if (Math.abs(rate - 0.7000001) < 0.00000001) {
+            baseReward = 5000 // trial_special
+        } else {
+            baseReward = 4500 // trial_standard
+        }
+    } else if (customRewardPrice !== null) {
+        // プランコーチ報酬を優先適用（2名受講時）
+        baseReward = customRewardPrice
+    } else if (planBaseRewardPrice !== null) {
+        // 1名受講のときはプラン報酬設定額にコーチの報酬率を適用する
+        baseReward = Math.floor(planBaseRewardPrice * rate)
+    } else {
+        baseReward = Math.floor(basePrice * rate)
+    }
+
+    // ペアレッスン手当 (通常レッスンかつ2人出席時のみ)
+    if (studentInfo?.is_two_person_lesson && !master.is_trial && (attendanceType === 'both' || !attendanceType)) {
+        baseReward += 1000
+    }
+
+    // 施設利用料（支払報酬には施設利用料を上乗せする）
+    if (facilityFee > 0) {
+        baseReward += facilityFee
+    }
+
+    // 8. 遠方対応オプションの判定
+    const isActualDistantOption = !!studentInfo?.is_default_distant_option && !master.is_trial
+
+    return {
+        base_price: basePrice,
+        base_reward: baseReward,
+        facility_id: facilityId,
+        is_actual_distant_option: isActualDistantOption
+    }
+}
 
 
 const formSchema = z.object({
@@ -72,10 +230,23 @@ export async function submitLessonReport(values: FormValues) {
     }
 
     try {
-        // 3. Insert into Supabase (Base columns only to match current DB schema)
-        // Note: coach_comment and billing_price 
-        // are only editable by Admin/Coach.
-        const { data: insertedLesson, error: dbError } = await supabase.from('lessons').insert({
+        const { createAdminClient } = await import('@/lib/supabase/admin')
+        const supabaseAdmin = createAdminClient()
+
+        // 報酬・請求金額の計算
+        const { base_price, base_reward, facility_id, is_actual_distant_option } = 
+            await getCalculatedLessonAmounts(
+                supabaseAdmin,
+                user.id,
+                data.student_id,
+                data.lesson_master_id,
+                data.lesson_date,
+                data.location,
+                data.attendance_type || 'both'
+            )
+
+        // 3. Insert into Supabase using Admin Client
+        const { data: insertedLesson, error: dbError } = await supabaseAdmin.from('lessons').insert({
             coach_id: user.id,
             student_id: data.student_id || null,
             student_name: data.student_name,
@@ -84,8 +255,12 @@ export async function submitLessonReport(values: FormValues) {
             location: data.location,
             menu_description: data.menu_description || '',
             price: data.price,
+            billing_price: billingPrice,
             attendance_type: data.attendance_type || 'both',
-            // billing_price: billingPrice, // Temporarily disabled due to schema mismatch
+            base_price,
+            base_reward,
+            facility_id,
+            is_actual_distant_option
         }).select('id').single()
 
         if (dbError) {
@@ -368,6 +543,18 @@ export async function updateLessonReport(lessonId: string, values: FormValues) {
             attendance_type: data.attendance_type
         })
 
+        // 報酬・請求金額の計算
+        const { base_price, base_reward, facility_id, is_actual_distant_option } = 
+            await getCalculatedLessonAmounts(
+                supabaseAdmin,
+                lesson?.coach_id || user.id,
+                data.student_id,
+                data.lesson_master_id,
+                data.lesson_date,
+                data.location,
+                data.attendance_type || 'both'
+            )
+
         const { error } = await supabaseAdmin.from('lessons').update({
             student_id: data.student_id || null,
             student_name: data.student_name,
@@ -378,7 +565,11 @@ export async function updateLessonReport(lessonId: string, values: FormValues) {
             coach_comment: data.coach_comment || '',
             price: data.price,
             billing_price: billingPrice,
-            attendance_type: data.attendance_type || 'both'
+            attendance_type: data.attendance_type || 'both',
+            base_price,
+            base_reward,
+            facility_id,
+            is_actual_distant_option
         }).eq('id', lessonId)
 
         if (error) {
@@ -387,6 +578,9 @@ export async function updateLessonReport(lessonId: string, values: FormValues) {
         }
 
         revalidatePath('/admin/reports')
+        revalidatePath('/admin/finance/payouts')
+        revalidatePath('/coach')
+        revalidatePath('/finance')
         return { success: true }
     } catch (error: any) {
         console.error('Update Error:', error)
@@ -427,22 +621,63 @@ export async function submitPublicLessonReport(values: PublicFormValues) {
     data.price = data.price + facilityFee
 
     try {
-        // 2. Insert into Supabase using Public RPC
-        const { data: newId, error } = await supabase.rpc('submit_lesson_report_public', {
-            p_coach_id: data.coach_id,
-            p_student_id: data.student_id || null,
-            p_student_name: data.student_name,
-            p_lesson_date: data.lesson_date,
-            p_description: data.menu_description || '',
-            p_lesson_master_id: data.lesson_master_id,
-            p_price: data.price,
-            p_location: data.location,
-            p_coach_comment: ''
-        })
+        const { createAdminClient } = await import('@/lib/supabase/admin')
+        const supabaseAdmin = createAdminClient()
 
-        if (error) throw error
+        // 報酬・請求金額の計算
+        const { base_price, base_reward, facility_id, is_actual_distant_option } = 
+            await getCalculatedLessonAmounts(
+                supabaseAdmin,
+                data.coach_id,
+                data.student_id,
+                data.lesson_master_id,
+                data.lesson_date,
+                data.location,
+                'both'
+            )
 
-        const { data: lessonMaster } = await supabase
+        // 請求金額計算（月会員は施設利用料のみ）
+        let billingPrice = data.price
+        if (data.student_id) {
+            const { data: student } = await supabaseAdmin
+                .from('students')
+                .select('membership_types ( fee )')
+                .eq('id', data.student_id)
+                .single()
+
+            const membership = Array.isArray(student?.membership_types)
+                ? student.membership_types[0]
+                : student?.membership_types
+
+            if (membership && membership.fee > 0) {
+                billingPrice = facilityFee
+            }
+        }
+
+        // 2. Insert into Supabase using Admin Client directly
+        const { data: insertedLesson, error: dbError } = await supabaseAdmin.from('lessons').insert({
+            coach_id: data.coach_id,
+            student_id: data.student_id || null,
+            student_name: data.student_name,
+            lesson_master_id: data.lesson_master_id,
+            lesson_date: data.lesson_date,
+            location: data.location,
+            menu_description: data.menu_description || '',
+            coach_comment: '',
+            price: data.price,
+            billing_price: billingPrice,
+            attendance_type: 'both',
+            base_price,
+            base_reward,
+            facility_id,
+            is_actual_distant_option
+        }).select('id').single()
+
+        if (dbError) throw dbError
+
+        const newId = insertedLesson?.id
+
+        const { data: lessonMaster } = await supabaseAdmin
             .from('lesson_masters')
             .select('name, is_trial')
             .eq('id', data.lesson_master_id)
@@ -676,6 +911,18 @@ export async function submitAdminProxyReport(values: AdminProxyValues) {
     }
 
     try {
+        // 報酬・請求金額の計算
+        const { base_price, base_reward, facility_id, is_actual_distant_option } = 
+            await getCalculatedLessonAmounts(
+                supabaseAdmin,
+                data.coach_id,
+                data.student_id,
+                data.lesson_master_id,
+                data.lesson_date,
+                data.location,
+                data.attendance_type || 'both'
+            )
+
         // 7. Admin Client で RLS バイパスして INSERT
         const { error } = await supabaseAdmin.from('lessons').insert({
             coach_id: data.coach_id,
@@ -689,6 +936,10 @@ export async function submitAdminProxyReport(values: AdminProxyValues) {
             price: finalPrice,
             billing_price: billingPrice,
             attendance_type: data.attendance_type || 'both',
+            base_price,
+            base_reward,
+            facility_id,
+            is_actual_distant_option
         })
 
         if (error) throw new Error(error.message)
