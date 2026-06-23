@@ -133,12 +133,14 @@ export function calculateLessonReward(
             (l: any) => l.lesson_master_id === master.id
         )
         if (config && config.reward_price !== null && config.reward_price !== undefined) {
-            // ペア受講対象で1名出席の場合はプラン報酬設定額を計算の基本単価として使う
-            if (isPairStudent && isSingleAttendance) {
-                planBaseRewardPrice = config.reward_price
-            } else {
+            // ペア受講対象で2名出席（both）の場合のみ、固定のカスタム報酬としてそのまま適用する（レートは掛けない）
+            const isPairBothAttendance = isPairStudent && !isSingleAttendance
+            if (isPairBothAttendance) {
                 hasCustomRewardPrice = true
                 customRewardPrice = config.reward_price
+            } else {
+                // ペア受講の1名出席、または通常の通常受講生の場合は、プラン報酬設定額にコーチレートを適用して計算する
+                planBaseRewardPrice = config.reward_price
             }
         }
     }

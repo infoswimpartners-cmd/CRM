@@ -20,6 +20,11 @@ async function test() {
     const payments2 = await calculateHistoricalPayments(supabase, coachId2, 12)
     const may2 = payments2.find(p => p.month.includes('2026年5月') || p.month.includes('05') || p.month === '2026年5月分')
     console.log('May Payments for Takahashi:', JSON.stringify(may2, null, 2))
+
+    const coachId3 = 'cded4d65-32bf-40fc-86e8-cd76e1218e17' // 佐藤初音コーチ
+    const payments3 = await calculateHistoricalPayments(supabase, coachId3, 12)
+    const may3 = payments3.find(p => p.month.includes('2026年5月') || p.month.includes('05') || p.month === '2026年5月分')
+    console.log('May Payments for Satou:', JSON.stringify(may3, null, 2))
 }
 
 test()
