@@ -117,8 +117,6 @@ export function calculateLessonReward(
     }
 
     // 会員区分設定によるカスタム報酬（プランのコーチ報酬）があるか確認
-    let hasCustomRewardPrice = false
-    let customRewardPrice = 0
     const isSingleAttendance = !!lesson.attendance_type && lesson.attendance_type !== 'both'
     const isPairStudent = !!lesson.students?.is_two_person_lesson
 
@@ -133,15 +131,8 @@ export function calculateLessonReward(
             (l: any) => l.lesson_master_id === master.id
         )
         if (config && config.reward_price !== null && config.reward_price !== undefined) {
-            // ペア受講対象で2名出席（both）の場合のみ、固定のカスタム報酬としてそのまま適用する（レートは掛けない）
-            const isPairBothAttendance = isPairStudent && !isSingleAttendance
-            if (isPairBothAttendance) {
-                hasCustomRewardPrice = true
-                customRewardPrice = config.reward_price
-            } else {
-                // ペア受講の1名出席、または通常の通常受講生の場合は、プラン報酬設定額にコーチレートを適用して計算する
-                planBaseRewardPrice = config.reward_price
-            }
+            // プランに報酬単価が設定されている場合は、コーチレートを適用して計算する基本単価として扱う
+            planBaseRewardPrice = config.reward_price
         }
     }
 
@@ -163,11 +154,8 @@ export function calculateLessonReward(
         } else {
             reward = settings.trial_standard
         }
-    } else if (hasCustomRewardPrice) {
-        // プランのコーチ報酬が登録されている場合は、レートを掛けずにそのまま適用（2名受講時）
-        reward = customRewardPrice
     } else if (planBaseRewardPrice !== null) {
-        // 1名受講のときはプラン報酬設定額にコーチの報酬率を適用する
+        // プラン報酬設定額にコーチの報酬率を適用する
         reward = Math.floor(planBaseRewardPrice * rate)
     } else {
         reward = Math.floor(basePrice * rate)

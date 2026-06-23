@@ -47,7 +47,6 @@ export async function getCalculatedLessonAmounts(
 
     // 4. 生徒情報およびプランコーチ報酬の取得
     let studentInfo: any = null
-    let customRewardPrice: number | null = null
     let planBaseRewardPrice: number | null = null
 
     if (studentId) {
@@ -65,9 +64,6 @@ export async function getCalculatedLessonAmounts(
 
         studentInfo = student
 
-        const isSingleAttendance = attendanceType !== 'both' && !!attendanceType
-        const isPairStudent = !!student?.is_two_person_lesson
-
         if (student?.membership_type_id) {
             const { data: config } = await supabaseAdmin
                 .from('membership_type_lessons')
@@ -77,14 +73,8 @@ export async function getCalculatedLessonAmounts(
                 .maybeSingle()
 
             if (config && config.reward_price !== null && config.reward_price !== undefined) {
-                // ペア受講対象で2名出席（both）の場合のみ、固定のカスタム報酬としてそのまま適用する（レートは掛けない）
-                const isPairBothAttendance = isPairStudent && !isSingleAttendance
-                if (isPairBothAttendance) {
-                    customRewardPrice = config.reward_price
-                } else {
-                    // ペア受講の1名出席、または通常の通常受講生の場合は、プラン報酬設定額にコーチレートを適用して計算する
-                    planBaseRewardPrice = config.reward_price
-                }
+                // プランに報酬単価が設定されている場合は、コーチレートを適用して計算する基本単価として扱う
+                planBaseRewardPrice = config.reward_price
             }
         }
     }
@@ -135,11 +125,8 @@ export async function getCalculatedLessonAmounts(
         } else {
             baseReward = 4500 // trial_standard
         }
-    } else if (customRewardPrice !== null) {
-        // プランコーチ報酬を優先適用（2名受講時）
-        baseReward = customRewardPrice
     } else if (planBaseRewardPrice !== null) {
-        // 1名受講のときはプラン報酬設定額にコーチの報酬率を適用する
+        // プラン報酬設定額にコーチの報酬率を適用する
         baseReward = Math.floor(planBaseRewardPrice * rate)
     } else {
         baseReward = Math.floor(basePrice * rate)
