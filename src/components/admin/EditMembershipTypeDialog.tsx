@@ -28,6 +28,8 @@ interface MembershipType {
     reward_master_id: string | null
     description?: string | null
     rules?: string | null
+    min_contract_months?: number
+    lock_period_months?: number
 }
 
 interface EditMembershipTypeDialogProps {
@@ -57,6 +59,8 @@ export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembe
     const [stripePairPriceId, setStripePairPriceId] = useState((type as any).stripe_pair_price_id || '')
     const [description, setDescription] = useState(type.description || '')
     const [rules, setRules] = useState(type.rules || '')
+    const [minContractMonths, setMinContractMonths] = useState(type.min_contract_months?.toString() || '2')
+    const [lockPeriodMonths, setLockPeriodMonths] = useState(type.lock_period_months?.toString() || '2')
     // Map of lesson_id -> { reward: string, unit: string, pair: string, showInEnroll: boolean }
     const [selectedLessons, setSelectedLessons] = useState<Map<string, { reward: string, unit: string, pair: string, showInEnroll: boolean }>>(new Map())
     const [lessonMasters, setLessonMasters] = useState<LessonMaster[]>([])
@@ -118,6 +122,8 @@ export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembe
         setStripePairPriceId((type as any).stripe_pair_price_id || '')
         setDescription(type.description || '')
         setRules(type.rules || '')
+        setMinContractMonths(type.min_contract_months?.toString() || '2')
+        setLockPeriodMonths(type.lock_period_months?.toString() || '2')
     }, [type])
 
     const toggleLesson = (id: string) => {
@@ -161,7 +167,9 @@ export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembe
                 stripePairPriceId: stripePairPriceId || null,
                 selectedLessons: formattedLessons,
                 description,
-                rules
+                rules,
+                minContractMonths: parseInt(minContractMonths),
+                lockPeriodMonths: parseInt(lockPeriodMonths)
             })
 
             if (!res.success) {
@@ -256,6 +264,34 @@ export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembe
                                     className="col-span-3"
                                     placeholder="例：&#13;&#10;コーチの交通費・施設利用料がすべて含まれています。&#13;&#10;振替の有効期間は【2ヶ月間】となります。"
                                     rows={4}
+                                />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="edit-min-contract-months" className="text-right whitespace-nowrap">
+                                    最小契約期間 (月)
+                                </Label>
+                                <Input
+                                    id="edit-min-contract-months"
+                                    type="number"
+                                    value={minContractMonths}
+                                    onChange={(e) => setMinContractMonths(e.target.value)}
+                                    className="col-span-3"
+                                    min="0"
+                                    required
+                                />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="edit-lock-period-months" className="text-right whitespace-nowrap">
+                                    変更ロック期間 (月)
+                                </Label>
+                                <Input
+                                    id="edit-lock-period-months"
+                                    type="number"
+                                    value={lockPeriodMonths}
+                                    onChange={(e) => setLockPeriodMonths(e.target.value)}
+                                    className="col-span-3"
+                                    min="0"
+                                    required
                                 />
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">

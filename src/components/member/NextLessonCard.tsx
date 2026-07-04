@@ -35,15 +35,17 @@ export default function NextLessonCard({ lesson, isMember }: NextLessonCardProps
                     </div>
                 </div>
 
-                <Button 
-                    asChild 
-                    className="w-full h-24 md:h-28 md:px-14 rounded-[2.5rem] bg-slate-900 hover:bg-slate-800 text-white font-black text-lg tracking-widest transition-all shadow-2xl shadow-slate-200 group/btn border-none"
-                >
-                    <a href={isMember ? "https://line.me/R/ti/p/@swim_partners" : "/member/reservation"}>
-                        {isMember ? '担当コーチにお問い合わせ' : '体験レッスンを予約'}
-                        <ArrowRight className="ml-4 w-6 h-6 group-hover:translate-x-2 transition-transform text-sky-400" />
-                    </a>
-                </Button>
+                {!isMember && (
+                    <Button 
+                        asChild 
+                        className="w-full h-24 md:h-28 md:px-14 rounded-[2.5rem] bg-slate-900 hover:bg-slate-800 text-white font-black text-lg tracking-widest transition-all shadow-2xl shadow-slate-200 group/btn border-none"
+                    >
+                        <a href="/member/reservation">
+                            体験レッスンを予約
+                            <ArrowRight className="ml-4 w-6 h-6 group-hover:translate-x-2 transition-transform text-sky-400" />
+                        </a>
+                    </Button>
+                )}
             </Card>
         );
     }

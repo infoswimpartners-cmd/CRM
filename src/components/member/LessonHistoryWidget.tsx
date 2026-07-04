@@ -30,8 +30,8 @@ export default function LessonHistoryWidget({ lessons }: LessonHistoryWidgetProp
                     </p>
                 </div>
                 <div className="pt-2">
-                    <Link href="/member/reports" className="w-full py-3 bg-white/50 border border-cyan-100 rounded-xl text-sm font-bold text-cyan-600 hover:bg-white hover:text-cyan-700 hover:border-cyan-300 transition-colors flex items-center justify-center shadow-sm">
-                        すべての履歴を見る
+                    <Link href="/member/dashboard" className="w-full py-3 bg-white/50 border border-cyan-100 rounded-xl text-sm font-bold text-cyan-600 hover:bg-white hover:text-cyan-700 hover:border-cyan-300 transition-colors flex items-center justify-center shadow-sm">
+                        ホームで全スケジュールを見る
                     </Link>
                 </div>
             </div>
@@ -87,8 +87,8 @@ export default function LessonHistoryWidget({ lessons }: LessonHistoryWidgetProp
             </div>
 
             <div className="pt-2">
-                <Link href="/member/reports" className="w-full py-3 bg-white/50 border border-cyan-100 rounded-xl text-sm font-bold text-cyan-600 hover:bg-white hover:text-cyan-700 hover:border-cyan-300 transition-colors flex items-center justify-center shadow-sm">
-                    すべての履歴を見る
+                <Link href="/member/dashboard" className="w-full py-3 bg-white/50 border border-cyan-100 rounded-xl text-sm font-bold text-cyan-600 hover:bg-white hover:text-cyan-700 hover:border-cyan-300 transition-colors flex items-center justify-center shadow-sm">
+                    ホームで全スケジュールを見る
                 </Link>
             </div>
         </div>

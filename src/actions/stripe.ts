@@ -493,18 +493,14 @@ export async function createStripeInvoiceItemOnly(scheduleId: string) {
         // @ts-ignore
         const customerId = schedule.student.stripe_customer_id
 
-        // 日時フォーマットの構築 (例: 2026年5月28日(木) 10:00〜)
+        // 日時フォーマットの構築 (例: 2026年5月28日(木))
         const startDate = new Date(schedule.start_time)
         const dateStr = startDate.toLocaleDateString('ja-JP', {
+            timeZone: 'Asia/Tokyo',
             year: 'numeric',
             month: 'long',
             day: 'numeric',
             weekday: 'short'
-        })
-        const timeStr = startDate.toLocaleTimeString('ja-JP', {
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false
         })
 
         // 単発会員かどうかの判定
@@ -516,13 +512,13 @@ export async function createStripeInvoiceItemOnly(scheduleId: string) {
 
         let itemDescription = ''
         if (isSinglePlan) {
-            // 単発会員の場合: 「レッスン種別 [受講日時: 〇〇〜]」 (3のタイトルは不要)
+            // 単発会員の場合: 「レッスン種別 [受講日: 〇〇]」
             // @ts-ignore
             const lessonTypeName = schedule.lesson_master?.name || 'レッスン'
-            itemDescription = `${lessonTypeName} [受講日時: ${dateStr} ${timeStr}〜]`
+            itemDescription = `${lessonTypeName} [受講日: ${dateStr}]`
         } else {
             // 通常会員の追加レッスンの場合
-            itemDescription = `追加レッスン料 [受講日時: ${dateStr} ${timeStr}〜]: ${schedule.title}`
+            itemDescription = `追加レッスン料 [受講日: ${dateStr}]`
         }
 
         const invoiceItem = await stripe.invoiceItems.create({

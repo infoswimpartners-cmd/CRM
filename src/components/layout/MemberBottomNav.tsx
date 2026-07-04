@@ -2,20 +2,30 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, FileText, Crown, User } from 'lucide-react'
+import { Home, FileText, Crown, User, CreditCard } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 /**
  * MemberBottomNav
  * 明るくクールなガラスモーフィズム・ナビゲーション
  */
-export default function MemberBottomNav({ isTrioMember = false }: { isTrioMember?: boolean }) {
+export default function MemberBottomNav({ 
+    isTrioMember = false,
+    isMember = false,
+}: { 
+    isTrioMember?: boolean 
+    isMember?: boolean
+}) {
     const pathname = usePathname()
 
     const navItems = [
         { href: '/member/dashboard', icon: Home, label: 'ホーム' },
-        { href: '/member/reports', icon: FileText, label: 'カルテ' },
-        { href: '/trio', icon: Crown, label: 'Trio', isTrio: true },
+        ...(isTrioMember ? [
+            { href: '/trio', icon: Crown, label: 'Trio', isTrio: true }
+        ] : []),
+        ...(isMember ? [
+            { href: '/member/billing', icon: CreditCard, label: '契約・支払い' }
+        ] : []),
         { href: '/member/profile', icon: User, label: 'マイページ' },
     ];
 

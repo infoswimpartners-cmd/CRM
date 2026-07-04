@@ -11,6 +11,7 @@ import { calculateCoachRate, calculateLessonReward, LessonData } from '@/lib/rew
 import { TargetSettingsCard } from '@/components/admin/analytics/TargetSettingsCard'
 import { LessonCountChart } from '@/components/admin/analytics/LessonCountChart'
 import { getAppConfig } from '@/actions/app_configs'
+import { CustomerSalesSummary } from '@/components/admin/analytics/CustomerSalesSummary'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -42,7 +43,8 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
         .select(`
             id,
             price,
-            attendance_type,
+            billing_price,
+            stripe_invoice_item_id,
             coach_id,
             lesson_date,
             student_id,
@@ -51,10 +53,13 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
             students (
                 id,
                 full_name,
+                student_number,
                 is_two_person_lesson,
                 is_default_distant_option,
                 membership_types!students_membership_type_id_fkey (
                     id,
+                    name,
+                    fee,
                     membership_type_lessons (lesson_master_id, reward_price)
                 )
             )
@@ -280,6 +285,29 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
         .in('role', ['coach', 'admin', 'owner'])
         .order('full_name')
 
+    // 顧客一覧（Stripe照合テーブル用）
+    const { data: students } = await supabase
+        .from('students')
+        .select(`
+            id,
+            full_name,
+            student_number,
+            status,
+            membership:membership_types!students_membership_type_id_fkey (
+                id,
+                name,
+                fee
+            )
+        `)
+        .order('student_number', { ascending: true })
+
+    // スケジュールデータ（月謝会員の追加レッスン基本料金の集計用）
+    const { data: schedules } = await supabase
+        .from('lesson_schedules')
+        .select('id, student_id, start_time, price, is_overage, is_reported, stripe_invoice_item_id')
+        .gte('start_time', fetchStart.toISOString())
+        .lte('start_time', yearEnd.toISOString())
+
     return (
         <div className="space-y-8 pb-8">
             <div className="flex items-center gap-4">
@@ -379,6 +407,35 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: Pr
 
             {/* コーチ別月次売上推移 */}
             <CoachMonthlyPerformance data={coachMonthlyData} year={selectedYear} />
+
+            {/* 顧客別売上・請求集計（Stripe突合テーブル） */}
+            <CustomerSalesSummary 
+                students={(students || []).map((s: any) => ({
+                    id: s.id,
+                    full_name: s.full_name,
+                    student_number: s.student_number || '',
+                    status: s.status || '',
+                    membership_name: s.membership?.name || '単発プラン',
+                    membership_fee: s.membership?.fee || 0
+                }))}
+                lessons={(yearLessons || []).map((l: any) => ({
+                    id: l.id,
+                    student_id: l.student_id,
+                    lesson_date: l.lesson_date,
+                    billing_price: l.billing_price || 0,
+                    stripe_invoice_item_id: l.stripe_invoice_item_id || null
+                }))}
+                schedules={(schedules || []).map((s: any) => ({
+                    id: s.id,
+                    student_id: s.student_id,
+                    start_time: s.start_time,
+                    price: s.price || 0,
+                    is_overage: !!s.is_overage,
+                    is_reported: !!s.is_reported,
+                    stripe_invoice_item_id: s.stripe_invoice_item_id || null
+                }))}
+                year={selectedYear}
+            />
         </div>
     )
 }

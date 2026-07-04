@@ -76,6 +76,13 @@ function TrioPortalContent() {
 
       if (portalData.isLoggedIn && portalData.student) {
           const { student, entries } = portalData;
+          
+          // Trio会員ではない場合はアクセス制限（リダイレクト）
+          if (!student.is_trio) {
+              router.replace('/member/dashboard');
+              return;
+          }
+
           setStudentId(student.id);
           setStudentData(student);
           setTicketBalance(student.trio_ticket_balance || 0);
@@ -92,13 +99,7 @@ function TrioPortalContent() {
             .filter(Boolean);
           setUserPendingSlotIds(pendingIds);
 
-          if (student.is_trio) {
-            setUserType('PATTERN_C');
-          } else if (entries.length > 0) {
-            setUserType('PATTERN_B');
-          } else {
-            setUserType('PATTERN_A');
-          }
+          setUserType('PATTERN_C');
 
           // エントリーがある場合は常に次回のセッションを表示
           if (entries.length > 0) {

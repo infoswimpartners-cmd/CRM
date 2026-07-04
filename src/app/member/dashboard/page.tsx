@@ -209,24 +209,26 @@ export default async function MemberDashboard({
             </div>
 
             {/* Trio 予約状況 (最優先) */}
-            <TrioDashboardSection entries={trioEntries} />
+            {student.is_trio && <TrioDashboardSection entries={trioEntries} />}
 
             {/* 次回レッスン (個人) */}
-            <div className="space-y-8">
-                <div className="flex items-center gap-6 px-2">
-                    <div className="w-14 h-14 rounded-2xl bg-white border border-sky-100 shadow-[0_8px_30px_rgba(56,189,248,0.06)] flex items-center justify-center">
-                        <Calendar className="w-6 h-6 text-sky-500" />
+            {student.membership_type_id && (
+                <div className="space-y-8">
+                    <div className="flex items-center gap-6 px-2">
+                        <div className="w-14 h-14 rounded-2xl bg-white border border-sky-100 shadow-[0_8px_30px_rgba(56,189,248,0.06)] flex items-center justify-center">
+                            <Calendar className="w-6 h-6 text-sky-500" />
+                        </div>
+                        <div className="space-y-1">
+                            <h3 className="text-2xl font-black text-slate-800 tracking-tighter">個人レッスン</h3>
+                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.3em]">Personal Training</p>
+                        </div>
                     </div>
-                    <div className="space-y-1">
-                        <h3 className="text-2xl font-black text-slate-800 tracking-tighter">個人レッスン</h3>
-                        <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.3em]">Personal Training</p>
-                    </div>
+                    <NextLessonCard 
+                        lesson={nextLesson} 
+                        isMember={!!student.membership_type_id} 
+                    />
                 </div>
-                <NextLessonCard 
-                    lesson={nextLesson} 
-                    isMember={!!student.membership_type_id} 
-                />
-            </div>
+            )}
 
             {/* お知らせ・レポートの並列グリッド */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
@@ -250,25 +252,27 @@ export default async function MemberDashboard({
             </div>
 
             {/* 登録された予定一覧 */}
-            <div className="space-y-8">
-                <div className="flex items-center gap-6 px-2">
-                    <div className="w-14 h-14 rounded-2xl bg-white border border-slate-100 shadow-[0_8px_30px_rgba(0,0,0,0.03)] flex items-center justify-center">
-                        <div className="w-2 h-6 bg-slate-800 rounded-full" />
+            {student.membership_type_id && (
+                <div className="space-y-8">
+                    <div className="flex items-center gap-6 px-2">
+                        <div className="w-14 h-14 rounded-2xl bg-white border border-slate-100 shadow-[0_8px_30px_rgba(0,0,0,0.03)] flex items-center justify-center">
+                            <div className="w-2 h-6 bg-slate-800 rounded-full" />
+                        </div>
+                        <div className="space-y-1">
+                            <h3 className="text-2xl font-black text-slate-800 tracking-tighter">全スケジュール履歴</h3>
+                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.3em]">Full History</p>
+                        </div>
                     </div>
-                    <div className="space-y-1">
-                        <h3 className="text-2xl font-black text-slate-800 tracking-tighter">全スケジュール履歴</h3>
-                        <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.3em]">Full History</p>
+                    <div className="bg-white/70 backdrop-blur-3xl border border-slate-100 rounded-[3rem] p-10 shadow-[0_30px_100px_rgba(0,0,0,0.03)]">
+                        <StudentScheduleSection schedules={
+                            schedules.map((s: any) => ({
+                                ...s,
+                                coach_full_name: Array.isArray(s.profiles) ? s.profiles[0]?.full_name : s.profiles?.full_name,
+                            }))
+                        } />
                     </div>
                 </div>
-                <div className="bg-white/70 backdrop-blur-3xl border border-slate-100 rounded-[3rem] p-10 shadow-[0_30px_100px_rgba(0,0,0,0.03)]">
-                    <StudentScheduleSection schedules={
-                        schedules.map((s: any) => ({
-                            ...s,
-                            coach_full_name: Array.isArray(s.profiles) ? s.profiles[0]?.full_name : s.profiles?.full_name,
-                        }))
-                    } />
-                </div>
-            </div>
+            )}
 
             {/* フッターアクション */}
             <div className="pt-24 pb-12 text-center flex flex-col items-center gap-10">

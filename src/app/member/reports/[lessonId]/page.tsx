@@ -46,7 +46,7 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ l
         <div className="space-y-5 pb-24">
             {/* ヘッダー */}
             <div className="flex items-center gap-3">
-                <Link href="/member/reports" className="p-2 rounded-full hover:bg-gray-100 transition-colors">
+                <Link href="/member/dashboard" className="p-2 rounded-full hover:bg-gray-100 transition-colors">
                     <ArrowLeft size={20} className="text-gray-600" />
                 </Link>
                 <div>

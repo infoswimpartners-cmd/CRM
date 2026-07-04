@@ -56,6 +56,8 @@ export async function createMembershipTypeAction(data: {
     selectedLessons: { id: string, rewardPrice: number | null, showInEnroll?: boolean }[]
     description?: string | null
     rules?: string | null
+    minContractMonths?: number
+    lockPeriodMonths?: number
 }) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -109,6 +111,8 @@ export async function createMembershipTypeAction(data: {
                 reward_master_id: null,
                 description: data.description || null,
                 rules: data.rules || null,
+                min_contract_months: data.minContractMonths ?? 2,
+                lock_period_months: data.lockPeriodMonths ?? 2,
             })
             .select()
             .single()
@@ -219,6 +223,8 @@ export async function updateMembershipTypeAction(data: {
     selectedLessons: { id: string, rewardPrice: number | null, unitPrice: number | null, pairUnitPrice: number | null, showInEnroll?: boolean }[]
     description?: string | null
     rules?: string | null
+    minContractMonths?: number
+    lockPeriodMonths?: number
 }) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -372,6 +378,8 @@ export async function updateMembershipTypeAction(data: {
                 default_lesson_master_id: data.selectedLessons.length > 0 ? data.selectedLessons[0].id : null,
                 description: data.description || null,
                 rules: data.rules || null,
+                min_contract_months: data.minContractMonths ?? 2,
+                lock_period_months: data.lockPeriodMonths ?? 2,
             })
             .eq('id', data.id)
 

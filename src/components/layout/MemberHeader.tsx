@@ -15,13 +15,14 @@ interface MemberHeaderProps {
     studentName?: string;
     planName?: string;
     isTrioMember?: boolean;
+    isMember?: boolean;
 }
 
 /**
  * MemberHeader
  * 明るくクールな洗練されたヘッダー
  */
-export default function MemberHeader({ unreadCount = 0, studentName, planName, isTrioMember = false }: MemberHeaderProps) {
+export default function MemberHeader({ unreadCount = 0, studentName, planName, isTrioMember = false, isMember = false }: MemberHeaderProps) {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const pathname = usePathname();
 
@@ -41,8 +42,8 @@ export default function MemberHeader({ unreadCount = 0, studentName, planName, i
     // 現在のページ名を判定
     const getPageTitle = () => {
         if (pathname === '/trio') return 'The Trio';
-        if (pathname === '/member/reports') return 'Medical Record';
         if (pathname === '/member/profile') return 'Account';
+        if (pathname === '/member/billing') return 'Billing';
         return 'Home';
     };
 
@@ -99,6 +100,7 @@ export default function MemberHeader({ unreadCount = 0, studentName, planName, i
                 onClose={() => setIsSidebarOpen(false)}
                 studentName={studentName}
                 isTrioMember={isTrioMember}
+                isMember={isMember}
                 handleLogout={handleLogout}
             />
         </>

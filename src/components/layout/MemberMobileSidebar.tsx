@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect } from 'react'
 import Link from 'next/link'
 import {
     X,
@@ -12,7 +12,8 @@ import {
     User,
     Settings,
     Crown,
-    Sparkles
+    Sparkles,
+    CreditCard
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { usePathname } from 'next/navigation'
@@ -23,6 +24,7 @@ interface MemberMobileSidebarProps {
     onClose: () => void
     studentName?: string
     isTrioMember?: boolean
+    isMember?: boolean
     handleLogout: () => Promise<void>
 }
 
@@ -35,6 +37,7 @@ export default function MemberMobileSidebar({
     onClose,
     studentName,
     isTrioMember = false,
+    isMember = false,
     handleLogout
 }: MemberMobileSidebarProps) {
     const pathname = usePathname()
@@ -50,9 +53,13 @@ export default function MemberMobileSidebar({
 
     const navItems = [
         { href: '/member/dashboard', icon: Home, label: 'ホーム', subLabel: 'Dashboard' },
-        { href: '/member/reports', icon: FileText, label: 'カルテ・レポート', subLabel: 'Medical Records' },
-        { href: '/trio', icon: Crown, label: 'THE TRIO', subLabel: 'Premium Matching', isTrio: true },
-        { href: '/member/profile', icon: Settings, label: 'アカウント設定', subLabel: 'Settings' },
+        ...(isTrioMember ? [
+            { href: '/trio', icon: Crown, label: 'THE TRIO', subLabel: 'Premium Matching', isTrio: true }
+        ] : []),
+        ...(isMember ? [
+            { href: '/member/billing', icon: CreditCard, label: 'ご契約・お支払い', subLabel: 'Billing & Payments' }
+        ] : []),
+        { href: '/member/profile', icon: Settings, label: 'アカウント設定', subLabel: 'Profile Settings' },
     ];
 
     return (

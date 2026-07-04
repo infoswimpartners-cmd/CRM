@@ -1,10 +1,7 @@
-import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Settings, User, CreditCard } from 'lucide-react'
-import Link from 'next/link'
+import { Settings, User } from 'lucide-react'
 import ProfileForm from './ProfileForm'
-import StripePortalButton from './StripePortalButton'
 
 import { getCachedMemberData } from '@/lib/member-data'
 
@@ -44,21 +41,6 @@ export default async function MemberProfilePage() {
                 </CardHeader>
                 <CardContent className="p-8 md:p-10">
                     <ProfileForm student={student} />
-                </CardContent>
-            </Card>
-
-            <Card className="rounded-[2.5rem] border-none shadow-xl bg-white/80 backdrop-blur-xl overflow-hidden">
-                <CardHeader className="bg-gradient-to-br from-indigo-50/50 to-white border-b border-indigo-50/50 p-8">
-                    <div className="flex items-center gap-3">
-                        <CreditCard className="w-5 h-5 text-indigo-500" />
-                        <CardTitle className="text-xl font-black text-gray-800">クレジットカード情報</CardTitle>
-                    </div>
-                    <CardDescription className="text-gray-500 font-medium">
-                        お支払い用のクレジットカードの登録・変更・確認を安全に行えます。
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="p-8 md:p-10 flex justify-center">
-                    <StripePortalButton />
                 </CardContent>
             </Card>
         </div>

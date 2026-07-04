@@ -58,6 +58,7 @@ export function DesktopSidebar({ role }: DesktopSidebarProps) {
                         <NavHeading>財務管理</NavHeading>
                         <NavItem href="/admin/finance/payouts" icon={CreditCard} label="報酬支払管理" isActive={pathname?.startsWith('/admin/finance/payouts')} />
                         <NavItem href="/admin/approvals" icon={FileCheck} label="請求・決済管理" isActive={pathname?.startsWith('/admin/approvals')} />
+                        <NavItem href="/admin/approvals/plans" icon={FileCheck} label="プラン変更承認" isActive={pathname?.startsWith('/admin/approvals/plans')} />
 
                         <NavHeading>運営管理</NavHeading>
                         <NavItem href="/admin/leads" icon={UserPlus} label="体験申込リード管理" isActive={pathname?.startsWith('/admin/leads')} />

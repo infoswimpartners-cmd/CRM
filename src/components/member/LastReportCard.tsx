@@ -61,7 +61,7 @@ export default function LastReportCard({ report }: LastReportCardProps) {
                     variant="outline"
                     className="w-full h-14 rounded-2xl border-slate-100 bg-slate-50 hover:bg-white hover:border-indigo-200 text-slate-600 font-black text-xs uppercase tracking-widest transition-all group/btn"
                 >
-                    <Link href={`/member/reports`}>
+                    <Link href={`/member/reports/${report.id}`}>
                         レポート詳細を見る
                         <ArrowRight className="ml-2 w-4 h-4 group-hover/btn:translate-x-1 transition-transform text-indigo-500" />
                     </Link>

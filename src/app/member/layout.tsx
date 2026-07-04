@@ -28,15 +28,17 @@ export default async function MembersLayout({ children }: { children: ReactNode 
         unreadCount = count || 0;
     }
 
+    const isMember = isPersonalMember || isTrioMember;
+
     return (
         <div className="min-h-screen flex w-full bg-blue-50/10">
-            <MemberDesktopSidebar studentName={studentName} isTrioMember={isTrioMember} />
+            <MemberDesktopSidebar studentName={studentName} isTrioMember={isTrioMember} isMember={isMember} />
             <div className="flex-1 flex flex-col min-w-0">
-                <MemberHeader unreadCount={unreadCount} studentName={studentName} planName={planName} isTrioMember={isTrioMember} />
+                <MemberHeader unreadCount={unreadCount} studentName={studentName} planName={planName} isTrioMember={isTrioMember} isMember={isMember} />
                 <main className="flex-1 container mx-auto px-4 py-8 max-w-5xl">
                     {children}
                 </main>
-                <MemberBottomNav isTrioMember={isTrioMember} />
+                <MemberBottomNav isTrioMember={isTrioMember} isMember={isMember} />
             </div>
         </div>
     );

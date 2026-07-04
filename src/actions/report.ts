@@ -48,6 +48,8 @@ export async function getCalculatedLessonAmounts(
     // 4. 生徒情報およびプランコーチ報酬の取得
     let studentInfo: any = null
     let planBaseRewardPrice: number | null = null
+    let planBaseUnitPrice: number | null = null
+    let planBasePairUnitPrice: number | null = null
 
     if (studentId) {
         const { data: student } = await supabaseAdmin
@@ -67,14 +69,22 @@ export async function getCalculatedLessonAmounts(
         if (student?.membership_type_id) {
             const { data: config } = await supabaseAdmin
                 .from('membership_type_lessons')
-                .select('reward_price')
+                .select('reward_price, unit_price, pair_unit_price')
                 .eq('membership_type_id', student.membership_type_id)
                 .eq('lesson_master_id', lessonMasterId)
                 .maybeSingle()
 
-            if (config && config.reward_price !== null && config.reward_price !== undefined) {
-                // プランに報酬単価が設定されている場合は、コーチレートを適用して計算する基本単価として扱う
-                planBaseRewardPrice = config.reward_price
+            if (config) {
+                if (config.reward_price !== null && config.reward_price !== undefined) {
+                    // プランに報酬単価が設定されている場合は、コーチレートを適用して計算する基本単価として扱う
+                    planBaseRewardPrice = config.reward_price
+                }
+                if (config.unit_price !== null && config.unit_price !== undefined) {
+                    planBaseUnitPrice = config.unit_price
+                }
+                if (config.pair_unit_price !== null && config.pair_unit_price !== undefined) {
+                    planBasePairUnitPrice = config.pair_unit_price
+                }
             }
         }
     }
@@ -105,11 +115,11 @@ export async function getCalculatedLessonAmounts(
     }
 
     // 6. 基本受講料（base_price）の決定
-    let basePrice = master.unit_price
+    let basePrice = planBaseUnitPrice !== null ? planBaseUnitPrice : master.unit_price
     const isPair = !!studentInfo?.is_two_person_lesson && (attendanceType === 'both' || !attendanceType)
     const applyPairPrice = !!studentInfo?.apply_pair_pricing && isPair
-    if (applyPairPrice && master.pair_unit_price) {
-        basePrice = master.pair_unit_price
+    if (applyPairPrice) {
+        basePrice = planBasePairUnitPrice !== null ? planBasePairUnitPrice : (master.pair_unit_price ?? basePrice)
     }
 
     // 7. 基本報酬（base_reward）の決定
@@ -201,6 +211,7 @@ export async function submitLessonReport(values: FormValues) {
 
     // 2.5 Determine Billing Price
     let billingPrice = data.price
+    let isMonthlyMember = false
     if (data.student_id) {
         const { data: student } = await supabase
             .from('students')
@@ -215,6 +226,7 @@ export async function submitLessonReport(values: FormValues) {
         // If Monthly Member (Fee > 0), Billing Price is 0 (Included in Sub) plus facility fee
         if (membership && membership.fee > 0) {
             billingPrice = facilityFee
+            isMonthlyMember = true
         }
     }
 
@@ -263,7 +275,16 @@ export async function submitLessonReport(values: FormValues) {
         if (data.schedule_id) {
             const { createAdminClient } = await import('@/lib/supabase/admin')
             const supabaseAdmin = createAdminClient()
-            await supabaseAdmin.from('lesson_schedules').update({ is_reported: true }).eq('id', data.schedule_id)
+            
+            // スケジュールに設定する price を決定する
+            // 月謝会員なら基本料 (base_price)、単発会員（isMonthlyMemberがfalse）なら総額 (billingPrice = data.price)
+            const schedulePrice = isMonthlyMember ? base_price : billingPrice
+
+            await supabaseAdmin.from('lesson_schedules').update({ 
+                is_reported: true,
+                price: schedulePrice,
+                lesson_master_id: data.lesson_master_id
+            }).eq('id', data.schedule_id)
 
             // 単発レッスン・追加レッスンの自動請求追加
             try {
@@ -293,6 +314,14 @@ export async function submitLessonReport(values: FormValues) {
                         const billingResult = await createStripeInvoiceItemOnly(data.schedule_id)
                         if (billingResult.success) {
                             console.log(`[Auto-Billing] Successfully registered invoice item for schedule ${data.schedule_id}`)
+                            
+                            // 単発会員の場合は、Stripeで作成された請求アイテムIDを lessons テーブル側にも保存して二重請求を防ぐ
+                            if (!isMonthlyMember && billingResult.invoiceItemId) {
+                                await supabaseAdmin.from('lessons')
+                                    .update({ stripe_invoice_item_id: billingResult.invoiceItemId })
+                                    .eq('id', newLessonId)
+                                console.log(`[Auto-Billing] Synced stripe_invoice_item_id to lesson ${newLessonId}`)
+                            }
                         } else {
                             console.error(`[Auto-Billing] Failed to register invoice item:`, billingResult.error)
                         }

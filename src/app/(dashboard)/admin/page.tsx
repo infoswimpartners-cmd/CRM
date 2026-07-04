@@ -111,6 +111,7 @@ async function AdminDashboardContent({ monthParam }: { monthParam: string }) {
         { data: myUpcomingSchedules },
         { count: totalStudents },
         { data: appConfigs },
+        { data: pendingChangeRequests },
     ] = await Promise.all([
         // 1. Fetch Coaches
         supabase.from('profiles').select('*'),
@@ -199,6 +200,16 @@ async function AdminDashboardContent({ monthParam }: { monthParam: string }) {
         supabase.from('app_configs')
             .select('key, value')
             .like('key', 'coach_tax:%'),
+
+        // 10. Fetch Pending Membership Change Requests
+        supabase.from('membership_change_requests')
+            .select(`
+                *,
+                student:students ( id, full_name, student_number ),
+                requested:membership_types!requested_membership_type_id ( name )
+            `)
+            .eq('status', 'pending')
+            .order('created_at', { ascending: false })
     ])
 
     // 10. THE TRIO Status (Fetch separately to avoid blocking other data if it fails)
@@ -418,6 +429,71 @@ async function AdminDashboardContent({ monthParam }: { monthParam: string }) {
 
     return (
         <div className="space-y-6 md:space-y-10 animate-fade-in-up">
+            {/* 保留中のプラン申請セクション */}
+            {pendingChangeRequests && pendingChangeRequests.length > 0 && (
+                <section className="space-y-6">
+                    <div className="flex items-center gap-3">
+                        <h2 className="text-lg font-bold text-slate-700">プラン変更・追加・解約申請の承認待ち ({pendingChangeRequests.length}件)</h2>
+                        <div className="h-px flex-1 bg-slate-100"></div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {pendingChangeRequests.map((req: any) => {
+                            let typeLabel = 'プラン変更'
+                            let typeColor = 'bg-blue-50 text-blue-700 border-blue-200'
+                            let detail = `希望プラン: ${req.requested?.name || '解約'}`
+
+                            if (req.request_type === 'add_plan' && req.requested_is_trio === true) {
+                                typeLabel = 'Trio追加'
+                                typeColor = 'bg-amber-50 text-amber-700 border-amber-200'
+                                detail = 'THE TRIOプランの追加'
+                            } else if (req.request_type === 'cancel_plan' && req.requested_is_trio === false) {
+                                typeLabel = 'Trio解約'
+                                typeColor = 'bg-red-50 text-red-700 border-red-200'
+                                detail = 'THE TRIOプランの解約'
+                            } else if (req.request_type === 'add_plan') {
+                                typeLabel = 'プラン追加'
+                                typeColor = 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                detail = `追加プラン: ${req.requested?.name || ''}`
+                            }
+
+                            return (
+                                <Link key={req.id} href={`/customers/${req.student?.id}`} className="block">
+                                    <div className="group bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer flex flex-col justify-between h-full hover:border-indigo-200">
+                                        <div className="space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <Badge className={cn("text-[10px] font-bold px-2 py-0.5", typeColor)} variant="outline">
+                                                    {typeLabel}
+                                                </Badge>
+                                                <span className="text-[10px] text-slate-400 font-mono">
+                                                    {req.student?.student_number}
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <h4 className="text-sm font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">
+                                                    {req.student?.full_name}
+                                                </h4>
+                                                <p className="text-xs text-slate-500 mt-1 leading-normal font-medium">
+                                                    {detail}
+                                                </p>
+                                                {req.note && (
+                                                    <p className="text-[10px] text-slate-400 bg-slate-50 p-2 rounded-lg border border-slate-100 mt-2 line-clamp-2 italic">
+                                                        「{req.note}」
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center text-[10px] text-slate-400 font-bold">
+                                            <span>申請日: {format(new Date(req.created_at), 'yyyy/MM/dd')}</span>
+                                            <span className="text-indigo-600 group-hover:translate-x-1 transition-transform">詳細・承認へ ➔</span>
+                                        </div>
+                                    </div>
+                                </Link>
+                            )
+                        })}
+                    </div>
+                </section>
+            )}
+
             {/* ビジネス概要セクション */}
             <section className="space-y-6">
                 <div className="flex items-center gap-3">

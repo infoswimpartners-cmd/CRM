@@ -26,6 +26,7 @@ import { StudentScheduleSection } from '@/components/customers/StudentScheduleSe
 import { StudentMembershipAssigner } from '@/components/admin/StudentMembershipAssigner'
 import { checkStudentLessonStatus } from '@/actions/lesson_schedule'
 import { UsageStatusCard } from '@/components/customers/UsageStatusCard'
+import MembershipChangeRequestApproval from '@/components/admin/MembershipChangeRequestApproval'
 
 export const dynamic = 'force-dynamic'
 
@@ -67,7 +68,8 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
         paymentMethodStatus,
         studentStatusMastersRes,
         assignedCoachesRes,
-        schedulesRes
+        schedulesRes,
+        changeRequestRes
     ] = await Promise.all([
         // Fetch Lesson History via RPC (Bypasses RLS)
         supabase.rpc('get_student_lesson_history_public', {
@@ -108,7 +110,14 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
             profiles (
                 full_name
             )
-        `).eq('student_id', student.id).order('start_time', { ascending: false }).limit(100)
+        `).eq('student_id', student.id).order('start_time', { ascending: false }).limit(100),
+        // Fetch Membership Change Request
+        supabase
+            .from('membership_change_requests')
+            .select('*, requested:membership_types!requested_membership_type_id(name)')
+            .eq('student_id', student.id)
+            .eq('status', 'pending')
+            .limit(1)
     ])
 
     const lessons = lessonsRes.data
@@ -124,6 +133,7 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
     const studentStatusMasters = studentStatusMastersRes.data
     const assignedCoaches = assignedCoachesRes.data
     const schedules = schedulesRes.data
+    const changeRequest = changeRequestRes.data && changeRequestRes.data.length > 0 ? changeRequestRes.data[0] : null
 
     const statusLabels: Record<string, string> = {}
     const statusColors: Record<string, string> = {}
@@ -165,6 +175,16 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
                     </div>
                 )}
             </div>
+
+            {/* プラン変更申請バナー (管理者のみ) */}
+            {isAdmin && changeRequest && (
+                <MembershipChangeRequestApproval 
+                    request={{
+                        ...changeRequest,
+                        student_lock_until: student.membership_lock_until
+                    }} 
+                />
+            )}
 
             {/* Main Content Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

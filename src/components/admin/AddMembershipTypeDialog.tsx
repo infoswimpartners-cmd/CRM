@@ -38,6 +38,8 @@ export function AddMembershipTypeDialog() {
     const [pairFee, setPairFee] = useState('')
     const [description, setDescription] = useState('')
     const [rules, setRules] = useState('')
+    const [minContractMonths, setMinContractMonths] = useState('2')
+    const [lockPeriodMonths, setLockPeriodMonths] = useState('2')
     // Map of lesson_id -> { reward: string, showInEnroll: boolean }
     const [selectedLessons, setSelectedLessons] = useState<Map<string, { reward: string, showInEnroll: boolean }>>(new Map())
     const [lessonMasters, setLessonMasters] = useState<LessonMaster[]>([])
@@ -97,7 +99,9 @@ export function AddMembershipTypeDialog() {
                 pairFee: pairFee ? parseInt(pairFee) : undefined,
                 selectedLessons: selectedLessonsArray,
                 description,
-                rules
+                rules,
+                minContractMonths: parseInt(minContractMonths),
+                lockPeriodMonths: parseInt(lockPeriodMonths)
             })
 
             if (!result.success) {
@@ -111,6 +115,8 @@ export function AddMembershipTypeDialog() {
             setPairFee('')
             setDescription('')
             setRules('')
+            setMinContractMonths('2')
+            setLockPeriodMonths('2')
             setSelectedLessons(new Map())
             router.refresh()
         } catch (error: any) {
@@ -205,6 +211,34 @@ export function AddMembershipTypeDialog() {
                                     className="col-span-3"
                                     placeholder="例：&#13;&#10;コーチの交通費・施設利用料がすべて含まれています。&#13;&#10;振替の有効期間は【2ヶ月間】となります。"
                                     rows={4}
+                                />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="min-contract-months" className="text-right whitespace-nowrap">
+                                    最小契約期間 (月)
+                                </Label>
+                                <Input
+                                    id="min-contract-months"
+                                    type="number"
+                                    value={minContractMonths}
+                                    onChange={(e) => setMinContractMonths(e.target.value)}
+                                    className="col-span-3"
+                                    min="0"
+                                    required
+                                />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="lock-period-months" className="text-right whitespace-nowrap">
+                                    変更ロック期間 (月)
+                                </Label>
+                                <Input
+                                    id="lock-period-months"
+                                    type="number"
+                                    value={lockPeriodMonths}
+                                    onChange={(e) => setLockPeriodMonths(e.target.value)}
+                                    className="col-span-3"
+                                    min="0"
+                                    required
                                 />
                             </div>
                             <div className="grid grid-cols-4 items-start gap-4">

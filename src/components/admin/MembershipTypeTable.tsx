@@ -59,6 +59,8 @@ interface MembershipType {
         name: string
     }
     display_order: number
+    min_contract_months?: number
+    lock_period_months?: number
 }
 
 // Sortable Row Component
@@ -104,6 +106,12 @@ function SortableRow({ type, toggleActive, setEditingType, setDeletingId }: {
             </TableCell>
             <TableCell>
                 {type.default_lesson?.name || <span className="text-gray-400 text-xs">未設定</span>}
+            </TableCell>
+            <TableCell>
+                <div className="flex flex-col text-xs text-slate-600 font-medium">
+                    <span>最小契約: {type.min_contract_months ?? 2}ヶ月</span>
+                    <span>ロック: {type.lock_period_months ?? 2}ヶ月</span>
+                </div>
             </TableCell>
             <TableCell>
                 <div className="flex items-center gap-2">
@@ -300,6 +308,7 @@ export function MembershipTypeTable({ types }: { types: MembershipType[] }) {
                             </TableHead>
                             <TableHead>会費 (ペア)</TableHead>
                             <TableHead>標準レッスン</TableHead>
+                            <TableHead>最小契約/ロック</TableHead>
                             <TableHead
                                 className="cursor-pointer hover:bg-slate-50 transition-colors"
                                 onClick={() => handleSort('active')}

@@ -11,7 +11,8 @@ import {
     LayoutGrid,
     User,
     Settings,
-    Crown
+    Crown,
+    CreditCard
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { usePathname } from 'next/navigation'
@@ -22,11 +23,13 @@ import { cn } from '@/lib/utils'
 interface MemberDesktopSidebarProps {
     studentName?: string
     isTrioMember?: boolean
+    isMember?: boolean
 }
 
 export default function MemberDesktopSidebar({
     studentName,
     isTrioMember = false,
+    isMember = false,
 }: MemberDesktopSidebarProps) {
     const pathname = usePathname()
 
@@ -44,15 +47,15 @@ export default function MemberDesktopSidebar({
         }
     };
 
-    const baseItems = [
-        { href: '/member/profile', icon: Settings, label: 'アカウント設定', subLabel: '基本情報の確認・変更', external: false },
-    ];
-
     const navItems = [
         { href: '/member/dashboard', icon: LayoutGrid, label: 'ホーム', subLabel: '予約の確認・キャンセル', external: false },
-        { href: '/member/reports', icon: FileText, label: 'カルテ', subLabel: 'レッスンレポート・成長の記録', external: false },
-        { href: '/trio', icon: Crown, label: 'Trio', subLabel: 'グループレッスン募集一覧', external: false },
-        { href: '/member/profile', icon: User, label: 'マイページ', subLabel: '基本情報・お支払い方法の変更', external: false },
+        ...(isTrioMember ? [
+            { href: '/trio', icon: Crown, label: 'Trio', subLabel: 'グループレッスン募集一覧', external: false }
+        ] : []),
+        ...(isMember ? [
+            { href: '/member/billing', icon: CreditCard, label: 'ご契約・お支払い', subLabel: '契約内容・お支払い方法の変更', external: false }
+        ] : []),
+        { href: '/member/profile', icon: User, label: 'マイページ', subLabel: '基本情報の確認・変更', external: false },
     ];
 
     if (pathname === '/member/login') return null;
