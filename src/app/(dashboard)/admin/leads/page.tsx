@@ -41,7 +41,8 @@ import {
     saveLineConfigAction,
     completeLeadManuallyAction,
     createLeadManuallyAction,
-    updateLeadAction
+    updateLeadAction,
+    cancelLeadAssignmentAction
 } from '@/actions/leads'
 import {
     Dialog,
@@ -144,6 +145,7 @@ export default function AdminLeadsPage() {
     const [selectedWebhooks, setSelectedWebhooks] = useState<Record<string, string>>({})
     const [sendingStates, setSendingStates] = useState<Record<string, boolean>>({})
     const [completingStates, setCompletingStates] = useState<Record<string, boolean>>({})
+    const [cancelingStates, setCancelingStates] = useState<Record<string, boolean>>({})
 
     // 新規Webhook追加用フォームのステート
     const [newSpaceName, setNewSpaceName] = useState('')
@@ -785,6 +787,26 @@ export default function AdminLeadsPage() {
             console.error(error)
         } finally {
             setCompletingStates(prev => ({ ...prev, [leadId]: false }))
+        }
+    }
+
+    const handleCancelAssignment = async (leadId: string) => {
+        if (!confirm('この案件のアサインを解除してもよろしいですか？\n担当コーチの紐付けが解除され、生徒のステータスも「体験予定」に戻ります。')) return
+
+        setCancelingStates(prev => ({ ...prev, [leadId]: true }))
+        try {
+            const res = await cancelLeadAssignmentAction(leadId)
+            if (res.success) {
+                toast.success('アサインを解除しました')
+                await fetchData()
+            } else {
+                toast.error(res.error || 'アサイン解除に失敗しました')
+            }
+        } catch (error) {
+            toast.error('エラーが発生しました')
+            console.error(error)
+        } finally {
+            setCancelingStates(prev => ({ ...prev, [leadId]: false }))
         }
     }
 
@@ -1766,6 +1788,15 @@ export default function AdminLeadsPage() {
                                                                                 場所: {lead.confirmed_location}
                                                                             </span>
                                                                         )}
+                                                                        <Button
+                                                                            type="button"
+                                                                            variant="link"
+                                                                            className="text-[10px] text-rose-600 p-0 h-auto justify-start font-semibold mt-1 hover:text-rose-800"
+                                                                            disabled={cancelingStates[lead.id]}
+                                                                            onClick={() => handleCancelAssignment(lead.id)}
+                                                                        >
+                                                                            アサイン解除
+                                                                        </Button>
                                                                     </div>
                                                                 )
                                                             })()

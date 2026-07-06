@@ -1081,3 +1081,175 @@ export async function updateLeadAction(leadId: string, leadData: {
     }
 }
 
+// 17. アサインをキャンセル（解除）し、ステータスを募集開始に戻す
+export async function cancelLeadAssignmentAction(leadId: string) {
+    const supabase = await createClient()
+
+    try {
+        // 1. 管理者チェック
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        if (authError || !user) {
+            throw new Error('認証エラー: ログインしてください')
+        }
+
+        const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single()
+
+        if (profileError || !profile) {
+            throw new Error('プロファイルが見つかりません')
+        }
+
+        if (profile.role !== 'admin') {
+            throw new Error('管理者権限が必要です')
+        }
+
+        // 2. リード情報の取得
+        const { data: lead, error: leadError } = await supabase
+            .from('leads')
+            .select('*')
+            .eq('id', leadId)
+            .single()
+
+        if (leadError || !lead) {
+            throw new Error('案件が見つかりません')
+        }
+
+        const prevCoachId = lead.assigned_coach_id
+        if (!prevCoachId) {
+            return { success: true } // すでにアサイン解除されている場合は正常終了扱いとする
+        }
+
+        // 3. リードレコードをアサイン解除状態に更新（ステータスは「募集開始」に戻す）
+        const { error: updateError } = await supabase
+            .from('leads')
+            .update({
+                assigned_coach_id: null,
+                status: '募集開始',
+                assigned_at: null,
+                confirmed_datetime: null,
+                confirmed_location: null
+            })
+            .eq('id', leadId)
+
+        if (updateError) {
+            throw updateError
+        }
+
+        // 4. 紐付けられている生徒（students）と student_coaches の関係を解除
+        let studentId: string | null = null
+
+        // LINE ID での生徒検索
+        if (lead.line_user_id) {
+            const { data: stdByLine } = await supabase
+                .from('students')
+                .select('id')
+                .eq('line_user_id', lead.line_user_id)
+                .maybeSingle()
+            if (stdByLine) {
+                studentId = stdByLine.id
+            }
+        }
+
+        // メールアドレスでの生徒検索
+        if (!studentId && lead.email) {
+            const { data: stdByEmail } = await supabase
+                .from('students')
+                .select('id')
+                .eq('contact_email', lead.email)
+                .maybeSingle()
+            if (stdByEmail) {
+                studentId = stdByEmail.id
+            }
+        }
+
+        // お名前での生徒検索
+        if (!studentId && lead.name) {
+            const { data: stdByName } = await supabase
+                .from('students')
+                .select('id')
+                .eq('full_name', lead.name)
+                .maybeSingle()
+            if (stdByName) {
+                studentId = stdByName.id
+            }
+        }
+
+        if (studentId) {
+            // students テーブルの coach_id をクリアし、ステータスを体験予定（trial_pending）に戻す
+            const { error: studentUpdateError } = await supabase
+                .from('students')
+                .update({
+                    coach_id: null,
+                    status: 'trial_pending'
+                })
+                .eq('id', studentId)
+
+            if (studentUpdateError) {
+                console.error('Failed to clear student coach_id and status:', studentUpdateError)
+            }
+
+            // student_coaches テーブルから紐付けレコードを削除
+            const { error: relDeleteError } = await supabase
+                .from('student_coaches')
+                .delete()
+                .eq('student_id', studentId)
+                .eq('coach_id', prevCoachId)
+
+            if (relDeleteError) {
+                console.error('Failed to delete student_coaches relation:', relDeleteError)
+            }
+
+            revalidatePath(`/customers/${studentId}`)
+        }
+
+        // 5. アサインキャンセルの Google Chat 通知を送信（スレッド返信）
+        if (lead.notification_webhook_id) {
+            try {
+                const { data: webhook } = await supabase
+                    .from('google_chat_webhooks')
+                    .select('webhook_url')
+                    .eq('id', lead.notification_webhook_id)
+                    .single()
+                
+                if (webhook?.webhook_url) {
+                    const gchatMessage = `❌ *【体験アサイン解除】*
+案件のアサインがキャンセル（解除）されました。
+ステータスを「募集開始」に戻しました。再度アサインが可能です。
+
+*■ 対象顧客*
+・名前： ${lead.name || '未設定'} 様`
+
+                    await sendGoogleChatMessage(webhook.webhook_url, gchatMessage, `lead_${leadId}`)
+
+                    // 指定のWebhook（追加通知先）への新規送信
+                    try {
+                        const { data: assignedWebhookConfig } = await supabase
+                            .from('app_configs')
+                            .select('value')
+                            .eq('key', 'lead_assigned_webhook_url')
+                            .maybeSingle()
+
+                        if (assignedWebhookConfig?.value) {
+                            await sendGoogleChatMessage(assignedWebhookConfig.value, gchatMessage)
+                        }
+                    } catch (additionalGchatErr) {
+                        console.error('Failed to send additional cancel notification:', additionalGchatErr)
+                    }
+                }
+            } catch (gchatErr) {
+                console.error('Failed to send cancel notification to Google Chat:', gchatErr)
+            }
+        }
+
+        revalidatePath('/coach/leads')
+        revalidatePath('/admin/leads')
+        return { success: true }
+    } catch (error: any) {
+        console.error('Failed to cancel assignment:', error)
+        return { success: false, error: error.message || 'アサイン解除処理に失敗しました' }
+    }
+}
+
