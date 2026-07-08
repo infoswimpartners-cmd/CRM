@@ -58,7 +58,6 @@ interface LessonMaster {
     stripe_price_id?: string | null
     stripe_pair_product_id?: string | null
     stripe_pair_price_id?: string | null
-    stripe_pair_price_id?: string | null
     created_at: string
     display_order: number
     pricing_group?: string | null
