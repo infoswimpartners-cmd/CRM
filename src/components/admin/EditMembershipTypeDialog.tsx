@@ -36,6 +36,7 @@ interface EditMembershipTypeDialogProps {
     type: MembershipType
     open: boolean
     onOpenChange: (open: boolean) => void
+    existingTags?: string[]
 }
 
 interface LessonMaster {
@@ -46,7 +47,7 @@ interface LessonMaster {
     pair_unit_price: number | null
 }
 
-export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembershipTypeDialogProps) {
+export function EditMembershipTypeDialog({ type, open, onOpenChange, existingTags = [] }: EditMembershipTypeDialogProps) {
     const [loading, setLoading] = useState(false)
     const router = useRouter()
 
@@ -223,11 +224,17 @@ export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembe
                                 </Label>
                                 <Input
                                     id="edit-pricing-group"
+                                    list="edit-existing-tags"
                                     value={pricingGroup}
                                     onChange={(e) => setPricingGroup(e.target.value)}
                                     className="col-span-3"
                                     placeholder="例: 2026年7月新料金 (任意)"
                                 />
+                                <datalist id="edit-existing-tags">
+                                    {existingTags.map(tag => (
+                                        <option key={tag} value={tag} />
+                                    ))}
+                                </datalist>
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <div className="col-start-2 col-span-3 flex items-center space-x-2">

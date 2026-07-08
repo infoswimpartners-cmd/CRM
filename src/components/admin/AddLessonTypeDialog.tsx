@@ -20,7 +20,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Plus } from 'lucide-react'
 import { createLessonMasterAction } from '@/actions/masters'
 
-export function AddLessonTypeDialog() {
+export function AddLessonTypeDialog({ existingTags = [] }: { existingTags?: string[] }) {
     const [open, setOpen] = useState(false)
     const [loading, setLoading] = useState(false)
     const router = useRouter()
@@ -143,11 +143,17 @@ export function AddLessonTypeDialog() {
                             </Label>
                             <Input
                                 id="pricing-group"
+                                list="existing-tags"
                                 value={pricingGroup}
                                 onChange={(e) => setPricingGroup(e.target.value)}
                                 className="col-span-3"
                                 placeholder="例: 2026年7月新料金 (任意)"
                             />
+                            <datalist id="existing-tags">
+                                {existingTags.map(tag => (
+                                    <option key={tag} value={tag} />
+                                ))}
+                            </datalist>
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
                             <div className="col-start-2 col-span-3 flex items-center space-x-2">

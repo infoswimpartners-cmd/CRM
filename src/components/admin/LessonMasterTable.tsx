@@ -58,8 +58,11 @@ interface LessonMaster {
     stripe_price_id?: string | null
     stripe_pair_product_id?: string | null
     stripe_pair_price_id?: string | null
+    stripe_pair_price_id?: string | null
     created_at: string
     display_order: number
+    pricing_group?: string | null
+    show_in_enroll?: boolean
 }
 
 // Sortable Row Component
@@ -161,6 +164,9 @@ export function LessonMasterTable({ masters }: { masters: LessonMaster[] }) {
     // Sorting State
     const [sortConfig, setSortConfig] = useState<{ key: keyof LessonMaster; direction: 'asc' | 'desc' } | null>(null)
     const [optimisticMasters, setOptimisticMasters] = useState(masters)
+    const [selectedTag, setSelectedTag] = useState<string | 'ALL'>('ALL')
+
+    const uniqueTags = Array.from(new Set(masters.map((m) => m.pricing_group).filter(Boolean))) as string[]
 
     // DnD Sensors
     const sensors = useSensors(
@@ -230,6 +236,12 @@ export function LessonMasterTable({ masters }: { masters: LessonMaster[] }) {
         return 0
     })
 
+    const filteredMasters = sortedMasters.filter(master => {
+        if (selectedTag === 'ALL') return true
+        if (selectedTag === 'UNTAGGED') return !master.pricing_group
+        return master.pricing_group === selectedTag
+    })
+
     const SortIcon = ({ column }: { column: keyof LessonMaster }) => {
         if (sortConfig?.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 text-slate-400" />
         if (sortConfig.direction === 'asc') return <ArrowUp className="ml-2 h-4 w-4 text-primary" />
@@ -285,13 +297,44 @@ export function LessonMasterTable({ masters }: { masters: LessonMaster[] }) {
     }
 
     return (
-        <div className="border rounded-md">
-            <DndContext
-                id="lesson-master-dnd-context"
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleDragEnd}
-            >
+        <div className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+                <Button
+                    variant={selectedTag === 'ALL' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setSelectedTag('ALL')}
+                    className="rounded-full"
+                >
+                    すべて
+                </Button>
+                {uniqueTags.map(tag => (
+                    <Button
+                        key={tag}
+                        variant={selectedTag === tag ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setSelectedTag(tag)}
+                        className="rounded-full"
+                    >
+                        {tag}
+                    </Button>
+                ))}
+                <Button
+                    variant={selectedTag === 'UNTAGGED' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setSelectedTag('UNTAGGED')}
+                    className="rounded-full text-gray-500"
+                >
+                    タグなし
+                </Button>
+            </div>
+            
+            <div className="border rounded-md">
+                <DndContext
+                    id="lesson-master-dnd-context"
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
+                >
                 <Table>
                     <TableHeader>
                         <TableRow>
@@ -338,10 +381,10 @@ export function LessonMasterTable({ masters }: { masters: LessonMaster[] }) {
                     </TableHeader>
                     <TableBody>
                         <SortableContext
-                            items={sortedMasters.map(m => m.id)}
+                            items={filteredMasters.map(m => m.id)}
                             strategy={verticalListSortingStrategy}
                         >
-                            {sortedMasters.map((master) => (
+                            {filteredMasters.map((master) => (
                                 <SortableRow
                                     key={master.id}
                                     master={master}
@@ -351,10 +394,10 @@ export function LessonMasterTable({ masters }: { masters: LessonMaster[] }) {
                                 />
                             ))}
                         </SortableContext>
-                        {masters.length === 0 && (
+                        {filteredMasters.length === 0 && (
                             <TableRow>
-                                <TableCell colSpan={5} className="text-center py-8 text-gray-500">
-                                    登録されたレッスンタイプはありません
+                                <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                                    該当するレッスンタイプはありません
                                 </TableCell>
                             </TableRow>
                         )}
@@ -369,6 +412,7 @@ export function LessonMasterTable({ masters }: { masters: LessonMaster[] }) {
                         open={!!editingMaster}
                         onOpenChange={(open: boolean) => !open && setEditingMaster(null)}
                         onUpdate={handleUpdateMaster}
+                        existingTags={uniqueTags}
                     />
                 )
             }
@@ -392,6 +436,7 @@ export function LessonMasterTable({ masters }: { masters: LessonMaster[] }) {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-        </div >
+        </div>
+        </div>
     )
 }

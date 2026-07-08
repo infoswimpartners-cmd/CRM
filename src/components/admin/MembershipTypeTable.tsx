@@ -155,7 +155,7 @@ function SortableRow({ type, toggleActive, setEditingType, setDeletingId }: {
     )
 }
 
-export function MembershipTypeTable({ types }: { types: MembershipType[] }) {
+export function MembershipTypeTable({ types, existingTags = [] }: { types: MembershipType[], existingTags?: string[] }) {
     const router = useRouter()
     const supabase = createClient()
     const [editingType, setEditingType] = useState<MembershipType | null>(null)
@@ -163,6 +163,7 @@ export function MembershipTypeTable({ types }: { types: MembershipType[] }) {
 
     const [sortConfig, setSortConfig] = useState<{ key: keyof MembershipType; direction: 'asc' | 'desc' } | null>(null)
     const [optimisticTypes, setOptimisticTypes] = useState(types)
+    const [selectedTag, setSelectedTag] = useState<string | 'ALL'>('ALL')
 
     // DnD Sensors
     const sensors = useSensors(
@@ -229,6 +230,12 @@ export function MembershipTypeTable({ types }: { types: MembershipType[] }) {
         return 0
     })
 
+    const filteredTypes = sortedTypes.filter(t => {
+        if (selectedTag === 'ALL') return true
+        if (selectedTag === 'UNTAGGED') return !t.pricing_group
+        return t.pricing_group === selectedTag
+    })
+
     const SortIcon = ({ column }: { column: keyof MembershipType }) => {
         if (sortConfig?.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 text-slate-400" />
         if (sortConfig.direction === 'asc') return <ArrowUp className="ml-2 h-4 w-4 text-primary" />
@@ -278,12 +285,44 @@ export function MembershipTypeTable({ types }: { types: MembershipType[] }) {
     }
 
     return (
-        <div className="border rounded-md">
-            <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleDragEnd}
-            >
+        <div className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+                <Button
+                    variant={selectedTag === 'ALL' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setSelectedTag('ALL')}
+                    className="rounded-full"
+                >
+                    すべて
+                </Button>
+                {existingTags.map(tag => (
+                    <Button
+                        key={tag}
+                        variant={selectedTag === tag ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setSelectedTag(tag)}
+                        className="rounded-full"
+                    >
+                        {tag}
+                    </Button>
+                ))}
+                <Button
+                    variant={selectedTag === 'UNTAGGED' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setSelectedTag('UNTAGGED')}
+                    className="rounded-full text-gray-500"
+                >
+                    タグなし
+                </Button>
+            </div>
+            
+            <div className="border rounded-md">
+                <DndContext
+                    id="membership-dnd-context"
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
+                >
                 <Table>
                     <TableHeader>
                         <TableRow>
@@ -293,7 +332,7 @@ export function MembershipTypeTable({ types }: { types: MembershipType[] }) {
                                 onClick={() => handleSort('name')}
                             >
                                 <div className="flex items-center">
-                                    名称
+                                    名稱
                                     <SortIcon column="name" />
                                 </div>
                             </TableHead>
@@ -324,10 +363,10 @@ export function MembershipTypeTable({ types }: { types: MembershipType[] }) {
                     </TableHeader>
                     <TableBody>
                         <SortableContext
-                            items={sortedTypes.map(t => t.id)}
+                            items={filteredTypes.map(t => t.id)}
                             strategy={verticalListSortingStrategy}
                         >
-                            {sortedTypes.map((type) => (
+                            {filteredTypes.map((type) => (
                                 <SortableRow
                                     key={type.id}
                                     type={type}
@@ -337,10 +376,10 @@ export function MembershipTypeTable({ types }: { types: MembershipType[] }) {
                                 />
                             ))}
                         </SortableContext>
-                        {types.length === 0 && (
+                        {filteredTypes.length === 0 && (
                             <TableRow>
                                 <TableCell colSpan={6} className="text-center py-8 text-gray-500">
-                                    登録された会員区分はありません
+                                    該当する月次プランはありません
                                 </TableCell>
                             </TableRow>
                         )}
@@ -354,6 +393,7 @@ export function MembershipTypeTable({ types }: { types: MembershipType[] }) {
                         type={editingType}
                         open={!!editingType}
                         onOpenChange={(open: boolean) => !open && setEditingType(null)}
+                        existingTags={existingTags}
                     />
                 )
             }
@@ -377,6 +417,7 @@ export function MembershipTypeTable({ types }: { types: MembershipType[] }) {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-        </div >
+        </div>
+        </div>
     )
 }

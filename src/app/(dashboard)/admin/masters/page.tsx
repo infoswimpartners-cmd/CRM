@@ -18,6 +18,8 @@ export default async function MastersPage() {
         .select('*')
         .order('created_at', { ascending: false })
 
+    const uniqueTags = Array.from(new Set((masters || []).map(m => m.pricing_group).filter(Boolean))) as string[]
+
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -39,7 +41,7 @@ export default async function MastersPage() {
 
             <div className="flex items-center justify-between">
                 <h2 className="text-xl font-semibold">レッスン種類一覧</h2>
-                <AddLessonTypeDialog />
+                <AddLessonTypeDialog existingTags={uniqueTags} />
             </div>
 
             <LessonMasterTable masters={masters || []} />

@@ -41,9 +41,10 @@ interface EditLessonTypeDialogProps {
     open: boolean
     onOpenChange: (open: boolean) => void
     onUpdate?: (updated: LessonMaster) => void
+    existingTags?: string[]
 }
 
-export function EditLessonTypeDialog({ master, open, onOpenChange, onUpdate }: EditLessonTypeDialogProps) {
+export function EditLessonTypeDialog({ master, open, onOpenChange, onUpdate, existingTags = [] }: EditLessonTypeDialogProps) {
     const [loading, setLoading] = useState(false)
     const router = useRouter()
 
@@ -237,11 +238,17 @@ export function EditLessonTypeDialog({ master, open, onOpenChange, onUpdate }: E
                             </Label>
                             <Input
                                 id="edit-pricing-group"
+                                list="edit-existing-tags"
                                 value={pricingGroup}
                                 onChange={(e) => setPricingGroup(e.target.value)}
                                 className="col-span-3"
                                 placeholder="例: 2026年7月新料金 (任意)"
                             />
+                            <datalist id="edit-existing-tags">
+                                {existingTags.map(tag => (
+                                    <option key={tag} value={tag} />
+                                ))}
+                            </datalist>
                         </div>
                         <div className="grid grid-cols-4 items-center gap-4">
                             <div className="col-start-2 col-span-3 flex items-center space-x-2">

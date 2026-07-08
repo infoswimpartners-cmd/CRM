@@ -89,6 +89,8 @@ export default async function MembershipTypesPage() {
         `)
         .order('display_order', { ascending: true })
 
+    const uniqueTags = Array.from(new Set((allTypes || []).map(m => m.pricing_group).filter(Boolean))) as string[]
+
     // 月次プランとパッケージプランを分離
     const monthlyTypes = (allTypes || []).filter((t: any) => !t.is_package)
     const packageTypes = (allTypes || []).filter((t: any) => t.is_package)
@@ -136,9 +138,9 @@ export default async function MembershipTypesPage() {
                             <h2 className="text-xl font-semibold">月次プラン一覧</h2>
                             <p className="text-sm text-slate-500 mt-0.5">毎月の継続課金プランを管理します。</p>
                         </div>
-                        <AddMembershipTypeDialog />
+                        <AddMembershipTypeDialog existingTags={uniqueTags} />
                     </div>
-                    <MembershipTypeTable types={monthlyTypes as any} />
+                    <MembershipTypeTable types={monthlyTypes as any} existingTags={uniqueTags} />
                 </TabsContent>
 
                 {/* パッケージプランタブ */}
