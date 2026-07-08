@@ -16,7 +16,7 @@ export async function updateLessonMasterOrder(items: { id: string, display_order
 
             if (error) throw error
         }
-        revalidatePath('/admin/masters')
+        revalidatePath('/admin/masters', 'layout')
         return { success: true }
     } catch (error) {
         console.error('Failed to update lesson master order:', error)
@@ -36,7 +36,7 @@ export async function updateMembershipTypeOrder(items: { id: string, display_ord
 
             if (error) throw error
         }
-        revalidatePath('/admin/masters')
+        revalidatePath('/admin/masters', 'layout')
         revalidatePath('/admin/masters/membership-types')
         return { success: true }
     } catch (error) {
@@ -139,7 +139,7 @@ export async function createMembershipTypeAction(data: {
             if (relationError) throw relationError
         }
 
-        revalidatePath('/admin/masters')
+        revalidatePath('/admin/masters', 'layout')
         revalidatePath('/admin/masters/membership-types')
         return { success: true }
     } catch (error: any) {
@@ -211,7 +211,7 @@ export async function createLessonMasterAction(data: {
 
         if (error) throw error
 
-        revalidatePath('/admin/masters')
+        revalidatePath('/admin/masters', 'layout')
         return { success: true }
     } catch (error: any) {
         console.error('Create Lesson Master Error:', error)
@@ -422,7 +422,7 @@ export async function updateMembershipTypeAction(data: {
             if (relationError) throw relationError
         }
 
-        revalidatePath('/admin/masters')
+        revalidatePath('/admin/masters', 'layout')
         revalidatePath('/admin/masters/membership-types')
         return { success: true }
     } catch (error: any) {
@@ -515,7 +515,7 @@ export async function createPackageTypeAction(data: {
             if (relationError) throw relationError
         }
 
-        revalidatePath('/admin/masters')
+        revalidatePath('/admin/masters', 'layout')
         revalidatePath('/admin/masters/membership-types')
         return { success: true }
     } catch (error: any) {
@@ -639,7 +639,7 @@ export async function updatePackageTypeAction(data: {
             }
         }
 
-        revalidatePath('/admin/masters')
+        revalidatePath('/admin/masters', 'layout')
         revalidatePath('/admin/masters/membership-types')
         return { success: true }
     } catch (error: any) {
@@ -769,7 +769,7 @@ export async function updateLessonMasterAction(data: {
 
         if (error) throw error
 
-        revalidatePath('/admin/masters')
+        revalidatePath('/admin/masters', 'layout')
         return { success: true }
     } catch (error: any) {
         console.error('Update Lesson Master Error:', error)
