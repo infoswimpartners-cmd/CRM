@@ -584,7 +584,21 @@ export default function EnrollmentForm({
                     )}
 
                     {/* プランの説明文 */}
-                    <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">{activePlan.description}</p>
+                    <div className="text-xs text-slate-600 mt-1.5 leading-relaxed">
+                      {activePlan.description?.includes('※最低2ヶ月以上のご継続が条件となります。') ? (
+                        <>
+                          <span className="whitespace-pre-wrap block">
+                            {activePlan.description.replace(/[\r\n]*※最低2ヶ月以上のご継続が条件となります。[\r\n]*/, '')}
+                          </span>
+                          <span className="flex items-center gap-1.5 mt-3 mb-1 p-2.5 bg-red-50 border border-red-200 text-red-700 font-bold rounded-lg shadow-sm">
+                            <span className="text-red-500 text-sm">⚠️</span>
+                            ※最低2ヶ月以上のご継続が条件となります。
+                          </span>
+                        </>
+                      ) : (
+                        <span className="whitespace-pre-wrap block">{activePlan.description}</span>
+                      )}
+                    </div>
                   </div>
                 ) : (
                   <p className="text-xs font-bold text-red-500 mt-2">
