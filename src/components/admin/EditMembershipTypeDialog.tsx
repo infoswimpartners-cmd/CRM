@@ -30,6 +30,8 @@ interface MembershipType {
     rules?: string | null
     min_contract_months?: number
     lock_period_months?: number
+    pricing_group?: string | null
+    show_in_enroll?: boolean
 }
 
 interface EditMembershipTypeDialogProps {

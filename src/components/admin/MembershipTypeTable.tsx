@@ -55,6 +55,8 @@ interface MembershipType {
     created_at: string
     default_lesson_master_id: string | null
     reward_master_id: string | null
+    pricing_group?: string | null
+    show_in_enroll?: boolean
     default_lesson?: {
         name: string
     }
