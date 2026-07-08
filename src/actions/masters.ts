@@ -58,6 +58,8 @@ export async function createMembershipTypeAction(data: {
     rules?: string | null
     minContractMonths?: number
     lockPeriodMonths?: number
+    pricingGroup?: string | null
+    showInEnroll?: boolean
 }) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -113,6 +115,8 @@ export async function createMembershipTypeAction(data: {
                 rules: data.rules || null,
                 min_contract_months: data.minContractMonths ?? 2,
                 lock_period_months: data.lockPeriodMonths ?? 2,
+                pricing_group: data.pricingGroup || null,
+                show_in_enroll: data.showInEnroll ?? true,
             })
             .select()
             .single()
@@ -149,6 +153,8 @@ export async function createLessonMasterAction(data: {
     price: number
     pairPrice?: number
     isTrial: boolean
+    pricingGroup?: string | null
+    showInEnroll?: boolean
 }) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -195,6 +201,8 @@ export async function createLessonMasterAction(data: {
                 unit_price: data.price,
                 pair_unit_price: data.pairPrice || null,
                 is_trial: data.isTrial,
+                pricing_group: data.pricingGroup || null,
+                show_in_enroll: data.showInEnroll ?? true,
                 stripe_product_id: product.id,
                 stripe_price_id: price.id,
                 stripe_pair_product_id: pairProductId,
@@ -225,6 +233,8 @@ export async function updateMembershipTypeAction(data: {
     rules?: string | null
     minContractMonths?: number
     lockPeriodMonths?: number
+    pricingGroup?: string | null
+    showInEnroll?: boolean
 }) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -380,6 +390,8 @@ export async function updateMembershipTypeAction(data: {
                 rules: data.rules || null,
                 min_contract_months: data.minContractMonths ?? 2,
                 lock_period_months: data.lockPeriodMonths ?? 2,
+                pricing_group: data.pricingGroup || null,
+                show_in_enroll: data.showInEnroll ?? true,
             })
             .eq('id', data.id)
 
@@ -431,6 +443,8 @@ export async function createPackageTypeAction(data: {
     selectedLessons?: { id: string, rewardPrice: number | null, showInEnroll?: boolean }[]
     description?: string | null
     rules?: string | null
+    pricingGroup?: string | null
+    showInEnroll?: boolean
 }) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -477,6 +491,8 @@ export async function createPackageTypeAction(data: {
                 default_lesson_master_id: data.selectedLessons && data.selectedLessons.length > 0 ? data.selectedLessons[0].id : null,
                 description: data.description || null,
                 rules: data.rules || null,
+                pricing_group: data.pricingGroup || null,
+                show_in_enroll: data.showInEnroll ?? true,
             })
             .select()
             .single()
@@ -518,6 +534,8 @@ export async function updatePackageTypeAction(data: {
     selectedLessons?: { id: string, rewardPrice: number | null, unitPrice: number | null, pairUnitPrice: number | null, showInEnroll?: boolean }[]
     description?: string | null
     rules?: string | null
+    pricingGroup?: string | null
+    showInEnroll?: boolean
 }) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -587,6 +605,8 @@ export async function updatePackageTypeAction(data: {
                 default_lesson_master_id: data.selectedLessons && data.selectedLessons.length > 0 ? data.selectedLessons[0].id : null,
                 description: data.description || null,
                 rules: data.rules || null,
+                pricing_group: data.pricingGroup || null,
+                show_in_enroll: data.showInEnroll ?? true,
             })
             .eq('id', data.id)
 
@@ -638,6 +658,8 @@ export async function updateLessonMasterAction(data: {
     stripePriceId?: string | null
     stripePairProductId?: string | null
     stripePairPriceId?: string | null
+    pricingGroup?: string | null
+    showInEnroll?: boolean
 }) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -736,6 +758,8 @@ export async function updateLessonMasterAction(data: {
                 unit_price: data.price,
                 pair_unit_price: data.pairPrice,
                 is_trial: data.isTrial,
+                pricing_group: data.pricingGroup || null,
+                show_in_enroll: data.showInEnroll ?? true,
                 stripe_product_id: stripeProductId,
                 stripe_price_id: stripePriceId,
                 stripe_pair_product_id: stripePairProductId,

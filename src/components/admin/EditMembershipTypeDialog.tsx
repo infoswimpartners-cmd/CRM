@@ -61,6 +61,8 @@ export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembe
     const [rules, setRules] = useState(type.rules || '')
     const [minContractMonths, setMinContractMonths] = useState(type.min_contract_months?.toString() || '2')
     const [lockPeriodMonths, setLockPeriodMonths] = useState(type.lock_period_months?.toString() || '2')
+    const [pricingGroup, setPricingGroup] = useState((type as any).pricing_group || '')
+    const [showInEnroll, setShowInEnroll] = useState((type as any).show_in_enroll ?? true)
     // Map of lesson_id -> { reward: string, unit: string, pair: string, showInEnroll: boolean }
     const [selectedLessons, setSelectedLessons] = useState<Map<string, { reward: string, unit: string, pair: string, showInEnroll: boolean }>>(new Map())
     const [lessonMasters, setLessonMasters] = useState<LessonMaster[]>([])
@@ -124,6 +126,8 @@ export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembe
         setRules(type.rules || '')
         setMinContractMonths(type.min_contract_months?.toString() || '2')
         setLockPeriodMonths(type.lock_period_months?.toString() || '2')
+        setPricingGroup((type as any).pricing_group || '')
+        setShowInEnroll((type as any).show_in_enroll ?? true)
     }, [type])
 
     const toggleLesson = (id: string) => {
@@ -169,7 +173,9 @@ export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembe
                 description,
                 rules,
                 minContractMonths: parseInt(minContractMonths),
-                lockPeriodMonths: parseInt(lockPeriodMonths)
+                lockPeriodMonths: parseInt(lockPeriodMonths),
+                pricingGroup,
+                showInEnroll
             })
 
             if (!res.success) {
@@ -210,6 +216,30 @@ export function EditMembershipTypeDialog({ type, open, onOpenChange }: EditMembe
                                     className="col-span-3"
                                     required
                                 />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="edit-pricing-group" className="text-right">
+                                    料金タグ
+                                </Label>
+                                <Input
+                                    id="edit-pricing-group"
+                                    value={pricingGroup}
+                                    onChange={(e) => setPricingGroup(e.target.value)}
+                                    className="col-span-3"
+                                    placeholder="例: 2026年7月新料金 (任意)"
+                                />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <div className="col-start-2 col-span-3 flex items-center space-x-2">
+                                    <Checkbox
+                                        id="edit-show-in-enroll"
+                                        checked={showInEnroll}
+                                        onCheckedChange={(checked) => setShowInEnroll(!!checked)}
+                                    />
+                                    <Label htmlFor="edit-show-in-enroll" className="cursor-pointer">
+                                        入会フォームに表示する
+                                    </Label>
+                                </div>
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="edit-fee" className="text-right">

@@ -30,6 +30,8 @@ interface LessonMaster {
     stripe_price_id?: string | null
     stripe_pair_product_id?: string | null
     stripe_pair_price_id?: string | null
+    pricing_group?: string | null
+    show_in_enroll?: boolean
     created_at: string
     display_order: number
 }
@@ -53,6 +55,8 @@ export function EditLessonTypeDialog({ master, open, onOpenChange, onUpdate }: E
     const [stripePriceId, setStripePriceId] = useState((master as any).stripe_price_id || '')
     const [stripePairProductId, setStripePairProductId] = useState((master as any).stripe_pair_product_id || '')
     const [stripePairPriceId, setStripePairPriceId] = useState((master as any).stripe_pair_price_id || '')
+    const [pricingGroup, setPricingGroup] = useState((master as any).pricing_group || '')
+    const [showInEnroll, setShowInEnroll] = useState((master as any).show_in_enroll ?? true)
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -76,6 +80,8 @@ export function EditLessonTypeDialog({ master, open, onOpenChange, onUpdate }: E
                 stripePriceId: stripePriceId || null,
                 stripePairProductId: stripePairProductId || null,
                 stripePairPriceId: stripePairPriceId || null,
+                pricingGroup,
+                showInEnroll
             })
 
             if (!res.success) {
@@ -94,6 +100,8 @@ export function EditLessonTypeDialog({ master, open, onOpenChange, onUpdate }: E
                     stripe_price_id: stripePriceId || null,
                     stripe_pair_product_id: stripePairProductId || null,
                     stripe_pair_price_id: stripePairPriceId || null,
+                    pricing_group: pricingGroup,
+                    show_in_enroll: showInEnroll
                 })
             }
 
@@ -221,6 +229,30 @@ export function EditLessonTypeDialog({ master, open, onOpenChange, onUpdate }: E
                                 >
                                     体験レッスンとして扱う
                                 </label>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="edit-pricing-group" className="text-right">
+                                料金タグ
+                            </Label>
+                            <Input
+                                id="edit-pricing-group"
+                                value={pricingGroup}
+                                onChange={(e) => setPricingGroup(e.target.value)}
+                                className="col-span-3"
+                                placeholder="例: 2026年7月新料金 (任意)"
+                            />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <div className="col-start-2 col-span-3 flex items-center space-x-2">
+                                <Checkbox
+                                    id="edit-show-in-enroll"
+                                    checked={showInEnroll}
+                                    onCheckedChange={(checked) => setShowInEnroll(!!checked)}
+                                />
+                                <Label htmlFor="edit-show-in-enroll" className="cursor-pointer">
+                                    入会フォームに表示する
+                                </Label>
                             </div>
                         </div>
                     </div>

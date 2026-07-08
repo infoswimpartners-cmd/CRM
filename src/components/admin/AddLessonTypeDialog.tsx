@@ -29,6 +29,8 @@ export function AddLessonTypeDialog() {
     const [price, setPrice] = useState('0')
     const [pairPrice, setPairPrice] = useState('0')
     const [isTrial, setIsTrial] = useState(false)
+    const [pricingGroup, setPricingGroup] = useState('')
+    const [showInEnroll, setShowInEnroll] = useState(true)
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -38,7 +40,9 @@ export function AddLessonTypeDialog() {
                 name,
                 price: parseInt(price),
                 pairPrice: parseInt(pairPrice),
-                isTrial
+                isTrial,
+                pricingGroup,
+                showInEnroll
             })
 
             if (!result.success) throw new Error(result.error)
@@ -49,6 +53,8 @@ export function AddLessonTypeDialog() {
             setPrice('0')
             setPairPrice('0')
             setIsTrial(false)
+            setPricingGroup('')
+            setShowInEnroll(true)
             router.refresh()
         } catch (error: any) {
             console.error('Error adding lesson type:', error.message, error.details, error.hint)
@@ -129,6 +135,30 @@ export function AddLessonTypeDialog() {
                                 >
                                     体験レッスンとして扱う
                                 </label>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <Label htmlFor="pricing-group" className="text-right">
+                                料金タグ
+                            </Label>
+                            <Input
+                                id="pricing-group"
+                                value={pricingGroup}
+                                onChange={(e) => setPricingGroup(e.target.value)}
+                                className="col-span-3"
+                                placeholder="例: 2026年7月新料金 (任意)"
+                            />
+                        </div>
+                        <div className="grid grid-cols-4 items-center gap-4">
+                            <div className="col-start-2 col-span-3 flex items-center space-x-2">
+                                <Checkbox
+                                    id="show-in-enroll"
+                                    checked={showInEnroll}
+                                    onCheckedChange={(checked) => setShowInEnroll(!!checked)}
+                                />
+                                <Label htmlFor="show-in-enroll" className="cursor-pointer">
+                                    入会フォームに表示する
+                                </Label>
                             </div>
                         </div>
                     </div>

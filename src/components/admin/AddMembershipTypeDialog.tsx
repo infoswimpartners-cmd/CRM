@@ -40,6 +40,8 @@ export function AddMembershipTypeDialog() {
     const [rules, setRules] = useState('')
     const [minContractMonths, setMinContractMonths] = useState('2')
     const [lockPeriodMonths, setLockPeriodMonths] = useState('2')
+    const [pricingGroup, setPricingGroup] = useState('')
+    const [showInEnroll, setShowInEnroll] = useState(true)
     // Map of lesson_id -> { reward: string, showInEnroll: boolean }
     const [selectedLessons, setSelectedLessons] = useState<Map<string, { reward: string, showInEnroll: boolean }>>(new Map())
     const [lessonMasters, setLessonMasters] = useState<LessonMaster[]>([])
@@ -101,7 +103,9 @@ export function AddMembershipTypeDialog() {
                 description,
                 rules,
                 minContractMonths: parseInt(minContractMonths),
-                lockPeriodMonths: parseInt(lockPeriodMonths)
+                lockPeriodMonths: parseInt(lockPeriodMonths),
+                pricingGroup,
+                showInEnroll
             })
 
             if (!result.success) {
@@ -117,6 +121,8 @@ export function AddMembershipTypeDialog() {
             setRules('')
             setMinContractMonths('2')
             setLockPeriodMonths('2')
+            setPricingGroup('')
+            setShowInEnroll(true)
             setSelectedLessons(new Map())
             router.refresh()
         } catch (error: any) {
@@ -240,6 +246,30 @@ export function AddMembershipTypeDialog() {
                                     min="0"
                                     required
                                 />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="pricing-group" className="text-right">
+                                    料金タグ
+                                </Label>
+                                <Input
+                                    id="pricing-group"
+                                    value={pricingGroup}
+                                    onChange={(e) => setPricingGroup(e.target.value)}
+                                    className="col-span-3"
+                                    placeholder="例: 2026年7月新料金 (任意)"
+                                />
+                            </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <div className="col-start-2 col-span-3 flex items-center space-x-2">
+                                    <Checkbox
+                                        id="show-in-enroll"
+                                        checked={showInEnroll}
+                                        onCheckedChange={(checked) => setShowInEnroll(!!checked)}
+                                    />
+                                    <Label htmlFor="show-in-enroll" className="cursor-pointer">
+                                        入会フォームに表示する
+                                    </Label>
+                                </div>
                             </div>
                             <div className="grid grid-cols-4 items-start gap-4">
                                 <Label className="text-right pt-2">

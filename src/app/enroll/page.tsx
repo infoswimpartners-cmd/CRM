@@ -81,12 +81,13 @@ export default async function EnrollPage({
   // 単発レッスン料金表示設定の読み込み
   const showSinglePrices = await getAppConfig('enroll_show_single_prices') || 'true';
 
-  // 1. 「単発」プランの会員区分（membership_types）をDBから取得
   const { data: singlePlanObj } = await supabase
     .from('membership_types')
     .select('id')
     .or('name.eq.単発,name.eq.単発プラン')
     .eq('active', true)
+    .eq('show_in_enroll', true)
+    .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
 
@@ -125,6 +126,7 @@ export default async function EnrollPage({
       .from('lesson_masters')
       .select('id, name, unit_price')
       .eq('active', true)
+      .eq('show_in_enroll', true)
       .ilike('name', '%【単発】%')
       .order('display_order', { ascending: true });
 
@@ -136,30 +138,15 @@ export default async function EnrollPage({
   }
 
 
-  // membership_types からアクティブなプランを取得（月次・パッケージ両方）
+  // membership_types からアクティブかつ入会受付中のプランを取得
   const { data: dbPlans } = await supabase
     .from('membership_types')
-    .select('id, name, fee, stripe_price_id, active, display_order, is_package, ticket_count, description, rules')
+    .select('id, name, fee, stripe_price_id, active, display_order, is_package, ticket_count, description, rules, show_in_enroll')
     .eq('active', true)
+    .eq('show_in_enroll', true)
     .order('display_order', { ascending: true });
 
-  // 月次プランの対象名称
-  const targetNames = [
-    '月4回（60分）',
-    '月4回（90分）',
-    '月4回 (120分)',
-    '月2回（60分）',
-    '月2回（90分）',
-    '月2回 (120分)',
-    '月4回プラン【60分】',
-    '月2回プラン【60分】',
-    '単発',
-    '単発プラン'
-  ];
-
-  // 月次プラン（名称で絞り込み） + パッケージプラン（is_package=true）を統合
-  const filteredPlans = (dbPlans || [])
-    .filter((plan: any) => targetNames.includes(plan.name) || plan.is_package === true);
+  const filteredPlans = dbPlans || [];
 
   return (
     <EnrollmentForm
