@@ -315,7 +315,7 @@ export default function CoachManualPage() {
                                 <li>
                                     Stripe（またはCRM）で該当する以下の商品を呼び出す。
                                     <div className="bg-white p-2 border rounded mt-1 shadow-sm">
-                                        追加レッスン [60分/月2回用]：8,700円
+                                        追加レッスン [60分/月2回用]：9,500円
                                     </div>
                                 </li>
                                 <li>決済を実行（または請求書送付）し、入金確認後に予約を確定する。</li>
@@ -325,7 +325,7 @@ export default function CoachManualPage() {
                         <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
                             <h4 className="font-semibold text-blue-800 mb-1">顧客への案内例</h4>
                             <p className="text-sm text-blue-900 italic">
-                                「○○様は既にご入会済みですので、コース開始前ですが、会員様特別単価の8,700円にてご受講いただけます。」
+                                「○○様は既にご入会済みですので、コース開始前ですが、会員様特別単価の9,500円にてご受講いただけます。」
                             </p>
                         </div>
                     </CardContent>
@@ -401,27 +401,34 @@ export default function CoachManualPage() {
                                 <tbody>
                                     <tr className="bg-slate-100"><td className="p-2 font-semibold" colSpan={3}>60分コース</td></tr>
                                     <tr className="border-t">
-                                        <td className="p-2">月2回</td><td className="p-2">17,400円/月</td><td className="p-2">8,700円/回</td>
+                                        <td className="p-2">月2回</td><td className="p-2">19,000円/月</td><td className="p-2">9,500円/回</td>
                                     </tr>
                                     <tr className="border-t">
-                                        <td className="p-2">月4回</td><td className="p-2">34,000円/月</td><td className="p-2">8,500円/回</td>
+                                        <td className="p-2">月4回</td><td className="p-2">36,000円/月</td><td className="p-2">9,000円/回</td>
                                     </tr>
                                     <tr className="bg-slate-100"><td className="p-2 font-semibold" colSpan={3}>90分コース</td></tr>
                                     <tr className="border-t">
-                                        <td className="p-2">月2回</td><td className="p-2">25,400円/月</td><td className="p-2">12,700円/回</td>
+                                        <td className="p-2">月2回</td><td className="p-2">27,000円/月</td><td className="p-2">13,500円/回</td>
                                     </tr>
                                     <tr className="border-t">
-                                        <td className="p-2">月4回</td><td className="p-2">50,000円/月</td><td className="p-2">12,500円/回</td>
+                                        <td className="p-2">月4回</td><td className="p-2">52,000円/月</td><td className="p-2">13,000円/回</td>
+                                    </tr>
+                                    <tr className="bg-slate-100"><td className="p-2 font-semibold" colSpan={3}>120分コース</td></tr>
+                                    <tr className="border-t">
+                                        <td className="p-2">月2回</td><td className="p-2">35,000円/月</td><td className="p-2">17,500円/回</td>
+                                    </tr>
+                                    <tr className="border-t">
+                                        <td className="p-2">月4回</td><td className="p-2">68,000円/月</td><td className="p-2">17,000円/回</td>
                                     </tr>
                                     <tr className="bg-slate-100"><td className="p-2 font-semibold" colSpan={3}>単発会員</td></tr>
                                     <tr className="border-t">
-                                        <td className="p-2">単発 (60分)</td><td className="p-2">-</td><td className="p-2">9,000円/回</td>
+                                        <td className="p-2">単発 (60分)</td><td className="p-2">-</td><td className="p-2">10,000円/回</td>
                                     </tr>
                                     <tr className="border-t">
-                                        <td className="p-2">単発 (90分)</td><td className="p-2">-</td><td className="p-2">13,000円/回</td>
+                                        <td className="p-2">単発 (90分)</td><td className="p-2">-</td><td className="p-2">14,000円/回</td>
                                     </tr>
                                     <tr className="border-t">
-                                        <td className="p-2">単発 (120分)</td><td className="p-2">-</td><td className="p-2">17,000円/回</td>
+                                        <td className="p-2">単発 (120分)</td><td className="p-2">-</td><td className="p-2">18,000円/回</td>
                                     </tr>
                                 </tbody>
                             </table>

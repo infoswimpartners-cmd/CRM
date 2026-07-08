@@ -134,8 +134,8 @@ export default function MembershipBillingCard({
         const defaultRules = [
             'コーチの交通費・施設利用料がすべて含まれています。',
             isMonthly4
-                ? 'レッスンの追加・先行利用は「8,500円/回」で可能です。'
-                : 'レッスンの追加・先行利用は「8,700円/回」で可能です。',
+                ? `レッスンの追加・先行利用は「${Math.floor((selectedPlan.fee || 0) / 4).toLocaleString()}円/回」で可能です。`
+                : `レッスンの追加・先行利用は「${Math.floor((selectedPlan.fee || 0) / 2).toLocaleString()}円/回」で可能です。`,
             '振替の有効期間は【2ヶ月間】となります。',
             '入会金・年会費は一切かかりません。'
         ]

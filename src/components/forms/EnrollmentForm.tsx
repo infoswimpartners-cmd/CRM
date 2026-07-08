@@ -219,7 +219,7 @@ export default function EnrollmentForm({
       const defaultDesc = '一括払いのパッケージプランです。決済完了後、チケットが自動的に付与されます。';
       const defaultRules = [
         ...parsedConsentRules,
-        '1回あたり8,500円（月4回コースと同等の特別価格）で受講可能です。'
+        `1回あたり${Math.floor((pkgPlan.fee || 0) / (pkgPlan.ticket_count || 12)).toLocaleString()}円（特別価格）で受講可能です。`
       ];
       return {
         id: pkgPlan.id,
@@ -279,8 +279,8 @@ export default function EnrollmentForm({
     const defaultRules = [
       'コーチの交通費・施設利用料がすべて含まれています。',
       isMonthly4
-        ? `レッスンの追加・先行利用は「8,500円/回」で可能です。`
-        : `レッスンの追加・先行利用は「8,700円/回」で可能です。`,
+        ? `レッスンの追加・先行利用は「${Math.floor((dbPlan?.fee || 36000) / 4).toLocaleString()}円/回」で可能です。`
+        : `レッスンの追加・先行利用は「${Math.floor((dbPlan?.fee || 19000) / 2).toLocaleString()}円/回」で可能です。`,
       '振替の有効期間は【2ヶ月間】となります。',
       '入会金・年会費は一切かかりません。'
     ];

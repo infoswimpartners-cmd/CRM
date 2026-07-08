@@ -152,13 +152,13 @@ export function BillingSystemGuide() {
                                     </tr>
                                     <tr className="hover:bg-slate-50">
                                         <td className="p-3">月2回</td>
-                                        <td className="p-3">17,400円/月</td>
-                                        <td className="p-3">8,700円/回</td>
+                                        <td className="p-3">19,000円/月</td>
+                                        <td className="p-3">9,500円/回</td>
                                     </tr>
                                     <tr className="hover:bg-slate-50">
                                         <td className="p-3">月4回</td>
-                                        <td className="p-3">34,000円/月</td>
-                                        <td className="p-3">8,500円/回</td>
+                                        <td className="p-3">36,000円/月</td>
+                                        <td className="p-3">9,000円/回</td>
                                     </tr>
 
                                     {/* 90分コース */}
@@ -167,13 +167,28 @@ export function BillingSystemGuide() {
                                     </tr>
                                     <tr className="hover:bg-slate-50">
                                         <td className="p-3">月2回</td>
-                                        <td className="p-3">25,400円/月</td>
-                                        <td className="p-3">12,700円/回</td>
+                                        <td className="p-3">27,000円/月</td>
+                                        <td className="p-3">13,500円/回</td>
                                     </tr>
                                     <tr className="hover:bg-slate-50">
                                         <td className="p-3">月4回</td>
-                                        <td className="p-3">50,000円/月</td>
-                                        <td className="p-3">12,500円/回</td>
+                                        <td className="p-3">52,000円/月</td>
+                                        <td className="p-3">13,000円/回</td>
+                                    </tr>
+
+                                    {/* 120分コース */}
+                                    <tr className="bg-slate-50/50">
+                                        <td className="p-3 font-bold text-slate-700" colSpan={3}>120分コース</td>
+                                    </tr>
+                                    <tr className="hover:bg-slate-50">
+                                        <td className="p-3">月2回</td>
+                                        <td className="p-3">35,000円/月</td>
+                                        <td className="p-3">17,500円/回</td>
+                                    </tr>
+                                    <tr className="hover:bg-slate-50">
+                                        <td className="p-3">月4回</td>
+                                        <td className="p-3">68,000円/月</td>
+                                        <td className="p-3">17,000円/回</td>
                                     </tr>
 
                                     {/* 単発会員 */}
@@ -183,12 +198,17 @@ export function BillingSystemGuide() {
                                     <tr className="hover:bg-slate-50">
                                         <td className="p-3">単発 (60分)</td>
                                         <td className="p-3 text-gray-400">-</td>
-                                        <td className="p-3">9,000円/回</td>
+                                        <td className="p-3">10,000円/回</td>
                                     </tr>
                                     <tr className="hover:bg-slate-50">
                                         <td className="p-3">単発 (90分)</td>
                                         <td className="p-3 text-gray-400">-</td>
-                                        <td className="p-3">13,000円/回</td>
+                                        <td className="p-3">14,000円/回</td>
+                                    </tr>
+                                    <tr className="hover:bg-slate-50">
+                                        <td className="p-3">単発 (120分)</td>
+                                        <td className="p-3 text-gray-400">-</td>
+                                        <td className="p-3">18,000円/回</td>
                                     </tr>
                                 </tbody>
                             </table>
