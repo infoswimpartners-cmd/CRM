@@ -27,7 +27,6 @@ interface StudentScheduleSectionProps {
     isAdmin?: boolean
 }
 
-// ステータスの表示定義
 const statusConfig: Record<string, { label: string; className: string; icon: any }> = {
     pending: {
         label: '確認待ち',
@@ -42,6 +41,31 @@ const statusConfig: Record<string, { label: string; className: string; icon: any
     cancelled: {
         label: 'キャンセル',
         className: 'bg-red-50 text-red-700 border-red-200',
+        icon: XCircle,
+    },
+    awaiting_approval: {
+        label: '承認待ち',
+        className: 'bg-blue-50 text-blue-700 border-blue-200',
+        icon: AlertCircle,
+    },
+    ready_to_invoice: {
+        label: '保留中(次月合算)',
+        className: 'bg-purple-50 text-purple-700 border-purple-200',
+        icon: Clock,
+    },
+    awaiting_payment: {
+        label: '支払い待ち',
+        className: 'bg-orange-50 text-orange-700 border-orange-200',
+        icon: AlertCircle,
+    },
+    paid: {
+        label: '支払い済み',
+        className: 'bg-green-50 text-green-700 border-green-200',
+        icon: CheckCircle2,
+    },
+    refunded: {
+        label: '返金済み',
+        className: 'bg-gray-50 text-gray-700 border-gray-200',
         icon: XCircle,
     },
 }

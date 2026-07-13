@@ -210,6 +210,16 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
                                 {/* @ts-ignore relationship */}
                                 {student.membership_types?.name || '会員種別: 未選択'}
                             </Badge>
+                            {student.status === 'trial_billed' && (
+                                <span className="text-xs font-semibold text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md">
+                                    体験日程確定 & 請求送信済み
+                                </span>
+                            )}
+                            {student.status === 'trial_confirmed' && (
+                                <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+                                    体験代金決済完了・実施確定
+                                </span>
+                            )}
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-2">
