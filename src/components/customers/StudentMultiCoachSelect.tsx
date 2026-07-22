@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -14,7 +14,8 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Loader2 } from "lucide-react"
+import { Loader2, Search } from "lucide-react"
+import { saveStudentCoachesWithFeesAction } from '@/actions/student'
 
 interface Coach {
     id: string
@@ -27,6 +28,7 @@ interface AssignedCoach {
     role?: string
     option_reward_fee?: number | null
     option_reward_note?: string | null
+    profiles?: any
 }
 
 interface Props {
@@ -36,13 +38,22 @@ interface Props {
     coaches?: Coach[]
     triggerText?: string
     variant?: 'outline' | 'default' | 'ghost'
+    onSaveSuccess?: (updated: AssignedCoach[]) => void
 }
 
-export function StudentMultiCoachSelect({ studentId, initialAssignedCoaches, coaches: propCoaches, triggerText, variant = 'outline' }: Props) {
+export function StudentMultiCoachSelect({
+    studentId,
+    initialAssignedCoaches,
+    coaches: propCoaches,
+    triggerText,
+    variant = 'outline',
+    onSaveSuccess
+}: Props) {
     const [assignedCoaches, setAssignedCoaches] = useState<string[]>(initialAssignedCoaches.map(c => c.coach_id))
     const [optionFees, setOptionFees] = useState<{ [coachId: string]: number }>({})
     const [optionNotes, setOptionNotes] = useState<{ [coachId: string]: string }>({})
     const [localCoaches, setLocalCoaches] = useState<Coach[]>([])
+    const [searchTerm, setSearchTerm] = useState('')
     const [loading, setLoading] = useState(false)
     const [open, setOpen] = useState(false)
     const supabase = createClient()
@@ -81,39 +92,47 @@ export function StudentMultiCoachSelect({ studentId, initialAssignedCoaches, coa
         fetchCoaches()
     }, [propCoaches])
 
+    const filteredCoaches = useMemo(() => {
+        if (!searchTerm.trim()) return localCoaches
+        const term = searchTerm.toLowerCase().trim()
+        return localCoaches.filter(c => (c.full_name || '').toLowerCase().includes(term))
+    }, [localCoaches, searchTerm])
+
     const handleSave = async () => {
         setLoading(true)
         try {
-            const primaryCoachId = assignedCoaches.length > 0 ? assignedCoaches[0] : null
+            const payload = assignedCoaches.map(cId => ({
+                coach_id: cId,
+                option_reward_fee: optionFees[cId] || 0,
+                option_reward_note: optionNotes[cId] || null
+            }))
 
-            // Update students table (primary coach for legacy compatibility)
-            const { error: studentError } = await supabase
-                .from('students')
-                .update({ coach_id: primaryCoachId })
-                .eq('id', studentId)
+            const res = await saveStudentCoachesWithFeesAction(studentId, payload)
 
-            if (studentError) throw studentError
-
-            // Update student_coaches table
-            await supabase.from('student_coaches').delete().eq('student_id', studentId)
-
-            if (assignedCoaches.length > 0) {
-                const records = assignedCoaches.map(cId => ({
-                    student_id: studentId,
-                    coach_id: cId,
-                    role: 'assigned',
-                    option_reward_fee: optionFees[cId] || 0,
-                    option_reward_note: optionNotes[cId] || null
-                }))
-                
-                await supabase.from('student_coaches').insert(records)
+            if (!res.success) {
+                throw new Error(res.error)
             }
 
             toast.success('担当コーチを更新しました')
             setOpen(false)
+
+            if (onSaveSuccess) {
+                const updatedList: AssignedCoach[] = payload.map(p => {
+                    const cInfo = localCoaches.find(c => c.id === p.coach_id)
+                    return {
+                        coach_id: p.coach_id,
+                        role: 'assigned',
+                        option_reward_fee: p.option_reward_fee,
+                        option_reward_note: p.option_reward_note,
+                        profiles: cInfo ? { id: cInfo.id, full_name: cInfo.full_name, avatar_url: cInfo.avatar_url } : null
+                    }
+                })
+                onSaveSuccess(updatedList)
+            }
+
             router.refresh()
         } catch (error: any) {
-            toast.error('更新に失敗しました')
+            toast.error(`更新に失敗しました: ${error.message || ''}`)
             console.error(error)
         } finally {
             setLoading(false)
@@ -153,52 +172,71 @@ export function StudentMultiCoachSelect({ studentId, initialAssignedCoaches, coa
                     </div>
                 </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[300px] p-2" align="start">
+            <PopoverContent className="w-[320px] p-2" align="start">
                 <div className="space-y-2">
                     <div className="text-xs font-bold text-gray-500 px-1 pt-1 ml-1">担当コーチを選択</div>
-                    <div className="max-h-[340px] overflow-y-auto space-y-2 p-1">
-                        {localCoaches.map((coach) => {
-                            const isAssigned = assignedCoaches.includes(coach.id)
-                            return (
-                                <div key={coach.id} className="p-2 rounded-md border border-gray-100 bg-gray-50/50 space-y-2">
-                                    <div className="flex items-center gap-2">
-                                        <Checkbox
-                                            id={`coach-${coach.id}`}
-                                            checked={isAssigned}
-                                            onCheckedChange={(checked) => toggleCoach(coach.id, checked as boolean)}
-                                        />
-                                        <div className="flex-1 flex items-center gap-2">
-                                            <Avatar className="h-5 w-5">
-                                                <AvatarImage src={coach.avatar_url || undefined} />
-                                                <AvatarFallback className="text-[10px]">{(coach.full_name || '?')[0]}</AvatarFallback>
-                                            </Avatar>
-                                            <Label htmlFor={`coach-${coach.id}`} className="text-xs cursor-pointer flex-1 py-0.5 font-medium">
-                                                {coach.full_name}
-                                            </Label>
-                                        </div>
-                                    </div>
-
-                                    {/* オプション手当設定 */}
-                                    {isAssigned && (
-                                        <div className="pl-6 pt-1 flex items-center gap-1.5">
-                                            <span className="text-[10px] text-gray-500 whitespace-nowrap">オプション手当:</span>
-                                            <Input
-                                                type="number"
-                                                placeholder="0"
-                                                value={optionFees[coach.id] || ''}
-                                                onChange={(e) => {
-                                                    const val = parseInt(e.target.value) || 0
-                                                    setOptionFees(prev => ({ ...prev, [coach.id]: val }))
-                                                }}
-                                                className="h-6 w-20 text-[11px] px-1.5 py-0 bg-white"
-                                            />
-                                            <span className="text-[10px] text-gray-500">円</span>
-                                        </div>
-                                    )}
-                                </div>
-                            )
-                        })}
+                    
+                    {/* コーチ検索入力 */}
+                    <div className="relative px-1">
+                        <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-gray-400" />
+                        <Input
+                            placeholder="コーチ名で検索..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="h-8 pl-8 text-xs bg-white"
+                        />
                     </div>
+
+                    <div className="max-h-[300px] overflow-y-auto space-y-2 p-1">
+                        {filteredCoaches.length > 0 ? (
+                            filteredCoaches.map((coach) => {
+                                const isAssigned = assignedCoaches.includes(coach.id)
+                                return (
+                                    <div key={coach.id} className="p-2 rounded-md border border-gray-100 bg-gray-50/50 space-y-2">
+                                        <div className="flex items-center gap-2">
+                                            <Checkbox
+                                                id={`coach-${coach.id}`}
+                                                checked={isAssigned}
+                                                onCheckedChange={(checked) => toggleCoach(coach.id, checked as boolean)}
+                                            />
+                                            <div className="flex-1 flex items-center gap-2">
+                                                <Avatar className="h-5 w-5">
+                                                    <AvatarImage src={coach.avatar_url || undefined} />
+                                                    <AvatarFallback className="text-[10px]">{(coach.full_name || '?')[0]}</AvatarFallback>
+                                                </Avatar>
+                                                <Label htmlFor={`coach-${coach.id}`} className="text-xs cursor-pointer flex-1 py-0.5 font-medium">
+                                                    {coach.full_name}
+                                                </Label>
+                                            </div>
+                                        </div>
+
+                                        {/* オプション手当設定 */}
+                                        {isAssigned && (
+                                            <div className="pl-6 pt-1 flex items-center gap-1.5">
+                                                <span className="text-[10px] text-gray-500 whitespace-nowrap">オプション手当:</span>
+                                                <Input
+                                                    type="number"
+                                                    placeholder="0"
+                                                    value={optionFees[coach.id] || ''}
+                                                    onChange={(e) => {
+                                                        const val = parseInt(e.target.value) || 0
+                                                        setOptionFees(prev => ({ ...prev, [coach.id]: val }))
+                                                    }}
+                                                    className="h-6 w-20 text-[11px] px-1.5 py-0 bg-white font-mono font-bold"
+                                                />
+                                                <span className="text-[10px] text-gray-500">円</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                )
+                            })
+                        ) : (
+                            <div className="text-xs text-gray-400 text-center py-4">
+                                一致するコーチが見つかりません
+                            </div>
+                        )}
+                    </div>
+
                     <div className="pt-2 border-t flex justify-end gap-2 p-1">
                         <Button variant="ghost" size="sm" onClick={() => setOpen(false)} className="h-8 text-xs px-3">
                             キャンセル

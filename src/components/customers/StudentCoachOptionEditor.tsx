@@ -1,13 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Loader2, Check } from 'lucide-react'
+import { updateStudentCoachOptionFeeAction } from '@/actions/student'
 
 interface AssignedCoach {
     coach_id: string
@@ -21,37 +21,40 @@ interface Props {
     studentId: string
     assignedCoaches: AssignedCoach[]
     isAdmin?: boolean
+    onUpdateSuccess?: (coachId: string, newFee: number) => void
 }
 
-export function StudentCoachOptionEditor({ studentId, assignedCoaches, isAdmin }: Props) {
-    const [fees, setFees] = useState<{ [coachId: string]: number }>(() => {
+export function StudentCoachOptionEditor({ studentId, assignedCoaches, isAdmin, onUpdateSuccess }: Props) {
+    const [fees, setFees] = useState<{ [coachId: string]: number }>({})
+    const [loadingCoachId, setLoadingCoachId] = useState<string | null>(null)
+    const router = useRouter()
+
+    useEffect(() => {
         const initial: { [coachId: string]: number } = {}
         assignedCoaches.forEach(ac => {
             initial[ac.coach_id] = ac.option_reward_fee || 0
         })
-        return initial
-    })
-    const [loadingCoachId, setLoadingCoachId] = useState<string | null>(null)
-    const supabase = createClient()
-    const router = useRouter()
+        setFees(initial)
+    }, [assignedCoaches])
 
     const handleSaveFee = async (coachId: string) => {
         setLoadingCoachId(coachId)
         try {
             const fee = fees[coachId] || 0
-            const { error } = await supabase
-                .from('student_coaches')
-                .update({ option_reward_fee: fee })
-                .eq('student_id', studentId)
-                .eq('coach_id', coachId)
+            const res = await updateStudentCoachOptionFeeAction(studentId, coachId, fee)
 
-            if (error) throw error
+            if (!res.success) {
+                throw new Error(res.error)
+            }
 
             toast.success('オプション手当額を更新しました')
+            if (onUpdateSuccess) {
+                onUpdateSuccess(coachId, fee)
+            }
             router.refresh()
         } catch (error: any) {
             console.error('Failed to update option fee:', error)
-            toast.error('手当額の更新に失敗しました')
+            toast.error(`手当額の更新に失敗しました: ${error.message || ''}`)
         } finally {
             setLoadingCoachId(null)
         }

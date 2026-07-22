@@ -491,3 +491,75 @@ export async function updateStudentCoachAction(studentId: string, coachId: strin
         return { success: false, error: error.message || '担当コーチの更新に失敗しました' }
     }
 }
+
+export async function saveStudentCoachesWithFeesAction(
+    studentId: string,
+    assignedCoaches: { coach_id: string; option_reward_fee?: number; option_reward_note?: string | null }[]
+) {
+    const supabase = await createClient()
+
+    try {
+        const primaryCoachId = assignedCoaches.length > 0 ? assignedCoaches[0].coach_id : null
+
+        // 1. Update students table
+        const { error: studentError } = await supabase
+            .from('students')
+            .update({ coach_id: primaryCoachId })
+            .eq('id', studentId)
+
+        if (studentError) throw studentError
+
+        // 2. Clear existing student_coaches
+        await supabase.from('student_coaches').delete().eq('student_id', studentId)
+
+        // 3. Insert new student_coaches
+        if (assignedCoaches.length > 0) {
+            const records = assignedCoaches.map(c => ({
+                student_id: studentId,
+                coach_id: c.coach_id,
+                role: 'assigned',
+                option_reward_fee: c.option_reward_fee || 0,
+                option_reward_note: c.option_reward_note || null
+            }))
+
+            const { error: insertError } = await supabase.from('student_coaches').insert(records)
+            if (insertError) throw insertError
+        }
+
+        revalidatePath(`/customers/${studentId}`)
+        revalidatePath('/customers')
+        revalidatePath('/coach')
+        revalidatePath('/admin')
+        return { success: true }
+    } catch (error: any) {
+        console.error('Save Student Coaches Error:', error)
+        return { success: false, error: error.message || '担当コーチの保存に失敗しました' }
+    }
+}
+
+export async function updateStudentCoachOptionFeeAction(
+    studentId: string,
+    coachId: string,
+    optionFee: number
+) {
+    const supabase = await createClient()
+
+    try {
+        const { error } = await supabase
+            .from('student_coaches')
+            .update({ option_reward_fee: optionFee })
+            .eq('student_id', studentId)
+            .eq('coach_id', coachId)
+
+        if (error) throw error
+
+        revalidatePath(`/customers/${studentId}`)
+        revalidatePath('/customers')
+        revalidatePath('/coach')
+        revalidatePath('/admin')
+        return { success: true }
+    } catch (error: any) {
+        console.error('Update Option Fee Error:', error)
+        return { success: false, error: error.message || '手当額の更新に失敗しました' }
+    }
+}

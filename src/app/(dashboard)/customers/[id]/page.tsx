@@ -21,8 +21,7 @@ import { StudentAccountLinker } from '@/components/admin/StudentAccountLinker'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { calculateAge, cn } from '@/lib/utils'
-import { StudentCoachOptionEditor } from '@/components/customers/StudentCoachOptionEditor'
-import { StudentMultiCoachSelect } from '@/components/customers/StudentMultiCoachSelect'
+import { StudentCoachCardContainer } from '@/components/customers/StudentCoachCardContainer'
 import { StudentScheduleButton } from '@/components/students/StudentScheduleButton'
 import { StudentScheduleSection } from '@/components/customers/StudentScheduleSection'
 import { StudentMembershipAssigner } from '@/components/admin/StudentMembershipAssigner'
@@ -387,27 +386,12 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
                 {/* Right Column: Contract & Assignment */}
                 <div className="space-y-6">
                     {/* Coach Assignment Card */}
-                    <Card>
-                        <CardHeader className="pb-3 flex flex-row items-center justify-between">
-                            <CardTitle className="text-base font-bold">担当コーチ</CardTitle>
-                            {isAdmin && (
-                                <StudentMultiCoachSelect
-                                    studentId={student.id}
-                                    initialAssignedCoaches={assignedCoaches || []}
-                                    coaches={coaches || []}
-                                    triggerText="変更 / 追加"
-                                    variant="outline"
-                                />
-                            )}
-                        </CardHeader>
-                        <CardContent>
-                            <StudentCoachOptionEditor
-                                studentId={student.id}
-                                assignedCoaches={assignedCoaches || []}
-                                isAdmin={isAdmin}
-                            />
-                        </CardContent>
-                    </Card>
+                    <StudentCoachCardContainer
+                        studentId={student.id}
+                        initialAssignedCoaches={assignedCoaches || []}
+                        coaches={coaches || []}
+                        isAdmin={isAdmin}
+                    />
 
                     {/* Contract & Payment Card */}
                     <Card>
