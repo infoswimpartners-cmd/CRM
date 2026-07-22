@@ -30,6 +30,7 @@ export default async function FinancePage() {
                 full_name,
                 is_two_person_lesson,
                 is_default_distant_option,
+                student_coaches ( coach_id, option_reward_fee, option_reward_note ),
                 membership_types!students_membership_type_id_fkey (
                     reward_master:lesson_masters!reward_master_id ( unit_price ),
                     membership_type_lessons ( lesson_master_id, reward_price )

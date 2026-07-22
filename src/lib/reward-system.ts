@@ -26,6 +26,15 @@ export type LessonData = {
                 reward_price: number | null
             }[]
         }
+        student_coaches?: {
+            coach_id: string
+            option_reward_fee?: number | null
+            option_reward_note?: string | null
+        }[] | {
+            coach_id: string
+            option_reward_fee?: number | null
+            option_reward_note?: string | null
+        }
     }
     profiles?: {
         distant_reward_fee?: number
@@ -142,6 +151,18 @@ export function calculateLessonReward(
         distantFee = lesson.profiles.distant_reward_fee;
     }
 
+    // コーチx生徒ごとの個別のオプション手当を追加
+    let coachOptionFee = 0;
+    if (lesson.students?.student_coaches) {
+        const coachRelations = Array.isArray(lesson.students.student_coaches)
+            ? lesson.students.student_coaches
+            : [lesson.students.student_coaches]
+        const match = coachRelations.find((sc: any) => sc.coach_id === lesson.coach_id)
+        if (match && match.option_reward_fee) {
+            coachOptionFee = match.option_reward_fee
+        }
+    }
+
     // Calculate base reward
     let reward = 0
     if (master.is_trial) {
@@ -167,7 +188,7 @@ export function calculateLessonReward(
         reward += settings.pair_bonus
     }
 
-    return reward + facilityFee + distantFee
+    return reward + facilityFee + distantFee + coachOptionFee
 }
 
 export function calculateMonthlyStats(

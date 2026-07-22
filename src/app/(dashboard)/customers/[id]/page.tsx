@@ -90,6 +90,9 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
         // Fetch All Assigned Coaches
         supabase.from('student_coaches').select(`
             role,
+            coach_id,
+            option_reward_fee,
+            option_reward_note,
             profiles (
                 id,
                 full_name,
