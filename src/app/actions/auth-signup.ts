@@ -41,7 +41,7 @@ export async function createGenericInvitation(): Promise<{ success?: boolean; ur
 /**
  * Verifies if a signup token is valid.
  */
-export async function verifySignupToken(token: string): Promise<{ valid: boolean; error?: string }> {
+export async function verifySignupToken(token: string): Promise<{ valid: boolean; isUsed?: boolean; error?: string }> {
     if (!token) return { valid: false, error: 'トークンがありません。' }
 
     const supabase = createAdminClient()
@@ -56,7 +56,7 @@ export async function verifySignupToken(token: string): Promise<{ valid: boolean
     }
 
     if (data.is_used) {
-        return { valid: false, error: 'このリンクは既に使用されています。' }
+        return { valid: false, isUsed: true, error: 'このリンクは既に使用されています。' }
     }
 
     if (new Date(data.expires_at) < new Date()) {

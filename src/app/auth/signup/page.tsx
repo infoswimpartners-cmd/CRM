@@ -2,6 +2,7 @@ import { verifySignupToken } from '@/app/actions/auth-signup'
 import { CoachSignupForm } from '@/components/auth/CoachSignupForm'
 import { AlertCircle } from 'lucide-react'
 import Image from 'next/image'
+import { redirect } from 'next/navigation'
 
 interface PageProps {
     searchParams: Promise<{ token?: string }>
@@ -11,7 +12,11 @@ export default async function SignupPage({ searchParams }: PageProps) {
     const { token } = await searchParams
 
     // Verify token on server side
-    const { valid, error } = await verifySignupToken(token || '')
+    const { valid, isUsed, error } = await verifySignupToken(token || '')
+
+    if (isUsed) {
+        redirect('/login')
+    }
 
     return (
         <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">

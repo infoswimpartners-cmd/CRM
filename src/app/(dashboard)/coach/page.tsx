@@ -13,6 +13,7 @@ import { startOfMonth, subMonths, endOfMonth, format } from 'date-fns'
 import { CoachActivityWidget } from '@/components/dashboard/CoachActivityWidget'
 import { calculateCoachRate, calculateMonthlyStats } from '@/lib/reward-system'
 import { ManualBanner } from '@/components/dashboard/ManualBanner'
+import { BankAlertBanner } from '@/components/dashboard/BankAlertBanner'
 import { AnnouncementsWidget } from '@/components/dashboard/AnnouncementsWidget'
 import { TodayScheduleWidget } from '@/components/dashboard/TodayScheduleWidget'
 
@@ -38,6 +39,9 @@ export default async function CoachDashboard() {
         <div className="space-y-5 md:space-y-8 animate-fade-in-up pb-10 min-w-0">
             {/* Manual Banner (Highest Priority) */}
             <ManualBanner />
+
+            {/* Bank Info Alert Banner */}
+            <BankAlertBanner userId={user.id} />
 
             <Suspense fallback={<CoachDashboardSkeleton />}>
                 <CoachDashboardContent userId={user.id} profile={profile} />

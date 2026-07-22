@@ -81,7 +81,7 @@ export function BankInfoForm() {
     }
 
     return (
-        <Card>
+        <Card id="bank-info">
             <CardHeader>
                 <CardTitle>振込先口座情報</CardTitle>
                 <CardDescription>
