@@ -62,7 +62,7 @@ export function CoachChangeDialog({
                 <DialogHeader>
                     <DialogTitle>担当コーチの変更</DialogTitle>
                     <DialogDescription>
-                        メイン担当コーチを選択してください。変更すると即時に反映されます。
+                        担当コーチを選択してください。変更すると即時に反映されます。
                     </DialogDescription>
                 </DialogHeader>
 

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import {
     Popover,
@@ -12,19 +13,18 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
-import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Loader2 } from "lucide-react"
 
 interface Coach {
     id: string
     full_name: string
-    avatar_url: string | null
+    avatar_url?: string | null
 }
 
 interface AssignedCoach {
     coach_id: string
-    role: 'main' | 'sub'
+    role?: string
     option_reward_fee?: number | null
     option_reward_note?: string | null
 }
@@ -32,23 +32,24 @@ interface AssignedCoach {
 interface Props {
     studentId: string
     initialAssignedCoaches: AssignedCoach[]
-    initialMainCoachId: string | null
+    initialMainCoachId?: string | null
     coaches?: Coach[]
+    triggerText?: string
+    variant?: 'outline' | 'default' | 'ghost'
 }
 
-export function StudentMultiCoachSelect({ studentId, initialAssignedCoaches, initialMainCoachId, coaches: propCoaches }: Props) {
+export function StudentMultiCoachSelect({ studentId, initialAssignedCoaches, coaches: propCoaches, triggerText, variant = 'outline' }: Props) {
     const [assignedCoaches, setAssignedCoaches] = useState<string[]>(initialAssignedCoaches.map(c => c.coach_id))
-    const [mainCoachId, setMainCoachId] = useState<string | null>(initialMainCoachId)
     const [optionFees, setOptionFees] = useState<{ [coachId: string]: number }>({})
     const [optionNotes, setOptionNotes] = useState<{ [coachId: string]: string }>({})
     const [localCoaches, setLocalCoaches] = useState<Coach[]>([])
     const [loading, setLoading] = useState(false)
     const [open, setOpen] = useState(false)
     const supabase = createClient()
+    const router = useRouter()
 
     useEffect(() => {
         setAssignedCoaches(initialAssignedCoaches.map(c => c.coach_id))
-        setMainCoachId(initialMainCoachId)
         
         const fees: { [coachId: string]: number } = {}
         const notes: { [coachId: string]: string } = {}
@@ -58,7 +59,7 @@ export function StudentMultiCoachSelect({ studentId, initialAssignedCoaches, ini
         })
         setOptionFees(fees)
         setOptionNotes(notes)
-    }, [initialAssignedCoaches, initialMainCoachId])
+    }, [initialAssignedCoaches])
 
     useEffect(() => {
         if (propCoaches && propCoaches.length > 0) {
@@ -83,41 +84,35 @@ export function StudentMultiCoachSelect({ studentId, initialAssignedCoaches, ini
     const handleSave = async () => {
         setLoading(true)
         try {
-            // Update students table (main coach)
+            const primaryCoachId = assignedCoaches.length > 0 ? assignedCoaches[0] : null
+
+            // Update students table (primary coach for legacy compatibility)
             const { error: studentError } = await supabase
                 .from('students')
-                .update({ coach_id: mainCoachId })
+                .update({ coach_id: primaryCoachId })
                 .eq('id', studentId)
 
             if (studentError) throw studentError
 
             // Update student_coaches table
-            // Delete existing
             await supabase.from('student_coaches').delete().eq('student_id', studentId)
 
-            // Insert new
             if (assignedCoaches.length > 0) {
                 const records = assignedCoaches.map(cId => ({
                     student_id: studentId,
                     coach_id: cId,
-                    role: cId === mainCoachId ? 'main' : 'sub',
+                    role: 'assigned',
                     option_reward_fee: optionFees[cId] || 0,
                     option_reward_note: optionNotes[cId] || null
                 }))
                 
-                // 誰もメインでない場合は、最初のコーチをメインにする
-                if (!records.find(r => r.role === 'main') && records.length > 0) {
-                    records[0].role = 'main'
-                    // studentsテーブルも更新
-                    await supabase.from('students').update({ coach_id: records[0].coach_id }).eq('id', studentId)
-                }
-
                 await supabase.from('student_coaches').insert(records)
             }
 
             toast.success('担当コーチを更新しました')
             setOpen(false)
-        } catch (error) {
+            router.refresh()
+        } catch (error: any) {
             toast.error('更新に失敗しました')
             console.error(error)
         } finally {
@@ -128,47 +123,44 @@ export function StudentMultiCoachSelect({ studentId, initialAssignedCoaches, ini
     const toggleCoach = (id: string, checked: boolean) => {
         if (checked) {
             setAssignedCoaches(prev => [...prev, id])
-            if (!mainCoachId) setMainCoachId(id)
         } else {
             setAssignedCoaches(prev => prev.filter(cId => cId !== id))
-            if (mainCoachId === id) {
-                setMainCoachId(prev => {
-                    const others = assignedCoaches.filter(cId => cId !== id)
-                    return others.length > 0 ? others[0] : null
-                })
-            }
         }
     }
 
-    const mainCoach = localCoaches.find(c => c.id === mainCoachId)
-    const subCount = assignedCoaches.length > 1 ? assignedCoaches.length - 1 : 0
+    const firstAssignedCoach = localCoaches.find(c => assignedCoaches.includes(c.id))
+    const extraCount = assignedCoaches.length > 1 ? assignedCoaches.length - 1 : 0
 
     return (
         <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>
                 <Button 
-                    variant="outline" 
+                    variant={variant} 
                     size="sm" 
                     className="h-7 rounded-full px-3 text-xs font-medium gap-2 border-gray-200 hover:bg-gray-50 bg-white"
                 >
-                    <div className="flex items-center gap-1 max-w-[120px] overflow-hidden">
-                        {mainCoach ? (
-                            <span className="truncate">{mainCoach.full_name}</span>
+                    <div className="flex items-center gap-1 max-w-[140px] overflow-hidden">
+                        {triggerText ? (
+                            <span>{triggerText}</span>
+                        ) : firstAssignedCoach ? (
+                            <span className="truncate">{firstAssignedCoach.full_name}</span>
                         ) : (
-                            <span className="text-gray-400">未設定</span>
+                            <span className="text-gray-400">担当なし</span>
                         )}
-                        {subCount > 0 && <span className="text-gray-500 whitespace-nowrap text-[10px] bg-gray-100 px-1 rounded">+{subCount}</span>}
+                        {!triggerText && extraCount > 0 && (
+                            <span className="text-gray-500 whitespace-nowrap text-[10px] bg-gray-100 px-1 rounded">+{extraCount}</span>
+                        )}
                     </div>
                 </Button>
             </PopoverTrigger>
             <PopoverContent className="w-[300px] p-2" align="start">
                 <div className="space-y-2">
-                    <div className="text-xs font-bold text-gray-500 px-1 pt-1 ml-1">担当コーチと個別オプション手当を選択</div>
+                    <div className="text-xs font-bold text-gray-500 px-1 pt-1 ml-1">担当コーチを選択</div>
                     <div className="max-h-[340px] overflow-y-auto space-y-2 p-1">
                         {localCoaches.map((coach) => {
                             const isAssigned = assignedCoaches.includes(coach.id)
                             return (
-                                <div key={coach.id} className="p-1.5 rounded-md border border-gray-100 bg-gray-50/50 space-y-1.5">
+                                <div key={coach.id} className="p-2 rounded-md border border-gray-100 bg-gray-50/50 space-y-2">
                                     <div className="flex items-center gap-2">
                                         <Checkbox
                                             id={`coach-${coach.id}`}
@@ -184,22 +176,6 @@ export function StudentMultiCoachSelect({ studentId, initialAssignedCoaches, ini
                                                 {coach.full_name}
                                             </Label>
                                         </div>
-                                        {isAssigned && (
-                                            <button
-                                                onClick={(e) => {
-                                                    e.preventDefault()
-                                                    setMainCoachId(coach.id)
-                                                }}
-                                                className={cn(
-                                                    "text-[9px] px-1.5 py-0.5 rounded border transition-colors whitespace-nowrap",
-                                                    mainCoachId === coach.id 
-                                                        ? "bg-slate-900 text-white border-slate-900 font-bold" 
-                                                        : "bg-white text-gray-400 border-gray-100 hover:border-gray-300"
-                                                )}
-                                            >
-                                                メイン
-                                            </button>
-                                        )}
                                     </div>
 
                                     {/* オプション手当設定 */}
@@ -214,7 +190,7 @@ export function StudentMultiCoachSelect({ studentId, initialAssignedCoaches, ini
                                                     const val = parseInt(e.target.value) || 0
                                                     setOptionFees(prev => ({ ...prev, [coach.id]: val }))
                                                 }}
-                                                className="h-6 w-20 text-[11px] px-1.5 py-0"
+                                                className="h-6 w-20 text-[11px] px-1.5 py-0 bg-white"
                                             />
                                             <span className="text-[10px] text-gray-500">円</span>
                                         </div>
@@ -225,7 +201,7 @@ export function StudentMultiCoachSelect({ studentId, initialAssignedCoaches, ini
                     </div>
                     <div className="pt-2 border-t flex justify-end gap-2 p-1">
                         <Button variant="ghost" size="sm" onClick={() => setOpen(false)} className="h-8 text-xs px-3">
-                            取消
+                            キャンセル
                         </Button>
                         <Button size="sm" onClick={handleSave} disabled={loading} className="h-8 text-xs px-4">
                             {loading && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}

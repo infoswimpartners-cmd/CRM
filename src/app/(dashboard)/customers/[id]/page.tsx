@@ -21,6 +21,8 @@ import { StudentAccountLinker } from '@/components/admin/StudentAccountLinker'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { calculateAge, cn } from '@/lib/utils'
+import { StudentCoachOptionEditor } from '@/components/customers/StudentCoachOptionEditor'
+import { StudentMultiCoachSelect } from '@/components/customers/StudentMultiCoachSelect'
 import { StudentScheduleButton } from '@/components/students/StudentScheduleButton'
 import { StudentScheduleSection } from '@/components/customers/StudentScheduleSection'
 import { StudentMembershipAssigner } from '@/components/admin/StudentMembershipAssigner'
@@ -80,7 +82,7 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
         // Fetch User Role
         user ? supabase.from('profiles').select('role').eq('id', user.id).single() : Promise.resolve({ data: null }),
         // Fetch Coaches for Trial Confirm
-        supabase.from('profiles').select('id, full_name').in('role', ['coach', 'admin', 'owner']).order('full_name'),
+        supabase.from('profiles').select('id, full_name, avatar_url').in('role', ['coach', 'admin', 'owner']).order('full_name'),
         // Fetch Trial Masters
         supabase.from('lesson_masters').select('id, name, unit_price, pair_unit_price, email_template_id').eq('is_trial', true).eq('active', true).order('display_order', { ascending: true }),
         // Fetch Stripe Status
@@ -389,38 +391,21 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
                         <CardHeader className="pb-3 flex flex-row items-center justify-between">
                             <CardTitle className="text-base font-bold">担当コーチ</CardTitle>
                             {isAdmin && (
-                                <CoachChangeButton
+                                <StudentMultiCoachSelect
                                     studentId={student.id}
-                                    currentCoachId={student.coach_id}
+                                    initialAssignedCoaches={assignedCoaches || []}
+                                    coaches={coaches || []}
+                                    triggerText="変更 / 追加"
+                                    variant="outline"
                                 />
                             )}
                         </CardHeader>
                         <CardContent>
-                            <div className="space-y-3">
-                                {assignedCoaches && assignedCoaches.length > 0 ? (
-                                    assignedCoaches.map((ac: any) => (
-                                        <div key={ac.profiles.id} className="flex items-center gap-3 p-2 rounded-lg bg-gray-50 border border-gray-100">
-                                            {/* アバタープレースホルダー */}
-                                            <div className="h-8 w-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-500">
-                                                {ac.profiles.full_name.slice(0, 1)}
-                                            </div>
-                                            <div className="flex-1">
-                                                <div className="font-bold text-sm">{ac.profiles.full_name}</div>
-                                                <div className="text-xs text-gray-500">
-                                                    {ac.role === 'main' ? 'メイン担当' : 'サブ担当'}
-                                                </div>
-                                            </div>
-                                            {ac.role === 'main' && (
-                                                <Badge className="bg-slate-900">MAIN</Badge>
-                                            )}
-                                        </div>
-                                    ))
-                                ) : (
-                                    <div className="text-sm text-gray-500 py-2 text-center bg-gray-50 rounded border border-dashed border-gray-200">
-                                        担当コーチ未設定
-                                    </div>
-                                )}
-                            </div>
+                            <StudentCoachOptionEditor
+                                studentId={student.id}
+                                assignedCoaches={assignedCoaches || []}
+                                isAdmin={isAdmin}
+                            />
                         </CardContent>
                     </Card>
 
