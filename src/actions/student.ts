@@ -514,10 +514,10 @@ export async function saveStudentCoachesWithFeesAction(
 
         // 3. Insert new student_coaches
         if (assignedCoaches.length > 0) {
-            const records = assignedCoaches.map(c => ({
+            const records = assignedCoaches.map((c, index) => ({
                 student_id: studentId,
                 coach_id: c.coach_id,
-                role: 'assigned',
+                role: index === 0 ? 'main' : 'sub',
                 option_reward_fee: c.option_reward_fee || 0,
                 option_reward_note: c.option_reward_note || null
             }))
