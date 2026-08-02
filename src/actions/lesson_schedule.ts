@@ -110,8 +110,9 @@ async function calculateMonthlyUsage(
         const prevStart = new Date(Date.UTC(jstYear, jstMonth - 1, 1, -9, 0, 0)).toISOString()
 
         let canHaveRollover = true
-        if (membershipStartedAt) {
-            const startUtcTime = new Date(membershipStartedAt).getTime()
+        const refStartDate = membershipStartedAt || createdAt
+        if (refStartDate) {
+            const startUtcTime = new Date(refStartDate).getTime()
             const startJstTime = startUtcTime + JST_OFFSET
             const startJstDate = new Date(startJstTime)
 
@@ -132,13 +133,15 @@ async function calculateMonthlyUsage(
             canHaveRollover = false
         }
 
-        console.log(`[CalcUsage] canHaveRollover: ${canHaveRollover}, StartedAt: ${membershipStartedAt}`)
+        console.log(`[CalcUsage] canHaveRollover: ${canHaveRollover}, StartedAt: ${membershipStartedAt}, CreatedAt: ${createdAt}`)
 
         if (canHaveRollover) {
+            // A. Count from schedules
             const { data: prevSchedulesList, error: prevError } = await supabaseAdmin
                 .from('lesson_schedules')
                 .select(`
                     id,
+                    lesson_master_id,
                     lesson_master:lesson_masters (
                         is_trial
                     )
@@ -153,9 +156,62 @@ async function calculateMonthlyUsage(
                 const isTrial = s.lesson_master?.is_trial === true
                 return !isTrial
             })
+            const scheduleCount = prevNonTrialScheduled.length
 
-            const prevTotal = prevNonTrialScheduled.length
-            const unused = Math.max(0, monthlyLimit - prevTotal)
+            // B. Count from actual lessons (in case schedules were not created but lesson report exists)
+            const { data: prevLessonsList, error: prevLessonError } = await supabaseAdmin
+                .from('lessons')
+                .select(`
+                    id,
+                    lesson_master_id,
+                    lesson_master:lesson_masters (
+                        is_trial
+                    )
+                `)
+                .eq('student_id', studentId)
+                .gte('lesson_date', prevStart)
+                .lt('lesson_date', start)
+
+            if (prevLessonError) throw prevLessonError
+
+            const prevNonTrialLessons = (prevLessonsList || []).filter((l: any) => {
+                const isTrial = l.lesson_master?.is_trial === true
+                return !isTrial
+            })
+            const lessonCount = prevNonTrialLessons.length
+
+            // Extract primary lesson_master_id in the previous month to find the previous plan limit
+            let prevLessonMasterId: string | null = null
+            const lmIds = [
+                ...(prevSchedulesList || []).map((s: any) => s.lesson_master_id),
+                ...(prevLessonsList || []).map((l: any) => l.lesson_master_id)
+            ].filter(Boolean) as string[]
+
+            if (lmIds.length > 0) {
+                const counts = lmIds.reduce((acc, id) => {
+                    acc[id] = (acc[id] || 0) + 1
+                    return acc
+                }, {} as Record<string, number>)
+                prevLessonMasterId = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b)
+            }
+
+            let prevMonthlyLimit = monthlyLimit
+            if (prevLessonMasterId) {
+                const { data: mt } = await supabaseAdmin
+                    .from('membership_types')
+                    .select('monthly_lesson_limit')
+                    .eq('default_lesson_master_id', prevLessonMasterId)
+                    .maybeSingle()
+                
+                if (mt && mt.monthly_lesson_limit !== null && mt.monthly_lesson_limit !== undefined) {
+                    prevMonthlyLimit = mt.monthly_lesson_limit
+                }
+            }
+
+            const prevTotal = Math.max(scheduleCount, lessonCount)
+            console.log(`[CalcUsage] Previous month count - Schedules: ${scheduleCount}, Lessons: ${lessonCount}, Selected Total: ${prevTotal}, Previous Limit: ${prevMonthlyLimit}`)
+
+            const unused = Math.max(0, prevMonthlyLimit - prevTotal)
             rollover = Math.min(unused, appliedMaxRollover)
         }
     }
