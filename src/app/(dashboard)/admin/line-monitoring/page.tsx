@@ -216,15 +216,19 @@ export default function LineMonitoringPage() {
         setIsLoadingConfigs(false)
     }
 
-    // ステータス更新処理
+    // ステータス更新処理 (0秒即時反映)
     const handleUpdateStatus = async (logId: string, currentStatus: 'unread' | 'checked') => {
         const nextStatus = currentStatus === 'unread' ? 'checked' : 'unread'
+        
+        // 1. 0秒で画面を即時更新（リロードなしで瞬時に反映）
+        setLogs(prev => prev.map(log => log.id === logId ? { ...log, status: nextStatus } : log))
+        toast.success(nextStatus === 'checked' ? 'ログを確認済みにしました' : 'ログを未確認に戻しました')
+
+        // 2. バックグラウンドで非同期送信
         const res = await updateLogStatusAction(logId, nextStatus)
-        if (res.success) {
-            toast.success(nextStatus === 'checked' ? 'ログを確認済みにしました' : 'ログを未確認に戻しました')
-            // ローカルステートを即時更新してスムーズな操作感を提供する
-            setLogs(prev => prev.map(log => log.id === logId ? { ...log, status: nextStatus } : log))
-        } else {
+        if (!res.success) {
+            // エラー時は元のステータスにロールバック
+            setLogs(prev => prev.map(log => log.id === logId ? { ...log, status: currentStatus } : log))
             toast.error('ステータス更新に失敗しました: ' + res.error)
         }
     }
@@ -327,13 +331,14 @@ export default function LineMonitoringPage() {
             if (res && res.success) {
                 toast.success('全体スケジュールにレッスンを登録しました')
                 
-                // 監視ログのステータスを自動的に確認済にする
+                // 監視ログのステータスを自動的に確認済にし、ローカルステートも即時反映
                 if (selectedLogForSchedule.status === 'unread') {
+                    setLogs(prev => prev.map(log => log.id === selectedLogForSchedule.id ? { ...log, status: 'checked' } : log))
                     await updateLogStatusAction(selectedLogForSchedule.id, 'checked')
                 }
 
                 setIsScheduleDialogOpen(false)
-                fetchLogs() // ログ一覧の更新
+                fetchLogs() // バックグラウンドで最新データを取得
             } else {
                 toast.error('スケジュールの登録に失敗しました: ' + (res?.error || '不明なエラー'))
             }
