@@ -677,64 +677,133 @@ export default function LineMonitoringPage() {
 
                 {/* タブ2: ボット設定 */}
                 <TabsContent value="settings" className="space-y-4">
-                    {isLoadingConfigs ? (
-                        <div className="flex flex-col items-center justify-center p-12 space-y-4">
-                            <RefreshCw className="h-8 w-8 text-indigo-500 animate-spin" />
-                            <p className="text-slate-400 text-sm">LINEボット設定を読み込んでいます...</p>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+                        {/* 左：ボット設定一覧（2カラム相当） */}
+                        <div className="lg:col-span-2 space-y-4">
+                            {isLoadingConfigs ? (
+                                <div className="flex flex-col items-center justify-center p-12 space-y-4">
+                                    <RefreshCw className="h-8 w-8 text-indigo-500 animate-spin" />
+                                    <p className="text-slate-400 text-sm">LINEボット設定を読み込んでいます...</p>
+                                </div>
+                            ) : configs.length === 0 ? (
+                                <Card className="border-dashed border-slate-200 text-center p-12 rounded-2xl bg-slate-50/50">
+                                    <CardContent className="space-y-3">
+                                        <Bot className="h-10 w-10 text-slate-300 mx-auto" />
+                                        <CardTitle className="text-slate-500 text-base">登録されているボットはありません</CardTitle>
+                                        <CardDescription className="text-slate-400 text-sm max-w-sm mx-auto">
+                                            右上ボタンからコーチとボットID（destination）の紐付け設定を追加してください。
+                                        </CardDescription>
+                                    </CardContent>
+                                </Card>
+                            ) : (
+                                <Card className="border-slate-100 shadow-sm rounded-2xl bg-white overflow-hidden">
+                                    <Table>
+                                        <TableHeader className="bg-slate-50/50">
+                                            <TableRow>
+                                                <TableHead>ボット表示名</TableHead>
+                                                <TableHead>担当コーチ</TableHead>
+                                                <TableHead>ボットID (destination)</TableHead>
+                                                <TableHead className="w-[120px] text-right">操作</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {configs.map((config) => (
+                                                <TableRow key={config.id} className="hover:bg-slate-50/50">
+                                                    <TableCell className="font-semibold text-slate-700">{config.bot_name}</TableCell>
+                                                    <TableCell>{config.coach_name}</TableCell>
+                                                    <TableCell className="font-mono text-xs text-slate-500">{config.bot_id}</TableCell>
+                                                    <TableCell className="text-right">
+                                                        <div className="flex justify-end gap-2">
+                                                            <Button 
+                                                                variant="ghost" 
+                                                                size="sm" 
+                                                                className="text-slate-500 hover:text-indigo-600 rounded-lg"
+                                                                onClick={() => startEditConfig(config)}
+                                                            >
+                                                                編集
+                                                            </Button>
+                                                            <Button 
+                                                                variant="ghost" 
+                                                                size="sm" 
+                                                                className="text-red-500 hover:text-red-600 rounded-lg hover:bg-red-50"
+                                                                onClick={() => handleDeleteConfig(config.id)}
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        </div>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </Card>
+                            )}
                         </div>
-                    ) : configs.length === 0 ? (
-                        <Card className="border-dashed border-slate-200 text-center p-12 rounded-2xl bg-slate-50/50">
-                            <CardContent className="space-y-3">
-                                <Bot className="h-10 w-10 text-slate-300 mx-auto" />
-                                <CardTitle className="text-slate-500 text-base">登録されているボットはありません</CardTitle>
-                                <CardDescription className="text-slate-400 text-sm max-w-sm mx-auto">
-                                    右上ボタンからコーチとボットID（destination）の紐付け設定を追加してください。
+
+                        {/* 右：マニュアルカード（1カラム相当） */}
+                        <Card className="border-slate-100 shadow-md rounded-2xl bg-gradient-to-br from-indigo-50/40 to-indigo-100/20 overflow-hidden">
+                            <CardHeader className="pb-3 border-b border-indigo-100/50 bg-indigo-50/50">
+                                <CardTitle className="text-sm font-bold text-indigo-950 flex items-center gap-1.5">
+                                    <Bot className="h-4 w-4 text-indigo-600" />
+                                    ボット紐付け設定マニュアル
+                                </CardTitle>
+                                <CardDescription className="text-xs text-indigo-700">
+                                    各コーチの公式LINEメッセージを自動検知するための連携手順です。
                                 </CardDescription>
+                            </CardHeader>
+                            <CardContent className="p-4 space-y-4 text-slate-700 text-xs leading-relaxed">
+                                <div className="space-y-2">
+                                    <h4 className="font-bold text-slate-800 flex items-center gap-1">
+                                        <span className="flex items-center justify-center w-4.5 h-4.5 rounded-full bg-indigo-600 text-white text-[10px] font-bold">1</span>
+                                        ボットID（destination）の取得
+                                    </h4>
+                                    <p className="text-slate-600 pl-5.5">
+                                        公式LINEアカウント固有の <code className="bg-slate-100 px-1 py-0.5 rounded font-mono font-bold text-indigo-700">U</code> から始まる33文字のIDを取得します。
+                                    </p>
+                                    <div className="bg-white/80 p-2.5 rounded-xl border border-indigo-100/50 ml-5.5 space-y-1.5">
+                                        <p className="font-semibold text-slate-800">【方法A: LINE Developers】</p>
+                                        <ol className="list-decimal pl-4 text-slate-600 space-y-0.5">
+                                            <li><a href="https://developers.line.biz/" target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:text-indigo-500 underline">LINE Developers</a> にログイン</li>
+                                            <li>対象アカウントの「Messaging API設定」タブを開く</li>
+                                            <li>下部の「ボット情報」➔「ボットユーザーID」をコピー</li>
+                                        </ol>
+                                        <p className="font-semibold text-slate-800 mt-2">【方法B: LINE Official Account Manager】</p>
+                                        <ol className="list-decimal pl-4 text-slate-600 space-y-0.5">
+                                            <li><a href="https://manager.line.biz/" target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:text-indigo-500 underline">LINE Official Account Manager</a> にログイン</li>
+                                            <li>右上の「設定」➔ 左メニューの「Messaging API」を開く</li>
+                                            <li>中央の「ボット情報」➔「ボットユーザーID」をコピー</li>
+                                        </ol>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <h4 className="font-bold text-slate-800 flex items-center gap-1">
+                                        <span className="flex items-center justify-center w-4.5 h-4.5 rounded-full bg-indigo-600 text-white text-[10px] font-bold">2</span>
+                                        本システムへの紐付け登録
+                                    </h4>
+                                    <p className="text-slate-600 pl-5.5">
+                                        画面右上の「ボット設定を追加」をクリックし、担当コーチを選択、コピーした「ボットID」と「表示名」を入力して保存します。
+                                    </p>
+                                </div>
+
+                                <div className="space-y-2 col-span-1">
+                                    <h4 className="font-bold text-slate-800 flex items-center gap-1">
+                                        <span className="flex items-center justify-center w-4.5 h-4.5 rounded-full bg-indigo-600 text-white text-[10px] font-bold">3</span>
+                                        LINE側のWebhook・応答設定
+                                    </h4>
+                                    <p className="text-slate-600 pl-5.5">
+                                        LINE Official Account Managerの「応答設定」で、**「チャット」**と**「Webhook」**を必ず **「オン」** にしてください。
+                                    </p>
+                                    <p className="text-slate-600 pl-5.5">
+                                        また、LINE Developersの「Webhook URL」に下記URLを入力し、「Verify（検証）」でSuccessになることを確認してください。
+                                    </p>
+                                    <div className="bg-slate-900 text-slate-200 p-2 rounded-xl font-mono text-[9px] select-all truncate ml-5.5 mt-1 border border-slate-800">
+                                        https://&#123;ドメイン&#125;/api/webhooks/line
+                                    </div>
+                                </div>
                             </CardContent>
                         </Card>
-                    ) : (
-                        <Card className="border-slate-100 shadow-sm rounded-2xl bg-white overflow-hidden">
-                            <Table>
-                                <TableHeader className="bg-slate-50/50">
-                                    <TableRow>
-                                        <TableHead>ボット表示名</TableHead>
-                                        <TableHead>担当コーチ</TableHead>
-                                        <TableHead>ボットID (destination)</TableHead>
-                                        <TableHead className="w-[120px] text-right">操作</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {configs.map((config) => (
-                                        <TableRow key={config.id} className="hover:bg-slate-50/50">
-                                            <TableCell className="font-semibold text-slate-700">{config.bot_name}</TableCell>
-                                            <TableCell>{config.coach_name}</TableCell>
-                                            <TableCell className="font-mono text-xs text-slate-500">{config.bot_id}</TableCell>
-                                            <TableCell className="text-right">
-                                                <div className="flex justify-end gap-2">
-                                                    <Button 
-                                                        variant="ghost" 
-                                                        size="sm" 
-                                                        className="text-slate-500 hover:text-indigo-600 rounded-lg"
-                                                        onClick={() => startEditConfig(config)}
-                                                    >
-                                                        編集
-                                                    </Button>
-                                                    <Button 
-                                                        variant="ghost" 
-                                                        size="sm" 
-                                                        className="text-red-500 hover:text-red-600 rounded-lg hover:bg-red-50"
-                                                        onClick={() => handleDeleteConfig(config.id)}
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </Card>
-                    )}
+                    </div>
                 </TabsContent>
             </Tabs>
 
