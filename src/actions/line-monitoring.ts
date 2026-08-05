@@ -152,27 +152,36 @@ export async function getLineBotConfigsAction() {
     }
 
     const supabase = await createClient()
-    const { data, error } = await supabase
-        .from('line_bot_configs')
-        .select(`
-            *,
-            profiles:coach_id (full_name),
-            google_chat_webhooks:gchat_webhook_id (space_name)
-        `)
-        .order('created_at', { ascending: false })
 
-    if (error) {
+    try {
+        const { data, error } = await supabase
+            .from('line_bot_configs')
+            .select(`
+                *,
+                profiles:coach_id (full_name)
+            `)
+            .order('created_at', { ascending: false })
+
+        if (error) throw error
+
+        // 手動でスペース名を取得・マッピング (リレーションシップ未定義エラーを防止)
+        const { data: webhooks } = await supabase
+            .from('google_chat_webhooks')
+            .select('id, space_name')
+
+        const webhookMap = new Map((webhooks || []).map(w => [w.id, w.space_name]))
+
+        const formattedData = (data || []).map((config: any) => ({
+            ...config,
+            coach_name: config.profiles?.full_name || '不明なコーチ',
+            space_name: config.gchat_webhook_id ? (webhookMap.get(config.gchat_webhook_id) || null) : null
+        }))
+
+        return { success: true, data: formattedData }
+    } catch (error: any) {
         console.error('getLineBotConfigsAction Error:', error)
-        return { success: false, error: error.message, data: [] }
+        return { success: false, error: error.message || '設定の取得に失敗しました', data: [] }
     }
-
-    const formattedData = (data || []).map((config: any) => ({
-        ...config,
-        coach_name: config.profiles?.full_name || '不明なコーチ',
-        space_name: config.google_chat_webhooks?.space_name || null
-    }))
-
-    return { success: true, data: formattedData }
 }
 
 /**
