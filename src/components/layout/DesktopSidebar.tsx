@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { LogOut, LayoutDashboard, Users, Calendar, DollarSign, Settings, User, History, PlusCircle, CreditCard, BookOpen, Mail, FileCheck, Megaphone, MessageCircle, Crown, Timer, UserPlus } from 'lucide-react'
+import { LogOut, LayoutDashboard, Users, Calendar, DollarSign, Settings, User, History, PlusCircle, CreditCard, BookOpen, Mail, FileCheck, Megaphone, MessageCircle, Crown, Timer, UserPlus, Sparkles } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 
 interface DesktopSidebarProps {
@@ -54,6 +54,7 @@ export function DesktopSidebar({ role }: DesktopSidebarProps) {
                         <NavHeading>分析・集計</NavHeading>
                         <NavItem href="/admin/analytics" icon={DollarSign} label="分析・集計" isActive={pathname?.startsWith('/admin/analytics')} />
                         <NavItem href="/admin/reports" icon={Calendar} label="全レッスン報告" isActive={pathname?.startsWith('/admin/reports')} />
+                        <NavItem href="/admin/geo-seo" icon={Sparkles} label="GEO・SEO・集客支援" isActive={pathname?.startsWith('/admin/geo-seo')} />
 
                         <NavHeading>財務管理</NavHeading>
                         <NavItem href="/admin/finance/payouts" icon={CreditCard} label="報酬支払管理" isActive={pathname?.startsWith('/admin/finance/payouts')} />
@@ -66,6 +67,7 @@ export function DesktopSidebar({ role }: DesktopSidebarProps) {
                         <NavItem href="/customers" icon={Users} label="会員管理" isActive={pathname?.startsWith('/customers')} />
                         <NavItem href="/admin/trio" icon={Crown} label="TRIO管理" isActive={pathname?.startsWith('/admin/trio')} />
                         <NavItem href="/admin/coaches" icon={User} label="コーチ管理" isActive={pathname?.startsWith('/admin/coaches')} />
+                        <NavItem href="/admin/line-monitoring" icon={MessageCircle} label="LINE日程監視" isActive={pathname?.startsWith('/admin/line-monitoring')} />
 
                         <NavHeading>実務メニュー</NavHeading>
                         <NavItem href="/coach/history" icon={History} label="レッスン履歴" isActive={pathname?.startsWith('/coach/history')} />
