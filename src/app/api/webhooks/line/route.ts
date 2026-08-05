@@ -89,19 +89,68 @@ export async function POST(req: NextRequest) {
         // 管理者特権Supabaseクライアント作成
         const supabase = createAdminClient()
 
-        // 2. ボットID (destination) に紐づくコーチを特定
+        // 2. ボットID (destination) または ベーシックID (@...) に紐づくコーチを特定
         let coachId: string | null = null
         let botName = 'LINEボット'
         if (destination) {
+            // まずは bot_id が destination (U...) と完全一致するものを検索
             const { data: botConfig } = await supabase
                 .from('line_bot_configs')
-                .select('coach_id, bot_name')
+                .select('id, coach_id, bot_name, bot_id')
                 .eq('bot_id', destination)
-                .single()
+                .maybeSingle()
             
             if (botConfig) {
                 coachId = botConfig.coach_id
                 botName = botConfig.bot_name
+            } else {
+                // destination で一致しない場合、ベーシックID (@...) 等で登録されている設定がないか柔軟に照合
+                let basicId: string | null = null
+                if (CHANNEL_ACCESS_TOKEN) {
+                    try {
+                        const botInfoRes = await fetch('https://api.line.me/v2/bot/info', {
+                            headers: { 'Authorization': `Bearer ${CHANNEL_ACCESS_TOKEN}` }
+                        })
+                        if (botInfoRes.ok) {
+                            const botInfo = await botInfoRes.json()
+                            basicId = botInfo.basicId ? (botInfo.basicId.startsWith('@') ? botInfo.basicId : `@${botInfo.basicId}`) : null
+                        }
+                    } catch (e) {
+                        console.error('[LINE Webhook] Failed to fetch bot info from LINE API:', e)
+                    }
+                }
+
+                // 登録されている全 line_bot_configs を取得して柔軟マッチング
+                const { data: allConfigs } = await supabase
+                    .from('line_bot_configs')
+                    .select('id, coach_id, bot_name, bot_id')
+
+                if (allConfigs && allConfigs.length > 0) {
+                    const cleanDest = destination.trim().toLowerCase()
+                    const cleanBasic = basicId ? basicId.trim().toLowerCase() : ''
+                    const cleanBasicNoAt = cleanBasic.replace(/^@/, '')
+
+                    const matched = allConfigs.find(c => {
+                        const cleanConfigId = c.bot_id.trim().toLowerCase()
+                        const cleanConfigIdNoAt = cleanConfigId.replace(/^@/, '')
+                        
+                        return cleanConfigId === cleanDest || 
+                               (cleanBasic && (cleanConfigId === cleanBasic || cleanConfigId === cleanBasicNoAt || cleanConfigIdNoAt === cleanBasicNoAt))
+                    })
+
+                    if (matched) {
+                        coachId = matched.coach_id
+                        botName = matched.bot_name
+
+                        // 次回以降のアクセス高速化のため、bot_id を destination (U...) で自動更新（学習）
+                        await supabase
+                            .from('line_bot_configs')
+                            .update({ bot_id: destination })
+                            .eq('id', matched.id)
+                        
+                        console.log(`[LINE Webhook] Successfully matched and updated bot_id for "${matched.bot_name}" to destination: ${destination}`)
+                    }
+                }
             }
         }
 

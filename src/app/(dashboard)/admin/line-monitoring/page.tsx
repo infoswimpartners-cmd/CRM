@@ -511,13 +511,13 @@ export default function LineMonitoringPage() {
                                             />
                                         </div>
                                         <div className="flex flex-col gap-2">
-                                            <label className="text-sm font-medium text-slate-700">ボットID (destination)</label>
+                                            <label className="text-sm font-medium text-slate-700">ボットID (または ベーシックID)</label>
                                             <Input 
                                                 value={formBotId} 
                                                 onChange={(e) => setFormBotId(e.target.value)} 
-                                                placeholder="LINE Developers記載のボットID" 
+                                                placeholder="例: @amao_swim または U12345..." 
                                             />
-                                            <p className="text-xs text-slate-400">※LINE Developersコンソールの「ボットユーザーID」（Uから始まるID等）です。</p>
+                                            <p className="text-xs text-slate-400">※ベーシックID（例: @123abcde）またはLINE Developersの「ボットユーザーID（U...）」のどちらでも設定可能です。</p>
                                         </div>
                                     </div>
                                     <DialogFooter>
