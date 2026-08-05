@@ -188,6 +188,28 @@ export async function saveLineBotConfigAction(data: {
     }
 
     const supabase = await createClient()
+    const cleanBotId = data.bot_id.trim()
+    const cleanBotName = data.bot_name.trim()
+
+    // 1. 同一 bot_id が自分以外で既に登録されていないか事前チェック
+    let checkQuery = supabase
+        .from('line_bot_configs')
+        .select('id, bot_name, profiles:coach_id(full_name)')
+        .eq('bot_id', cleanBotId)
+
+    if (data.id) {
+        checkQuery = checkQuery.neq('id', data.id)
+    }
+
+    const { data: existingConfig } = await checkQuery.maybeSingle()
+
+    if (existingConfig) {
+        const coachName = (existingConfig as any).profiles?.full_name || '他のアカウント'
+        return { 
+            success: false, 
+            error: `このボットID（${cleanBotId}）はすでに「${coachName}」の設定（${existingConfig.bot_name}）として登録されています。一覧の「編集」ボタンから変更するか、別のボットIDを指定してください。` 
+        }
+    }
 
     if (data.id) {
         // 更新
@@ -195,14 +217,14 @@ export async function saveLineBotConfigAction(data: {
             .from('line_bot_configs')
             .update({
                 coach_id: data.coach_id,
-                bot_id: data.bot_id,
-                bot_name: data.bot_name
+                bot_id: cleanBotId,
+                bot_name: cleanBotName
             })
             .eq('id', data.id)
 
         if (error) {
             console.error('saveLineBotConfigAction Update Error:', error)
-            return { success: false, error: error.message }
+            return { success: false, error: '設定の更新に失敗しました: ' + error.message }
         }
     } else {
         // 新規作成
@@ -210,13 +232,16 @@ export async function saveLineBotConfigAction(data: {
             .from('line_bot_configs')
             .insert({
                 coach_id: data.coach_id,
-                bot_id: data.bot_id,
-                bot_name: data.bot_name
+                bot_id: cleanBotId,
+                bot_name: cleanBotName
             })
 
         if (error) {
             console.error('saveLineBotConfigAction Insert Error:', error)
-            return { success: false, error: error.message }
+            if (error.code === '23505') {
+                return { success: false, error: 'このボットIDは既に登録されています。既存の設定を編集してください。' }
+            }
+            return { success: false, error: '設定の保存に失敗しました: ' + error.message }
         }
     }
 
