@@ -156,7 +156,8 @@ export async function getLineBotConfigsAction() {
         .from('line_bot_configs')
         .select(`
             *,
-            profiles:coach_id (full_name)
+            profiles:coach_id (full_name),
+            google_chat_webhooks:gchat_webhook_id (space_name)
         `)
         .order('created_at', { ascending: false })
 
@@ -167,7 +168,8 @@ export async function getLineBotConfigsAction() {
 
     const formattedData = (data || []).map((config: any) => ({
         ...config,
-        coach_name: config.profiles?.full_name || '不明なコーチ'
+        coach_name: config.profiles?.full_name || '不明なコーチ',
+        space_name: config.google_chat_webhooks?.space_name || null
     }))
 
     return { success: true, data: formattedData }
@@ -181,6 +183,7 @@ export async function saveLineBotConfigAction(data: {
     coach_id: string
     bot_id: string
     bot_name: string
+    gchat_webhook_id?: string | null
 }) {
     const { isAuthorized } = await verifyAdminRole()
     if (!isAuthorized) {
@@ -190,6 +193,7 @@ export async function saveLineBotConfigAction(data: {
     const supabase = await createClient()
     const cleanBotId = data.bot_id.trim()
     const cleanBotName = data.bot_name.trim()
+    const gchatWebhookId = data.gchat_webhook_id || null
 
     // 1. 同一 bot_id が自分以外で既に登録されていないか事前チェック
     let checkQuery = supabase
@@ -218,7 +222,8 @@ export async function saveLineBotConfigAction(data: {
             .update({
                 coach_id: data.coach_id,
                 bot_id: cleanBotId,
-                bot_name: cleanBotName
+                bot_name: cleanBotName,
+                gchat_webhook_id: gchatWebhookId
             })
             .eq('id', data.id)
 
@@ -233,7 +238,8 @@ export async function saveLineBotConfigAction(data: {
             .insert({
                 coach_id: data.coach_id,
                 bot_id: cleanBotId,
-                bot_name: cleanBotName
+                bot_name: cleanBotName,
+                gchat_webhook_id: gchatWebhookId
             })
 
         if (error) {

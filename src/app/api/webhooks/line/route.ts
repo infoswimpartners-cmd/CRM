@@ -92,17 +92,20 @@ export async function POST(req: NextRequest) {
         // 2. ボットID (destination) または ベーシックID (@...) に紐づくコーチを特定
         let coachId: string | null = null
         let botName = 'LINEボット'
+        let gchatWebhookId: string | null = null
+
         if (destination) {
             // まずは bot_id が destination (U...) と完全一致するものを検索
             const { data: botConfig } = await supabase
                 .from('line_bot_configs')
-                .select('id, coach_id, bot_name, bot_id')
+                .select('id, coach_id, bot_name, bot_id, gchat_webhook_id')
                 .eq('bot_id', destination)
                 .maybeSingle()
             
             if (botConfig) {
                 coachId = botConfig.coach_id
                 botName = botConfig.bot_name
+                gchatWebhookId = botConfig.gchat_webhook_id || null
             } else {
                 // destination で一致しない場合、ベーシックID (@...) 等で登録されている設定がないか柔軟に照合
                 let basicId: string | null = null
@@ -123,7 +126,7 @@ export async function POST(req: NextRequest) {
                 // 登録されている全 line_bot_configs を取得して柔軟マッチング
                 const { data: allConfigs } = await supabase
                     .from('line_bot_configs')
-                    .select('id, coach_id, bot_name, bot_id')
+                    .select('id, coach_id, bot_name, bot_id, gchat_webhook_id')
 
                 if (allConfigs && allConfigs.length > 0) {
                     const cleanDest = destination.trim().toLowerCase()
@@ -141,6 +144,7 @@ export async function POST(req: NextRequest) {
                     if (matched) {
                         coachId = matched.coach_id
                         botName = matched.bot_name
+                        gchatWebhookId = matched.gchat_webhook_id || null
 
                         // 次回以降のアクセス高速化のため、bot_id を destination (U...) で自動更新（学習）
                         await supabase
@@ -256,41 +260,59 @@ export async function POST(req: NextRequest) {
                         .delete()
                         .lt('detected_at', threeMonthsAgo.toISOString())
 
-                    if (deleteError) {
-                        console.error('[LINE Webhook] Failed to auto-cleanup old logs:', deleteError)
-                    }
+                     // 7. 特定の Google Chat スペースへ通知する（新規発生時のみ）
+                     if (!isMerged) {
+                         let targetWebhookUrl: string | null = null
 
-                    // 7. Google Chatへ通知する
-                    // 有効な Google Chat Webhook URL を取得
-                    const { data: webhooks } = await supabase
-                        .from('google_chat_webhooks')
-                        .select('webhook_url')
-                        .eq('active', true)
-                    
-                    if (webhooks && webhooks.length > 0 && !isMerged) {
-                        // コーチの氏名を取得
-                        const { data: coachProfile } = await supabase
-                            .from('profiles')
-                            .select('full_name')
-                            .eq('id', coachId)
-                            .single()
+                         if (gchatWebhookId) {
+                             // ボット設定で特定スペースが指定されている場合
+                             const { data: targetWebhook } = await supabase
+                                 .from('google_chat_webhooks')
+                                 .select('webhook_url')
+                                 .eq('id', gchatWebhookId)
+                                 .eq('active', true)
+                                 .maybeSingle()
 
-                        const coachName = coachProfile?.full_name || '不明なコーチ'
-                        const chatMessage = `💬 *【LINE日程調整検知】*\n` +
-                                            `・*対象アカウント*: ${botName}\n` +
-                                            `・*担当コーチ*: ${coachName}\n` +
-                                            `・*顧客名*: ${displayName} 様\n` +
-                                            `・*メッセージ*: 「${messageText}」\n` +
-                                            `・*検知日時*: ${new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}`
+                             if (targetWebhook) {
+                                 targetWebhookUrl = targetWebhook.webhook_url
+                             }
+                         } else {
+                             // 未指定の場合は、有効な Webhook の先頭1件のみを対象にして全件配信を防ぐ
+                             const { data: firstWebhook } = await supabase
+                                 .from('google_chat_webhooks')
+                                 .select('webhook_url')
+                                 .eq('active', true)
+                                 .limit(1)
+                                 .maybeSingle()
 
-                        for (const webhook of webhooks) {
-                            try {
-                                await sendGoogleChatMessage(webhook.webhook_url, chatMessage)
-                            } catch (notifyErr) {
-                                console.error('[LINE Webhook] Failed to send Google Chat message:', notifyErr)
-                            }
-                        }
-                    }
+                             if (firstWebhook) {
+                                 targetWebhookUrl = firstWebhook.webhook_url
+                             }
+                         }
+
+                         if (targetWebhookUrl) {
+                             // コーチの氏名を取得
+                             const { data: coachProfile } = await supabase
+                                 .from('profiles')
+                                 .select('full_name')
+                                 .eq('id', coachId)
+                                 .single()
+
+                             const coachName = coachProfile?.full_name || '不明なコーチ'
+                             const chatMessage = `💬 *【LINE日程調整検知】*\n` +
+                                                 `・*対象アカウント*: ${botName}\n` +
+                                                 `・*担当コーチ*: ${coachName}\n` +
+                                                 `・*顧客名*: ${displayName} 様\n` +
+                                                 `・*メッセージ*: 「${messageText}」\n` +
+                                                 `・*検知日時*: ${new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}`
+
+                             try {
+                                 await sendGoogleChatMessage(targetWebhookUrl, chatMessage)
+                             } catch (notifyErr) {
+                                 console.error('[LINE Webhook] Failed to send Google Chat message:', notifyErr)
+                             }
+                         }
+                     }
                 }
             }
         }

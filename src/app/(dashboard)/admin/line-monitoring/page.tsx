@@ -14,6 +14,7 @@ import {
     LineMonitoringLog,
     LineBotConfig
 } from '@/actions/line-monitoring'
+import { getChatWebhooksAction, ChatWebhook } from '@/actions/gchat_webhook'
 import { createLessonSchedule } from '@/actions/lesson_schedule'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -142,6 +143,8 @@ export default function LineMonitoringPage() {
     const [formCoachId, setFormCoachId] = useState('')
     const [formBotId, setFormBotId] = useState('')
     const [formBotName, setFormBotName] = useState('')
+    const [formGChatWebhookId, setFormGChatWebhookId] = useState('')
+    const [chatWebhooks, setChatWebhooks] = useState<ChatWebhook[]>([])
 
     // ローディング状態
     const [isLoadingLogs, setIsLoadingLogs] = useState(true)
@@ -171,6 +174,7 @@ export default function LineMonitoringPage() {
         fetchCoaches()
         fetchLogs()
         fetchConfigs()
+        fetchChatWebhooks()
     }, [])
 
     // フィルター変更時に再フェッチ
@@ -185,6 +189,14 @@ export default function LineMonitoringPage() {
             setCoaches(res.data || [])
         } else {
             toast.error('コーチ情報の取得に失敗しました: ' + res.error)
+        }
+    }
+
+    // Google Chat Webhook 一覧取得
+    const fetchChatWebhooks = async () => {
+        const res = await getChatWebhooksAction()
+        if (res.success) {
+            setChatWebhooks((res.data || []).filter(w => w.active))
         }
     }
 
@@ -354,7 +366,7 @@ export default function LineMonitoringPage() {
     const handleSaveConfig = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!formCoachId || !formBotId || !formBotName) {
-            toast.error('すべての項目を入力してください')
+            toast.error('必須項目（担当コーチ、ボット表示名、ボットID）を入力してください')
             return
         }
 
@@ -363,7 +375,8 @@ export default function LineMonitoringPage() {
             id: editingConfig?.id,
             coach_id: formCoachId,
             bot_id: formBotId.trim(),
-            bot_name: formBotName.trim()
+            bot_name: formBotName.trim(),
+            gchat_webhook_id: formGChatWebhookId === 'none' ? null : (formGChatWebhookId || null)
         })
 
         setIsSaving(false)
@@ -390,11 +403,12 @@ export default function LineMonitoringPage() {
         }
     }
 
-    const startEditConfig = (config: LineBotConfig) => {
+    const startEditConfig = (config: any) => {
         setEditingConfig(config)
         setFormCoachId(config.coach_id)
         setFormBotId(config.bot_id)
         setFormBotName(config.bot_name)
+        setFormGChatWebhookId(config.gchat_webhook_id || 'none')
         setIsAddDialogOpen(true)
     }
 
@@ -403,6 +417,7 @@ export default function LineMonitoringPage() {
         setFormCoachId('')
         setFormBotId('')
         setFormBotName('')
+        setFormGChatWebhookId('')
     }
 
     // メッセージのハイライト処理（簡易）
@@ -523,6 +538,23 @@ export default function LineMonitoringPage() {
                                                 placeholder="例: @amao_swim または U12345..." 
                                             />
                                             <p className="text-xs text-slate-400">※ベーシックID（例: @123abcde）またはLINE Developersの「ボットユーザーID（U...）」のどちらでも設定可能です。</p>
+                                        </div>
+                                        <div className="flex flex-col gap-2">
+                                            <label className="text-sm font-medium text-slate-700">通知先 Google Chat スペース（特定指定）</label>
+                                            <Select value={formGChatWebhookId} onValueChange={setFormGChatWebhookId}>
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="通知先のスペースを選択 (指定なしの場合は既定の1件)" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="none">指定なし (既定のスペースへ通知)</SelectItem>
+                                                    {chatWebhooks.map(webhook => (
+                                                        <SelectItem key={webhook.id} value={webhook.id}>
+                                                            {webhook.space_name}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <p className="text-xs text-slate-400">※このボットからの検知通知を配信したい特定の Google Chat スペースを選択します。</p>
                                         </div>
                                     </div>
                                     <DialogFooter>
@@ -707,16 +739,26 @@ export default function LineMonitoringPage() {
                                             <TableRow>
                                                 <TableHead>ボット表示名</TableHead>
                                                 <TableHead>担当コーチ</TableHead>
-                                                <TableHead>ボットID (destination)</TableHead>
+                                                <TableHead>ボットID (または ベーシックID)</TableHead>
+                                                <TableHead>通知スペース</TableHead>
                                                 <TableHead className="w-[120px] text-right">操作</TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
-                                            {configs.map((config) => (
+                                            {configs.map((config: any) => (
                                                 <TableRow key={config.id} className="hover:bg-slate-50/50">
                                                     <TableCell className="font-semibold text-slate-700">{config.bot_name}</TableCell>
                                                     <TableCell>{config.coach_name}</TableCell>
                                                     <TableCell className="font-mono text-xs text-slate-500">{config.bot_id}</TableCell>
+                                                    <TableCell className="text-xs text-indigo-700 font-medium">
+                                                        {config.space_name ? (
+                                                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-700 font-medium">
+                                                                {config.space_name}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-slate-400">既定</span>
+                                                        )}
+                                                    </TableCell>
                                                     <TableCell className="text-right">
                                                         <div className="flex justify-end gap-2">
                                                             <Button 
