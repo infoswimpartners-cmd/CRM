@@ -144,33 +144,34 @@ export async function POST(req: NextRequest) {
         // 処理開始をマーク
         processingRequests.set(dedupKey, Date.now())
 
-        // 2. Extract Extra Fields for Notes
-        // マップ元の日本語キーも含めて除外対象にする（重複防止）
-        const mappedJapaneseKeys = Object.keys(keyMap)
-        const standardKeys = [
-            'name', 'kana', 'email', 'phone', 'message', 'type', 
-            'second_name', 'second_name_kana', 'birth_date', 'second_student_birth_date', 
-            'gender', 'second_student_gender',
-            ...mappedJapaneseKeys
-        ]
-        const extraInfo = Object.entries(result.data)
-            .filter(([key]) => !standardKeys.includes(key))
-            .map(([key, value]) => `【${key}】: ${value}`)
-            .join('\n')
+        // 2. Build full inputs list for Notes and Emails
+        const inputLines: string[] = []
+        const variables: Record<string, string> = {}
 
-        let notes = message ? `[メッセージ]\n${message}` : ''
-        
-        // 年齢情報をメモに追加
-        if (studentAge !== null) {
-            notes = notes ? `${notes}\n【年齢】: ${studentAge}歳` : `【年齢】: ${studentAge}歳`
-        }
-        if (secondStudentAge !== null) {
-            notes = notes ? `${notes}\n【年齢（2人目）】: ${secondStudentAge}歳` : `【年齢（2人目）】: ${secondStudentAge}歳`
+        if (studentAge !== null) variables['age'] = String(studentAge)
+        if (secondStudentAge !== null) variables['second_student_age'] = String(secondStudentAge)
+
+        for (const [key, value] of Object.entries(result.data)) {
+            if (value !== undefined && value !== null && value !== '') {
+                // 日本語の元キーはスキップ（マッピング後の英語キーで処理するため）
+                if (keyMap[key]) continue
+
+                const strValue = String(value)
+                variables[key] = strValue
+
+                const label = translateKey(key) || key
+                inputLines.push(`【${label}】: ${strValue}`)
+
+                if (key === 'birth_date' && studentAge !== null) {
+                    inputLines.push(`【年齢】: ${studentAge}歳`)
+                }
+                if (key === 'second_student_birth_date' && secondStudentAge !== null) {
+                    inputLines.push(`【年齢（2人目）】: ${secondStudentAge}歳`)
+                }
+            }
         }
 
-        if (extraInfo) {
-            notes = notes ? `${notes}\n\n[追加情報]\n${extraInfo}` : `[追加情報]\n${extraInfo}`
-        }
+        const notes = `[体験申し込み内容]\n${inputLines.join('\n')}`
 
         // 3. Check for Duplicate Student (Exact Match)
         const { data: exactDuplicate } = await supabaseAdmin
@@ -224,33 +225,6 @@ export async function POST(req: NextRequest) {
 
         // 5. Send Receipt Email -> Restored (Added to approval queue)
         // Convert all received data to string variables for the template
-        const variables: Record<string, string> = {}
-        const inputLines: string[] = []
-
-        // メール変数の設定
-        if (studentAge !== null) variables['age'] = String(studentAge)
-        if (secondStudentAge !== null) variables['second_student_age'] = String(secondStudentAge)
-
-        for (const [key, value] of Object.entries(result.data)) {
-            if (value !== undefined && value !== null) {
-                // 日本語の元キーはスキップ（マッピング後の英語キーで処理するため）
-                if (keyMap[key]) continue
-
-                const strValue = String(value)
-                variables[key] = strValue
-
-                const label = translateKey(key) || key
-                inputLines.push(`【${label}】: ${strValue}`)
-
-                if (key === 'birth_date' && studentAge !== null) {
-                    inputLines.push(`【年齢】: ${studentAge}歳`)
-                }
-                if (key === 'second_student_birth_date' && secondStudentAge !== null) {
-                    inputLines.push(`【年齢（2人目）】: ${secondStudentAge}歳`)
-                }
-            }
-        }
-
         variables['all_inputs'] = inputLines.join('\n')
 
         // Format Name for Email
