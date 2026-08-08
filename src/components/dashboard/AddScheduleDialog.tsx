@@ -46,6 +46,8 @@ interface Student {
     second_student_name?: string | null
     status?: string
     default_master_id?: string
+    is_default_distant_option?: boolean
+    default_transport_option_fee?: number
 }
 
 interface AddScheduleDialogProps {
@@ -634,6 +636,11 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
                                                             {(s as any).membership_name}
                                                         </span>
                                                     )}
+                                                    {s.is_default_distant_option && (
+                                                        <span className="text-[10px] sm:text-xs text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded whitespace-nowrap">
+                                                            遠方 (+¥{(s.default_transport_option_fee || 3000).toLocaleString()})
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </div>
                                         </SelectItem>
@@ -666,6 +673,19 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
                                     ) : (
                                         <>
                                             {membershipName ? `会員種別: ${membershipName}` : '会員種別: 未設定 (単発扱い)'}
+
+                                            {/* 遠方オプションバッジ */}
+                                            {(() => {
+                                                const s = students.find(st => st.id === studentId);
+                                                if (s?.is_default_distant_option) {
+                                                    return (
+                                                        <span className="bg-amber-100 text-amber-800 border border-amber-300 px-2 py-0.5 rounded text-xs whitespace-nowrap font-bold flex items-center gap-1">
+                                                            遠方オプション適用 (+¥{(s.default_transport_option_fee || 3000).toLocaleString()})
+                                                        </span>
+                                                    );
+                                                }
+                                                return null;
+                                            })()}
 
                                             {/* Usage Count Display */}
                                             {monthlyLimit !== null && monthlyLimit > 0 && (!membershipName || !membershipName.includes('単発')) && (

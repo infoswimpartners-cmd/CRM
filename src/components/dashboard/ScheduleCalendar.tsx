@@ -44,6 +44,8 @@ interface Schedule {
     students?: { 
         full_name: string, 
         second_student_name?: string | null,
+        is_default_distant_option?: boolean,
+        default_transport_option_fee?: number,
         membership_types?: { id: string, name: string, is_package: boolean } | null
     } | null // Joined data structure
     coach_id: string
@@ -194,6 +196,8 @@ export function ScheduleCalendar({ adminView = false }: ScheduleCalendarProps) {
                     students ( 
                         full_name, 
                         second_student_name,
+                        is_default_distant_option,
+                        default_transport_option_fee,
                         membership_types!students_membership_type_id_fkey (
                             id,
                             name,
@@ -252,6 +256,8 @@ export function ScheduleCalendar({ adminView = false }: ScheduleCalendarProps) {
                     students ( 
                         full_name, 
                         second_student_name,
+                        is_default_distant_option,
+                        default_transport_option_fee,
                         membership_types!students_membership_type_id_fkey (
                             id,
                             name,
@@ -367,7 +373,7 @@ export function ScheduleCalendar({ adminView = false }: ScheduleCalendarProps) {
                     <div className="flex items-center justify-between mb-1">
                         <h4 className="font-bold truncate">{schedule.title}</h4>
                     </div>
-                    <div className="space-y-1 text-sm text-gray-600">
+                    <div className="space-y-1.5 text-sm text-gray-600">
                         {schedule.location && (
                             <div className="flex items-center gap-1.5">
                                 <MapPin className="w-3.5 h-3.5" />
@@ -378,6 +384,13 @@ export function ScheduleCalendar({ adminView = false }: ScheduleCalendarProps) {
                             <div className="flex items-center gap-1.5 text-blue-600">
                                 <div className="w-1.5 h-1.5 rounded-full bg-blue-600" />
                                 {formatStudentNames((schedule as any).students)}
+                            </div>
+                        )}
+                        {/* 遠方オプションバッジ */}
+                        {(schedule as any).students?.is_default_distant_option && (
+                            <div className="flex items-center gap-1 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md w-fit">
+                                <MapPin className="w-3 h-3 text-amber-600" />
+                                <span>遠方オプション適用 ({((schedule as any).students?.default_transport_option_fee ? `+¥${(schedule as any).students.default_transport_option_fee.toLocaleString()}` : '+¥3,000')})</span>
                             </div>
                         )}
                         {/* Admin View: Show Coach Name */}

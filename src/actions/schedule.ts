@@ -175,6 +175,8 @@ export async function getStudentsForCoach(coachId: string) {
                 second_student_name,
                 status,
                 coach_id,
+                is_default_distant_option,
+                default_transport_option_fee,
                 student_coaches!inner(coach_id),
                 membership_types:membership_type_id (
                     default_lesson_master_id,

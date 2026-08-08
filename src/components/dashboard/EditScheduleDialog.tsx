@@ -15,7 +15,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { CalendarIcon, Loader2, Trash2, ExternalLink as ExternalLinkIcon } from 'lucide-react'
+import { CalendarIcon, Loader2, Trash2, ExternalLink as ExternalLinkIcon, MapPin } from 'lucide-react'
 import { format } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
@@ -73,6 +73,8 @@ interface Student {
     id: string
     full_name: string
     second_student_name?: string | null
+    is_default_distant_option?: boolean
+    default_transport_option_fee?: number
 }
 
 export function EditScheduleDialog({ schedule, open, onOpenChange, onSuccess }: EditScheduleDialogProps) {
@@ -437,6 +439,19 @@ export function EditScheduleDialog({ schedule, open, onOpenChange, onSuccess }: 
                                     disabled
                                     className="bg-slate-50 text-slate-700 cursor-not-allowed font-medium"
                                 />
+                                {(() => {
+                                    const s = students.find(st => st.id === studentId) || (schedule as any)?.student;
+                                    if (s?.is_default_distant_option || (schedule as any)?.students?.is_default_distant_option) {
+                                        const fee = s?.default_transport_option_fee || (schedule as any)?.students?.default_transport_option_fee || 3000;
+                                        return (
+                                            <div className="flex items-center gap-1.5 mt-1 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-md w-fit">
+                                                <MapPin className="w-3.5 h-3.5 text-amber-600" />
+                                                <span>遠方オプション適用生徒 (+¥{fee.toLocaleString()})</span>
+                                            </div>
+                                        );
+                                    }
+                                    return null;
+                                })()}
                                 {studentId !== 'none' && (students.find(s => s.id === studentId)?.second_student_name || (schedule as any)?.student?.second_student_name) && (
                                     <div className="grid gap-2 mt-2 p-3 bg-blue-50 border border-blue-100 rounded-md">
                                         <Label className="text-blue-800 font-bold text-xs">受講形式</Label>
