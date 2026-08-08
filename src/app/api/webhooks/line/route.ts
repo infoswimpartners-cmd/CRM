@@ -158,22 +158,10 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // コーチが特定できない場合は、デフォルトの管理者に紐付けるか、もしくは処理を中断
+        // コーチが特定できない場合は、未紐付けボットとして安全に処理（管理者に誤認されるのを防ぐ）
         if (!coachId) {
             console.warn(`[LINE Webhook] No coach configured for bot_id (destination): ${destination}`)
-            // ログの記録や通知のために、最初の管理者のIDをフォールバックに設定する
-            const { data: adminProfile } = await supabase
-                .from('profiles')
-                .select('id')
-                .eq('role', 'admin')
-                .limit(1)
-                .single()
-            
-            if (adminProfile) {
-                coachId = adminProfile.id
-            } else {
-                return NextResponse.json({ message: 'No coach or admin found for this bot' })
-            }
+            botName = '未紐付けボット'
         }
 
         for (const event of events) {

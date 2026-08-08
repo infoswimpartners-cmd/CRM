@@ -50,6 +50,20 @@ export default async function CoachDetailPage({ params }: PageProps) {
         .eq('coach_id', id)
         .order('created_at', { ascending: true })
 
+    // Fetch line bot config for this coach
+    const { data: lineBotConfig } = await supabase
+        .from('line_bot_configs')
+        .select('*')
+        .eq('coach_id', id)
+        .maybeSingle()
+
+    // Fetch active Google Chat webhooks
+    const { data: webhooks } = await supabase
+        .from('google_chat_webhooks')
+        .select('id, space_name')
+        .eq('active', true)
+        .order('space_name', { ascending: true })
+
     return (
         <div className="space-y-8">
             <div className="flex items-center justify-between">
@@ -131,6 +145,8 @@ export default async function CoachDetailPage({ params }: PageProps) {
                         <CoachLineSettingsForm
                             coachId={coach.id}
                             initialLineFriendUrl={coach.line_friend_url || ''}
+                            initialBotConfig={lineBotConfig || null}
+                            chatWebhooks={webhooks || []}
                         />
                     </CardContent>
                 </Card>
