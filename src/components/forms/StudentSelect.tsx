@@ -47,13 +47,14 @@ export function StudentSelect({ onSelect, selectedName, coachId }: StudentSelect
                 // Fetch direct associations
                 const { data: directData, error: directError } = await supabase
                     .from('students')
-                    .select('id, full_name, full_name_kana, second_student_name, second_student_name_kana')
+                    .select('id, full_name, full_name_kana, second_student_name, second_student_name_kana, status')
                     .eq('coach_id', coachId)
+                    .neq('status', 'withdrawn')
 
                 // Fetch associations via junction table
                 const { data: junctionData, error: junctionError } = await supabase
                     .from('student_coaches')
-                    .select('students(id, full_name, full_name_kana, second_student_name, second_student_name_kana)')
+                    .select('students(id, full_name, full_name_kana, second_student_name, second_student_name_kana, status)')
                     .eq('coach_id', coachId)
 
                 if (directError || junctionError) {
@@ -67,8 +68,8 @@ export function StudentSelect({ onSelect, selectedName, coachId }: StudentSelect
                 if (junctionData) {
                     for (const item of junctionData) {
                         // relationship is many-to-one, returning a single object
-                        const student = item.students as unknown as Student
-                        if (student && !combined.find(s => s.id === student.id)) {
+                        const student = item.students as any
+                        if (student && student.status !== 'withdrawn' && !combined.find(s => s.id === student.id)) {
                             combined.push(student)
                         }
                     }
@@ -80,7 +81,8 @@ export function StudentSelect({ onSelect, selectedName, coachId }: StudentSelect
             } else {
                 const { data, error } = await supabase
                     .from('students')
-                    .select('id, full_name, full_name_kana, second_student_name, second_student_name_kana')
+                    .select('id, full_name, full_name_kana, second_student_name, second_student_name_kana, status')
+                    .neq('status', 'withdrawn')
                     .order('full_name')
 
                 if (error) {

@@ -119,13 +119,13 @@ export function AdminCreateReportDialog({ open, onOpenChange }: AdminCreateRepor
             const supabase = createClient()
             // junction テーブルから生徒を取得
             const [{ data: directStudents }, { data: junctionStudents }] = await Promise.all([
-                supabase.from('students').select('id, full_name, second_student_name').eq('coach_id', selectedCoachId).order('full_name'),
-                supabase.from('student_coaches').select('students(id, full_name, second_student_name)').eq('coach_id', selectedCoachId),
+                supabase.from('students').select('id, full_name, second_student_name, status').eq('coach_id', selectedCoachId).neq('status', 'withdrawn').order('full_name'),
+                supabase.from('student_coaches').select('students(id, full_name, second_student_name, status)').eq('coach_id', selectedCoachId),
             ])
             const combined: { id: string; full_name: string; second_student_name: string | null }[] = [...(directStudents || [])]
             junctionStudents?.forEach((j: any) => {
                 const s = j.students
-                if (s && !combined.find(c => c.id === s.id)) combined.push(s)
+                if (s && s.status !== 'withdrawn' && !combined.find(c => c.id === s.id)) combined.push(s)
             })
             combined.sort((a, b) => a.full_name.localeCompare(b.full_name, 'ja'))
             setStudents(combined)

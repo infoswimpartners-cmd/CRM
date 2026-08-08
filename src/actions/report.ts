@@ -781,9 +781,11 @@ export async function getStudentsForCoachPublicAction(coachId: string) {
             id, 
             full_name, 
             second_student_name,
+            status,
             membership_types!students_membership_type_id_fkey ( default_lesson_master_id )
         `)
         .eq('coach_id', coachId)
+        .neq('status', 'withdrawn')
 
     // Fetch associations via junction table
     const { data: junctionData, error: junctionError } = await supabaseAdmin
@@ -793,6 +795,7 @@ export async function getStudentsForCoachPublicAction(coachId: string) {
                 id, 
                 full_name, 
                 second_student_name,
+                status,
                 membership_types!students_membership_type_id_fkey ( default_lesson_master_id )
             )
         `)
@@ -826,7 +829,7 @@ export async function getStudentsForCoachPublicAction(coachId: string) {
         for (const item of junctionData) {
             // relationship is many-to-one, returning a single object via junction
             const student = item.students as any
-            if (student && !combined.find(s => s.id === student.id)) {
+            if (student && student.status !== 'withdrawn' && !combined.find(s => s.id === student.id)) {
                 combined.push(extractMembership(student))
             }
         }
