@@ -376,7 +376,7 @@ export async function getLessonMastersListAction() {
 }
 
 /**
- * 生徒の簡易一覧を取得します（管理者およびコーチのみ）
+ * 生徒の簡易一覧を取得します（退会ステータスは除外、coach_id付き）
  */
 export async function getStudentsSimpleListAction() {
     const supabase = await createClient()
@@ -385,7 +385,8 @@ export async function getStudentsSimpleListAction() {
 
     const { data, error } = await supabase
         .from('students')
-        .select('id, full_name')
+        .select('id, full_name, coach_id, status')
+        .neq('status', 'withdrawn')
         .order('full_name', { ascending: true })
 
     if (error) {
@@ -393,5 +394,5 @@ export async function getStudentsSimpleListAction() {
         return { success: false, error: error.message, data: [] }
     }
 
-    return { success: true, data }
+    return { success: true, data: data || [] }
 }

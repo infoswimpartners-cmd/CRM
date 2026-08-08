@@ -164,10 +164,46 @@ export default function LineMonitoringPage() {
 
     // マスタデータおよび検索結果状態
     const [lessonMasters, setLessonMasters] = useState<{ id: string; name: string; price: number; is_trial: boolean }[]>([])
-    const [allStudents, setAllStudents] = useState<{ id: string; full_name: string }[]>([])
+    const [allStudents, setAllStudents] = useState<{ id: string; full_name: string; coach_id?: string | null; status?: string | null }[]>([])
     const [studentCandidates, setStudentCandidates] = useState<{ id: string; full_name: string; line_user_id: string | null }[]>([])
     const [isSearchingStudent, setIsSearchingStudent] = useState(false)
     const [isRegisteringSchedule, setIsRegisteringSchedule] = useState(false)
+    const [onlyAssignedCoachStudents, setOnlyAssignedCoachStudents] = useState(false)
+
+    // 時間の自動計算（レッスン種別の分数に基づく）
+    const calculateEndTime = (startStr: string, masterId: string, mastersList = lessonMasters) => {
+        if (!startStr) return ''
+        const master = mastersList.find(m => m.id === masterId)
+        let durationMinutes = 60
+        if (master) {
+            if (master.name.includes('120分') || master.name.includes('120')) durationMinutes = 120
+            else if (master.name.includes('90分') || master.name.includes('90')) durationMinutes = 90
+            else if (master.name.includes('30分') || master.name.includes('30')) durationMinutes = 30
+            else if (master.name.includes('60分') || master.name.includes('60')) durationMinutes = 60
+        }
+
+        const d = new Date(startStr)
+        if (isNaN(d.getTime())) return ''
+        d.setMinutes(d.getMinutes() + durationMinutes)
+        const pad = (n: number) => String(n).padStart(2, '0')
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+    }
+
+    // 開始日時変更時の連動
+    const handleStartTimeChange = (newStart: string) => {
+        setScheduleStartTime(newStart)
+        if (scheduleLessonMasterId) {
+            setScheduleEndTime(calculateEndTime(newStart, scheduleLessonMasterId))
+        }
+    }
+
+    // レッスン種別変更時の連動
+    const handleLessonMasterChange = (newMasterId: string) => {
+        setScheduleLessonMasterId(newMasterId)
+        if (scheduleStartTime) {
+            setScheduleEndTime(calculateEndTime(scheduleStartTime, newMasterId))
+        }
+    }
 
     // 初期フェッチ
     useEffect(() => {
@@ -253,23 +289,26 @@ export default function LineMonitoringPage() {
         setScheduleLocation('')
         setScheduleTitle('レッスン')
         setScheduleNotes(`LINEメッセージ:\n「${log.message_text}」`)
+        setOnlyAssignedCoachStudents(false)
         
         // 1. 日付の簡易パース
+        let initialStart = ''
+        let initialEnd = ''
         const parsed = parseDateTimeFromMessage(log.message_text)
         if (parsed) {
-            setScheduleStartTime(parsed.start)
-            setScheduleEndTime(parsed.end)
+            initialStart = parsed.start
+            initialEnd = parsed.end
         } else {
             // パースできない場合は明日の午前10時〜11時をデフォルトに
             const tomorrow = new Date()
             tomorrow.setDate(tomorrow.getDate() + 1)
             const pad = (n: number) => String(n).padStart(2, '0')
-            const startStr = `${tomorrow.getFullYear()}-${pad(tomorrow.getMonth() + 1)}-${pad(tomorrow.getDate())}T10:00`
-            const endStr = `${tomorrow.getFullYear()}-${pad(tomorrow.getMonth() + 1)}-${pad(tomorrow.getDate())}T11:00`
-            setScheduleStartTime(startStr)
-            setScheduleEndTime(endStr)
+            initialStart = `${tomorrow.getFullYear()}-${pad(tomorrow.getMonth() + 1)}-${pad(tomorrow.getDate())}T10:00`
+            initialEnd = `${tomorrow.getFullYear()}-${pad(tomorrow.getMonth() + 1)}-${pad(tomorrow.getDate())}T11:00`
         }
 
+        setScheduleStartTime(initialStart)
+        setScheduleEndTime(initialEnd)
         setIsScheduleDialogOpen(true)
         setIsSearchingStudent(true)
 
@@ -281,6 +320,26 @@ export default function LineMonitoringPage() {
                 getStudentsSimpleListAction()
             ])
 
+            let currentMasterId = ''
+            if (mastersRes.success && mastersRes.data && mastersRes.data.length > 0) {
+                setLessonMasters(mastersRes.data)
+                // 通常レッスン（非体験）を優先してデフォルト選択
+                const defaultMaster = mastersRes.data.find(m => !m.is_trial) || mastersRes.data[0]
+                if (defaultMaster) {
+                    currentMasterId = defaultMaster.id
+                    setScheduleLessonMasterId(defaultMaster.id)
+                    // レッスン種別の分数から終了時間を自動計算
+                    const autoEnd = calculateEndTime(initialStart, defaultMaster.id, mastersRes.data)
+                    if (autoEnd) {
+                        setScheduleEndTime(autoEnd)
+                    }
+                }
+            }
+
+            if (studentsListRes.success) {
+                setAllStudents(studentsListRes.data || [])
+            }
+
             if (studentRes.success) {
                 if (studentRes.match) {
                     setScheduleStudentId(studentRes.match.id)
@@ -288,18 +347,6 @@ export default function LineMonitoringPage() {
                 } else if (studentRes.candidates && studentRes.candidates.length > 0) {
                     setStudentCandidates(studentRes.candidates)
                 }
-            }
-
-            if (mastersRes.success) {
-                setLessonMasters(mastersRes.data || [])
-                const defaultMaster = mastersRes.data?.find(m => !m.is_trial) || mastersRes.data?.[0]
-                if (defaultMaster) {
-                    setScheduleLessonMasterId(defaultMaster.id)
-                }
-            }
-
-            if (studentsListRes.success) {
-                setAllStudents(studentsListRes.data || [])
             }
 
         } catch (e) {
@@ -890,7 +937,20 @@ export default function LineMonitoringPage() {
 
                                 {/* 生徒の選択 */}
                                 <div className="flex flex-col gap-2">
-                                    <Label className="text-sm font-semibold text-slate-700">生徒名 *</Label>
+                                    <div className="flex items-center justify-between">
+                                        <Label className="text-sm font-semibold text-slate-700">生徒名 *</Label>
+                                        {allStudents.filter(s => s.coach_id === selectedLogForSchedule?.coach_id).length > 0 && (
+                                            <label className="flex items-center gap-1.5 text-xs text-indigo-600 font-medium cursor-pointer hover:text-indigo-700">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={onlyAssignedCoachStudents}
+                                                    onChange={(e) => setOnlyAssignedCoachStudents(e.target.checked)}
+                                                    className="rounded text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5"
+                                                />
+                                                担当生徒（{allStudents.filter(s => s.coach_id === selectedLogForSchedule?.coach_id).length}名）のみ表示
+                                            </label>
+                                        )}
+                                    </div>
                                     
                                     {/* 曖昧一致する候補が見つかった場合のヒント */}
                                     {studentCandidates.length > 0 && !scheduleStudentId && (
@@ -905,7 +965,7 @@ export default function LineMonitoringPage() {
                                                         type="button"
                                                         variant="secondary"
                                                         size="sm"
-                                                        className="text-xs bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                                                        className="text-xs bg-white border border-indigo-200 text-indigo-700 hover:bg-indigo-50 shadow-sm"
                                                         onClick={() => {
                                                             setScheduleStudentId(c.id)
                                                             setScheduleTitle(`レッスン (${c.full_name})`)
@@ -928,12 +988,28 @@ export default function LineMonitoringPage() {
                                         <SelectTrigger className="rounded-xl border-slate-200">
                                             <SelectValue placeholder="生徒を選択" />
                                         </SelectTrigger>
-                                        <SelectContent>
-                                            {allStudents.map(student => (
-                                                <SelectItem key={student.id} value={student.id}>
-                                                    {student.full_name}
-                                                </SelectItem>
-                                            ))}
+                                        <SelectContent className="max-h-64">
+                                            {(onlyAssignedCoachStudents 
+                                                ? allStudents.filter(s => s.coach_id === selectedLogForSchedule?.coach_id)
+                                                : [
+                                                    ...allStudents.filter(s => s.coach_id === selectedLogForSchedule?.coach_id),
+                                                    ...allStudents.filter(s => s.coach_id !== selectedLogForSchedule?.coach_id)
+                                                  ]
+                                            ).map(student => {
+                                                const isAssigned = student.coach_id === selectedLogForSchedule?.coach_id
+                                                return (
+                                                    <SelectItem key={student.id} value={student.id}>
+                                                        <div className="flex items-center justify-between gap-2 w-full">
+                                                            <span>{student.full_name}</span>
+                                                            {isAssigned && (
+                                                                <span className="text-[10px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded font-medium border border-indigo-100">
+                                                                    担当
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </SelectItem>
+                                                )
+                                            })}
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -941,7 +1017,7 @@ export default function LineMonitoringPage() {
                                 {/* レッスン種別の選択 */}
                                 <div className="flex flex-col gap-2">
                                     <Label className="text-sm font-semibold text-slate-700">レッスン種別 *</Label>
-                                    <Select value={scheduleLessonMasterId} onValueChange={setScheduleLessonMasterId}>
+                                    <Select value={scheduleLessonMasterId} onValueChange={handleLessonMasterChange}>
                                         <SelectTrigger className="rounded-xl border-slate-200">
                                             <SelectValue placeholder="レッスン種別を選択" />
                                         </SelectTrigger>
@@ -974,13 +1050,18 @@ export default function LineMonitoringPage() {
                                         <Input
                                             type="datetime-local"
                                             value={scheduleStartTime}
-                                            onChange={(e) => setScheduleStartTime(e.target.value)}
+                                            onChange={(e) => handleStartTimeChange(e.target.value)}
                                             className="rounded-xl border-slate-200"
                                             required
                                         />
                                     </div>
                                     <div className="flex flex-col gap-2">
-                                        <Label className="text-sm font-semibold text-slate-700">終了日時 *</Label>
+                                        <div className="flex items-center justify-between">
+                                            <Label className="text-sm font-semibold text-slate-700">終了日時 *</Label>
+                                            <span className="text-[10px] text-indigo-600 font-medium bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">
+                                                自動計算
+                                            </span>
+                                        </div>
                                         <Input
                                             type="datetime-local"
                                             value={scheduleEndTime}
