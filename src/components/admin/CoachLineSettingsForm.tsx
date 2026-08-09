@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Loader2, Bot, Link as LinkIcon, Bell } from "lucide-react"
+import { Loader2, Bot, Link as LinkIcon, Bell, KeyRound } from "lucide-react"
 import { toast } from "sonner"
 import { updateCoachLineFriendUrlAction } from "@/actions/coaches"
 import { saveLineBotConfigAction } from "@/actions/line-monitoring"
@@ -18,6 +18,7 @@ interface CoachLineSettingsFormProps {
         bot_id: string
         bot_name: string
         gchat_webhook_id?: string | null
+        channel_access_token?: string | null
     } | null
     chatWebhooks?: { id: string; space_name: string }[]
 }
@@ -33,6 +34,7 @@ export function CoachLineSettingsForm({
     const [botId, setBotId] = useState(initialBotConfig?.bot_id || '')
     const [botName, setBotName] = useState(initialBotConfig?.bot_name || '')
     const [gchatWebhookId, setGchatWebhookId] = useState<string>(initialBotConfig?.gchat_webhook_id || 'none')
+    const [channelAccessToken, setChannelAccessToken] = useState<string>(initialBotConfig?.channel_access_token || '')
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -53,7 +55,8 @@ export function CoachLineSettingsForm({
                     coach_id: coachId,
                     bot_id: botId.trim(),
                     bot_name: botName.trim(),
-                    gchat_webhook_id: gchatWebhookId === 'none' ? null : (gchatWebhookId || null)
+                    gchat_webhook_id: gchatWebhookId === 'none' ? null : (gchatWebhookId || null),
+                    channel_access_token: channelAccessToken.trim() || null
                 })
 
                 if (!botResult.success) {
@@ -61,7 +64,7 @@ export function CoachLineSettingsForm({
                 }
             }
 
-            toast.success('LINE設定およびボット紐付けを保存しました')
+            toast.success('LINE設定およびボット連携設定を保存しました')
         } catch (error: any) {
             console.error(error)
             toast.error(error.message || '更新に失敗しました')
@@ -93,7 +96,7 @@ export function CoachLineSettingsForm({
             <div className="border-t border-slate-100 pt-4 space-y-4">
                 <div className="flex items-center gap-2">
                     <Bot className="h-4 w-4 text-indigo-600" />
-                    <h4 className="text-sm font-bold text-slate-800">公式LINE日程調整監視設定</h4>
+                    <h4 className="text-sm font-bold text-slate-800">公式LINE日程調整監視＆自動連絡設定</h4>
                 </div>
 
                 {/* 2. ボット表示名 */}
@@ -123,11 +126,30 @@ export function CoachLineSettingsForm({
                     </p>
                 </div>
 
-                {/* 4. 通知先 Google Chat スペース */}
+                {/* 4. チャネルアクセストークン（長期） */}
+                <div className="space-y-2">
+                    <Label htmlFor="channel_access_token" className="flex items-center gap-1 text-xs font-medium text-slate-600">
+                        <KeyRound className="h-3.5 w-3.5 text-indigo-600" />
+                        チャネルアクセストークン（長期）
+                    </Label>
+                    <Input
+                        id="channel_access_token"
+                        type="password"
+                        value={channelAccessToken}
+                        onChange={e => setChannelAccessToken(e.target.value)}
+                        placeholder="LINE Developersで発行した長期トークンを貼り付け"
+                        className="font-mono text-xs"
+                    />
+                    <p className="text-xs text-slate-400 leading-relaxed">
+                        ※このコーチの公式LINEから生徒へ **前日連絡を自動送信（プッシュ通知）** するために使用します。（LINE Developersの「Messaging API設定」タブ下部より取得）
+                    </p>
+                </div>
+
+                {/* 5. 通知先 Google Chat スペース */}
                 <div className="space-y-2">
                     <Label className="flex items-center gap-1 text-xs font-medium text-slate-600">
                         <Bell className="h-3.5 w-3.5 text-indigo-500" />
-                        通知先 Google Chat スペース（特定指定）
+                        連絡・通知先 Google Chat スペース
                     </Label>
                     <Select value={gchatWebhookId} onValueChange={setGchatWebhookId}>
                         <SelectTrigger>
@@ -142,13 +164,16 @@ export function CoachLineSettingsForm({
                             ))}
                         </SelectContent>
                     </Select>
+                    <p className="text-xs text-slate-400">
+                        ※LINE日程調整検知時および **前日のレッスン予定リマインド** を送信するコーチ専用スペースを選択します。
+                    </p>
                 </div>
             </div>
 
             <div className="flex justify-end pt-2">
                 <Button type="submit" disabled={saving} className="bg-indigo-600 hover:bg-indigo-500 text-white">
                     {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    LINE設定を保存
+                    LINE・通知設定を保存
                 </Button>
             </div>
         </form>

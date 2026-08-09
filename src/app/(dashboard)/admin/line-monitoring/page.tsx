@@ -11,6 +11,7 @@ import {
     findStudentByLineInfoAction,
     getLessonMastersListAction,
     getStudentsSimpleListAction,
+    executeLessonReminderCronAction,
     LineMonitoringLog,
     LineBotConfig
 } from '@/actions/line-monitoring'
@@ -26,6 +27,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { toast } from 'sonner'
+import Link from 'next/link'
 import { 
     MessageSquare, 
     Bot, 
@@ -39,7 +41,10 @@ import {
     AlertCircle, 
     ArrowRightLeft,
     Clock,
-    CalendarPlus
+    CalendarPlus,
+    Send,
+    ExternalLink,
+    KeyRound
 } from 'lucide-react'
 
 /**
@@ -169,6 +174,7 @@ export default function LineMonitoringPage() {
     const [isSearchingStudent, setIsSearchingStudent] = useState(false)
     const [isRegisteringSchedule, setIsRegisteringSchedule] = useState(false)
     const [onlyAssignedCoachStudents, setOnlyAssignedCoachStudents] = useState(false)
+    const [isTriggeringReminder, setIsTriggeringReminder] = useState(false)
 
     // 時間の自動計算（レッスン種別の分数に基づく）
     const calculateEndTime = (startStr: string, masterId: string, mastersList = lessonMasters) => {
@@ -202,6 +208,32 @@ export default function LineMonitoringPage() {
         setScheduleLessonMasterId(newMasterId)
         if (scheduleStartTime) {
             setScheduleEndTime(calculateEndTime(scheduleStartTime, newMasterId))
+        }
+    }
+
+    // 前日リマインド手動実行
+    const handleTriggerReminder = async (dryRun: boolean = true) => {
+        if (!dryRun && !confirm('明日のレッスン予定について、生徒へのLINE/メールおよびコーチ用Google Chatスペースへの前日連絡を一斉送信してよろしいですか？')) {
+            return
+        }
+
+        setIsTriggeringReminder(true)
+        try {
+            const res = await executeLessonReminderCronAction({ dryRun })
+            if (res.success) {
+                const count = res.data?.processed || 0
+                if (count === 0) {
+                    toast.info('明日予定されている未送信のリマインド対象レッスンはありませんでした。')
+                } else {
+                    toast.success(`${dryRun ? '【テスト確認】' : '【本送信完了】'} 明日のレッスン ${count}件 の前日連絡を処理しました。`)
+                }
+            } else {
+                toast.error('前日連絡の実行に失敗しました: ' + res.error)
+            }
+        } catch (e: any) {
+            toast.error('エラーが発生しました: ' + e.message)
+        } finally {
+            setIsTriggeringReminder(false)
         }
     }
 
@@ -499,7 +531,17 @@ export default function LineMonitoringPage() {
                             各コーチのLINE公式アカウントにおける、日程調整メッセージの自動検知と管理を行います。
                         </p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <Button 
+                            variant="secondary" 
+                            size="sm" 
+                            disabled={isTriggeringReminder}
+                            className="bg-indigo-900/40 text-indigo-200 border border-indigo-800 hover:bg-indigo-900/60"
+                            onClick={() => handleTriggerReminder(true)}
+                        >
+                            <Send className="mr-2 h-4 w-4 text-indigo-400" />
+                            {isTriggeringReminder ? '処理中...' : '明日の前日連絡テスト実行'}
+                        </Button>
                         <Button 
                             variant="secondary" 
                             size="sm" 
@@ -761,6 +803,25 @@ export default function LineMonitoringPage() {
 
                 {/* タブ2: ボット設定 */}
                 <TabsContent value="settings" className="space-y-4">
+                    {/* 一元管理案内バナー */}
+                    <div className="bg-indigo-50/80 border border-indigo-100 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-indigo-950">
+                        <div className="flex items-center gap-2.5">
+                            <KeyRound className="h-5 w-5 text-indigo-600 shrink-0" />
+                            <div>
+                                <h4 className="text-sm font-bold text-indigo-900">各コーチのLINE・通知設定は「コーチ詳細画面」から一元管理できます</h4>
+                                <p className="text-xs text-indigo-700/80 mt-0.5">
+                                    LINE友達追加URL、公式LINEボットID、前日自動送信用アクセストークン、連絡先Google Chatスペースをコーチごとに設定可能です。
+                                </p>
+                            </div>
+                        </div>
+                        <Button variant="outline" size="sm" asChild className="bg-white border-indigo-200 text-indigo-700 hover:bg-indigo-50 shadow-sm shrink-0 rounded-xl">
+                            <Link href="/admin/coaches">
+                                <ExternalLink className="h-4 w-4 mr-1.5" />
+                                コーチ一覧を開く
+                            </Link>
+                        </Button>
+                    </div>
+
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
                         {/* 左：ボット設定一覧（2カラム相当） */}
                         <div className="lg:col-span-2 space-y-4">
@@ -775,7 +836,7 @@ export default function LineMonitoringPage() {
                                         <Bot className="h-10 w-10 text-slate-300 mx-auto" />
                                         <CardTitle className="text-slate-500 text-base">登録されているボットはありません</CardTitle>
                                         <CardDescription className="text-slate-400 text-sm max-w-sm mx-auto">
-                                            右上ボタンからコーチとボットID（destination）の紐付け設定を追加してください。
+                                            各コーチの詳細画面（LINE設定）または右上ボタンから設定を追加してください。
                                         </CardDescription>
                                     </CardContent>
                                 </Card>
@@ -788,7 +849,7 @@ export default function LineMonitoringPage() {
                                                 <TableHead>担当コーチ</TableHead>
                                                 <TableHead>ボットID (または ベーシックID)</TableHead>
                                                 <TableHead>通知スペース</TableHead>
-                                                <TableHead className="w-[120px] text-right">操作</TableHead>
+                                                <TableHead className="w-[140px] text-right">操作</TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
@@ -807,11 +868,22 @@ export default function LineMonitoringPage() {
                                                         )}
                                                     </TableCell>
                                                     <TableCell className="text-right">
-                                                        <div className="flex justify-end gap-2">
+                                                        <div className="flex justify-end gap-1">
                                                             <Button 
                                                                 variant="ghost" 
                                                                 size="sm" 
-                                                                className="text-slate-500 hover:text-indigo-600 rounded-lg"
+                                                                asChild
+                                                                className="text-slate-500 hover:text-indigo-600 rounded-lg px-2"
+                                                                title="コーチ詳細画面を開く"
+                                                            >
+                                                                <Link href={`/admin/coaches/${config.coach_id}`}>
+                                                                    <ExternalLink className="h-3.5 w-3.5" />
+                                                                </Link>
+                                                            </Button>
+                                                            <Button 
+                                                                variant="ghost" 
+                                                                size="sm" 
+                                                                className="text-slate-500 hover:text-indigo-600 rounded-lg px-2 text-xs"
                                                                 onClick={() => startEditConfig(config)}
                                                             >
                                                                 編集
@@ -819,10 +891,10 @@ export default function LineMonitoringPage() {
                                                             <Button 
                                                                 variant="ghost" 
                                                                 size="sm" 
-                                                                className="text-red-500 hover:text-red-600 rounded-lg hover:bg-red-50"
+                                                                className="text-red-500 hover:text-red-600 rounded-lg hover:bg-red-50 px-2"
                                                                 onClick={() => handleDeleteConfig(config.id)}
                                                             >
-                                                                <Trash2 className="h-4 w-4" />
+                                                                <Trash2 className="h-3.5 w-3.5" />
                                                             </Button>
                                                         </div>
                                                     </TableCell>

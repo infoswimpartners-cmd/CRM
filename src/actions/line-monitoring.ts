@@ -20,6 +20,9 @@ export type LineBotConfig = {
     coach_id: string
     bot_id: string
     bot_name: string
+    gchat_webhook_id?: string | null
+    space_name?: string | null
+    channel_access_token?: string | null
     created_at: string
     coach_name?: string | null
 }
@@ -193,6 +196,7 @@ export async function saveLineBotConfigAction(data: {
     bot_id: string
     bot_name: string
     gchat_webhook_id?: string | null
+    channel_access_token?: string | null
 }) {
     const { isAuthorized } = await verifyAdminRole()
     if (!isAuthorized) {
@@ -203,6 +207,7 @@ export async function saveLineBotConfigAction(data: {
     const cleanBotId = data.bot_id.trim()
     const cleanBotName = data.bot_name.trim()
     const gchatWebhookId = data.gchat_webhook_id || null
+    const channelAccessToken = data.channel_access_token?.trim() || null
 
     // 1. 同一 bot_id が自分以外で既に登録されていないか事前チェック
     let checkQuery = supabase
@@ -232,7 +237,8 @@ export async function saveLineBotConfigAction(data: {
                 coach_id: data.coach_id,
                 bot_id: cleanBotId,
                 bot_name: cleanBotName,
-                gchat_webhook_id: gchatWebhookId
+                gchat_webhook_id: gchatWebhookId,
+                channel_access_token: channelAccessToken
             })
             .eq('id', data.id)
 
@@ -248,7 +254,8 @@ export async function saveLineBotConfigAction(data: {
                 coach_id: data.coach_id,
                 bot_id: cleanBotId,
                 bot_name: cleanBotName,
-                gchat_webhook_id: gchatWebhookId
+                gchat_webhook_id: gchatWebhookId,
+                channel_access_token: channelAccessToken
             })
 
         if (error) {
@@ -261,6 +268,7 @@ export async function saveLineBotConfigAction(data: {
     }
 
     revalidatePath('/admin/line-monitoring')
+    revalidatePath('/admin/coaches')
     return { success: true }
 }
 
@@ -395,4 +403,29 @@ export async function getStudentsSimpleListAction() {
     }
 
     return { success: true, data: data || [] }
+}
+
+/**
+ * 前日連絡Cronを手動実行・テスト実行します（管理者のみ）
+ */
+export async function executeLessonReminderCronAction(options?: { dryRun?: boolean; targetDate?: string }) {
+    const { isAuthorized } = await verifyAdminRole()
+    if (!isAuthorized) {
+        return { success: false, error: 'Unauthorized' }
+    }
+
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    const dryRunParam = options?.dryRun ? '&dry_run=true' : ''
+    const dateParam = options?.targetDate ? `&date=${options.targetDate}` : ''
+
+    try {
+        const res = await fetch(`${appUrl}/api/cron/reminders?${dryRunParam}${dateParam}`, {
+            headers: { 'Cache-Control': 'no-cache' }
+        })
+        const data = await res.json()
+        return { success: true, data }
+    } catch (e: any) {
+        console.error('executeLessonReminderCronAction Error:', e)
+        return { success: false, error: e.message }
+    }
 }
