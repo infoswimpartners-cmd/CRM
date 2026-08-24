@@ -4,7 +4,7 @@ import { CoachGenericInviteButton } from '@/components/admin/CoachGenericInviteB
 import { CoachTable } from '@/components/admin/CoachTable'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
-import { ChevronLeft } from 'lucide-react'
+import { ChevronLeft, Bell } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,6 +46,12 @@ export default async function CoachListPage() {
                     <p className="text-gray-500">コーチ一覧と担当生徒の確認・引き継ぎ</p>
                 </div>
                 <div className="ml-auto flex items-center gap-2">
+                    <Button variant="outline" asChild className="gap-1.5 border-indigo-200 text-indigo-700 hover:bg-indigo-50">
+                        <Link href="/admin/webhooks">
+                            <Bell className="h-4 w-4 text-indigo-600" />
+                            Webhook設定
+                        </Link>
+                    </Button>
                     <CoachGenericInviteButton />
                     <AddCoachDialog />
                 </div>

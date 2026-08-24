@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { LogOut, LayoutDashboard, Users, Calendar, DollarSign, Settings, User, History, PlusCircle, CreditCard, BookOpen, Mail, FileCheck, Megaphone, MessageCircle, Crown, Timer, UserPlus, Sparkles } from 'lucide-react'
+import { LogOut, LayoutDashboard, Users, Calendar, DollarSign, Settings, User, History, PlusCircle, CreditCard, BookOpen, Mail, FileCheck, Megaphone, MessageCircle, Crown, Timer, UserPlus, Sparkles, Bell } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 
 interface DesktopSidebarProps {
@@ -75,6 +75,7 @@ export function DesktopSidebar({ role }: DesktopSidebarProps) {
 
                         <NavHeading>システム</NavHeading>
                         <NavItem href="/admin/masters" icon={Settings} label="マスタ設定" isActive={pathname?.startsWith('/admin/masters')} />
+                        <NavItem href="/admin/webhooks" icon={Bell} label="Webhook設定" isActive={pathname?.startsWith('/admin/webhooks')} />
                         <NavItem href="/admin/announcements" icon={Megaphone} label="お知らせ管理" isActive={pathname?.startsWith('/admin/announcements')} />
                         <NavItem href="/admin/email-templates" icon={Mail} label="メール設定" isActive={pathname?.startsWith('/admin/email-templates')} />
                         <NavItem href="/admin/settings" icon={Settings} label="全体設定" isActive={pathname?.startsWith('/admin/settings')} />

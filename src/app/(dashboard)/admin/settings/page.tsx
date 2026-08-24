@@ -2,7 +2,8 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Calendar } from 'lucide-react'
+import { Calendar, Bell, ArrowRight } from 'lucide-react'
+import Link from 'next/link'
 import { CompanySettingsForm } from "@/components/admin/CompanySettingsForm"
 import { PaymentSlipTemplateForm } from "@/components/admin/PaymentSlipTemplateForm"
 import { TermsSettingsForm } from "@/components/admin/TermsSettingsForm"
@@ -82,6 +83,33 @@ export default async function SettingsPage() {
                 </CardHeader>
                 <CardContent>
                     <TermsSettingsForm />
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Bell className="h-5 w-5 text-indigo-600" />
+                        Google Chat Webhook設定（コーチ通知・お知らせ配信）
+                    </CardTitle>
+                    <CardDescription>
+                        コーチへの前日レッスンリマインドやLINE日程調整検知、全体お知らせで使用するGoogle Chatスペースを管理します。
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="flex items-center justify-between p-4 border rounded-lg bg-indigo-50/30">
+                        <div>
+                            <div className="font-semibold text-slate-800">連携Webhookスペースの登録・編集</div>
+                            <p className="text-xs text-slate-500 mt-1">
+                                Google Chatの各スペースで発行したWebhook URLを一元管理できます。
+                            </p>
+                        </div>
+                        <Button asChild className="gap-1.5 bg-indigo-600 hover:bg-indigo-700">
+                            <Link href="/admin/webhooks">
+                                Webhook管理を開く <ArrowRight className="h-4 w-4" />
+                            </Link>
+                        </Button>
+                    </div>
                 </CardContent>
             </Card>
 

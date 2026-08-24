@@ -78,7 +78,9 @@ export async function createChatWebhookAction(data: { space_name: string; webhoo
 
         if (error) throw error
 
+        revalidatePath('/admin/webhooks')
         revalidatePath('/admin/announcements')
+        revalidatePath('/admin/coaches')
         return { success: true }
     } catch (error: any) {
         console.error('createChatWebhookAction Error:', error)
@@ -108,7 +110,9 @@ export async function updateChatWebhookAction(data: { id: string; space_name: st
 
         if (error) throw error
 
+        revalidatePath('/admin/webhooks')
         revalidatePath('/admin/announcements')
+        revalidatePath('/admin/coaches')
         return { success: true }
     } catch (error: any) {
         console.error('updateChatWebhookAction Error:', error)
@@ -134,7 +138,9 @@ export async function deleteChatWebhookAction(id: string) {
 
         if (error) throw error
 
+        revalidatePath('/admin/webhooks')
         revalidatePath('/admin/announcements')
+        revalidatePath('/admin/coaches')
         return { success: true }
     } catch (error: any) {
         console.error('deleteChatWebhookAction Error:', error)

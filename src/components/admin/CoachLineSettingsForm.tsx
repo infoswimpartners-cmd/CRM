@@ -5,10 +5,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Loader2, Bot, Link as LinkIcon, Bell, KeyRound } from "lucide-react"
+import { Loader2, Bot, Link as LinkIcon, Bell, KeyRound, Plus, ExternalLink } from "lucide-react"
 import { toast } from "sonner"
 import { updateCoachLineFriendUrlAction } from "@/actions/coaches"
 import { saveLineBotConfigAction } from "@/actions/line-monitoring"
+import { getChatWebhooksAction } from "@/actions/gchat_webhook"
+import { WebhookFormDialog } from "@/components/admin/announcements/WebhookFormDialog"
+import Link from 'next/link'
 
 interface CoachLineSettingsFormProps {
     coachId: string
@@ -35,6 +38,19 @@ export function CoachLineSettingsForm({
     const [botName, setBotName] = useState(initialBotConfig?.bot_name || '')
     const [gchatWebhookId, setGchatWebhookId] = useState<string>(initialBotConfig?.gchat_webhook_id || 'none')
     const [channelAccessToken, setChannelAccessToken] = useState<string>(initialBotConfig?.channel_access_token || '')
+    const [webhookList, setWebhookList] = useState<{ id: string; space_name: string }[]>(chatWebhooks)
+    const [dialogOpen, setDialogOpen] = useState(false)
+
+    const refreshWebhooks = async () => {
+        try {
+            const res = await getChatWebhooksAction()
+            if (res.success) {
+                setWebhookList(res.data.filter((w: any) => w.active))
+            }
+        } catch (e) {
+            console.error('Failed to refresh webhooks', e)
+        }
+    }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -74,108 +90,136 @@ export function CoachLineSettingsForm({
     }
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-5">
-            {/* 1. LINE友達追加URL */}
-            <div className="space-y-2">
-                <Label htmlFor="line_friend_url" className="flex items-center gap-1.5 font-semibold text-slate-700">
-                    <LinkIcon className="h-4 w-4 text-emerald-600" />
-                    LINE友達追加URL
-                </Label>
-                <Input
-                    id="line_friend_url"
-                    type="url"
-                    value={url}
-                    onChange={e => setUrl(e.target.value)}
-                    placeholder="例: https://line.me/ti/p/..."
-                />
-                <p className="text-xs text-slate-400">
-                    ※アサイン確定時の通知メッセージに挿入される、コーチ個人のLINE友達追加URLです。
-                </p>
-            </div>
-
-            <div className="border-t border-slate-100 pt-4 space-y-4">
-                <div className="flex items-center gap-2">
-                    <Bot className="h-4 w-4 text-indigo-600" />
-                    <h4 className="text-sm font-bold text-slate-800">公式LINE日程調整監視＆自動連絡設定</h4>
-                </div>
-
-                {/* 2. ボット表示名 */}
+        <>
+            <form onSubmit={handleSubmit} className="space-y-5">
+                {/* 1. LINE友達追加URL */}
                 <div className="space-y-2">
-                    <Label htmlFor="bot_name" className="text-xs font-medium text-slate-600">ボット表示名</Label>
-                    <Input
-                        id="bot_name"
-                        value={botName}
-                        onChange={e => setBotName(e.target.value)}
-                        placeholder="例: 岡野コーチ公式LINE"
-                    />
-                </div>
-
-                {/* 3. ボットID / ベーシックID */}
-                <div className="space-y-2">
-                    <Label htmlFor="bot_id" className="text-xs font-medium text-slate-600">
-                        ボットID または ベーシックID
+                    <Label htmlFor="line_friend_url" className="flex items-center gap-1.5 font-semibold text-slate-700">
+                        <LinkIcon className="h-4 w-4 text-emerald-600" />
+                        LINE友達追加URL
                     </Label>
                     <Input
-                        id="bot_id"
-                        value={botId}
-                        onChange={e => setBotId(e.target.value)}
-                        placeholder="例: @766pzpvi または U12345..."
+                        id="line_friend_url"
+                        type="url"
+                        value={url}
+                        onChange={e => setUrl(e.target.value)}
+                        placeholder="例: https://line.me/ti/p/..."
                     />
                     <p className="text-xs text-slate-400">
-                        ※LINE管理画面のベーシックID（@...）またはLINE DevelopersのボットユーザーID（U...）を入力します。
+                        ※アサイン確定時の通知メッセージに挿入される、コーチ個人のLINE友達追加URLです。
                     </p>
                 </div>
 
-                {/* 4. チャネルアクセストークン（長期） */}
-                <div className="space-y-2">
-                    <Label htmlFor="channel_access_token" className="flex items-center gap-1 text-xs font-medium text-slate-600">
-                        <KeyRound className="h-3.5 w-3.5 text-indigo-600" />
-                        チャネルアクセストークン（長期）
-                    </Label>
-                    <Input
-                        id="channel_access_token"
-                        type="password"
-                        value={channelAccessToken}
-                        onChange={e => setChannelAccessToken(e.target.value)}
-                        placeholder="LINE Developersで発行した長期トークンを貼り付け"
-                        className="font-mono text-xs"
-                    />
-                    <p className="text-xs text-slate-400 leading-relaxed">
-                        ※このコーチの公式LINEから生徒へ **前日連絡を自動送信（プッシュ通知）** するために使用します。（LINE Developersの「Messaging API設定」タブ下部より取得）
-                    </p>
+                <div className="border-t border-slate-100 pt-4 space-y-4">
+                    <div className="flex items-center gap-2">
+                        <Bot className="h-4 w-4 text-indigo-600" />
+                        <h4 className="text-sm font-bold text-slate-800">公式LINE日程調整監視＆自動連絡設定</h4>
+                    </div>
+
+                    {/* 2. ボット表示名 */}
+                    <div className="space-y-2">
+                        <Label htmlFor="bot_name" className="text-xs font-medium text-slate-600">ボット表示名</Label>
+                        <Input
+                            id="bot_name"
+                            value={botName}
+                            onChange={e => setBotName(e.target.value)}
+                            placeholder="例: 岡野コーチ公式LINE"
+                        />
+                    </div>
+
+                    {/* 3. ボットID / ベーシックID */}
+                    <div className="space-y-2">
+                        <Label htmlFor="bot_id" className="text-xs font-medium text-slate-600">
+                            ボットID または ベーシックID
+                        </Label>
+                        <Input
+                            id="bot_id"
+                            value={botId}
+                            onChange={e => setBotId(e.target.value)}
+                            placeholder="例: @766pzpvi または U12345..."
+                        />
+                        <p className="text-xs text-slate-400">
+                            ※LINE管理画面のベーシックID（@...）またはLINE DevelopersのボットユーザーID（U...）を入力します。
+                        </p>
+                    </div>
+
+                    {/* 4. チャネルアクセストークン（長期） */}
+                    <div className="space-y-2">
+                        <Label htmlFor="channel_access_token" className="flex items-center gap-1 text-xs font-medium text-slate-600">
+                            <KeyRound className="h-3.5 w-3.5 text-indigo-600" />
+                            チャネルアクセストークン（長期）
+                        </Label>
+                        <Input
+                            id="channel_access_token"
+                            type="password"
+                            value={channelAccessToken}
+                            onChange={e => setChannelAccessToken(e.target.value)}
+                            placeholder="LINE Developersで発行した長期トークンを貼り付け"
+                            className="font-mono text-xs"
+                        />
+                        <p className="text-xs text-slate-400 leading-relaxed">
+                            ※このコーチの公式LINEから生徒へ **前日連絡を自動送信（プッシュ通知）** するために使用します。（LINE Developersの「Messaging API設定」タブ下部より取得）
+                        </p>
+                    </div>
+
+                    {/* 5. 通知先 Google Chat スペース */}
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                            <Label className="flex items-center gap-1 text-xs font-medium text-slate-600">
+                                <Bell className="h-3.5 w-3.5 text-indigo-500" />
+                                連絡・通知先 Google Chat スペース
+                            </Label>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setDialogOpen(true)}
+                                    className="text-[11px] text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-0.5"
+                                >
+                                    <Plus className="h-3 w-3" /> 新規Webhook追加
+                                </button>
+                                <span className="text-slate-300 text-xs">|</span>
+                                <Link
+                                    href="/admin/webhooks"
+                                    target="_blank"
+                                    className="text-[11px] text-slate-500 hover:text-slate-700 flex items-center gap-0.5"
+                                >
+                                    一覧管理 <ExternalLink className="h-2.5 w-2.5" />
+                                </Link>
+                            </div>
+                        </div>
+                        <Select value={gchatWebhookId} onValueChange={setGchatWebhookId}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="通知先のスペースを選択" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="none">指定なし (既定のスペースへ通知)</SelectItem>
+                                {webhookList.map(webhook => (
+                                    <SelectItem key={webhook.id} value={webhook.id}>
+                                        {webhook.space_name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <p className="text-xs text-slate-400">
+                            ※LINE日程調整検知時および **前日のレッスン予定リマインド** を送信するコーチ専用スペースを選択します。
+                        </p>
+                    </div>
                 </div>
 
-                {/* 5. 通知先 Google Chat スペース */}
-                <div className="space-y-2">
-                    <Label className="flex items-center gap-1 text-xs font-medium text-slate-600">
-                        <Bell className="h-3.5 w-3.5 text-indigo-500" />
-                        連絡・通知先 Google Chat スペース
-                    </Label>
-                    <Select value={gchatWebhookId} onValueChange={setGchatWebhookId}>
-                        <SelectTrigger>
-                            <SelectValue placeholder="通知先のスペースを選択" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="none">指定なし (既定のスペースへ通知)</SelectItem>
-                            {chatWebhooks.map(webhook => (
-                                <SelectItem key={webhook.id} value={webhook.id}>
-                                    {webhook.space_name}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <p className="text-xs text-slate-400">
-                        ※LINE日程調整検知時および **前日のレッスン予定リマインド** を送信するコーチ専用スペースを選択します。
-                    </p>
+                <div className="flex justify-end pt-2">
+                    <Button type="submit" disabled={saving} className="bg-indigo-600 hover:bg-indigo-500 text-white">
+                        {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        LINE・通知設定を保存
+                    </Button>
                 </div>
-            </div>
+            </form>
 
-            <div className="flex justify-end pt-2">
-                <Button type="submit" disabled={saving} className="bg-indigo-600 hover:bg-indigo-500 text-white">
-                    {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    LINE・通知設定を保存
-                </Button>
-            </div>
-        </form>
+            <WebhookFormDialog
+                webhook={null}
+                open={dialogOpen}
+                onOpenChange={setDialogOpen}
+                onSuccess={refreshWebhooks}
+            />
+        </>
     )
 }

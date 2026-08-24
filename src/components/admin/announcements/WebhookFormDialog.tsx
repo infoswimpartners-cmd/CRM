@@ -94,7 +94,7 @@ export function WebhookFormDialog({ webhook, open, onOpenChange, onSuccess }: We
                     <DialogHeader>
                         <DialogTitle>{webhook ? 'Google Chat Webhook編集' : 'Google Chat Webhook登録'}</DialogTitle>
                         <DialogDescription>
-                            お知らせ公開時に通知を配信するGoogle Chatのスペース情報を設定します。
+                            コーチ連絡・前日リマインド通知、お知らせ配信、リード通知等で使用するGoogle Chatのスペース情報を設定します。
                         </DialogDescription>
                     </DialogHeader>
 
