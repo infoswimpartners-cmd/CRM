@@ -14,7 +14,7 @@ export default async function CoachListPage() {
     const { data: coaches, error } = await supabase
         .from('profiles')
         .select('*')
-        .eq('role', 'coach')
+        .in('role', ['coach', 'admin'])
         .order('full_name')
 
     if (error) {

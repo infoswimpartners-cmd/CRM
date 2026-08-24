@@ -137,7 +137,12 @@ export function CoachTable({ coaches, studentCounts }: CoachTableProps) {
                                     <AvatarImage src={coach.avatar_url || undefined} />
                                     <AvatarFallback><User className="h-4 w-4" /></AvatarFallback>
                                 </Avatar>
-                                {coach.full_name}
+                                <span>{coach.full_name}</span>
+                                {coach.role === 'admin' && (
+                                    <Badge className="bg-purple-100 text-purple-700 border-purple-200 hover:bg-purple-100 text-xs font-normal">
+                                        管理者
+                                    </Badge>
+                                )}
                                 {coach.coach_number && (
                                     <Badge variant="secondary" className="text-xs font-normal">
                                         {coach.coach_number}
