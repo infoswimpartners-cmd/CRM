@@ -42,7 +42,8 @@ import {
     completeLeadManuallyAction,
     createLeadManuallyAction,
     updateLeadAction,
-    cancelLeadAssignmentAction
+    cancelLeadAssignmentAction,
+    adminAssignLeadAction
 } from '@/actions/leads'
 import {
     Dialog,
@@ -87,12 +88,16 @@ interface Lead {
     id: string
     name: string
     full_name_kana: string | null
+    gender: string | null
+    birth_date: string | null
     email: string | null
     phone: string | null
     area: string | null
     datetime1: string | null
     datetime2: string | null
     datetime3: string | null
+    available_times: string | null
+    frequency: string | null
     skill_level: string | null
     notes: string | null
     status: string | null
@@ -101,7 +106,26 @@ interface Lead {
     assigned_at: string | null
     confirmed_datetime: string | null
     confirmed_location: string | null
+    notification_webhook_id?: string | null
+    line_user_id?: string | null
+    second_student_name?: string | null
+    second_student_full_name_kana?: string | null
+    second_student_gender?: string | null
+    second_student_birth_date?: string | null
     created_at: string
+}
+
+function calculateAge(birthDateString: string | null | undefined): number | null {
+    if (!birthDateString) return null
+    const birthDate = new Date(birthDateString)
+    if (isNaN(birthDate.getTime())) return null
+    const today = new Date()
+    let age = today.getFullYear() - birthDate.getFullYear()
+    const m = today.getMonth() - birthDate.getMonth()
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+        age--
+    }
+    return age
 }
 
 interface Facility {
@@ -179,6 +203,14 @@ export default function AdminLeadsPage() {
     const [students, setStudents] = useState<Student[]>([])
     const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
     const [creatingLead, setCreatingLead] = useState(false)
+
+    // 管理者直接アサイン用のステート
+    const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false)
+    const [assigningLead, setAssigningLead] = useState<Lead | null>(null)
+    const [assignTargetCoachId, setAssignTargetCoachId] = useState('')
+    const [assignConfirmedDate, setAssignConfirmedDate] = useState('')
+    const [assignConfirmedLocation, setAssignConfirmedLocation] = useState('')
+    const [isAssigning, setIsAssigning] = useState(false)
 
     // 案件編集用のステート
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -807,6 +839,53 @@ export default function AdminLeadsPage() {
             console.error(error)
         } finally {
             setCancelingStates(prev => ({ ...prev, [leadId]: false }))
+        }
+    }
+
+    const handleOpenAssignDialog = (lead: Lead) => {
+        setAssigningLead(lead)
+        setAssignTargetCoachId(lead.assigned_coach_id || '')
+        setAssignConfirmedDate(lead.confirmed_datetime || lead.datetime1 || '')
+        setAssignConfirmedLocation(lead.confirmed_location || lead.lesson_location || lead.area || '')
+        setIsAssignDialogOpen(true)
+    }
+
+    const handleExecuteAdminAssign = async () => {
+        if (!assigningLead) return
+        if (!assignTargetCoachId) {
+            toast.error('担当コーチを選択してください')
+            return
+        }
+        if (!assignConfirmedDate.trim()) {
+            toast.error('確定体験日時を入力してください')
+            return
+        }
+        if (!assignConfirmedLocation.trim()) {
+            toast.error('確定体験場所を入力してください')
+            return
+        }
+
+        setIsAssigning(true)
+        try {
+            const res = await adminAssignLeadAction(
+                assigningLead.id,
+                assignTargetCoachId,
+                assignConfirmedDate.trim(),
+                assignConfirmedLocation.trim()
+            )
+
+            if (res.success) {
+                toast.success(`${res.coachName} コーチにアサインしました`)
+                setIsAssignDialogOpen(false)
+                setAssigningLead(null)
+                await fetchData()
+            } else {
+                toast.error(res.error || 'アサインに失敗しました')
+            }
+        } catch (error: any) {
+            toast.error(error.message || 'アサイン処理中にエラーが発生しました')
+        } finally {
+            setIsAssigning(false)
         }
     }
 
@@ -1690,6 +1769,157 @@ export default function AdminLeadsPage() {
                                 </form>
                             </DialogContent>
                         </Dialog>
+
+                        {/* アサイン実行ダイアログ */}
+                        <Dialog open={isAssignDialogOpen} onOpenChange={(open) => {
+                            setIsAssignDialogOpen(open)
+                            if (!open) setAssigningLead(null)
+                        }}>
+                            <DialogContent className="max-w-md">
+                                <DialogHeader>
+                                    <DialogTitle className="text-base font-bold">
+                                        体験レッスンのアサイン
+                                    </DialogTitle>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        担当コーチと確定日時・場所を指定してアサインします。
+                                    </p>
+                                </DialogHeader>
+
+                                {assigningLead && (
+                                    <div className="space-y-4 py-2">
+                                        {/* 顧客情報カード */}
+                                        <div className="bg-gray-50 p-3 rounded-md border border-gray-100 space-y-1">
+                                            <div className="flex items-center justify-between">
+                                                <span className="font-bold text-xs text-gray-900">
+                                                    {assigningLead.name} 様
+                                                </span>
+                                                <span className="text-[11px] text-gray-500">
+                                                    {assigningLead.gender || '性別未設定'} {calculateAge(assigningLead.birth_date) ? `(${calculateAge(assigningLead.birth_date)}歳)` : ''}
+                                                </span>
+                                            </div>
+                                            {assigningLead.area && (
+                                                <div className="text-[11px] text-gray-600 flex items-center gap-1">
+                                                    <MapPin className="h-3 w-3 text-gray-400 shrink-0" />
+                                                    <span>希望エリア: {assigningLead.area}</span>
+                                                </div>
+                                            )}
+                                            {assigningLead.skill_level && (
+                                                <div className="text-[11px] text-gray-500">
+                                                    泳力: {assigningLead.skill_level}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* 担当コーチ選択 */}
+                                        <div className="space-y-1.5">
+                                            <Label htmlFor="assignCoachSelect" className="text-xs font-semibold text-gray-700">
+                                                担当コーチ <span className="text-destructive">*</span>
+                                            </Label>
+                                            <Select
+                                                value={assignTargetCoachId}
+                                                onValueChange={setAssignTargetCoachId}
+                                            >
+                                                <SelectTrigger id="assignCoachSelect" className="text-xs h-9 bg-white border-gray-200">
+                                                    <SelectValue placeholder="担当コーチを選択してください" />
+                                                </SelectTrigger>
+                                                <SelectContent className="max-h-60">
+                                                    {coaches.map((c) => (
+                                                        <SelectItem key={c.id} value={c.id} className="text-xs">
+                                                            <div className="flex items-center justify-between w-full gap-2">
+                                                                <span className="font-medium">{c.full_name}</span>
+                                                                <span className="text-[10px] text-gray-400">
+                                                                    {c.role === 'admin' ? '管理者' : c.role === 'owner' ? 'オーナー' : 'コーチ'}
+                                                                </span>
+                                                            </div>
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+
+                                        {/* 確定体験日時 */}
+                                        <div className="space-y-1.5">
+                                            <div className="flex items-center justify-between">
+                                                <Label htmlFor="assignDate" className="text-xs font-semibold text-gray-700">
+                                                    確定体験日時 <span className="text-destructive">*</span>
+                                                </Label>
+                                                <span className="text-[10px] text-gray-400">希望日時をクリックで自動入力</span>
+                                            </div>
+                                            {/* 希望日時ボタン */}
+                                            <div className="flex flex-wrap gap-1 mb-1">
+                                                {[
+                                                    { label: '第1希望', val: assigningLead.datetime1 },
+                                                    { label: '第2希望', val: assigningLead.datetime2 },
+                                                    { label: '第3希望', val: assigningLead.datetime3 },
+                                                ].filter(d => d.val).map((d, idx) => (
+                                                    <button
+                                                        key={idx}
+                                                        type="button"
+                                                        className="text-[10px] px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100 hover:bg-blue-100 transition-colors text-left cursor-pointer"
+                                                        onClick={() => setAssignConfirmedDate(d.val || '')}
+                                                    >
+                                                        {d.label}: {d.val}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <Input
+                                                id="assignDate"
+                                                placeholder="例: 2026/09/01 10:00〜"
+                                                className="text-xs h-9 bg-white border-gray-200"
+                                                value={assignConfirmedDate}
+                                                onChange={(e) => setAssignConfirmedDate(e.target.value)}
+                                            />
+                                        </div>
+
+                                        {/* 確定体験場所 */}
+                                        <div className="space-y-1.5">
+                                            <div className="flex items-center justify-between">
+                                                <Label htmlFor="assignLocation" className="text-xs font-semibold text-gray-700">
+                                                    確定体験場所 <span className="text-destructive">*</span>
+                                                </Label>
+                                                {assigningLead.lesson_location && (
+                                                    <button
+                                                        type="button"
+                                                        className="text-[10px] text-blue-600 hover:underline cursor-pointer"
+                                                        onClick={() => setAssignConfirmedLocation(assigningLead.lesson_location || '')}
+                                                    >
+                                                        設定済場所を反映
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <Input
+                                                id="assignLocation"
+                                                placeholder="例: ○○プール"
+                                                className="text-xs h-9 bg-white border-gray-200"
+                                                value={assignConfirmedLocation}
+                                                onChange={(e) => setAssignConfirmedLocation(e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                <DialogFooter className="gap-2 pt-2">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setIsAssignDialogOpen(false)}
+                                        className="text-xs h-9"
+                                    >
+                                        キャンセル
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        disabled={isAssigning}
+                                        onClick={handleExecuteAdminAssign}
+                                        className="text-xs h-9 px-5 font-semibold"
+                                    >
+                                        {isAssigning ? 'アサイン中...' : 'アサインを確定する'}
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
                     </div>
 
                     <div className="border rounded-lg bg-white shadow-xs overflow-hidden">
@@ -1765,18 +1995,17 @@ export default function AdminLeadsPage() {
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="align-middle whitespace-normal">
-                                                    <div className="w-[134px] min-w-[134px]">
+                                                    <div className="w-[140px] min-w-[140px]">
                                                         {lead.assigned_coach_id ? (
                                                             (() => {
                                                                 const coach = coaches.find(c => c.id === lead.assigned_coach_id)
-                                                                if (!coach) return <span className="text-xs text-gray-400">不明</span>
                                                                 return (
                                                                     <div className="flex flex-col gap-0.5">
                                                                         <span className="font-semibold text-xs text-gray-950">
-                                                                            {coach.full_name}
+                                                                            {coach?.full_name || '不明なコーチ'}
                                                                         </span>
                                                                         <span className="text-[9px] text-gray-400">
-                                                                            {coach.role === 'admin' ? '管理者' : 'コーチ'}
+                                                                            {coach?.role === 'admin' ? '管理者' : coach?.role === 'owner' ? 'オーナー' : 'コーチ'}
                                                                         </span>
                                                                         {lead.confirmed_datetime && (
                                                                             <span className="text-[10px] text-emerald-700 font-semibold mt-0.5 leading-normal" title="確定体験日時">
@@ -1788,20 +2017,42 @@ export default function AdminLeadsPage() {
                                                                                 場所: {lead.confirmed_location}
                                                                             </span>
                                                                         )}
-                                                                        <Button
-                                                                            type="button"
-                                                                            variant="link"
-                                                                            className="text-[10px] text-rose-600 p-0 h-auto justify-start font-semibold mt-1 hover:text-rose-800"
-                                                                            disabled={cancelingStates[lead.id]}
-                                                                            onClick={() => handleCancelAssignment(lead.id)}
-                                                                        >
-                                                                            アサイン解除
-                                                                        </Button>
+                                                                        <div className="flex items-center gap-2 mt-1">
+                                                                            <Button
+                                                                                type="button"
+                                                                                variant="link"
+                                                                                className="text-[10px] text-blue-600 p-0 h-auto justify-start font-semibold hover:text-blue-800"
+                                                                                onClick={() => handleOpenAssignDialog(lead)}
+                                                                            >
+                                                                                変更
+                                                                            </Button>
+                                                                            <span className="text-gray-300 text-[10px]">|</span>
+                                                                            <Button
+                                                                                type="button"
+                                                                                variant="link"
+                                                                                className="text-[10px] text-rose-600 p-0 h-auto justify-start font-semibold hover:text-rose-800"
+                                                                                disabled={cancelingStates[lead.id]}
+                                                                                onClick={() => handleCancelAssignment(lead.id)}
+                                                                            >
+                                                                                解除
+                                                                            </Button>
+                                                                        </div>
                                                                     </div>
                                                                 )
                                                             })()
                                                         ) : (
-                                                            <span className="text-xs text-gray-400">未アサイン</span>
+                                                            <div className="flex flex-col gap-1.5 items-start">
+                                                                <span className="text-xs text-gray-400">未アサイン</span>
+                                                                <Button
+                                                                    type="button"
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    className="h-6 text-[11px] font-semibold text-blue-700 border-blue-200 hover:bg-blue-50 px-2 shadow-2xs"
+                                                                    onClick={() => handleOpenAssignDialog(lead)}
+                                                                >
+                                                                    アサインする
+                                                                </Button>
+                                                            </div>
                                                         )}
                                                     </div>
                                                 </TableCell>

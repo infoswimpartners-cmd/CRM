@@ -415,6 +415,267 @@ Swim Partners`
     }
 }
 
+// 2.5. 管理者が指定したコーチ（新吉航大等の管理者含む）でアサインを実行する
+export async function adminAssignLeadAction(
+    leadId: string,
+    coachId: string,
+    confirmedDate: string,
+    confirmedLocation: string
+) {
+    const supabase = await createClient()
+
+    try {
+        // 1. ログインユーザーが管理者か確認
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        if (authError || !user) {
+            throw new Error('認証エラー: ログインしてください')
+        }
+
+        const { data: currentProfile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single()
+
+        if (!currentProfile || (currentProfile.role !== 'admin' && currentProfile.role !== 'owner')) {
+            throw new Error('権限エラー: 管理者のみ実行できます')
+        }
+
+        // アサイン先コーチのプロフィールを取得
+        const { data: targetCoach, error: profileError } = await supabase
+            .from('profiles')
+            .select('id, full_name, line_friend_url')
+            .eq('id', coachId)
+            .single()
+
+        if (profileError || !targetCoach) {
+            throw new Error('指定されたコーチのプロフィールが見つかりません')
+        }
+
+        // 2. リードの存在チェック
+        const { data: lead, error: leadError } = await supabase
+            .from('leads')
+            .select('*')
+            .eq('id', leadId)
+            .single()
+
+        if (leadError || !lead) {
+            throw new Error('案件が見つかりません')
+        }
+
+        // 3. リードレコードをアサイン完了状態に更新
+        const { error: updateError } = await supabase
+            .from('leads')
+            .update({
+                assigned_coach_id: targetCoach.id,
+                status: '体験確定',
+                assigned_at: new Date().toISOString(),
+                confirmed_datetime: confirmedDate,
+                confirmed_location: confirmedLocation
+            })
+            .eq('id', leadId)
+
+        if (updateError) {
+            throw updateError
+        }
+
+        // 3.5. 顧客マスタ（students）および紐付けテーブル（student_coaches）へのアサインコーチ紐付け
+        let studentId: string | null = null
+
+        // LINE ID での生徒検索
+        if (lead.line_user_id) {
+            const { data: stdByLine } = await supabase
+                .from('students')
+                .select('id')
+                .eq('line_user_id', lead.line_user_id)
+                .maybeSingle()
+            if (stdByLine) {
+                studentId = stdByLine.id
+            }
+        }
+
+        // メールアドレスでの生徒検索
+        if (!studentId && lead.email) {
+            const { data: stdByEmail } = await supabase
+                .from('students')
+                .select('id')
+                .eq('contact_email', lead.email)
+                .maybeSingle()
+            if (stdByEmail) {
+                studentId = stdByEmail.id
+            }
+        }
+
+        // お名前での生徒検索
+        if (!studentId && lead.name) {
+            const { data: stdByName } = await supabase
+                .from('students')
+                .select('id')
+                .eq('full_name', lead.name)
+                .maybeSingle()
+            if (stdByName) {
+                studentId = stdByName.id
+            }
+        }
+
+        if (studentId) {
+            // students テーブルの coach_id と status を更新
+            const { error: studentUpdateError } = await supabase
+                .from('students')
+                .update({
+                    coach_id: targetCoach.id,
+                    status: 'trial_confirmed'
+                })
+                .eq('id', studentId)
+
+            if (studentUpdateError) {
+                console.error('Failed to update student coach_id and status:', studentUpdateError)
+            }
+
+            // student_coaches テーブルの重複チェックとインサート
+            const { data: existRel } = await supabase
+                .from('student_coaches')
+                .select('id')
+                .eq('student_id', studentId)
+                .eq('coach_id', targetCoach.id)
+                .maybeSingle()
+
+            if (!existRel) {
+                const { error: relInsertError } = await supabase
+                    .from('student_coaches')
+                    .insert({
+                        student_id: studentId,
+                        coach_id: targetCoach.id,
+                        role: 'main'
+                    })
+                
+                if (relInsertError) {
+                    console.error('Failed to insert student_coaches relation:', relInsertError)
+                }
+            }
+
+            // 関連画面のキャッシュ再検証
+            revalidatePath(`/customers/${studentId}`)
+        }
+
+        // 4. 顧客への自動確定通知（LINEプッシュメッセージ）の送信
+        if (lead.line_user_id && lead.send_customer_notification !== false) {
+            const { data: tokenConfig } = await supabase
+                .from('app_configs')
+                .select('value')
+                .eq('key', 'line_channel_access_token')
+                .single()
+
+            const { data: templateConfig } = await supabase
+                .from('app_configs')
+                .select('value')
+                .eq('key', 'line_assigned_template')
+                .single()
+
+            const token = tokenConfig?.value || ''
+            
+            const defaultLineAssignedTemplate = `{{name}} 様\n\nお申し込みいただいた体験レッスンの担当コーチが決定いたしました。\n\n■ 担当コーチ: {{coach_name}}\n■ 確定体験日時: {{lesson_date}}\n■ レッスン場所: {{location}}\n{{second_student_info}}\n\n別途、担当コーチよりレッスンの日時調整等のご連絡をさせていただきます。\nご連絡をお待ちいただけますようお願いいたします。\n\nSwim Partners`
+
+            const bodyTemplate = templateConfig?.value || defaultLineAssignedTemplate
+
+            let secondStudentInfo = ''
+            if (lead.second_student_name) {
+                const secondAge = calculateAge(lead.second_student_birth_date)
+                const secondAgeStr = secondAge !== null ? `${secondAge}歳` : '未設定'
+                secondStudentInfo = `\n■ 2人目の情報\n名前: ${lead.second_student_name}（${lead.second_student_gender || '未設定'} / ${secondAgeStr}）`
+            }
+
+            const message = bodyTemplate
+                .replace(/\{\{name\}\}/g, lead.name || 'お客様')
+                .replace(/\{\{coach_name\}\}/g, targetCoach.full_name || '')
+                .replace(/\{\{coach_line_url\}\}/g, targetCoach.line_friend_url || '')
+                .replace(/\{\{lesson_date\}\}/g, confirmedDate)
+                .replace(/\{\{location\}\}/g, confirmedLocation)
+                .replace(/\{\{second_student_info\}\}/g, secondStudentInfo)
+
+            const { lineService } = await import('@/lib/line')
+            const success = await lineService.pushMessage(lead.line_user_id, message, token)
+            if (!success) {
+                console.error('Failed to send LINE push notification to client')
+            }
+        }
+
+        // 5. アサイン確定の Google Chat 通知
+        if (lead.notification_webhook_id) {
+            try {
+                const { data: webhook } = await supabase
+                    .from('google_chat_webhooks')
+                    .select('webhook_url')
+                    .eq('id', lead.notification_webhook_id)
+                    .single()
+                
+                if (webhook?.webhook_url) {
+                    const { data: templateConfig } = await supabase
+                        .from('app_configs')
+                        .select('value')
+                        .eq('key', 'lead_assigned_notification_template')
+                        .maybeSingle()
+
+                    const defaultTemplate = `✅ *【体験レッスンアサイン確定】*\n案件のアサインが確定いたしました。\n\n*■ アサインコーチ*\n・名前： {{coach_name}}\n・確定体験日時： {{confirmed_datetime}}\n・確定体験場所： {{confirmed_location}}\n\n*■ 確定顧客*\n・名前： {{name}} 様{{second_student_info}}`
+
+                    const bodyTemplate = templateConfig?.value || defaultTemplate
+
+                    let secondStudentNameInfo = ''
+                    if (lead.second_student_name) {
+                        secondStudentNameInfo = `\n・2人目の名前： ${lead.second_student_name} 様`
+                    }
+
+                    const gchatMessage = bodyTemplate
+                        .replace(/\{\{name\}\}/g, lead.name || '未設定')
+                        .replace(/\{\{coach_name\}\}/g, targetCoach.full_name || '未設定')
+                        .replace(/\{\{confirmed_datetime\}\}/g, confirmedDate || '未設定')
+                        .replace(/\{\{confirmed_location\}\}/g, confirmedLocation || '未設定')
+                        .replace(/\{\{second_student_info\}\}/g, secondStudentNameInfo)
+
+                    await sendGoogleChatMessage(webhook.webhook_url, gchatMessage, `lead_${leadId}`)
+
+                    try {
+                        const { data: assignedWebhookConfig } = await supabase
+                            .from('app_configs')
+                            .select('value')
+                            .eq('key', 'lead_assigned_webhook_url')
+                            .maybeSingle()
+
+                        if (assignedWebhookConfig?.value) {
+                            const { data: additionalTemplateConfig } = await supabase
+                                .from('app_configs')
+                                .select('value')
+                                .eq('key', 'lead_assigned_additional_webhook_template')
+                                .maybeSingle()
+
+                            const additionalTemplate = additionalTemplateConfig?.value || bodyTemplate
+                            const additionalGchatMessage = additionalTemplate
+                                .replace(/\{\{name\}\}/g, lead.name || '未設定')
+                                .replace(/\{\{coach_name\}\}/g, targetCoach.full_name || '未設定')
+                                .replace(/\{\{confirmed_datetime\}\}/g, confirmedDate || '未設定')
+                                .replace(/\{\{confirmed_location\}\}/g, confirmedLocation || '未設定')
+                                .replace(/\{\{second_student_info\}\}/g, secondStudentNameInfo)
+
+                            await sendGoogleChatMessage(assignedWebhookConfig.value, additionalGchatMessage)
+                        }
+                    } catch (additionalGchatErr) {
+                        console.error('Failed to send additional assign notification:', additionalGchatErr)
+                    }
+                }
+            } catch (gchatErr) {
+                console.error('Failed to send assign notification to Google Chat:', gchatErr)
+            }
+        }
+
+        revalidatePath('/coach/leads')
+        revalidatePath('/admin/leads')
+        return { success: true, coachName: targetCoach.full_name }
+    } catch (error: any) {
+        console.error('Failed to admin assign lead:', error)
+        return { success: false, error: error.message || '管理者アサイン処理に失敗しました' }
+    }
+}
+
 // 3. Webhookの追加
 export async function createWebhookAction(spaceName: string, webhookUrl: string) {
     const supabase = await createClient()
