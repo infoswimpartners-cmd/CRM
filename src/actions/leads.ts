@@ -20,6 +20,182 @@ function calculateAge(birthDateString: string | null | undefined): number | null
     return age
 }
 
+// 確定日時の文字列から開始時刻と終了時刻（ISO 8601）を抽出するヘルパー関数
+function parseConfirmedDateTime(dateTimeStr: string): { start: string; end: string } {
+    const now = new Date()
+    let parsedStart: Date | null = null
+    let parsedEnd: Date | null = null
+
+    if (dateTimeStr) {
+        // 年月日時分 例: 2026/08/30 10:00, 2026-08-30 10:00, 2026年8月30日 10:00
+        const fullMatch = dateTimeStr.match(/(\d{4})[年\/\-](\d{1,2})[月\/\-](\d{1,2})[日\s]*\s*(\d{1,2}):(\d{2})/)
+        if (fullMatch) {
+            const year = parseInt(fullMatch[1], 10)
+            const month = parseInt(fullMatch[2], 10) - 1
+            const day = parseInt(fullMatch[3], 10)
+            const hour = parseInt(fullMatch[4], 10)
+            const minute = parseInt(fullMatch[5], 10)
+            parsedStart = new Date(year, month, day, hour, minute)
+        } else {
+            // 年省略 例: 8/30 10:00, 8月30日 10:00
+            const noYearMatch = dateTimeStr.match(/(\d{1,2})[月\/\-](\d{1,2})[日\s]*\s*(\d{1,2}):(\d{2})/)
+            if (noYearMatch) {
+                const year = now.getFullYear()
+                const month = parseInt(noYearMatch[1], 10) - 1
+                const day = parseInt(noYearMatch[2], 10)
+                const hour = parseInt(noYearMatch[3], 10)
+                const minute = parseInt(noYearMatch[4], 10)
+                parsedStart = new Date(year, month, day, hour, minute)
+            } else {
+                // 日付のみ 例: 2026/08/30, 2026-08-30
+                const dateOnlyMatch = dateTimeStr.match(/(\d{4})[年\/\-](\d{1,2})[月\/\-](\d{1,2})/)
+                if (dateOnlyMatch) {
+                    const year = parseInt(dateOnlyMatch[1], 10)
+                    const month = parseInt(dateOnlyMatch[2], 10) - 1
+                    const day = parseInt(dateOnlyMatch[3], 10)
+                    parsedStart = new Date(year, month, day, 10, 0)
+                }
+            }
+        }
+
+        // 終了時刻の抽出（例: 〜11:00, -11:00）
+        if (parsedStart && !isNaN(parsedStart.getTime())) {
+            const endMatch = dateTimeStr.match(/[〜\-\~]\s*(\d{1,2}):(\d{2})/)
+            if (endMatch) {
+                const endHour = parseInt(endMatch[1], 10)
+                const endMin = parseInt(endMatch[2], 10)
+                parsedEnd = new Date(parsedStart)
+                parsedEnd.setHours(endHour, endMin, 0, 0)
+            }
+            if (!parsedEnd || isNaN(parsedEnd.getTime()) || parsedEnd <= parsedStart) {
+                // デフォルトは開始時刻の60分後
+                parsedEnd = new Date(parsedStart.getTime() + 60 * 60 * 1000)
+            }
+        }
+    }
+
+    if (!parsedStart || isNaN(parsedStart.getTime())) {
+        // パースできなかった場合のフォールバック（翌日10:00〜11:00）
+        parsedStart = new Date(now.getTime() + 24 * 60 * 60 * 1000)
+        parsedStart.setHours(10, 0, 0, 0)
+        parsedEnd = new Date(parsedStart.getTime() + 60 * 60 * 1000)
+    }
+
+    return {
+        start: parsedStart.toISOString(),
+        end: parsedEnd ? parsedEnd.toISOString() : new Date(parsedStart.getTime() + 60 * 60 * 1000).toISOString()
+    }
+}
+
+// 体験アサイン時に仮スケジュールを登録するヘルパー関数
+async function createTrialScheduleForLead(params: {
+    leadId: string
+    coachId: string
+    studentId: string | null
+    studentName: string
+    confirmedDate: string
+    confirmedLocation: string
+    leadNotes?: string | null
+    hasSecondStudent?: boolean
+}) {
+    try {
+        const supabaseAdmin = createAdminClient()
+
+        // 1. 体験レッスンマスタの取得
+        const { data: trialMaster } = await supabaseAdmin
+            .from('lesson_masters')
+            .select('id, name, unit_price, pair_unit_price')
+            .eq('is_trial', true)
+            .eq('active', true)
+            .maybeSingle()
+
+        // 2. 日時のパース
+        const { start, end } = parseConfirmedDateTime(params.confirmedDate)
+
+        const title = `【仮・体験】${params.studentName}様`
+        const notes = `[体験レッスン仮スケジュール]\n案件ID: ${params.leadId}\n確定日時: ${params.confirmedDate}\n確定場所: ${params.confirmedLocation}\nご要望・備考: ${params.leadNotes || 'なし'}`
+
+        // 3. lesson_schedules へ登録（ステータスは pending = 確認待ち/仮スケジュール）
+        const { data: insertedSchedule, error: insertError } = await supabaseAdmin
+            .from('lesson_schedules')
+            .insert({
+                coach_id: params.coachId,
+                student_id: params.studentId || null,
+                lesson_master_id: trialMaster?.id || null,
+                title: title,
+                start_time: start,
+                end_time: end,
+                location: params.confirmedLocation || null,
+                notes: notes,
+                status: 'pending',
+                billing_status: 'awaiting_payment',
+                attendance_type: params.hasSecondStudent ? 'both' : 'single',
+                is_overage: false
+            })
+            .select()
+            .single()
+
+        if (insertError) {
+            console.error('Failed to insert trial schedule:', insertError)
+            return null
+        }
+
+        // 4. Googleカレンダーへの同期
+        try {
+            const { createCalendarEvent, getAdminRefreshToken, getCoachRefreshToken } = await import('@/lib/google-calendar')
+            let finalEventId: string | null = null
+
+            // a) コーチのカレンダー同期
+            if (params.coachId) {
+                const coachRefreshToken = await getCoachRefreshToken(supabaseAdmin, params.coachId)
+                if (coachRefreshToken) {
+                    finalEventId = await createCalendarEvent(coachRefreshToken, {
+                        summary: title,
+                        description: notes,
+                        location: params.confirmedLocation || '',
+                        start: start,
+                        end: end
+                    })
+                }
+            }
+
+            // b) 管理者のカレンダー同期
+            const adminRefreshToken = await getAdminRefreshToken(supabaseAdmin)
+            if (adminRefreshToken) {
+                const adminEventId = await createCalendarEvent(adminRefreshToken, {
+                    summary: title,
+                    description: notes,
+                    location: params.confirmedLocation || '',
+                    start: start,
+                    end: end
+                })
+                if (!finalEventId) finalEventId = adminEventId
+            }
+
+            if (finalEventId && insertedSchedule?.id) {
+                await supabaseAdmin
+                    .from('lesson_schedules')
+                    .update({ google_event_id: finalEventId })
+                    .eq('id', insertedSchedule.id)
+            }
+        } catch (calErr) {
+            console.error('Google Calendar sync failed for trial schedule:', calErr)
+        }
+
+        // キャッシュ再検証
+        revalidatePath('/coach/schedule')
+        revalidatePath('/admin/schedule')
+        if (params.studentId) {
+            revalidatePath(`/customers/${params.studentId}`)
+        }
+
+        return insertedSchedule
+    } catch (err) {
+        console.error('Error in createTrialScheduleForLead:', err)
+        return null
+    }
+}
+
 // 1. Google Chatへ案件情報を通知し、リードを募集開始ステータスにする
 export async function sendLeadNotificationAction(
     leadId: string,
@@ -271,6 +447,18 @@ export async function assignLeadAction(leadId: string, confirmedDate: string, co
             // 関連画面のキャッシュ再検証
             revalidatePath(`/customers/${studentId}`)
         }
+
+        // 3.6. 体験レッスンの仮スケジュール（lesson_schedules）を自動登録
+        await createTrialScheduleForLead({
+            leadId: lead.id,
+            coachId: profile.id,
+            studentId: studentId,
+            studentName: lead.name || 'お客様',
+            confirmedDate: confirmedDate,
+            confirmedLocation: confirmedLocation,
+            leadNotes: lead.notes,
+            hasSecondStudent: !!lead.second_student_name
+        })
 
         // 4. 顧客への自動確定通知（LINEプッシュメッセージ）の送信
         if (lead.line_user_id && lead.send_customer_notification !== false) {
@@ -557,6 +745,18 @@ export async function adminAssignLeadAction(
             // 関連画面のキャッシュ再検証
             revalidatePath(`/customers/${studentId}`)
         }
+
+        // 3.6. 体験レッスンの仮スケジュール（lesson_schedules）を自動登録
+        await createTrialScheduleForLead({
+            leadId: lead.id,
+            coachId: targetCoach.id,
+            studentId: studentId,
+            studentName: lead.name || 'お客様',
+            confirmedDate: confirmedDate,
+            confirmedLocation: confirmedLocation,
+            leadNotes: lead.notes,
+            hasSecondStudent: !!lead.second_student_name
+        })
 
         // 4. 顧客への自動確定通知（LINEプッシュメッセージ）の送信
         if (lead.line_user_id && lead.send_customer_notification !== false) {
@@ -1464,6 +1664,50 @@ export async function cancelLeadAssignmentAction(leadId: string) {
             }
 
             revalidatePath(`/customers/${studentId}`)
+        }
+
+        // 4.5. 該当リード/生徒の未実施の体験仮スケジュール（status: 'pending'）を削除
+        try {
+            const supabaseAdmin = createAdminClient()
+            let scheduleQuery = supabaseAdmin
+                .from('lesson_schedules')
+                .select('id, google_event_id, coach_id')
+                .eq('status', 'pending')
+
+            if (studentId) {
+                scheduleQuery = scheduleQuery.eq('student_id', studentId)
+            } else {
+                scheduleQuery = scheduleQuery.ilike('notes', `%${leadId}%`)
+            }
+
+            const { data: trialSchedules } = await scheduleQuery
+
+            if (trialSchedules && trialSchedules.length > 0) {
+                for (const ts of trialSchedules) {
+                    if (ts.google_event_id) {
+                        try {
+                            const { deleteCalendarEvent, getAdminRefreshToken, getCoachRefreshToken } = await import('@/lib/google-calendar')
+                            let token = await getCoachRefreshToken(supabaseAdmin, ts.coach_id)
+                            if (!token) token = await getAdminRefreshToken(supabaseAdmin)
+                            if (token) {
+                                await deleteCalendarEvent(token, ts.google_event_id)
+                            }
+                        } catch (calErr) {
+                            console.error('Failed to delete Google Calendar event on assign cancel:', calErr)
+                        }
+                    }
+
+                    await supabaseAdmin
+                        .from('lesson_schedules')
+                        .delete()
+                        .eq('id', ts.id)
+                }
+            }
+
+            revalidatePath('/coach/schedule')
+            revalidatePath('/admin/schedule')
+        } catch (schedErr) {
+            console.error('Failed to delete trial schedule on assign cancel:', schedErr)
         }
 
         // 5. アサインキャンセルの Google Chat 通知を送信（スレッド返信）
