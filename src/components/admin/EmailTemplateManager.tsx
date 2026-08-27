@@ -1230,10 +1230,66 @@ export function EmailTemplateManager({ templates, triggers, trialMasters = [] }:
                                     該当する自動送信ロジックがありません
                                 </div>
                             ) : (
-                                <div className="space-y-3">
-                                    {filteredTriggers.map(trigger => (
-                                        <TriggerCard key={trigger.id} trigger={trigger} />
-                                    ))}
+                                <div className="space-y-6">
+                                    {/* レッスン・リマインド関連 */}
+                                    {filteredTriggers.some(t => getTemplateMeta(t.id).category === 'lesson') && (
+                                        <div className="space-y-2.5">
+                                            <div className="flex items-center gap-1.5 border-b border-slate-200 pb-1.5">
+                                                <h3 className="text-xs font-bold text-slate-800">レッスン・リマインド関連</h3>
+                                                <span className="text-[10px] text-slate-400">（前日リマインド / レッスン報告 / 予約通知）</span>
+                                            </div>
+                                            <div className="space-y-2.5">
+                                                {filteredTriggers.filter(t => getTemplateMeta(t.id).category === 'lesson').map(trigger => (
+                                                    <TriggerCard key={trigger.id} trigger={trigger} />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* 体験レッスン関連 */}
+                                    {filteredTriggers.some(t => getTemplateMeta(t.id).category === 'trial') && (
+                                        <div className="space-y-2.5">
+                                            <div className="flex items-center gap-1.5 border-b border-slate-200 pb-1.5">
+                                                <h3 className="text-xs font-bold text-slate-800">体験レッスン・集客関連</h3>
+                                                <span className="text-[10px] text-slate-400">（体験申込受付 / 予約確定 / 事前決済 / アサイン通知）</span>
+                                            </div>
+                                            <div className="space-y-2.5">
+                                                {filteredTriggers.filter(t => getTemplateMeta(t.id).category === 'trial').map(trigger => (
+                                                    <TriggerCard key={trigger.id} trigger={trigger} />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* 入会・決済関連 */}
+                                    {filteredTriggers.some(t => getTemplateMeta(t.id).category === 'billing') && (
+                                        <div className="space-y-2.5">
+                                            <div className="flex items-center gap-1.5 border-b border-slate-200 pb-1.5">
+                                                <h3 className="text-xs font-bold text-slate-800">入会・決済関連</h3>
+                                                <span className="text-[10px] text-slate-400">（本入会完了 / 一般決済 / 決済エラー）</span>
+                                            </div>
+                                            <div className="space-y-2.5">
+                                                {filteredTriggers.filter(t => getTemplateMeta(t.id).category === 'billing').map(trigger => (
+                                                    <TriggerCard key={trigger.id} trigger={trigger} />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* お問い合わせ関連 */}
+                                    {filteredTriggers.some(t => getTemplateMeta(t.id).category === 'inquiry') && (
+                                        <div className="space-y-2.5">
+                                            <div className="flex items-center gap-1.5 border-b border-slate-200 pb-1.5">
+                                                <h3 className="text-xs font-bold text-slate-800">お問い合わせ関連</h3>
+                                                <span className="text-[10px] text-slate-400">（フォーム受付自動返信）</span>
+                                            </div>
+                                            <div className="space-y-2.5">
+                                                {filteredTriggers.filter(t => getTemplateMeta(t.id).category === 'inquiry').map(trigger => (
+                                                    <TriggerCard key={trigger.id} trigger={trigger} />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
