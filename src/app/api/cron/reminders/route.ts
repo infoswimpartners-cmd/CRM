@@ -171,8 +171,8 @@ export async function GET(request: NextRequest) {
                 }
             }
 
-            // --- C. 生徒宛て メール送信 ---
-            if (student.contact_email) {
+            // --- C. 生徒宛て メール送信（LINEが未連携または送信失敗時のみフォールバック送信） ---
+            if (!lineSent && student.contact_email) {
                 let emailBody = templateBody
                     .replace(/{{name}}/g, student.full_name)
                     .replace(/{{student_name}}/g, student.full_name)
@@ -183,7 +183,7 @@ export async function GET(request: NextRequest) {
                     .replace(/{{notes}}/g, schedule.notes || '')
 
                 if (dryRun) {
-                    console.log(`[DRY RUN] Would send Email to ${student.contact_email}`)
+                    console.log(`[DRY RUN] LINE not sent, would fallback to Email for ${student.contact_email}`)
                     emailSent = true
                 } else {
                     emailSent = await emailService.sendEmail({
