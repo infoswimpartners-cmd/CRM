@@ -202,6 +202,33 @@ export async function GET(request: NextRequest) {
             const webhookUrl = targetWebhookId ? webhookMap.get(targetWebhookId) : null
 
             if (webhookUrl) {
+                // 生徒の前回レッスン報告（練習内容・課題など）を取得
+                let prevLessonInfo = ''
+                try {
+                    const { data: prevLesson } = await supabase
+                        .from('lessons')
+                        .select('lesson_date, menu_description, feedback_good, feedback_next, coach_comment')
+                        .eq('student_id', student.id)
+                        .not('menu_description', 'is', null)
+                        .order('lesson_date', { ascending: false })
+                        .limit(1)
+                        .maybeSingle()
+
+                    if (prevLesson && prevLesson.menu_description) {
+                        const prevDateStr = format(new Date(prevLesson.lesson_date), 'M/d(E)', { locale: ja })
+                        prevLessonInfo = 
+                            `\n━━━━━━━━━━━━━━\n` +
+                            `📋 *【前回の練習内容 (${prevDateStr})】*\n` +
+                            `・${prevLesson.menu_description}\n` +
+                            (prevLesson.feedback_next ? `・*次回への課題*: ${prevLesson.feedback_next}\n` : '') +
+                            (prevLesson.feedback_good ? `・*良かった点*: ${prevLesson.feedback_good}\n` : '') +
+                            (prevLesson.coach_comment ? `・*指導メモ*: ${prevLesson.coach_comment}\n` : '') +
+                            `━━━━━━━━━━━━━━`
+                    }
+                } catch (prevErr) {
+                    console.error('[Cron Reminders] Failed to fetch previous lesson report:', prevErr)
+                }
+
                 const coachChatMessage = 
                     `⏰ *【明日のレッスン予定（前日リマインド）】*\n` +
                     `・*担当コーチ*: ${coachName}\n` +
@@ -209,7 +236,8 @@ export async function GET(request: NextRequest) {
                     `・*日時*: ${dateStr} ${timeStr}\n` +
                     `・*場所*: ${locationStr}\n` +
                     (lessonMaster?.name ? `・*種別*: ${lessonMaster.name}\n` : '') +
-                    (schedule.notes ? `・*特記事項*: 「${schedule.notes}」\n` : '') +
+                    (schedule.notes ? `・*連絡事項*: 「${schedule.notes}」\n` : '') +
+                    (prevLessonInfo ? `${prevLessonInfo}\n` : '') +
                     `・*ステータス*: 予約確定`
 
                 if (dryRun) {
