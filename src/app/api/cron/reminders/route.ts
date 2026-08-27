@@ -30,6 +30,18 @@ export async function GET(request: NextRequest) {
     const dryRun = searchParams.get('dry_run') === 'true'
     const targetDateParam = searchParams.get('date') // YYYY-MM-DD 指定テスト用
 
+    // 【安全ガード / キルスイッチ】
+    // 管理者からの明示的な許可（ENABLE_LESSON_REMINDERS_CRON === 'true'）が出るまで自動送信を完全ブロック
+    const isCronEnabled = process.env.ENABLE_LESSON_REMINDERS_CRON === 'true'
+    if (!isCronEnabled && !dryRun) {
+        return NextResponse.json({
+            success: true,
+            paused: true,
+            message: '前日リマインドの自動配信は現在、安全のため一時停止（無効化）されています。許可が出るまで他のお客様への自動送信は行われません。',
+            processed: 0
+        })
+    }
+
     const supabase = await createClient()
 
     // 1. 日本時間 (JST) で「明日」の開始・終了日時を計算
