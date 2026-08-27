@@ -331,20 +331,11 @@ export async function sendTestEmail(key: string, subject: string, body: string, 
             // テスト太郎のLINE IDへ直接送信
             const testTaroLineUserId = 'U0e5a7654874369ca5e38deb47fd783aa'
             const { lineService } = await import('@/lib/line')
-            let lineMessage = ''
-            if (key === 'trial_confirmed') {
-                lineMessage = `【体験レッスン予約確定とご請求】\n\n${testBody}`
-            } else if (key === 'trial_payment_completed') {
-                lineMessage = `【体験レッスン決済完了】\n\n${testBody}`
-            } else if (key === 'trio_trial_payment_completed') {
-                lineMessage = `【THE TRIO 体験レッスン決済完了】\n\n${testBody}`
-            } else if (key === 'enrollment_complete' || key === 'enrollment_completed') {
-                lineMessage = `【本入会手続き完了】\n\n${testBody}`
-            } else {
-                lineMessage = `📢 ${testSubject}\n\n${testBody}`
-            }
+            
+            // ユーザー設定のメッセージ本文そのものを送信（余計な絵文字やヘッダーを追加しない）
+            const lineMessage = testBody
 
-            const success = await lineService.pushMessage(testTaroLineUserId, `🧪 [TEST]\n${lineMessage}`)
+            const success = await lineService.pushMessage(testTaroLineUserId, lineMessage)
             if (success) {
                 results.push('LINE')
                 isLineSent = true
@@ -364,6 +355,8 @@ export async function sendTestEmail(key: string, subject: string, body: string, 
 
             // テスト送信でLINE優先送信の対象とするテンプレートキー判定
             const isLineTargetTemplate = [
+                'lesson_reminder_line',
+                'lesson_reminder',
                 'trial_confirmed',
                 'trial_payment_request',
                 'trial_payment_completed',
@@ -375,20 +368,10 @@ export async function sendTestEmail(key: string, subject: string, body: string, 
 
             if (student?.line_user_id && isLineTargetTemplate) {
                 const { lineService } = await import('@/lib/line')
-                let lineMessage = ''
-                if (key === 'trial_confirmed') {
-                    lineMessage = `【体験レッスン予約確定とご請求】\n\n${testBody}`
-                } else if (key === 'trial_payment_completed') {
-                    lineMessage = `【体験レッスン決済完了】\n\n${testBody}`
-                } else if (key === 'trio_trial_payment_completed') {
-                    lineMessage = `【THE TRIO 体験レッスン決済完了】\n\n${testBody}`
-                } else if (key === 'enrollment_complete' || key === 'enrollment_completed') {
-                    lineMessage = `【本入会手続き完了】\n\n${testBody}`
-                } else {
-                    lineMessage = `📢 ${testSubject}\n\n${testBody}`
-                }
+                // ユーザー設定のメッセージ本文そのものを送信
+                const lineMessage = testBody
 
-                const success = await lineService.pushMessage(student.line_user_id, `🧪 [TEST]\n${lineMessage}`)
+                const success = await lineService.pushMessage(student.line_user_id, lineMessage)
                 if (success) {
                     results.push('LINE')
                     isLineSent = true

@@ -250,19 +250,8 @@ ${text}
             if (shouldSendToLine) {
                 console.log(`[Notification] Student has LINE linked (${student.line_user_id}). Sending to LINE instead of email for trigger '${triggerId}'.`)
                 try {
-                    let lineMessage = ''
-                    if (triggerId === 'trial_lesson_reserved') {
-                        lineMessage = `【体験レッスン予約確定とご請求】\n\n${renderedBody}`
-                    } else if (triggerId === 'trial_payment_completed') {
-                        lineMessage = `【体験レッスン決済完了】\n\n${renderedBody}`
-                    } else if (triggerId === 'trio_trial_payment_completed') {
-                        lineMessage = `【THE TRIO 体験レッスン決済完了】\n\n${renderedBody}`
-                    } else if (triggerId === 'enrollment_completed') {
-                        lineMessage = `【本入会手続き完了】\n\n${renderedBody}`
-                    } else {
-                        lineMessage = `📢 ${renderedSubject}\n\n${renderedBody}`
-                    }
-
+                    // ユーザー設定のメッセージ本文そのものを送信（余計な絵文字やヘッダーを追加しない）
+                    const lineMessage = renderedBody
 
                     const success = await lineService.pushMessage(student.line_user_id, lineMessage)
                     if (success) {
