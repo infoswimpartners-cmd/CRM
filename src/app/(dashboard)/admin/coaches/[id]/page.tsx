@@ -60,7 +60,7 @@ export default async function CoachDetailPage({ params }: PageProps) {
     // Fetch active Google Chat webhooks
     const { data: webhooks } = await supabase
         .from('google_chat_webhooks')
-        .select('id, space_name')
+        .select('id, space_name, webhook_url')
         .eq('active', true)
         .order('space_name', { ascending: true })
 

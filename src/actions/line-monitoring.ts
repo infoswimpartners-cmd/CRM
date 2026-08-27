@@ -196,6 +196,8 @@ export async function saveLineBotConfigAction(data: {
     bot_id: string
     bot_name: string
     gchat_webhook_id?: string | null
+    custom_webhook_url?: string | null
+    custom_space_name?: string | null
     channel_access_token?: string | null
 }) {
     const { isAuthorized } = await verifyAdminRole()
@@ -206,8 +208,57 @@ export async function saveLineBotConfigAction(data: {
     const supabase = await createClient()
     const cleanBotId = data.bot_id.trim()
     const cleanBotName = data.bot_name.trim()
-    const gchatWebhookId = data.gchat_webhook_id || null
+    let gchatWebhookId = data.gchat_webhook_id || null
     const channelAccessToken = data.channel_access_token?.trim() || null
+    const customWebhookUrl = data.custom_webhook_url?.trim() || null
+    const customSpaceName = data.custom_space_name?.trim() || null
+
+    // 0. 直接 Webhook URL が入力されている場合の処理
+    if (customWebhookUrl) {
+        if (!customWebhookUrl.startsWith('https://chat.googleapis.com/')) {
+            return { success: false, error: 'Google Chatの有効なWebhook URLを入力してください (https://chat.googleapis.com/...)' }
+        }
+
+        const targetSpaceName = customSpaceName || `${cleanBotName || 'コーチ'} 連絡用`
+
+        // 既存の webhook_url があるか確認
+        const { data: existingWebhook } = await supabase
+            .from('google_chat_webhooks')
+            .select('id, space_name')
+            .eq('webhook_url', customWebhookUrl)
+            .maybeSingle()
+
+        if (existingWebhook) {
+            gchatWebhookId = existingWebhook.id
+            // スペース名が指定されていて変更がある場合は更新
+            if (customSpaceName && existingWebhook.space_name !== customSpaceName) {
+                await supabase
+                    .from('google_chat_webhooks')
+                    .update({ space_name: customSpaceName, active: true })
+                    .eq('id', existingWebhook.id)
+            }
+        } else {
+            // 新規作成
+            const { data: newWebhook, error: webhookError } = await supabase
+                .from('google_chat_webhooks')
+                .insert({
+                    space_name: targetSpaceName,
+                    webhook_url: customWebhookUrl,
+                    active: true
+                })
+                .select('id')
+                .single()
+
+            if (webhookError) {
+                console.error('saveLineBotConfigAction webhook insert error:', webhookError)
+                return { success: false, error: 'Webhookの登録に失敗しました: ' + webhookError.message }
+            }
+            gchatWebhookId = newWebhook.id
+        }
+    } else if (data.custom_webhook_url !== undefined && !customWebhookUrl) {
+        // 空文字が明示的に渡された場合は未設定（null）にする
+        gchatWebhookId = null
+    }
 
     // 1. 同一 bot_id が自分以外で既に登録されていないか事前チェック
     let checkQuery = supabase
