@@ -145,6 +145,37 @@ const TRIGGER_VARIABLES: Record<string, { key: string; label: string }[]> = {
         { key: 'location', label: 'レッスン場所' },
         { key: 'notes', label: '特記事項・連絡事項' },
     ],
+    lesson_reminder_line: [
+        { key: 'name', label: '生徒氏名' },
+        { key: 'student_name', label: '生徒氏名' },
+        { key: 'date', label: 'レッスン日 (例: 8月28日(金))' },
+        { key: 'time', label: 'レッスン時刻 (例: 10:00〜11:00)' },
+        { key: 'lesson_date', label: 'レッスン日時' },
+        { key: 'coach_name', label: '担当コーチ名' },
+        { key: 'location', label: 'レッスン場所' },
+        { key: 'notes', label: '特記事項・連絡事項' },
+    ],
+    lesson_reminder_email: [
+        { key: 'name', label: '生徒氏名' },
+        { key: 'student_name', label: '生徒氏名' },
+        { key: 'date', label: 'レッスン日 (例: 8月28日(金))' },
+        { key: 'time', label: 'レッスン時刻 (例: 10:00〜11:00)' },
+        { key: 'lesson_date', label: 'レッスン日時' },
+        { key: 'coach_name', label: '担当コーチ名' },
+        { key: 'location', label: 'レッスン場所' },
+        { key: 'notes', label: '特記事項・連絡事項' },
+    ],
+    lesson_reminder_coach: [
+        { key: 'name', label: '生徒氏名' },
+        { key: 'student_name', label: '生徒氏名' },
+        { key: 'date', label: 'レッスン日 (例: 8月28日(金))' },
+        { key: 'time', label: 'レッスン時刻 (例: 10:00〜11:00)' },
+        { key: 'lesson_date', label: 'レッスン日時' },
+        { key: 'coach_name', label: '担当コーチ名' },
+        { key: 'location', label: 'レッスン場所' },
+        { key: 'notes', label: '連絡事項' },
+        { key: 'previous_lesson', label: '前回の練習内容ブロック' },
+    ],
     lead_assigned: [
         { key: 'name', label: '顧客氏名' },
         { key: 'coach_name', label: '担当コーチ名' },
@@ -686,11 +717,20 @@ export function EmailTemplateManager({ templates, triggers, trialMasters = [] }:
     const getRecommendedVars = (tmpl: EmailTemplate) => {
         const related = triggersList.filter(t => t.template_id === tmpl.id)
         const vars: { key: string; label: string }[] = []
+        
+        // トリガーに紐づく変数
         related.forEach(trigger => {
             ; (TRIGGER_VARIABLES[trigger.id] || []).forEach(v => {
                 if (!vars.find(rv => rv.key === v.key)) vars.push(v)
             })
         })
+
+        // テンプレートキー直接定義の変数
+        const directVars = TRIGGER_VARIABLES[tmpl.key] || []
+        directVars.forEach(v => {
+            if (!vars.find(rv => rv.key === v.key)) vars.push(v)
+        })
+
         return vars
     }
 
@@ -713,7 +753,8 @@ export function EmailTemplateManager({ templates, triggers, trialMasters = [] }:
         payment_link: 'https://buy.stripe.com/...',
         payment_url: 'https://buy.stripe.com/...',
         phone: '090-1234-5678',
-        email: 'test@example.com'
+        email: 'test@example.com',
+        previous_lesson: '━━━━━━━━━━━━━━\n【前回の練習内容 (8/20(木))】\n・ビート板を持った呼吸付きクロールの練習。足首の曲がりを次回修正。\n・次回への課題: キック時の足首の脱力\n・良かった点: 姿勢が安定してきた\n━━━━━━━━━━━━━━'
     }
 
     const renderPreviewText = (templateStr: string): string => {

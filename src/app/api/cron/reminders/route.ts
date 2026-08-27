@@ -125,15 +125,26 @@ export async function GET(request: NextRequest) {
 
         const webhookMap = new Map((webhooks || []).map(w => [w.id, w.webhook_url]))
 
-        // 5. メールテンプレートの取得
-        const { data: templateData } = await supabase
+        // 5. 各メッセージテンプレートの取得（3パターン）
+        const { data: reminderTemplates } = await supabase
             .from('email_templates')
             .select('*')
-            .eq('key', 'lesson_reminder')
-            .maybeSingle()
+            .in('key', ['lesson_reminder_line', 'lesson_reminder_email', 'lesson_reminder_coach', 'lesson_reminder'])
 
-        const templateBody = templateData?.body || '{{name}}様\n\n明日 {{date}} {{time}}よりレッスンがあります。\n担当コーチ: {{coach_name}}\n場所: {{location}}\n\nお気をつけてお越しくださいませ。'
-        const templateSubject = templateData?.subject || '【Swim Partners】明日のレッスン予定のご案内'
+        const templateMap = new Map((reminderTemplates || []).map(t => [t.key, t]))
+
+        // ① 生徒LINE用
+        const lineTmpl = templateMap.get('lesson_reminder_line') || templateMap.get('lesson_reminder')
+        const lineBodyTmpl = lineTmpl?.body || '【Swim Partners】明日のレッスン予定のご案内\n\n{{name}} 様\n\nいつもご利用ありがとうございます。\n明日、以下の内容でレッスンを予定しております。\n\n・日時: {{date}} {{time}}\n・担当コーチ: {{coach_name}}\n・場所: {{location}}\n{{notes}}\n\n体調にお気をつけてお越しくださいませ。'
+
+        // ② 生徒メール用（LINE未送信時）
+        const emailTmpl = templateMap.get('lesson_reminder_email') || templateMap.get('lesson_reminder')
+        const emailBodyTmpl = emailTmpl?.body || '{{name}} 様\n\nいつもSwim Partnersをご利用いただきありがとうございます。\n\n明日 {{date}} {{time}}より、{{coach_name}}とのレッスン予約がございます。\n場所: {{location}}\n{{notes}}\n\n当日はお気をつけてお越しください。\nお待ちしております。\n\nSwim Partners'
+        const emailSubjectTmpl = emailTmpl?.subject || '【Swim Partners】明日のレッスン予約のリマインド'
+
+        // ③ コーチGoogle Chat用
+        const coachTmpl = templateMap.get('lesson_reminder_coach')
+        const coachBodyTmpl = coachTmpl?.body || '【明日のレッスン予定（前日リマインド）】\n・担当コーチ: {{coach_name}}\n・生徒名: {{name}} 様\n・日時: {{date}} {{time}}\n・場所: {{location}}\n{{notes}}\n{{previous_lesson}}\n・ステータス: 予約確定'
 
         const results = []
 
@@ -152,38 +163,52 @@ export async function GET(request: NextRequest) {
             const timeStr = `${format(startTime, 'HH:mm')}〜${format(endTime, 'HH:mm')}`
             const coachName = coach?.full_name || '担当コーチ'
             const locationStr = schedule.location || 'ご指定のプール'
-
-            // --- A. 生徒向けメッセージ作成（メッセージ設定のテンプレートを反映） ---
-            let studentMessage = templateBody
-                .replace(/{{name}}/g, student.full_name)
-                .replace(/{{student_name}}/g, student.full_name)
-                .replace(/{{lesson_date}}/g, `${dateStr} ${timeStr}`)
-                .replace(/{{date}}/g, dateStr)
-                .replace(/{{time}}/g, timeStr)
-                .replace(/{{coach_name}}/g, coachName)
-                .replace(/{{location}}/g, locationStr)
-                .replace(/{{notes}}/g, schedule.notes || '')
+            const notesStr = schedule.notes ? `・連絡事項: 「${schedule.notes}」` : ''
 
             let lineSent = false
             let emailSent = false
             let gchatSent = false
 
-            // --- B. 生徒宛て LINE 送信（担当コーチの公式アカウントから） ---
+            // --- A. 生徒宛て LINE 送信（生徒送信用 LINE テンプレートを適用） ---
             if (student.line_user_id && coachConfig?.channel_access_token) {
+                const studentLineMessage = lineBodyTmpl
+                    .replace(/{{name}}/g, student.full_name)
+                    .replace(/{{student_name}}/g, student.full_name)
+                    .replace(/{{lesson_date}}/g, `${dateStr} ${timeStr}`)
+                    .replace(/{{date}}/g, dateStr)
+                    .replace(/{{time}}/g, timeStr)
+                    .replace(/{{coach_name}}/g, coachName)
+                    .replace(/{{location}}/g, locationStr)
+                    .replace(/{{notes}}/g, notesStr)
+
                 if (dryRun) {
                     console.log(`[DRY RUN] Would send LINE via ${coachConfig.bot_name} to student ${student.full_name}`)
                     lineSent = true
                 } else {
                     lineSent = await lineService.pushMessage(
                         student.line_user_id,
-                        studentMessage,
+                        studentLineMessage,
                         coachConfig.channel_access_token
                     )
                 }
             }
 
-            // --- C. 生徒宛て メール送信（LINEが未連携または送信失敗時のみフォールバック送信） ---
+            // --- B. 生徒宛て メール送信（LINEが未連携または送信失敗時のみフォールバック送信） ---
             if (!lineSent && student.contact_email) {
+                const studentEmailMessage = emailBodyTmpl
+                    .replace(/{{name}}/g, student.full_name)
+                    .replace(/{{student_name}}/g, student.full_name)
+                    .replace(/{{lesson_date}}/g, `${dateStr} ${timeStr}`)
+                    .replace(/{{date}}/g, dateStr)
+                    .replace(/{{time}}/g, timeStr)
+                    .replace(/{{coach_name}}/g, coachName)
+                    .replace(/{{location}}/g, locationStr)
+                    .replace(/{{notes}}/g, notesStr)
+
+                const studentEmailSubject = emailSubjectTmpl
+                    .replace(/{{name}}/g, student.full_name)
+                    .replace(/{{date}}/g, dateStr)
+
                 if (dryRun) {
                     console.log(`[DRY RUN] LINE not sent, would fallback to Email for ${student.contact_email}`)
                     emailSent = true
@@ -191,13 +216,13 @@ export async function GET(request: NextRequest) {
                     emailSent = await emailService.sendEmail({
                         to: student.contact_email,
                         bcc: process.env.SMTP_FROM || process.env.SMTP_USER,
-                        subject: templateSubject,
-                        text: studentMessage
+                        subject: studentEmailSubject,
+                        text: studentEmailMessage
                     })
                 }
             }
 
-            // --- D. コーチ宛て Google Chat 通知（担当コーチ専用スペースへ） ---
+            // --- C. コーチ宛て Google Chat 通知（コーチ送信用テンプレートを適用） ---
             const targetWebhookId = coachConfig?.gchat_webhook_id
             const webhookUrl = targetWebhookId ? webhookMap.get(targetWebhookId) : null
 
@@ -218,27 +243,27 @@ export async function GET(request: NextRequest) {
                         const prevDateStr = format(new Date(prevLesson.lesson_date), 'M/d(E)', { locale: ja })
                         prevLessonInfo = 
                             `\n━━━━━━━━━━━━━━\n` +
-                            `📋 *【前回の練習内容 (${prevDateStr})】*\n` +
+                            `【前回の練習内容 (${prevDateStr})】\n` +
                             `・${prevLesson.menu_description}\n` +
-                            (prevLesson.feedback_next ? `・*次回への課題*: ${prevLesson.feedback_next}\n` : '') +
-                            (prevLesson.feedback_good ? `・*良かった点*: ${prevLesson.feedback_good}\n` : '') +
-                            (prevLesson.coach_comment ? `・*指導メモ*: ${prevLesson.coach_comment}\n` : '') +
+                            (prevLesson.feedback_next ? `・次回への課題: ${prevLesson.feedback_next}\n` : '') +
+                            (prevLesson.feedback_good ? `・良かった点: ${prevLesson.feedback_good}\n` : '') +
+                            (prevLesson.coach_comment ? `・指導メモ: ${prevLesson.coach_comment}\n` : '') +
                             `━━━━━━━━━━━━━━`
                     }
                 } catch (prevErr) {
                     console.error('[Cron Reminders] Failed to fetch previous lesson report:', prevErr)
                 }
 
-                const coachChatMessage = 
-                    `⏰ *【明日のレッスン予定（前日リマインド）】*\n` +
-                    `・*担当コーチ*: ${coachName}\n` +
-                    `・*生徒名*: ${student.full_name} 様\n` +
-                    `・*日時*: ${dateStr} ${timeStr}\n` +
-                    `・*場所*: ${locationStr}\n` +
-                    (lessonMaster?.name ? `・*種別*: ${lessonMaster.name}\n` : '') +
-                    (schedule.notes ? `・*連絡事項*: 「${schedule.notes}」\n` : '') +
-                    (prevLessonInfo ? `${prevLessonInfo}\n` : '') +
-                    `・*ステータス*: 予約確定`
+                const coachChatMessage = coachBodyTmpl
+                    .replace(/{{name}}/g, student.full_name)
+                    .replace(/{{student_name}}/g, student.full_name)
+                    .replace(/{{lesson_date}}/g, `${dateStr} ${timeStr}`)
+                    .replace(/{{date}}/g, dateStr)
+                    .replace(/{{time}}/g, timeStr)
+                    .replace(/{{coach_name}}/g, coachName)
+                    .replace(/{{location}}/g, locationStr)
+                    .replace(/{{notes}}/g, notesStr)
+                    .replace(/{{previous_lesson}}/g, prevLessonInfo)
 
                 if (dryRun) {
                     console.log(`[DRY RUN] Would send GChat to space for coach ${coachName}`)

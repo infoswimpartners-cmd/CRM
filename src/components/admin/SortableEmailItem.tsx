@@ -12,6 +12,33 @@ interface Props {
 }
 
 export function getTemplateMeta(key: string) {
+    if (key === 'lesson_reminder_line') {
+        return {
+            category: 'lesson' as const,
+            categoryLabel: 'レッスン',
+            target: 'student' as const,
+            targetLabel: '生徒宛て',
+            channels: ['LINE']
+        }
+    }
+    if (key === 'lesson_reminder_email') {
+        return {
+            category: 'lesson' as const,
+            categoryLabel: 'レッスン',
+            target: 'student' as const,
+            targetLabel: '生徒宛て',
+            channels: ['メール']
+        }
+    }
+    if (key === 'lesson_reminder_coach') {
+        return {
+            category: 'lesson' as const,
+            categoryLabel: 'レッスン',
+            target: 'coach_admin' as const,
+            targetLabel: 'コーチ宛て',
+            channels: ['Chat']
+        }
+    }
     if (key.includes('lesson_reminder') || key.includes('notice_lesson_report') || key.includes('lesson_reserved')) {
         return {
             category: 'lesson' as const,
