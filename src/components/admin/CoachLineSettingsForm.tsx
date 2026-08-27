@@ -324,7 +324,7 @@ export function CoachLineSettingsForm({
                         )}
 
                         <p className="text-[11px] text-slate-500 leading-relaxed pt-1">
-                            ※前日のレッスン予定リマインド（前日Cron）および公式LINEの日程調整検知時に、このスペースへ自動通知されます。
+                            ※前日のレッスン予定リマインド（前日Cron）時に、このスペースへ担当レッスン予定と前回の練習内容が自動通知されます。（※公式LINEの日程調整検知は管理者専用スペースへ自動集約されるため、各コーチでの設定は不要です）
                         </p>
                     </div>
                 </div>

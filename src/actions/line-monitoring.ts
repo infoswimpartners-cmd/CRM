@@ -480,3 +480,99 @@ export async function executeLessonReminderCronAction(options?: { dryRun?: boole
         return { success: false, error: e.message }
     }
 }
+
+/**
+ * 管理者用 LINE日程調整検知 Google Chat Webhook設定を取得します
+ */
+export async function getScheduleMonitoringWebhookAction() {
+    const { isAuthorized } = await verifyAdminRole()
+    if (!isAuthorized) {
+        return { success: false, error: 'Unauthorized', data: null }
+    }
+
+    const supabase = await createClient()
+    const { data, error } = await supabase
+        .from('email_triggers')
+        .select('google_chat_webhook_url, google_chat_enabled')
+        .eq('id', 'line_schedule_detected')
+        .maybeSingle()
+
+    if (error) {
+        console.error('getScheduleMonitoringWebhookAction Error:', error)
+        return { success: false, error: error.message, data: null }
+    }
+
+    return { 
+        success: true, 
+        data: {
+            webhook_url: data?.google_chat_webhook_url || '',
+            enabled: data?.google_chat_enabled ?? true
+        }
+    }
+}
+
+/**
+ * 管理者用 LINE日程調整検知 Google Chat Webhook設定を保存します
+ */
+export async function saveScheduleMonitoringWebhookAction(data: { webhook_url: string; enabled: boolean }) {
+    const { isAuthorized } = await verifyAdminRole()
+    if (!isAuthorized) {
+        return { success: false, error: 'Unauthorized' }
+    }
+
+    const supabase = await createClient()
+    const { error } = await supabase
+        .from('email_triggers')
+        .upsert({
+            id: 'line_schedule_detected',
+            name: 'LINE公式アカウント 日程調整メッセージ検知（管理者通知）',
+            description: '生徒とコーチの間で日程調整が行われた際に、管理者専用のGoogle Chatスペースへ自動通知します。',
+            google_chat_webhook_url: data.webhook_url.trim() || null,
+            google_chat_enabled: data.enabled,
+            updated_at: new Date().toISOString()
+        })
+
+    if (error) {
+        console.error('saveScheduleMonitoringWebhookAction Error:', error)
+        return { success: false, error: error.message }
+    }
+
+    revalidatePath('/admin/line-monitoring')
+    return { success: true }
+}
+
+/**
+ * 管理者用 LINE日程調整検知 Google Chat Webhookのテスト送信を行います
+ */
+export async function testScheduleMonitoringWebhookAction(webhookUrl: string) {
+    const { isAuthorized } = await verifyAdminRole()
+    if (!isAuthorized) {
+        return { success: false, error: 'Unauthorized' }
+    }
+
+    if (!webhookUrl || !webhookUrl.trim()) {
+        return { success: false, error: 'Webhook URLが入力されていません' }
+    }
+
+    try {
+        const { sendGoogleChatMessage } = await import('@/lib/google-chat')
+        const testMessage = `💬 *【テスト送信: LINE日程調整検知通知】*\n` +
+                            `・*対象アカウント*: テスト公式LINE\n` +
+                            `・*担当コーチ*: テストコーチ\n` +
+                            `・*顧客名*: テスト太郎 様\n` +
+                            `・*メッセージ*: 「8月28日 10:00〜でレッスンをお願いできますか？」\n` +
+                            `・*送信日時*: ${new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}\n` +
+                            `※このメッセージはLINE日程調整検知の専用Webhook設定テストです。`
+
+        const success = await sendGoogleChatMessage(webhookUrl.trim(), testMessage)
+        if (!success) {
+            return { success: false, error: 'Google Chatへの送信に失敗しました。URLをご確認ください。' }
+        }
+
+        return { success: true }
+    } catch (e: any) {
+        console.error('testScheduleMonitoringWebhookAction Error:', e)
+        return { success: false, error: e.message }
+    }
+}
+

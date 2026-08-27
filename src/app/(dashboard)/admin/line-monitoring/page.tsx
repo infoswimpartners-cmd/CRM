@@ -12,6 +12,9 @@ import {
     getLessonMastersListAction,
     getStudentsSimpleListAction,
     executeLessonReminderCronAction,
+    getScheduleMonitoringWebhookAction,
+    saveScheduleMonitoringWebhookAction,
+    testScheduleMonitoringWebhookAction,
     LineMonitoringLog,
     LineBotConfig
 } from '@/actions/line-monitoring'
@@ -22,6 +25,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
@@ -44,7 +48,10 @@ import {
     CalendarPlus,
     Send,
     ExternalLink,
-    KeyRound
+    KeyRound,
+    Loader2,
+    ShieldCheck,
+    Save
 } from 'lucide-react'
 
 /**
@@ -151,6 +158,13 @@ export default function LineMonitoringPage() {
     const [formGChatWebhookId, setFormGChatWebhookId] = useState('')
     const [chatWebhooks, setChatWebhooks] = useState<ChatWebhook[]>([])
 
+    // 管理者用 Google Chat Webhook 状態（日程調整検知 集約用）
+    const [adminWebhookUrl, setAdminWebhookUrl] = useState('')
+    const [adminWebhookEnabled, setAdminWebhookEnabled] = useState(true)
+    const [selectedAdminWebhookId, setSelectedAdminWebhookId] = useState('none')
+    const [isSavingAdminWebhook, setIsSavingAdminWebhook] = useState(false)
+    const [isTestingAdminWebhook, setIsTestingAdminWebhook] = useState(false)
+
     // ローディング状態
     const [isLoadingLogs, setIsLoadingLogs] = useState(true)
     const [isLoadingConfigs, setIsLoadingConfigs] = useState(true)
@@ -243,7 +257,83 @@ export default function LineMonitoringPage() {
         fetchLogs()
         fetchConfigs()
         fetchChatWebhooks()
+        fetchAdminWebhook()
     }, [])
+
+    // Webhookリスト読み込み後のセレクトボックス自動同期
+    useEffect(() => {
+        if (adminWebhookUrl && chatWebhooks.length > 0) {
+            const matched = chatWebhooks.find(w => w.webhook_url === adminWebhookUrl)
+            if (matched) {
+                setSelectedAdminWebhookId(matched.id)
+            } else {
+                setSelectedAdminWebhookId('custom')
+            }
+        }
+    }, [adminWebhookUrl, chatWebhooks])
+
+    // 管理者専用Webhook取得
+    const fetchAdminWebhook = async () => {
+        const res = await getScheduleMonitoringWebhookAction()
+        if (res.success && res.data) {
+            setAdminWebhookUrl(res.data.webhook_url)
+            setAdminWebhookEnabled(res.data.enabled)
+        }
+    }
+
+    // 管理者専用Webhook保存
+    const handleSaveAdminWebhook = async () => {
+        setIsSavingAdminWebhook(true)
+        try {
+            const res = await saveScheduleMonitoringWebhookAction({
+                webhook_url: adminWebhookUrl,
+                enabled: adminWebhookEnabled
+            })
+            if (res.success) {
+                toast.success('管理者用 Google Chat 通知先を保存しました')
+            } else {
+                toast.error('保存に失敗しました: ' + res.error)
+            }
+        } catch (e: any) {
+            toast.error('エラーが発生しました: ' + e.message)
+        } finally {
+            setIsSavingAdminWebhook(false)
+        }
+    }
+
+    // 管理者専用Webhookテスト送信
+    const handleTestAdminWebhook = async () => {
+        if (!adminWebhookUrl.trim()) {
+            toast.error('Webhook URLを入力または選択してください')
+            return
+        }
+        setIsTestingAdminWebhook(true)
+        try {
+            const res = await testScheduleMonitoringWebhookAction(adminWebhookUrl)
+            if (res.success) {
+                toast.success('Google Chatスペースへテスト送信しました')
+            } else {
+                toast.error('テスト送信失敗: ' + res.error)
+            }
+        } catch (e: any) {
+            toast.error('エラーが発生しました: ' + e.message)
+        } finally {
+            setIsTestingAdminWebhook(false)
+        }
+    }
+
+    // 登録済みスペース選択時の変更
+    const handleSelectAdminSpace = (val: string) => {
+        setSelectedAdminWebhookId(val)
+        if (val === 'none') {
+            setAdminWebhookUrl('')
+        } else if (val !== 'custom') {
+            const webhook = chatWebhooks.find(w => w.id === val)
+            if (webhook) {
+                setAdminWebhookUrl(webhook.webhook_url)
+            }
+        }
+    }
 
     // フィルター変更時に再フェッチ
     useEffect(() => {
@@ -561,6 +651,90 @@ export default function LineMonitoringPage() {
                 <div className="absolute top-0 right-0 -mr-20 -mt-20 h-80 w-80 rounded-full bg-indigo-500/10 blur-3xl"></div>
                 <div className="absolute bottom-0 left-0 -ml-20 -mb-20 h-80 w-80 rounded-full bg-blue-500/10 blur-3xl"></div>
             </div>
+
+            {/* 管理者用 Google Chat 通知先設定（日程調整検知 集約用） */}
+            <Card className="border-slate-200 shadow-sm bg-white overflow-hidden">
+                <CardHeader className="p-4 bg-slate-50/50 border-b border-slate-100 flex flex-row items-center justify-between space-y-0">
+                    <div>
+                        <CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                            <ShieldCheck className="h-4 w-4 text-indigo-600" />
+                            管理者用 Google Chat 通知先設定（日程調整検知）
+                        </CardTitle>
+                        <CardDescription className="text-xs text-slate-500 mt-0.5">
+                            各コーチの公式LINEで日程調整が検知された際、この管理者専用スペースへ自動通知が集約されます。（各コーチでの設定は不要です）
+                        </CardDescription>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Label htmlFor="admin-webhook-switch" className="text-xs text-slate-600 cursor-pointer">
+                            {adminWebhookEnabled ? '通知 ON' : '通知 OFF'}
+                        </Label>
+                        <Switch
+                            id="admin-webhook-switch"
+                            checked={adminWebhookEnabled}
+                            onCheckedChange={setAdminWebhookEnabled}
+                        />
+                    </div>
+                </CardHeader>
+                <CardContent className="p-4 space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div className="space-y-1">
+                            <Label className="text-xs text-slate-600">登録済みスペースから選択</Label>
+                            <Select value={selectedAdminWebhookId} onValueChange={handleSelectAdminSpace}>
+                                <SelectTrigger className="h-8 text-xs bg-white border-slate-200">
+                                    <SelectValue placeholder="スペースを選択" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">指定なし（未設定）</SelectItem>
+                                    {selectedAdminWebhookId === 'custom' && (
+                                        <SelectItem value="custom">直接入力されたURL</SelectItem>
+                                    )}
+                                    {chatWebhooks.map(webhook => (
+                                        <SelectItem key={webhook.id} value={webhook.id}>
+                                            {webhook.space_name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="md:col-span-2 space-y-1">
+                            <Label className="text-xs text-slate-600">Webhook URL</Label>
+                            <div className="flex gap-2">
+                                <Input
+                                    type="url"
+                                    value={adminWebhookUrl}
+                                    onChange={e => {
+                                        setAdminWebhookUrl(e.target.value)
+                                        setSelectedAdminWebhookId('custom')
+                                    }}
+                                    placeholder="https://chat.googleapis.com/v1/spaces/..."
+                                    className="h-8 text-xs font-mono bg-white border-slate-200 flex-1"
+                                />
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleTestAdminWebhook}
+                                    disabled={isTestingAdminWebhook || !adminWebhookUrl.trim()}
+                                    className="h-8 text-xs gap-1 flex-none"
+                                >
+                                    {isTestingAdminWebhook ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+                                    テスト送信
+                                </Button>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    onClick={handleSaveAdminWebhook}
+                                    disabled={isSavingAdminWebhook}
+                                    className="h-8 text-xs gap-1 bg-slate-900 hover:bg-slate-800 text-white flex-none"
+                                >
+                                    {isSavingAdminWebhook ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                                    保存
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
 
             {/* メインコンテンツエリア */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">

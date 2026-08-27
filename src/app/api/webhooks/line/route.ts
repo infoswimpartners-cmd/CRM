@@ -248,37 +248,39 @@ export async function POST(req: NextRequest) {
                         .delete()
                         .lt('detected_at', threeMonthsAgo.toISOString())
 
-                     // 7. 特定の Google Chat スペースへ通知する（新規発生時のみ）
+                     // 7. 管理者専用の Google Chat スペースへ通知する（新規発生時のみ）
                      if (!isMerged) {
                          let targetWebhookUrl: string | null = null
+                         let isEnabled = true
 
-                         if (gchatWebhookId) {
-                             // ボット設定で特定スペースが指定されている場合
-                             const { data: targetWebhook } = await supabase
+                         // 管理者設定された「LINE日程調整検知 専用Webhook」を取得
+                         const { data: adminTrigger } = await supabase
+                             .from('email_triggers')
+                             .select('google_chat_webhook_url, google_chat_enabled')
+                             .eq('id', 'line_schedule_detected')
+                             .maybeSingle()
+
+                         if (adminTrigger) {
+                             targetWebhookUrl = adminTrigger.google_chat_webhook_url
+                             isEnabled = adminTrigger.google_chat_enabled !== false
+                         }
+
+                         // 専用Webhook未設定の場合、既存の「日程調整」関連Webhookをフォールバック検索
+                         if (!targetWebhookUrl) {
+                             const { data: defaultWebhook } = await supabase
                                  .from('google_chat_webhooks')
                                  .select('webhook_url')
-                                 .eq('id', gchatWebhookId)
-                                 .eq('active', true)
-                                 .maybeSingle()
-
-                             if (targetWebhook) {
-                                 targetWebhookUrl = targetWebhook.webhook_url
-                             }
-                         } else {
-                             // 未指定の場合は、有効な Webhook の先頭1件のみを対象にして全件配信を防ぐ
-                             const { data: firstWebhook } = await supabase
-                                 .from('google_chat_webhooks')
-                                 .select('webhook_url')
+                                 .ilike('space_name', '%日程調整%')
                                  .eq('active', true)
                                  .limit(1)
                                  .maybeSingle()
 
-                             if (firstWebhook) {
-                                 targetWebhookUrl = firstWebhook.webhook_url
+                             if (defaultWebhook) {
+                                 targetWebhookUrl = defaultWebhook.webhook_url
                              }
                          }
 
-                         if (targetWebhookUrl) {
+                         if (targetWebhookUrl && isEnabled) {
                              // コーチの氏名を取得
                              const { data: coachProfile } = await supabase
                                  .from('profiles')
@@ -287,12 +289,12 @@ export async function POST(req: NextRequest) {
                                  .single()
 
                              const coachName = coachProfile?.full_name || '不明なコーチ'
-                             const chatMessage = `💬 *【LINE日程調整検知】*\n` +
-                                                 `・*対象アカウント*: ${botName}\n` +
-                                                 `・*担当コーチ*: ${coachName}\n` +
-                                                 `・*顧客名*: ${displayName} 様\n` +
-                                                 `・*メッセージ*: 「${messageText}」\n` +
-                                                 `・*検知日時*: ${new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}`
+                             const chatMessage = `【LINE日程調整検知】\n` +
+                                                 `・対象アカウント: ${botName}\n` +
+                                                 `・担当コーチ: ${coachName}\n` +
+                                                 `・顧客名: ${displayName} 様\n` +
+                                                 `・メッセージ: 「${messageText}」\n` +
+                                                 `・検知日時: ${new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}`
 
                              try {
                                  await sendGoogleChatMessage(targetWebhookUrl, chatMessage)
