@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
-import { Loader2, Mail, Save, Trash2, SlidersHorizontal, Settings2, GripVertical, MessageSquare, ChevronDown, ChevronUp, ExternalLink, Copy, Edit3 } from 'lucide-react'
+import { Loader2, Mail, Save, Trash2, SlidersHorizontal, Settings2, GripVertical, MessageSquare, ChevronDown, ChevronUp, ExternalLink, Copy, Edit3, Search, Eye, Smartphone, Filter } from 'lucide-react'
 import { TestEmailDialog } from './TestEmailDialog'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -19,7 +19,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 // Dnd Kit Imports
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import { SortableEmailItem } from './SortableEmailItem'
+import { SortableEmailItem, getTemplateMeta } from './SortableEmailItem'
 
 // トリガーごとの変数定義マップ
 const TRIGGER_VARIABLES: Record<string, { key: string; label: string }[]> = {
@@ -292,12 +292,47 @@ export function EmailTemplateManager({ templates, triggers, trialMasters = [] }:
         })
     }, [])
 
-    // 新規作成
+    // 新規作成用状態
     const [isCreating, setIsCreating] = useState(false)
     const [newKey, setNewKey] = useState('')
     const [newSubject, setNewSubject] = useState('')
     const [newBody, setNewBody] = useState('')
     const [newDescription, setNewDescription] = useState('')
+
+    // フィルタリング用状態
+    const [categoryFilter, setCategoryFilter] = useState<'all' | 'lesson' | 'trial' | 'billing' | 'inquiry'>('all')
+    const [targetFilter, setTargetFilter] = useState<'all' | 'student' | 'coach_admin'>('all')
+    const [searchQuery, setSearchQuery] = useState('')
+    const [editorViewMode, setEditorViewMode] = useState<'edit' | 'preview_email' | 'preview_line'>('edit')
+
+    // フィルタリング処理
+    const filteredTemplates = templatesList.filter(tmpl => {
+        const meta = getTemplateMeta(tmpl.key)
+        if (categoryFilter !== 'all' && meta.category !== categoryFilter) return false
+        if (targetFilter !== 'all' && meta.target !== targetFilter) return false
+        if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase()
+            const matchesKey = tmpl.key.toLowerCase().includes(q)
+            const matchesSubject = tmpl.subject.toLowerCase().includes(q)
+            const matchesDesc = (tmpl.description || '').toLowerCase().includes(q)
+            if (!matchesKey && !matchesSubject && !matchesDesc) return false
+        }
+        return true
+    })
+
+    const filteredTriggers = triggersList.filter(trigger => {
+        const meta = getTemplateMeta(trigger.id)
+        if (categoryFilter !== 'all' && meta.category !== categoryFilter) return false
+        if (targetFilter !== 'all' && meta.target !== targetFilter) return false
+        if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase()
+            const matchesId = trigger.id.toLowerCase().includes(q)
+            const matchesName = trigger.name.toLowerCase().includes(q)
+            const matchesDesc = (trigger.description || '').toLowerCase().includes(q)
+            if (!matchesId && !matchesName && !matchesDesc) return false
+        }
+        return true
+    })
 
     const { toast } = useToast()
 
@@ -659,7 +694,37 @@ export function EmailTemplateManager({ templates, triggers, trialMasters = [] }:
         return vars
     }
 
-    // 変数パネルコンポーネント
+    // プレビュー用のダミー置換処理
+    const DUMMY_PREVIEW_DATA: Record<string, string> = {
+        name: 'テスト太郎',
+        student_name: 'テスト太郎',
+        full_name: 'テスト太郎',
+        date: '8月28日(金)',
+        time: '10:00〜11:00',
+        lesson_date: '8月28日(金) 10:00〜11:00',
+        coach_name: '新吉航大',
+        location: '東京体育館プール',
+        notes: '持ち物: 水着・キャップ',
+        subject: 'お問い合わせ内容の確認',
+        user_name: 'テスト太郎',
+        amount: '¥11,000',
+        plan_name: '月4回パーソナルプラン',
+        start_date: '2026年9月1日',
+        payment_link: 'https://buy.stripe.com/...',
+        payment_url: 'https://buy.stripe.com/...',
+        phone: '090-1234-5678',
+        email: 'test@example.com'
+    }
+
+    const renderPreviewText = (templateStr: string): string => {
+        let res = templateStr || ''
+        Object.entries(DUMMY_PREVIEW_DATA).forEach(([k, v]) => {
+            res = res.replace(new RegExp(`{{${k}}}`, 'g'), v)
+        })
+        return res
+    }
+
+    // 変数パネルコンポーネント（絵文字なし）
     const VariablePanel = ({ tmpl }: { tmpl: EmailTemplate }) => {
         const recommended = getRecommendedVars(tmpl)
         const extra = (tmpl.variables || []).filter(v => !recommended.find(rv => rv.key === v))
@@ -672,7 +737,7 @@ export function EmailTemplateManager({ templates, triggers, trialMasters = [] }:
                     onClick={() => setShowMainVariables(!showMainVariables)}
                 >
                     <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-semibold text-slate-600">📌 変数を挿入</span>
+                        <span className="text-xs font-semibold text-slate-700">変数の挿入</span>
                         {showMainVariables ? (
                             <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
                         ) : (
@@ -680,14 +745,14 @@ export function EmailTemplateManager({ templates, triggers, trialMasters = [] }:
                         )}
                     </div>
                     <div className="flex items-center gap-2">
-                        <span className="text-[11px] text-slate-400">
-                            挿入先：
-                            <span className={`font-bold ml-1 ${field === 'subject' ? 'text-cyan-600' : 'text-indigo-600'}`}>
-                                {field === 'subject' ? '📝 件名' : '📄 本文'}
+                        <span className="text-[11px] text-slate-500">
+                            挿入先:
+                            <span className={`font-semibold ml-1 ${field === 'subject' ? 'text-slate-900' : 'text-slate-900'}`}>
+                                {field === 'subject' ? '件名' : '本文'}
                             </span>
                         </span>
-                        <span className="text-xs text-cyan-600 font-medium bg-cyan-50 px-1.5 py-0.5 rounded">
-                            {showMainVariables ? '非表示にする' : '表示する'}
+                        <span className="text-xs text-slate-600 font-medium bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                            {showMainVariables ? '閉じる' : '展開'}
                         </span>
                     </div>
                 </div>
@@ -697,13 +762,12 @@ export function EmailTemplateManager({ templates, triggers, trialMasters = [] }:
                             <button
                                 key={v.key}
                                 type="button"
-                                // mouseDown で保存済みselectionを上書きせずに挿入
                                 onMouseDown={(e) => { e.preventDefault(); insertVariable(v.key) }}
                                 title={v.label}
-                                className="flex items-center gap-1 px-2 py-1 rounded border border-cyan-200 bg-cyan-50 hover:bg-cyan-100 hover:border-cyan-400 transition-all cursor-pointer"
+                                className="flex items-center gap-1 px-2 py-1 rounded border border-slate-200 bg-white hover:bg-slate-100 hover:border-slate-400 transition-all cursor-pointer text-left"
                             >
-                                <code className="text-[11px] font-mono text-cyan-800">{`{{${v.key}}}`}</code>
-                                <span className="text-[10px] text-cyan-600">{v.label}</span>
+                                <code className="text-[11px] font-mono text-slate-800">{`{{${v.key}}}`}</code>
+                                <span className="text-[10px] text-slate-500">{v.label}</span>
                             </button>
                         ))}
                         {extra.map(v => (
@@ -711,14 +775,14 @@ export function EmailTemplateManager({ templates, triggers, trialMasters = [] }:
                                 key={v}
                                 type="button"
                                 onMouseDown={(e) => { e.preventDefault(); insertVariable(v) }}
-                                className="flex items-center px-2 py-1 rounded border border-slate-200 bg-white hover:bg-indigo-50 hover:border-indigo-300 transition-all cursor-pointer"
+                                className="flex items-center px-2 py-1 rounded border border-slate-200 bg-white hover:bg-slate-100 transition-all cursor-pointer"
                             >
                                 <code className="text-[11px] font-mono text-slate-700">{`{{${v}}}`}</code>
                             </button>
                         ))}
                         {recommended.length === 0 && extra.length === 0 && (
                             <span className="text-xs text-slate-400 py-0.5">
-                                💡「自動送信ロジック設定」でこのテンプレートをトリガーに割り当てると変数が表示されます
+                                自動送信ロジック設定でこのテンプレートをトリガーに割り当てると推奨変数が表示されます
                             </span>
                         )}
                     </div>
@@ -729,354 +793,448 @@ export function EmailTemplateManager({ templates, triggers, trialMasters = [] }:
 
     return (
         <>
-            {/* 全体はページ高さいっぱいに広げ、スクロールはここ一箇所のみ */}
-            <Tabs defaultValue="templates" className="w-full h-[calc(100vh-130px)] flex flex-col">
-            {/* タブバー */}
-            <div className="flex-none flex items-center gap-4 mb-4 border-b border-gray-200 pb-2">
-                <TabsList className="bg-gray-100/80 p-1">
-                    <TabsTrigger value="templates" className="flex items-center gap-2 px-4 py-2">
-                        <Mail className="w-4 h-4" /> テンプレート編集
-                    </TabsTrigger>
-                    <TabsTrigger value="triggers" className="flex items-center gap-2 px-4 py-2">
-                        <SlidersHorizontal className="w-4 h-4" /> 自動送信ロジック設定
-                    </TabsTrigger>
-                </TabsList>
-            </div>
-
-            {/* ===== テンプレート編集タブ ===== */}
-            <TabsContent value="templates" className="flex-1 min-h-0 mt-0">
-                <div className="flex gap-5 h-full">
-
-                    {/* サイドバー：テンプレートリスト */}
-                    <div className="w-64 flex-none flex flex-col gap-2 overflow-y-auto pr-2 border-r border-gray-100">
-                        <Button
-                            onClick={() => { setIsCreating(true); setSelectedTemplate(null) }}
-                            className={`w-full flex-none ${isCreating ? 'bg-cyan-100 text-cyan-900 border-cyan-500' : ''}`}
-                            variant="outline"
-                            size="sm"
-                        >
-                            + 新規テンプレート作成
-                        </Button>
-                        <div className="text-[11px] text-gray-400 flex items-center justify-between px-0.5">
-                            <span>ドラッグで並び替え</span>
-                            <GripVertical className="w-3 h-3" />
-                        </div>
-                        {isMounted ? (
-                            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                                <SortableContext items={templatesList.map(t => t.id)} strategy={verticalListSortingStrategy}>
-                                    <div className="space-y-1.5">
-                                        {templatesList.map(tmpl => (
-                                            <SortableEmailItem
-                                                key={tmpl.id}
-                                                tmpl={tmpl}
-                                                isSelected={selectedTemplate?.id === tmpl.id}
-                                                onClick={() => handleSelect(tmpl)}
-                                            />
-                                        ))}
-                                    </div>
-                                </SortableContext>
-                            </DndContext>
-                        ) : (
-                            // SSR時はシンプルなリストを表示（ハイドレーション不一致を防ぐ）
-                            <div className="space-y-1.5">
-                                {templatesList.map(tmpl => (
-                                    <button
-                                        key={tmpl.id}
-                                        onClick={() => handleSelect(tmpl)}
-                                        className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${selectedTemplate?.id === tmpl.id
-                                            ? 'bg-cyan-50 text-cyan-900 border border-cyan-200'
-                                            : 'hover:bg-gray-100 text-gray-700'
-                                            }`}
-                                    >
-                                        {tmpl.key}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
+            {/* 全体コントロール */}
+            <div className="space-y-4">
+                {/* フィルター＆検索ヘッダー */}
+                <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-sm space-y-3">
+                    {/* ジャンル選択ピル */}
+                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+                        <span className="text-xs font-semibold text-slate-500 flex-none mr-1 flex items-center gap-1">
+                            <Filter className="w-3.5 h-3.5" />
+                            ジャンル:
+                        </span>
+                        {[
+                            { key: 'all', label: 'すべて' },
+                            { key: 'lesson', label: 'レッスン・リマインド' },
+                            { key: 'trial', label: '体験レッスン' },
+                            { key: 'billing', label: '入会・決済' },
+                            { key: 'inquiry', label: 'お問い合わせ' },
+                        ].map(cat => (
+                            <button
+                                key={cat.key}
+                                onClick={() => setCategoryFilter(cat.key as any)}
+                                className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors flex-none ${
+                                    categoryFilter === cat.key
+                                        ? 'bg-slate-900 text-white shadow-sm'
+                                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900'
+                                }`}
+                            >
+                                {cat.label}
+                            </button>
+                        ))}
                     </div>
 
-                    {/* エディタ領域 */}
-                    <div className="flex-1 min-w-0 flex flex-col h-full">
-                        {selectedTemplate ? (
-                            <div className="flex flex-col h-full gap-3">
-                                {/* ヘッダー：テンプレート名・ボタン群 */}
-                                <div className="flex-none flex flex-col lg:flex-row lg:items-center justify-between bg-gray-50/70 border border-gray-200 rounded-lg px-4 py-2 gap-3">
-                                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                                        <Mail className="w-4 h-4 text-cyan-600 flex-none" />
-
-                                        <Dialog open={isHeaderEditOpen} onOpenChange={setIsHeaderEditOpen}>
-                                            <DialogTrigger asChild>
-                                                <div className="flex items-center gap-1.5 flex-1 min-w-0 cursor-pointer hover:bg-white/50 p-1 rounded transition-colors group">
-                                                    <div className="h-7 text-[10px] font-mono px-2 py-0.5 w-auto max-w-[160px] bg-gray-100 border border-gray-200 rounded text-gray-500 truncate flex-none group-hover:border-cyan-200">
-                                                        {templateKey}
-                                                    </div>
-                                                    <span className="text-gray-300 flex-none">/</span>
-                                                    <div className="h-7 text-sm font-semibold truncate flex-1 min-w-0 group-hover:text-cyan-700">
-                                                        {subject || '名称未設定'}
-                                                    </div>
-                                                    <Settings2 className="w-3 h-3 text-gray-300 group-hover:text-cyan-500 flex-none ml-1" />
-                                                </div>
-                                            </DialogTrigger>
-                                            <DialogContent className="sm:max-w-[500px]">
-                                                <DialogHeader>
-                                                    <DialogTitle>テンプレート名の変更</DialogTitle>
-                                                    <DialogDescription>
-                                                        キー名と件名を編集できます。キー名はシステム識別子として使用されます。
-                                                    </DialogDescription>
-                                                </DialogHeader>
-                                                <div className="grid gap-4 py-4">
-                                                    <div className="grid gap-2">
-                                                        <Label htmlFor="key" className="text-xs text-gray-500">キー（システムID）</Label>
-                                                        <Input
-                                                            id="key"
-                                                            value={templateKey}
-                                                            onChange={e => setTemplateKey(e.target.value)}
-                                                            className="font-mono text-xs"
-                                                            placeholder="例: lesson_reminder"
-                                                        />
-                                                    </div>
-                                                    <div className="grid gap-2">
-                                                        <Label htmlFor="subject" className="text-xs text-gray-500">件名（タイトル）</Label>
-                                                        <Input
-                                                            id="subject"
-                                                            value={subject}
-                                                            onChange={e => setSubject(e.target.value)}
-                                                            placeholder="メールのタイトル"
-                                                        />
-                                                    </div>
-                                                </div>
-                                                <DialogFooter>
-                                                    <Button variant="outline" onClick={() => setIsHeaderEditOpen(false)}>キャンセル</Button>
-                                                    <Button
-                                                        onClick={async () => {
-                                                            if (!selectedTemplate) return;
-                                                            try {
-                                                                await updateEmailTemplate(selectedTemplate.id, subject, body, isApprovalRequired, isAutoSendEnabled, templateKey, description);
-                                                                setTemplatesList(prev => prev.map(t => t.id === selectedTemplate.id
-                                                                    ? { ...t, key: templateKey, subject, description }
-                                                                    : t));
-                                                                toast({ title: '保存しました', description: 'テンプレート名を更新しました。' });
-                                                                setIsHeaderEditOpen(false);
-                                                            } catch (e: any) {
-                                                                toast({ title: 'エラー', description: e.message || '保存に失敗しました。', variant: 'destructive' });
-                                                            }
-                                                        }}
-                                                        className="bg-cyan-600 hover:bg-cyan-700"
-                                                    >
-                                                        変更を保存
-                                                    </Button>
-                                                </DialogFooter>
-                                            </DialogContent>
-                                        </Dialog>
-                                    </div>
-                                    <div className="flex items-center gap-1.5 flex-none overflow-x-auto pb-1 sm:pb-0">
-                                        <Button onClick={handleDelete} disabled={isDeleting} variant="destructive" size="icon" className="w-8 h-8 flex-none" title="削除">
-                                            {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                                        </Button>
-                                        <TestEmailDialog
-                                            templateKey={selectedTemplate.key}
-                                            subject={subject}
-                                            body={body}
-                                            triggers={triggersList}
-                                            templateId={selectedTemplate.id}
-                                        />
-                                        <Button onClick={handleDuplicate} disabled={isDuplicating} variant="outline" size="icon" className="w-8 h-8 flex-none" title="複製">
-                                            {isDuplicating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Copy className="w-3.5 h-3.5" />}
-                                        </Button>
-                                        <Button onClick={handleSave} disabled={isSaving} size="sm" className="bg-cyan-600 hover:bg-cyan-700 h-8 px-3 flex-none">
-                                            {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Save className="w-3.5 h-3.5 mr-1" />}
-                                            保存
-                                        </Button>
-                                    </div>
-                                </div>
-
-                                {/* 説明 + 件名 + トグル群 */}
-                                <div className="flex-none space-y-2.5">
-                                    <div className="space-y-1.5">
-                                        <div className="flex items-center gap-3">
-                                            <Label className="w-10 flex-none text-xs text-gray-500">説明</Label>
-                                            <Input
-                                                value={description}
-                                                onChange={e => setDescription(e.target.value)}
-                                                className="flex-1 h-8 text-sm bg-white"
-                                                placeholder="このテンプレートの用途（例：体験レッスン予約確定メール）"
-                                            />
-                                        </div>
-                                    </div>
-                                    {/* 自動送信 / 承認フロー */}
-                                    <div className="flex gap-3">
-                                        <div className="flex-1 flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg">
-                                            <div>
-                                                <p className="text-sm font-medium text-gray-800">自動送信</p>
-                                                <p className="text-xs text-gray-400">OFFで自動送信停止</p>
-                                            </div>
-                                            <Switch checked={isAutoSendEnabled} onCheckedChange={setIsAutoSendEnabled} />
-                                        </div>
-                                        <div className="flex-1 flex items-center justify-between px-3 py-2 bg-white border border-gray-200 rounded-lg">
-                                            <div>
-                                                <p className="text-sm font-medium text-gray-800">承認フロー</p>
-                                                <p className="text-xs text-gray-400">送信前に管理者承認</p>
-                                            </div>
-                                            <Switch checked={isApprovalRequired} onCheckedChange={setIsApprovalRequired} disabled={!isAutoSendEnabled} />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* 変数パネル */}
-                                <div className="flex-none">
-                                    <VariablePanel tmpl={selectedTemplate} />
-                                </div>
-
-                                {/* 本文エリア：残りの全高さを使う */}
-                                <div className="flex-1 min-h-0 flex flex-col">
-                                    <Label className="flex-none text-sm mb-1.5">本文</Label>
-                                    <Textarea
-                                        ref={textareaRef}
-                                        value={body}
-                                        onChange={e => setBody(e.target.value)}
-                                        onFocus={() => {
-                                            saveBodySelection();
-                                            setPopupBody(body);
-                                            setIsPopupEditorOpen(true);
-                                        }}
-                                        onClick={() => {
-                                            setPopupBody(body);
-                                            setIsPopupEditorOpen(true);
-                                        }}
-                                        className="flex-1 font-mono text-sm leading-relaxed resize-none p-3 min-h-0 cursor-pointer bg-slate-50/50 hover:bg-slate-50 transition-colors"
-                                        placeholder="クリックしてメール本文を大きく編集..."
-                                        readOnly
-                                    />
-                                </div>
-                            </div>
-
-                        ) : isCreating ? (
-                            <div className="flex flex-col h-full gap-3">
-                                <div className="flex-none flex items-center justify-between bg-gray-50/70 border border-gray-200 rounded-lg px-4 py-2.5">
-                                    <div className="flex items-center gap-2">
-                                        <Mail className="w-4 h-4 text-gray-500" />
-                                        <span className="font-semibold text-gray-800">新規テンプレート作成</span>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <Button onClick={() => setIsCreating(false)} variant="outline" size="sm">キャンセル</Button>
-                                        <Button onClick={handleCreate} disabled={isSaving} size="sm" className="bg-cyan-600 hover:bg-cyan-700">
-                                            {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" /> : <Save className="w-3.5 h-3.5 mr-1.5" />}
-                                            作成
-                                        </Button>
-                                    </div>
-                                </div>
-                                <div className="flex-none space-y-3">
-                                    <div className="space-y-1">
-                                        <Label className="text-sm">キー（一意の識別子）</Label>
-                                        <Input value={newKey} onChange={e => setNewKey(e.target.value)} placeholder="例: custom_notification" />
-                                        <p className="text-xs text-gray-400">英数字とアンダースコアのみ推奨</p>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <Label className="text-sm">説明</Label>
-                                        <Input value={newDescription} onChange={e => setNewDescription(e.target.value)} placeholder="用途の簡単な説明" />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <Label className="text-sm">件名</Label>
-                                        <Input value={newSubject} onChange={e => setNewSubject(e.target.value)} />
-                                    </div>
-                                </div>
-                                <div className="flex-1 min-h-0 flex flex-col">
-                                    <Label className="flex-none text-sm mb-1.5">本文</Label>
-                                    <Textarea value={newBody} onChange={e => setNewBody(e.target.value)} className="flex-1 font-mono text-sm leading-relaxed p-3 min-h-0 resize-none" />
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="flex items-center justify-center h-full text-gray-400 border-2 border-dashed border-gray-200 rounded-xl">
-                                左側のリストからテンプレートを選択するか、新規作成してください
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </TabsContent>
-
-            {/* ===== 自動送信ロジック設定タブ ===== */}
-            <TabsContent value="triggers" className="flex-1 min-h-0 mt-0 overflow-y-auto">
-                <div className="max-w-4xl mx-auto space-y-3 pb-6">
-                    <div className="flex-none mb-4">
-                        <h2 className="text-lg font-semibold flex items-center gap-2">
-                            <SlidersHorizontal className="w-5 h-5 text-cyan-600" />
-                            自動送信ロジック設定
-                        </h2>
-                        <p className="text-sm text-gray-500 mt-1">どのイベントでどのメールを送るか、コード不要で設定できます。</p>
-                    </div>
-                    {/* 集客・体験申し込み関連 */}
-                    <div className="flex-none mb-4">
-                        <h2 className="text-lg font-semibold flex items-center gap-2">
-                            <Mail className="w-5 h-4 text-cyan-600" />
-                            集客・体験申し込み通知
-                        </h2>
-                    </div>
-                    {triggersList.filter(t => ['inquiry_received', 'reception_completed', 'trial_lesson_reserved', 'trial_form_submitted_admin', 'trial_lesson_reminder', 'trial_lesson_followup'].includes(t.id)).map(trigger => (
-                        <TriggerCard key={trigger.id} trigger={trigger} />
-                    ))}
-
-                    {/* 決済・入会関連 */}
-                    <div className="flex-none mb-4 mt-8 pt-6 border-t border-gray-200">
-                        <h2 className="text-lg font-semibold flex items-center gap-2">
-                            <Save className="w-5 h-4 text-emerald-600" />
-                            決済・入会のお礼メール設定
-                        </h2>
-                        <p className="text-sm text-gray-500 mt-1">決済完了時や入会完了時に送信される、お礼メールの設定です。</p>
-                    </div>
-                    {triggersList.filter(t => ['payment_success', 'payment_failed', 'trial_payment_completed', 'trio_trial_payment_completed', 'enrollment_completed'].includes(t.id)).map(trigger => (
-                        <TriggerCard key={trigger.id} trigger={trigger} />
-                    ))}
-
-                    {/* レッスン・報告関連 */}
-                    <div className="flex-none mb-4 mt-8 pt-6 border-t border-gray-200">
-                        <h2 className="text-lg font-semibold flex items-center gap-2">
-                            <MessageSquare className="w-5 h-4 text-indigo-600" />
-                            レッスン・指導報告
-                        </h2>
-                    </div>
-                    {triggersList.filter(t => !['inquiry_received', 'reception_completed', 'trial_lesson_reserved', 'trial_form_submitted_admin', 'trial_lesson_reminder', 'trial_lesson_followup', 'payment_success', 'payment_failed', 'trial_payment_completed', 'enrollment_completed'].includes(t.id)).map(trigger => (
-                        <TriggerCard key={trigger.id} trigger={trigger} />
-                    ))}
-
-
-                    {/* 体験レッスンプラン別設定 */}
-                    <div className="flex-none mb-4 mt-8 pt-6 border-t border-gray-200">
-                        <h2 className="text-lg font-semibold flex items-center gap-2">
-                            <SlidersHorizontal className="w-5 h-5 text-indigo-600" />
-                            体験レッスンプラン別メール設定
-                        </h2>
-                        <p className="text-sm text-gray-500 mt-1">
-                            各種体験レッスンの予約確定時に、個別のメールテンプレートを送信するように設定できます。未設定の場合は、標準の「体験レッスンが予約された時」のメールが送られます。
-                        </p>
-                    </div>
-                    {trialMastersList.map(master => (
-                        <div key={master.id} className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
-                            <div className="flex-1 min-w-0">
-                                <span className="font-semibold text-gray-900 text-sm">{master.name}</span>
-                            </div>
-                            <div className="flex items-center gap-2 flex-wrap flex-none">
-                                <Select
-                                    value={master.email_template_id || 'none'}
-                                    onValueChange={val => handleTrialMasterUpdate(master.id, val === 'none' ? null : val)}
+                    {/* 検索・対象者フィルター */}
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-2 border-t border-slate-100">
+                        <div className="relative flex-1">
+                            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                            <Input
+                                value={searchQuery}
+                                onChange={e => setSearchQuery(e.target.value)}
+                                placeholder="テンプレート名、件名、キーで検索..."
+                                className="pl-9 h-8 text-xs bg-slate-50/50 focus:bg-white border-slate-200"
+                            />
+                            {searchQuery && (
+                                <button
+                                    onClick={() => setSearchQuery('')}
+                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600"
                                 >
-                                    <SelectTrigger className="w-[300px] bg-white border-gray-300 text-sm h-8">
-                                        <SelectValue placeholder="メールを選択..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="none" className="text-gray-400 italic">-- 標準の予約自動返信を利用 --</SelectItem>
-                                        {templatesList.map(tmpl => (
-                                            <SelectItem key={tmpl.id} value={tmpl.id}>
-                                                {tmpl.subject} ({tmpl.key})
-                                            </SelectItem>
+                                    クリア
+                                </button>
+                            )}
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-none">
+                            <span className="text-xs text-slate-500 flex-none">送信先:</span>
+                            <Select value={targetFilter} onValueChange={(val: any) => setTargetFilter(val)}>
+                                <SelectTrigger className="w-[140px] h-8 text-xs bg-white border-slate-200">
+                                    <SelectValue placeholder="対象者" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">全対象</SelectItem>
+                                    <SelectItem value="student">生徒向け</SelectItem>
+                                    <SelectItem value="coach_admin">コーチ・管理者向け</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <span className="text-xs text-slate-400 flex-none font-mono">
+                                ({filteredTemplates.length}件)
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <Tabs defaultValue="templates" className="w-full h-[calc(100vh-230px)] flex flex-col">
+                    {/* タブバー */}
+                    <div className="flex-none flex items-center gap-4 mb-3 border-b border-slate-200 pb-2">
+                        <TabsList className="bg-slate-100 p-1">
+                            <TabsTrigger value="templates" className="flex items-center gap-1.5 px-4 py-1.5 text-xs">
+                                <Mail className="w-3.5 h-3.5" /> テンプレート一覧・編集
+                            </TabsTrigger>
+                            <TabsTrigger value="triggers" className="flex items-center gap-1.5 px-4 py-1.5 text-xs">
+                                <SlidersHorizontal className="w-3.5 h-3.5" /> 自動送信ロジック設定
+                            </TabsTrigger>
+                        </TabsList>
+                    </div>
+
+                    {/* ===== テンプレート編集タブ ===== */}
+                    <TabsContent value="templates" className="flex-1 min-h-0 mt-0">
+                        <div className="flex gap-4 h-full">
+                            {/* サイドバー：テンプレートリスト */}
+                            <div className="w-72 flex-none flex flex-col gap-2 overflow-y-auto pr-2 border-r border-slate-200">
+                                <Button
+                                    onClick={() => { setIsCreating(true); setSelectedTemplate(null) }}
+                                    className={`w-full flex-none h-8 text-xs font-medium ${isCreating ? 'bg-slate-800 text-white' : ''}`}
+                                    variant="outline"
+                                    size="sm"
+                                >
+                                    + 新規テンプレート作成
+                                </Button>
+                                <div className="text-[11px] text-slate-400 flex items-center justify-between px-0.5">
+                                    <span>ドラッグで並び替え</span>
+                                    <GripVertical className="w-3 h-3" />
+                                </div>
+
+                                {filteredTemplates.length === 0 ? (
+                                    <div className="text-xs text-slate-400 text-center py-8 bg-slate-50 rounded-lg border border-dashed border-slate-200">
+                                        該当するテンプレートがありません
+                                    </div>
+                                ) : isMounted ? (
+                                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                                        <SortableContext items={filteredTemplates.map(t => t.id)} strategy={verticalListSortingStrategy}>
+                                            <div className="space-y-1.5">
+                                                {filteredTemplates.map(tmpl => (
+                                                    <SortableEmailItem
+                                                        key={tmpl.id}
+                                                        tmpl={tmpl}
+                                                        isSelected={selectedTemplate?.id === tmpl.id}
+                                                        onClick={() => handleSelect(tmpl)}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </SortableContext>
+                                    </DndContext>
+                                ) : (
+                                    <div className="space-y-1.5">
+                                        {filteredTemplates.map(tmpl => (
+                                            <button
+                                                key={tmpl.id}
+                                                onClick={() => handleSelect(tmpl)}
+                                                className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-colors ${selectedTemplate?.id === tmpl.id
+                                                    ? 'bg-slate-100 text-slate-900 border border-slate-300'
+                                                    : 'hover:bg-slate-50 text-slate-700'
+                                                    }`}
+                                            >
+                                                {tmpl.key}
+                                            </button>
                                         ))}
-                                    </SelectContent>
-                                </Select>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* エディタ領域 */}
+                            <div className="flex-1 min-w-0 flex flex-col h-full bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+                                {selectedTemplate ? (
+                                    <div className="flex flex-col h-full gap-3">
+                                        {/* ヘッダー */}
+                                        <div className="flex-none flex flex-col lg:flex-row lg:items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 gap-3">
+                                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                                                <Dialog open={isHeaderEditOpen} onOpenChange={setIsHeaderEditOpen}>
+                                                    <DialogTrigger asChild>
+                                                        <div className="flex items-center gap-1.5 flex-1 min-w-0 cursor-pointer hover:bg-white p-1 rounded transition-colors group">
+                                                            <div className="h-6 text-[11px] font-mono px-2 py-0.5 w-auto max-w-[160px] bg-white border border-slate-200 rounded text-slate-600 truncate flex-none group-hover:border-slate-400">
+                                                                {templateKey}
+                                                            </div>
+                                                            <span className="text-slate-300 flex-none">/</span>
+                                                            <div className="h-6 text-sm font-semibold truncate flex-1 min-w-0 text-slate-900 group-hover:text-slate-700">
+                                                                {subject || '名称未設定'}
+                                                            </div>
+                                                            <Settings2 className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-700 flex-none ml-1" />
+                                                        </div>
+                                                    </DialogTrigger>
+                                                    <DialogContent className="sm:max-w-[500px]">
+                                                        <DialogHeader>
+                                                            <DialogTitle>テンプレート名の変更</DialogTitle>
+                                                            <DialogDescription>
+                                                                システム識別子（キー）と件名を変更できます。
+                                                            </DialogDescription>
+                                                        </DialogHeader>
+                                                        <div className="grid gap-4 py-4">
+                                                            <div className="grid gap-2">
+                                                                <Label htmlFor="key" className="text-xs text-slate-500">キー（システムID）</Label>
+                                                                <Input
+                                                                    id="key"
+                                                                    value={templateKey}
+                                                                    onChange={e => setTemplateKey(e.target.value)}
+                                                                    className="font-mono text-xs"
+                                                                    placeholder="例: lesson_reminder"
+                                                                />
+                                                            </div>
+                                                            <div className="grid gap-2">
+                                                                <Label htmlFor="subject" className="text-xs text-slate-500">件名（タイトル）</Label>
+                                                                <Input
+                                                                    id="subject"
+                                                                    value={subject}
+                                                                    onChange={e => setSubject(e.target.value)}
+                                                                    placeholder="メールのタイトル"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                        <DialogFooter>
+                                                            <Button variant="outline" onClick={() => setIsHeaderEditOpen(false)}>キャンセル</Button>
+                                                            <Button
+                                                                onClick={async () => {
+                                                                    if (!selectedTemplate) return;
+                                                                    try {
+                                                                        await updateEmailTemplate(selectedTemplate.id, subject, body, isApprovalRequired, isAutoSendEnabled, templateKey, description);
+                                                                        setTemplatesList(prev => prev.map(t => t.id === selectedTemplate.id
+                                                                            ? { ...t, key: templateKey, subject, description }
+                                                                            : t));
+                                                                        toast({ title: '保存しました', description: 'テンプレート名を更新しました。' });
+                                                                        setIsHeaderEditOpen(false);
+                                                                    } catch (e: any) {
+                                                                        toast({ title: 'エラー', description: e.message || '保存に失敗しました。', variant: 'destructive' });
+                                                                    }
+                                                                }}
+                                                                className="bg-slate-900 hover:bg-slate-800 text-white"
+                                                            >
+                                                                変更を保存
+                                                            </Button>
+                                                        </DialogFooter>
+                                                    </DialogContent>
+                                                </Dialog>
+                                            </div>
+
+                                            <div className="flex items-center gap-1.5 flex-none">
+                                                <Button onClick={handleDelete} disabled={isDeleting} variant="destructive" size="icon" className="w-8 h-8 flex-none" title="削除">
+                                                    {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                                                </Button>
+                                                <TestEmailDialog
+                                                    templateKey={selectedTemplate.key}
+                                                    subject={subject}
+                                                    body={body}
+                                                    triggers={triggersList}
+                                                    templateId={selectedTemplate.id}
+                                                />
+                                                <Button onClick={handleDuplicate} disabled={isDuplicating} variant="outline" size="icon" className="w-8 h-8 flex-none" title="複製">
+                                                    {isDuplicating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Copy className="w-3.5 h-3.5" />}
+                                                </Button>
+                                                <Button onClick={handleSave} disabled={isSaving} size="sm" className="bg-slate-900 hover:bg-slate-800 text-white h-8 px-3 flex-none text-xs font-medium">
+                                                    {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Save className="w-3.5 h-3.5 mr-1" />}
+                                                    保存
+                                                </Button>
+                                            </div>
+                                        </div>
+
+                                        {/* 説明 + 設定項目 */}
+                                        <div className="flex-none space-y-2">
+                                            <div className="flex items-center gap-2">
+                                                <Label className="w-12 flex-none text-xs text-slate-500">説明</Label>
+                                                <Input
+                                                    value={description}
+                                                    onChange={e => setDescription(e.target.value)}
+                                                    className="flex-1 h-7 text-xs bg-white border-slate-200"
+                                                    placeholder="用途の補足説明（例：前日のレッスンリマインド）"
+                                                />
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <div className="flex-1 flex items-center justify-between px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                                                    <span className="font-medium text-slate-800">自動送信</span>
+                                                    <Switch checked={isAutoSendEnabled} onCheckedChange={setIsAutoSendEnabled} />
+                                                </div>
+                                                <div className="flex-1 flex items-center justify-between px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                                                    <span className="font-medium text-slate-800">送信前承認</span>
+                                                    <Switch checked={isApprovalRequired} onCheckedChange={setIsApprovalRequired} disabled={!isAutoSendEnabled} />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* ビュー切り替えタブ（編集 / メールプレビュー / LINEプレビュー） */}
+                                        <div className="flex items-center justify-between border-b border-slate-200 pb-1">
+                                            <div className="flex items-center gap-1">
+                                                <button
+                                                    onClick={() => setEditorViewMode('edit')}
+                                                    className={`px-3 py-1 text-xs rounded-t font-medium transition-colors ${
+                                                        editorViewMode === 'edit'
+                                                            ? 'bg-slate-100 text-slate-900 border border-b-0 border-slate-200'
+                                                            : 'text-slate-500 hover:text-slate-800'
+                                                    }`}
+                                                >
+                                                    編集（エディタ）
+                                                </button>
+                                                <button
+                                                    onClick={() => setEditorViewMode('preview_email')}
+                                                    className={`px-3 py-1 text-xs rounded-t font-medium transition-colors flex items-center gap-1 ${
+                                                        editorViewMode === 'preview_email'
+                                                            ? 'bg-slate-100 text-slate-900 border border-b-0 border-slate-200'
+                                                            : 'text-slate-500 hover:text-slate-800'
+                                                    }`}
+                                                >
+                                                    <Eye className="w-3 h-3" /> メール表示プレビュー
+                                                </button>
+                                                <button
+                                                    onClick={() => setEditorViewMode('preview_line')}
+                                                    className={`px-3 py-1 text-xs rounded-t font-medium transition-colors flex items-center gap-1 ${
+                                                        editorViewMode === 'preview_line'
+                                                            ? 'bg-slate-100 text-slate-900 border border-b-0 border-slate-200'
+                                                            : 'text-slate-500 hover:text-slate-800'
+                                                    }`}
+                                                >
+                                                    <Smartphone className="w-3 h-3" /> LINE表示プレビュー
+                                                </button>
+                                            </div>
+
+                                            <span className="text-[11px] text-slate-400 font-mono">
+                                                {body.length} 文字
+                                            </span>
+                                        </div>
+
+                                        {/* 本文エリア / プレビューエリア */}
+                                        {editorViewMode === 'edit' ? (
+                                            <div className="flex-1 min-h-0 flex flex-col gap-2">
+                                                <VariablePanel tmpl={selectedTemplate} />
+                                                <Textarea
+                                                    ref={textareaRef}
+                                                    value={body}
+                                                    onChange={e => setBody(e.target.value)}
+                                                    onFocus={() => {
+                                                        saveBodySelection();
+                                                        setPopupBody(body);
+                                                        setIsPopupEditorOpen(true);
+                                                    }}
+                                                    onClick={() => {
+                                                        setPopupBody(body);
+                                                        setIsPopupEditorOpen(true);
+                                                    }}
+                                                    className="flex-1 font-mono text-xs leading-relaxed resize-none p-3 min-h-0 cursor-pointer bg-slate-50/50 hover:bg-slate-50 transition-colors border-slate-200"
+                                                    placeholder="クリックして本文を全画面エディタで編集..."
+                                                    readOnly
+                                                />
+                                            </div>
+                                        ) : editorViewMode === 'preview_email' ? (
+                                            <div className="flex-1 min-h-0 overflow-y-auto bg-slate-50/50 border border-slate-200 rounded-lg p-4 font-sans text-xs space-y-3">
+                                                <div className="border-b border-slate-200 pb-2 space-y-1 text-slate-600">
+                                                    <div><span className="font-semibold text-slate-700">件名:</span> {subject}</div>
+                                                    <div><span className="font-semibold text-slate-700">宛先:</span> テスト太郎 様 &lt;test@example.com&gt;</div>
+                                                </div>
+                                                <div className="whitespace-pre-wrap leading-relaxed text-slate-800 font-mono">
+                                                    {renderPreviewText(body)}
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="flex-1 min-h-0 overflow-y-auto bg-slate-100 border border-slate-200 rounded-lg p-4 flex justify-center">
+                                                <div className="w-full max-w-md bg-white rounded-xl shadow-sm border border-slate-200 p-4 space-y-2">
+                                                    <div className="text-[11px] text-slate-400 border-b border-slate-100 pb-1">
+                                                        公式LINE トーク画面イメージ
+                                                    </div>
+                                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs leading-relaxed text-slate-900 whitespace-pre-wrap font-sans">
+                                                        {renderPreviewText(body)}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : isCreating ? (
+                                    <div className="flex flex-col h-full gap-3">
+                                        <div className="flex-none flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-4 py-2.5">
+                                            <span className="font-semibold text-slate-800 text-xs">新規テンプレート作成</span>
+                                            <div className="flex gap-2">
+                                                <Button onClick={() => setIsCreating(false)} variant="outline" size="sm" className="h-7 text-xs">キャンセル</Button>
+                                                <Button onClick={handleCreate} disabled={isSaving} size="sm" className="bg-slate-900 hover:bg-slate-800 text-white h-7 text-xs">
+                                                    {isSaving ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Save className="w-3 h-3 mr-1" />}
+                                                    作成
+                                                </Button>
+                                            </div>
+                                        </div>
+                                        <div className="flex-none space-y-2">
+                                            <div className="space-y-1">
+                                                <Label className="text-xs">キー（システム識別子）</Label>
+                                                <Input value={newKey} onChange={e => setNewKey(e.target.value)} placeholder="例: custom_notification" className="h-7 text-xs font-mono" />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <Label className="text-xs">説明</Label>
+                                                <Input value={newDescription} onChange={e => setNewDescription(e.target.value)} placeholder="用途の簡単な説明" className="h-7 text-xs" />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <Label className="text-xs">件名</Label>
+                                                <Input value={newSubject} onChange={e => setNewSubject(e.target.value)} className="h-7 text-xs" />
+                                            </div>
+                                        </div>
+                                        <div className="flex-1 min-h-0 flex flex-col">
+                                            <Label className="flex-none text-xs mb-1">本文</Label>
+                                            <Textarea value={newBody} onChange={e => setNewBody(e.target.value)} className="flex-1 font-mono text-xs leading-relaxed p-3 min-h-0 resize-none border-slate-200" />
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="flex items-center justify-center h-full text-slate-400 text-xs border-2 border-dashed border-slate-200 rounded-xl">
+                                        左側のリストからテンプレートを選択するか、新規作成してください
+                                    </div>
+                                )}
                             </div>
                         </div>
-                    ))}
-                </div>
-            </TabsContent>
-        </Tabs>
+                    </TabsContent>
+
+                    {/* ===== 自動送信ロジック設定タブ ===== */}
+                    <TabsContent value="triggers" className="flex-1 min-h-0 mt-0 overflow-y-auto">
+                        <div className="max-w-4xl mx-auto space-y-4 pb-6">
+                            <div className="flex-none mb-3">
+                                <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-1.5">
+                                    <SlidersHorizontal className="w-4 h-4 text-slate-700" />
+                                    自動送信ロジック設定
+                                </h2>
+                                <p className="text-xs text-slate-500 mt-0.5">システムイベントと送信メッセージの割り当てを一括設定できます。</p>
+                            </div>
+
+                            {filteredTriggers.length === 0 ? (
+                                <div className="text-xs text-slate-400 text-center py-8 bg-slate-50 rounded-lg border border-dashed border-slate-200">
+                                    該当する自動送信ロジックがありません
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {filteredTriggers.map(trigger => (
+                                        <TriggerCard key={trigger.id} trigger={trigger} />
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* 体験レッスンプラン別設定 */}
+                            <div className="flex-none mb-3 mt-8 pt-6 border-t border-slate-200">
+                                <h2 className="text-sm font-semibold flex items-center gap-2 text-slate-900">
+                                    <SlidersHorizontal className="w-4 h-4 text-slate-700" />
+                                    体験レッスンプラン別メッセージ設定
+                                </h2>
+                                <p className="text-xs text-slate-500 mt-1">
+                                    各種体験レッスンの予約確定時に、個別のテンプレートを送信するように設定できます。未設定の場合は、標準の「体験レッスンが予約された時」のメッセージが送られます。
+                                </p>
+                            </div>
+                            {trialMastersList.map(master => (
+                                <div key={master.id} className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden p-3 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                                    <div className="flex-1 min-w-0">
+                                        <span className="font-semibold text-slate-900 text-xs">{master.name}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 flex-wrap flex-none">
+                                        <Select
+                                            value={master.email_template_id || 'none'}
+                                            onValueChange={val => handleTrialMasterUpdate(master.id, val === 'none' ? null : val)}
+                                        >
+                                            <SelectTrigger className="w-[280px] bg-white border-slate-200 text-xs h-7">
+                                                <SelectValue placeholder="メッセージを選択..." />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="none" className="text-slate-400 italic">-- 標準の予約自動返信を利用 --</SelectItem>
+                                                {templatesList.map(tmpl => (
+                                                    <SelectItem key={tmpl.id} value={tmpl.id}>
+                                                        {tmpl.subject} ({tmpl.key})
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </TabsContent>
+                </Tabs>
+            </div>
 
         {/* プレミアムなメール本文編集用ポップアップモーダル（完全レスポンシブ・PCサイズ最適化・ライトテーマ） */}
         <Dialog open={isPopupEditorOpen} onOpenChange={setIsPopupEditorOpen}>
