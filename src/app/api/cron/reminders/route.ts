@@ -153,17 +153,16 @@ export async function GET(request: NextRequest) {
             const coachName = coach?.full_name || '担当コーチ'
             const locationStr = schedule.location || 'ご指定のプール'
 
-            // --- A. 生徒向けメッセージ作成 ---
-            const studentLineMessage = 
-                `🏊‍♂️ *【Swim Partners】明日のレッスン予定のご案内*\n\n` +
-                `${student.full_name} 様\n\n` +
-                `いつもご利用ありがとうございます。\n` +
-                `明日、以下の内容でレッスンを予定しております。\n\n` +
-                `・*日時*: ${dateStr} ${timeStr}\n` +
-                `・*担当コーチ*: ${coachName}\n` +
-                `・*場所*: ${locationStr}\n` +
-                (schedule.notes ? `・*連絡事項*: ${schedule.notes}\n` : '') +
-                `\n体調にお気をつけてお越しくださいませ。`
+            // --- A. 生徒向けメッセージ作成（メッセージ設定のテンプレートを反映） ---
+            let studentMessage = templateBody
+                .replace(/{{name}}/g, student.full_name)
+                .replace(/{{student_name}}/g, student.full_name)
+                .replace(/{{lesson_date}}/g, `${dateStr} ${timeStr}`)
+                .replace(/{{date}}/g, dateStr)
+                .replace(/{{time}}/g, timeStr)
+                .replace(/{{coach_name}}/g, coachName)
+                .replace(/{{location}}/g, locationStr)
+                .replace(/{{notes}}/g, schedule.notes || '')
 
             let lineSent = false
             let emailSent = false
@@ -177,7 +176,7 @@ export async function GET(request: NextRequest) {
                 } else {
                     lineSent = await lineService.pushMessage(
                         student.line_user_id,
-                        studentLineMessage,
+                        studentMessage,
                         coachConfig.channel_access_token
                     )
                 }
@@ -185,15 +184,6 @@ export async function GET(request: NextRequest) {
 
             // --- C. 生徒宛て メール送信（LINEが未連携または送信失敗時のみフォールバック送信） ---
             if (!lineSent && student.contact_email) {
-                let emailBody = templateBody
-                    .replace(/{{name}}/g, student.full_name)
-                    .replace(/{{student_name}}/g, student.full_name)
-                    .replace(/{{date}}/g, dateStr)
-                    .replace(/{{time}}/g, timeStr)
-                    .replace(/{{coach_name}}/g, coachName)
-                    .replace(/{{location}}/g, locationStr)
-                    .replace(/{{notes}}/g, schedule.notes || '')
-
                 if (dryRun) {
                     console.log(`[DRY RUN] LINE not sent, would fallback to Email for ${student.contact_email}`)
                     emailSent = true
@@ -202,7 +192,7 @@ export async function GET(request: NextRequest) {
                         to: student.contact_email,
                         bcc: process.env.SMTP_FROM || process.env.SMTP_USER,
                         subject: templateSubject,
-                        text: emailBody
+                        text: studentMessage
                     })
                 }
             }

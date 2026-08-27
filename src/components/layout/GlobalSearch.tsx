@@ -88,7 +88,7 @@ export function GlobalSearch({ students, coaches = [], leads = [], announcements
                 { title: "レッスン報告", path: "/coach/report", icon: PlusCircle },
                 { title: "マスタ設定", path: "/admin/masters", icon: Settings },
                 { title: "お知らせ管理", path: "/admin/announcements", icon: Megaphone },
-                { title: "メール設定", path: "/admin/email-templates", icon: Mail },
+                { title: "メッセージ設定", path: "/admin/email-templates", icon: Mail },
                 { title: "全体設定", path: "/admin/settings", icon: Settings },
                 { title: "管理者マニュアル", path: "/admin/manual", icon: BookOpen },
                 { title: "コーチマニュアル", path: "/coach/manual", icon: BookOpen },

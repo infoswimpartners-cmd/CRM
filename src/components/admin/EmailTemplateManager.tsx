@@ -135,6 +135,16 @@ const TRIGGER_VARIABLES: Record<string, { key: string; label: string }[]> = {
         { key: 'title', label: '内容/プラン名' },
         { key: 'amount', label: '金額' },
     ],
+    lesson_reminder: [
+        { key: 'name', label: '生徒氏名' },
+        { key: 'student_name', label: '生徒氏名' },
+        { key: 'date', label: 'レッスン日 (例: 8月28日(金))' },
+        { key: 'time', label: 'レッスン時刻 (例: 10:00〜11:00)' },
+        { key: 'lesson_date', label: 'レッスン日時' },
+        { key: 'coach_name', label: '担当コーチ名' },
+        { key: 'location', label: 'レッスン場所' },
+        { key: 'notes', label: '特記事項・連絡事項' },
+    ],
     lead_assigned: [
         { key: 'name', label: '顧客氏名' },
         { key: 'coach_name', label: '担当コーチ名' },

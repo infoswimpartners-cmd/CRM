@@ -138,8 +138,8 @@ export default async function SettingsPage() {
                 <CardContent className="space-y-4">
                     <div className="bg-blue-50 p-4 rounded-lg text-blue-800">
                         <p className="font-bold">お知らせ</p>
-                        <p>リマインドメールの設定は「メール設定」メニューに統合されました。</p>
-                        <a href="/admin/email-templates" className="text-blue-600 underline mt-2 inline-block">メール設定へ移動</a>
+                        <p>前日リマインドや各種通知の設定は「メッセージ設定」メニューに統合されました。</p>
+                        <a href="/admin/email-templates" className="text-blue-600 underline mt-2 inline-block">メッセージ設定へ移動</a>
                     </div>
                 </CardContent>
             </Card>

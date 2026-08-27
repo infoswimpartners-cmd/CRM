@@ -5,7 +5,7 @@ import { Metadata } from 'next'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 export const metadata: Metadata = {
-    title: 'メールテンプレート管理 | Swim Partners',
+    title: 'メッセージ設定 | Swim Partners',
 }
 
 export default async function EmailTemplatesPage() {
@@ -24,9 +24,9 @@ export default async function EmailTemplatesPage() {
     return (
         <div className="space-y-6 max-w-[1600px] mx-auto h-full">
             <div>
-                <h1 className="text-3xl font-bold tracking-tight text-gray-900">メール設定</h1>
+                <h1 className="text-3xl font-bold tracking-tight text-gray-900">メッセージ設定</h1>
                 <p className="text-gray-500 mt-2">
-                    システムから送信される自動返信メールや通知メールの内容を編集できます。
+                    LINE・メール等の自動配信メッセージや通知テンプレートの内容を一括管理・編集できます。
                 </p>
             </div>
 
