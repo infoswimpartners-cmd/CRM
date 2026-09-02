@@ -570,3 +570,93 @@ export async function testScheduleMonitoringWebhookAction(webhookUrl: string) {
     }
 }
 
+/**
+ * LINE チャネルアクセストークンの有効性をAPI検証します（ボット情報取得）
+ * ※生徒へのメッセージ送信は一切行わず、LINEサーバーに対するボット情報の読み取り確認のみを行います。
+ */
+export async function verifyCoachLineTokenAction(token: string) {
+    const { isAuthorized } = await verifyAdminRole()
+    if (!isAuthorized) {
+        return { success: false, error: 'Unauthorized' }
+    }
+
+    const cleanToken = token?.trim()
+    if (!cleanToken) {
+        return { success: false, error: 'チャネルアクセストークンが入力されていません' }
+    }
+
+    try {
+        const res = await fetch('https://api.line.me/v2/bot/info', {
+            headers: {
+                Authorization: `Bearer ${cleanToken}`
+            },
+            cache: 'no-store'
+        })
+
+        if (!res.ok) {
+            const errJson = await res.json().catch(() => ({}))
+            const errMsg = errJson?.message || `認証エラー (ステータス: ${res.status})`
+            return {
+                success: false,
+                error: `LINEアクセストークンの認証に失敗しました: ${errMsg}。トークンが正しくコピーされているかご確認ください。`
+            }
+        }
+
+        const botInfo = await res.json()
+        return {
+            success: true,
+            botInfo: {
+                userId: botInfo.userId,
+                basicId: botInfo.basicId,
+                displayName: botInfo.displayName,
+                pictureUrl: botInfo.pictureUrl,
+                chatMode: botInfo.chatMode,
+                markAsReadMode: botInfo.markAsReadMode
+            }
+        }
+    } catch (e: any) {
+        console.error('verifyCoachLineTokenAction Error:', e)
+        return { success: false, error: 'LINEサーバーとの通信中にエラーが発生しました: ' + e.message }
+    }
+}
+
+/**
+ * コーチ連絡用 Google Chat Webhook の接続テストを行います
+ * ※コーチ専用の社内Google Chatスペースにのみ確認通知を送信します。
+ */
+export async function verifyCoachGChatWebhookAction(webhookUrl: string, coachName: string = 'コーチ') {
+    const { isAuthorized } = await verifyAdminRole()
+    if (!isAuthorized) {
+        return { success: false, error: 'Unauthorized' }
+    }
+
+    const cleanUrl = webhookUrl?.trim()
+    if (!cleanUrl) {
+        return { success: false, error: 'Webhook URLが入力されていません' }
+    }
+
+    if (!cleanUrl.startsWith('https://chat.googleapis.com/')) {
+        return { success: false, error: 'Google Chatの有効なWebhook URLを入力してください (https://chat.googleapis.com/...)' }
+    }
+
+    try {
+        const { sendGoogleChatMessage } = await import('@/lib/google-chat')
+        const testMessage = `【Swim Partners】連絡用Google Chat接続確認\n\n` +
+                            `・対象コーチ: ${coachName}\n` +
+                            `・ステータス: 接続正常\n` +
+                            `・送信日時: ${new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}\n\n` +
+                            `※このメッセージはコーチ連絡用スペースの設定確認テストです。前日レッスンリマインド時にこのスペースへ通知されます。`
+
+        const success = await sendGoogleChatMessage(cleanUrl, testMessage)
+        if (!success) {
+            return { success: false, error: 'Google Chatスペースへの送信に失敗しました。Webhook URLが正しいかご確認ください。' }
+        }
+
+        return { success: true }
+    } catch (e: any) {
+        console.error('verifyCoachGChatWebhookAction Error:', e)
+        return { success: false, error: e.message }
+    }
+}
+
+

@@ -5,10 +5,10 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Loader2, Bot, Link as LinkIcon, Bell, KeyRound, Plus, ExternalLink, Send } from "lucide-react"
+import { Loader2, Bot, Link as LinkIcon, Bell, KeyRound, Plus, ExternalLink, Send, CheckCircle2, AlertCircle } from "lucide-react"
 import { toast } from "sonner"
 import { updateCoachLineFriendUrlAction } from "@/actions/coaches"
-import { saveLineBotConfigAction } from "@/actions/line-monitoring"
+import { saveLineBotConfigAction, verifyCoachLineTokenAction, verifyCoachGChatWebhookAction } from "@/actions/line-monitoring"
 import { getChatWebhooksAction } from "@/actions/gchat_webhook"
 import { WebhookFormDialog } from "@/components/admin/announcements/WebhookFormDialog"
 import Link from 'next/link'
@@ -34,6 +34,11 @@ export function CoachLineSettingsForm({
 }: CoachLineSettingsFormProps) {
     const [saving, setSaving] = useState(false)
     const [testingWebhook, setTestingWebhook] = useState(false)
+    const [verifyingToken, setVerifyingToken] = useState(false)
+    const [tokenStatus, setTokenStatus] = useState<'idle' | 'valid' | 'invalid'>(initialBotConfig?.channel_access_token ? 'valid' : 'idle')
+    const [tokenInfo, setTokenInfo] = useState<{ displayName?: string; basicId?: string } | null>(null)
+    const [webhookStatus, setWebhookStatus] = useState<'idle' | 'valid' | 'invalid'>(initialBotConfig?.gchat_webhook_id ? 'valid' : 'idle')
+
     const [url, setUrl] = useState(initialLineFriendUrl || '')
     const [botId, setBotId] = useState(initialBotConfig?.bot_id || '')
     const [botName, setBotName] = useState(initialBotConfig?.bot_name || '')
@@ -42,19 +47,29 @@ export function CoachLineSettingsForm({
     // Webhook関連の状態
     const [webhookList, setWebhookList] = useState<{ id: string; space_name: string; webhook_url?: string }[]>(chatWebhooks)
     const [selectedWebhookId, setSelectedWebhookId] = useState<string>(initialBotConfig?.gchat_webhook_id || 'none')
-    
-    // 現在選択または紐づいているWebhookの情報
-    const currentWebhook = chatWebhooks.find(w => w.id === initialBotConfig?.gchat_webhook_id)
-    const [webhookUrl, setWebhookUrl] = useState<string>(currentWebhook?.webhook_url || '')
-    const [spaceName, setSpaceName] = useState<string>(currentWebhook?.space_name || '')
-    const [dialogOpen, setDialogOpen] = useState(false)
+    const [webhookUrl, setWebhookUrl] = useState('')
+    const [spaceName, setSpaceName] = useState('')
+    const [isDialogOpen, setIsDialogOpen] = useState(false)
 
-    // プルダウンで既存スペースを選択した時
+    // 初期化時に選択中のWebhookのURLと名前をセット
+    useEffect(() => {
+        if (selectedWebhookId && selectedWebhookId !== 'none' && selectedWebhookId !== 'custom') {
+            const found = webhookList.find(w => w.id === selectedWebhookId)
+            if (found) {
+                setWebhookUrl(found.webhook_url || '')
+                setSpaceName(found.space_name || '')
+            }
+        }
+    }, [selectedWebhookId, webhookList])
+
     const handleSelectSpace = (val: string) => {
         setSelectedWebhookId(val)
+        setWebhookStatus('idle')
         if (val === 'none') {
             setWebhookUrl('')
             setSpaceName('')
+        } else if (val === 'custom') {
+            // 直接入力モード
         } else {
             const found = webhookList.find(w => w.id === val)
             if (found) {
@@ -64,19 +79,15 @@ export function CoachLineSettingsForm({
         }
     }
 
-    // Webhook URLが手動入力された時
     const handleWebhookUrlChange = (val: string) => {
         setWebhookUrl(val)
-        // 既存のリストに同じURLがあればそれを選択状態にする
+        setWebhookStatus('idle')
         const matched = webhookList.find(w => w.webhook_url === val.trim())
         if (matched) {
             setSelectedWebhookId(matched.id)
-            if (!spaceName) setSpaceName(matched.space_name)
+            setSpaceName(matched.space_name)
         } else {
             setSelectedWebhookId('custom')
-            if (!spaceName && botName) {
-                setSpaceName(`${botName} 連絡用`)
-            }
         }
     }
 
@@ -88,6 +99,38 @@ export function CoachLineSettingsForm({
             }
         } catch (e) {
             console.error('Failed to refresh webhooks', e)
+        }
+    }
+
+    // LINEアクセストークンの検証
+    const handleVerifyToken = async () => {
+        if (!channelAccessToken.trim()) {
+            toast.error('チャネルアクセストークンを入力してください')
+            return
+        }
+
+        setVerifyingToken(true)
+        try {
+            const res = await verifyCoachLineTokenAction(channelAccessToken.trim())
+            if (res.success && res.botInfo) {
+                setTokenStatus('valid')
+                setTokenInfo({
+                    displayName: res.botInfo.displayName,
+                    basicId: res.botInfo.basicId
+                })
+                // ボット名やベーシックIDが未入力なら自動補完
+                if (!botName && res.botInfo.displayName) setBotName(res.botInfo.displayName)
+                if (!botId && res.botInfo.basicId) setBotId(res.botInfo.basicId)
+                toast.success(`LINE接続確認OK: ${res.botInfo.displayName} (${res.botInfo.basicId || ''})`)
+            } else {
+                setTokenStatus('invalid')
+                toast.error(res.error || 'LINEトークンの検証に失敗しました')
+            }
+        } catch (e: any) {
+            setTokenStatus('invalid')
+            toast.error('エラーが発生しました: ' + (e.message || ''))
+        } finally {
+            setVerifyingToken(false)
         }
     }
 
@@ -104,20 +147,16 @@ export function CoachLineSettingsForm({
 
         setTestingWebhook(true)
         try {
-            const response = await fetch(webhookUrl.trim(), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    text: `🔔 *【Swim Partners】Google Chat通知テスト*\n\n「${botName || 'コーチ'}」の連絡用Webhookが正常に接続されました。\n（前日レッスンリマインドやLINE調整検知時にこのスペースへ通知されます）`
-                })
-            })
-
-            if (response.ok) {
-                toast.success('Google Chatスペースへテスト通知を送信しました！')
+            const res = await verifyCoachGChatWebhookAction(webhookUrl.trim(), botName || 'コーチ')
+            if (res.success) {
+                setWebhookStatus('valid')
+                toast.success('Google Chatスペースへ接続確認通知を送信しました')
             } else {
-                toast.error(`送信に失敗しました (ステータス: ${response.status})`)
+                setWebhookStatus('invalid')
+                toast.error(res.error || '送信に失敗しました')
             }
         } catch (e: any) {
+            setWebhookStatus('invalid')
             console.error('Test Webhook Error:', e)
             toast.error('テスト送信中にエラーが発生しました: ' + (e.message || ''))
         } finally {
@@ -129,11 +168,39 @@ export function CoachLineSettingsForm({
         e.preventDefault()
         setSaving(true)
         try {
-            // 1. LINE友達追加URLの更新
+            // 1. LINEアクセストークンが入力されている場合、自動でAPI検証を実行
+            if (channelAccessToken.trim()) {
+                const tokenRes = await verifyCoachLineTokenAction(channelAccessToken.trim())
+                if (!tokenRes.success) {
+                    setTokenStatus('invalid')
+                    throw new Error(`【LINEトークン設定エラー】${tokenRes.error}`)
+                }
+                setTokenStatus('valid')
+                if (tokenRes.botInfo) {
+                    setTokenInfo({
+                        displayName: tokenRes.botInfo.displayName,
+                        basicId: tokenRes.botInfo.basicId
+                    })
+                    if (!botName && tokenRes.botInfo.displayName) setBotName(tokenRes.botInfo.displayName)
+                    if (!botId && tokenRes.botInfo.basicId) setBotId(tokenRes.botInfo.basicId)
+                }
+            }
+
+            // 2. Webhook URLが入力されている場合、自動でGoogle Chat接続テストを実行
+            if (webhookUrl.trim()) {
+                const chatRes = await verifyCoachGChatWebhookAction(webhookUrl.trim(), botName || 'コーチ')
+                if (!chatRes.success) {
+                    setWebhookStatus('invalid')
+                    throw new Error(`【Google Chat設定エラー】${chatRes.error}`)
+                }
+                setWebhookStatus('valid')
+            }
+
+            // 3. LINE友達追加URLの更新
             const result = await updateCoachLineFriendUrlAction(coachId, url.trim())
             if (!result.success) throw new Error(result.error)
 
-            // 2. ボットIDまたはボット表示名またはWebhookが入力されている場合はボット設定も更新
+            // 4. ボット設定の更新
             if (botId.trim() || botName.trim() || webhookUrl.trim() || channelAccessToken.trim()) {
                 if (!botId.trim() || !botName.trim()) {
                     throw new Error('公式LINE連携や通知設定を行う場合は「ボット表示名」と「ボットID / ベーシックID」の両方を入力してください。')
@@ -155,7 +222,7 @@ export function CoachLineSettingsForm({
                 }
             }
 
-            toast.success('LINE設定およびコーチ連絡用Webhook設定を保存しました')
+            toast.success('LINE・Google Chatの接続確認が完了し、設定を保存しました')
         } catch (error: any) {
             console.error(error)
             toast.error(error.message || '更新に失敗しました')
@@ -220,18 +287,48 @@ export function CoachLineSettingsForm({
 
                     {/* 4. チャネルアクセストークン（長期） */}
                     <div className="space-y-2">
-                        <Label htmlFor="channel_access_token" className="flex items-center gap-1 text-xs font-medium text-slate-600">
-                            <KeyRound className="h-3.5 w-3.5 text-indigo-600" />
-                            チャネルアクセストークン（長期）
-                        </Label>
-                        <Input
-                            id="channel_access_token"
-                            type="password"
-                            value={channelAccessToken}
-                            onChange={e => setChannelAccessToken(e.target.value)}
-                            placeholder="LINE Developersで発行した長期トークンを貼り付け"
-                            className="font-mono text-xs"
-                        />
+                        <div className="flex items-center justify-between">
+                            <Label htmlFor="channel_access_token" className="flex items-center gap-1 text-xs font-medium text-slate-600">
+                                <KeyRound className="h-3.5 w-3.5 text-indigo-600" />
+                                チャネルアクセストークン（長期）
+                            </Label>
+                            {tokenStatus === 'valid' && (
+                                <span className="inline-flex items-center gap-1 text-[11px] text-emerald-700 font-medium bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                    <CheckCircle2 className="h-3 w-3" />
+                                    接続確認済み {tokenInfo?.displayName ? `(${tokenInfo.displayName})` : ''}
+                                </span>
+                            )}
+                            {tokenStatus === 'invalid' && (
+                                <span className="inline-flex items-center gap-1 text-[11px] text-rose-700 font-medium bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+                                    <AlertCircle className="h-3 w-3" />
+                                    認証エラー
+                                </span>
+                            )}
+                        </div>
+                        <div className="flex gap-2">
+                            <Input
+                                id="channel_access_token"
+                                type="password"
+                                value={channelAccessToken}
+                                onChange={e => {
+                                    setChannelAccessToken(e.target.value)
+                                    setTokenStatus('idle')
+                                }}
+                                placeholder="LINE Developersで発行した長期トークンを貼り付け"
+                                className="font-mono text-xs flex-1"
+                            />
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={handleVerifyToken}
+                                disabled={verifyingToken || !channelAccessToken.trim()}
+                                className="h-9 text-xs gap-1 flex-none border-slate-200"
+                            >
+                                {verifyingToken ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                                接続確認
+                            </Button>
+                        </div>
                         <p className="text-xs text-slate-400 leading-relaxed">
                             ※このコーチの公式LINEから生徒へ **前日連絡を自動送信（プッシュ通知）** するために使用します。（LINE Developersの「Messaging API設定」タブ下部より取得）
                         </p>
@@ -245,6 +342,18 @@ export function CoachLineSettingsForm({
                                 コーチ連絡用 Google Chat Webhook 設定
                             </Label>
                             <div className="flex items-center gap-2">
+                                {webhookStatus === 'valid' && (
+                                    <span className="inline-flex items-center gap-1 text-[11px] text-emerald-700 font-medium bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                        <CheckCircle2 className="h-3 w-3" />
+                                        送信確認済み
+                                    </span>
+                                )}
+                                {webhookStatus === 'invalid' && (
+                                    <span className="inline-flex items-center gap-1 text-[11px] text-rose-700 font-medium bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+                                        <AlertCircle className="h-3 w-3" />
+                                        送信エラー
+                                    </span>
+                                )}
                                 <Link
                                     href="/admin/webhooks"
                                     target="_blank"
@@ -339,8 +448,8 @@ export function CoachLineSettingsForm({
 
             <WebhookFormDialog
                 webhook={null}
-                open={dialogOpen}
-                onOpenChange={setDialogOpen}
+                open={isDialogOpen}
+                onOpenChange={setIsDialogOpen}
                 onSuccess={refreshWebhooks}
             />
         </>

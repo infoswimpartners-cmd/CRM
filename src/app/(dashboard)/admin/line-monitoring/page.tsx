@@ -15,6 +15,7 @@ import {
     getScheduleMonitoringWebhookAction,
     saveScheduleMonitoringWebhookAction,
     testScheduleMonitoringWebhookAction,
+    verifyCoachLineTokenAction,
     LineMonitoringLog,
     LineBotConfig
 } from '@/actions/line-monitoring'
@@ -156,6 +157,8 @@ export default function LineMonitoringPage() {
     const [formBotId, setFormBotId] = useState('')
     const [formBotName, setFormBotName] = useState('')
     const [formGChatWebhookId, setFormGChatWebhookId] = useState('')
+    const [formChannelAccessToken, setFormChannelAccessToken] = useState('')
+    const [isVerifyingFormToken, setIsVerifyingFormToken] = useState(false)
     const [chatWebhooks, setChatWebhooks] = useState<ChatWebhook[]>([])
 
     // 管理者用 Google Chat Webhook 状態（日程調整検知 集約用）
@@ -541,22 +544,59 @@ export default function LineMonitoringPage() {
         }
 
         setIsSaving(true)
-        const res = await saveLineBotConfigAction({
-            id: editingConfig?.id,
-            coach_id: formCoachId,
-            bot_id: formBotId.trim(),
-            bot_name: formBotName.trim(),
-            gchat_webhook_id: formGChatWebhookId === 'none' ? null : (formGChatWebhookId || null)
-        })
+        try {
+            // チャネルアクセストークンが入力されている場合は自動でAPI検証
+            if (formChannelAccessToken.trim()) {
+                const tokenRes = await verifyCoachLineTokenAction(formChannelAccessToken.trim())
+                if (!tokenRes.success) {
+                    throw new Error(tokenRes.error || 'LINEトークンの検証に失敗しました')
+                }
+            }
 
-        setIsSaving(false)
-        if (res.success) {
-            toast.success(editingConfig ? 'ボットの紐付け設定を更新しました' : 'ボットの紐付け設定を登録しました')
-            setIsAddDialogOpen(false)
-            resetForm()
-            fetchConfigs()
-        } else {
-            toast.error('設定の保存に失敗しました: ' + res.error)
+            const res = await saveLineBotConfigAction({
+                id: editingConfig?.id,
+                coach_id: formCoachId,
+                bot_id: formBotId.trim(),
+                bot_name: formBotName.trim(),
+                gchat_webhook_id: formGChatWebhookId === 'none' ? null : (formGChatWebhookId || null),
+                channel_access_token: formChannelAccessToken.trim() || null
+            })
+
+            if (res.success) {
+                toast.success(editingConfig ? 'ボットの紐付け設定を更新しました' : 'ボットの紐付け設定を登録しました')
+                setIsAddDialogOpen(false)
+                resetForm()
+                fetchConfigs()
+            } else {
+                toast.error('設定の保存に失敗しました: ' + res.error)
+            }
+        } catch (err: any) {
+            toast.error(err.message || '保存に失敗しました')
+        } finally {
+            setIsSaving(false)
+        }
+    }
+
+    // LINEアクセストークン接続テスト
+    const handleVerifyFormToken = async () => {
+        if (!formChannelAccessToken.trim()) {
+            toast.error('チャネルアクセストークンを入力してください')
+            return
+        }
+        setIsVerifyingFormToken(true)
+        try {
+            const res = await verifyCoachLineTokenAction(formChannelAccessToken.trim())
+            if (res.success && res.botInfo) {
+                if (!formBotName && res.botInfo.displayName) setFormBotName(res.botInfo.displayName)
+                if (!formBotId && res.botInfo.basicId) setFormBotId(res.botInfo.basicId)
+                toast.success(`LINE接続確認OK: ${res.botInfo.displayName} (${res.botInfo.basicId || ''})`)
+            } else {
+                toast.error(res.error || 'LINEトークンの検証に失敗しました')
+            }
+        } catch (e: any) {
+            toast.error('エラーが発生しました: ' + (e.message || ''))
+        } finally {
+            setIsVerifyingFormToken(false)
         }
     }
 
@@ -579,6 +619,7 @@ export default function LineMonitoringPage() {
         setFormBotId(config.bot_id)
         setFormBotName(config.bot_name)
         setFormGChatWebhookId(config.gchat_webhook_id || 'none')
+        setFormChannelAccessToken(config.channel_access_token || '')
         setIsAddDialogOpen(true)
     }
 
@@ -588,6 +629,7 @@ export default function LineMonitoringPage() {
         setFormBotId('')
         setFormBotName('')
         setFormGChatWebhookId('')
+        setFormChannelAccessToken('')
     }
 
     // メッセージのハイライト処理（簡易）
@@ -804,13 +846,36 @@ export default function LineMonitoringPage() {
                                             <p className="text-xs text-slate-400">※ベーシックID（例: @123abcde）またはLINE Developersの「ボットユーザーID（U...）」のどちらでも設定可能です。</p>
                                         </div>
                                         <div className="flex flex-col gap-2">
-                                            <label className="text-sm font-medium text-slate-700">通知先 Google Chat スペース（特定指定）</label>
+                                            <label className="text-sm font-medium text-slate-700">チャネルアクセストークン（長期）</label>
+                                            <div className="flex gap-2">
+                                                <Input 
+                                                    type="password"
+                                                    value={formChannelAccessToken} 
+                                                    onChange={(e) => setFormChannelAccessToken(e.target.value)} 
+                                                    placeholder="LINE Developersの長期トークン"
+                                                    className="font-mono text-xs flex-1"
+                                                />
+                                                <Button 
+                                                    type="button" 
+                                                    variant="outline" 
+                                                    size="sm"
+                                                    onClick={handleVerifyFormToken}
+                                                    disabled={isVerifyingFormToken || !formChannelAccessToken.trim()}
+                                                    className="h-9 text-xs flex-none"
+                                                >
+                                                    {isVerifyingFormToken ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : '接続確認'}
+                                                </Button>
+                                            </div>
+                                            <p className="text-xs text-slate-400">※前日連絡を生徒に公式LINEプッシュ送信するために使用します。</p>
+                                        </div>
+                                        <div className="flex flex-col gap-2">
+                                            <label className="text-sm font-medium text-slate-700">通知先 Google Chat スペース（前日リマインド用）</label>
                                             <Select value={formGChatWebhookId} onValueChange={setFormGChatWebhookId}>
                                                 <SelectTrigger>
                                                     <SelectValue placeholder="通知先のスペースを選択 (指定なしの場合は既定の1件)" />
                                                 </SelectTrigger>
                                                 <SelectContent>
-                                                    <SelectItem value="none">指定なし (既定のスペースへ通知)</SelectItem>
+                                                    <SelectItem value="none">指定なし (未設定)</SelectItem>
                                                     {chatWebhooks.map(webhook => (
                                                         <SelectItem key={webhook.id} value={webhook.id}>
                                                             {webhook.space_name}
@@ -818,7 +883,7 @@ export default function LineMonitoringPage() {
                                                     ))}
                                                 </SelectContent>
                                             </Select>
-                                            <p className="text-xs text-slate-400">※このボットからの検知通知を配信したい特定の Google Chat スペースを選択します。</p>
+                                            <p className="text-xs text-slate-400">※前日のレッスン予定通知を受信するコーチ専用のGoogle Chatスペースを選択します。</p>
                                         </div>
                                     </div>
                                     <DialogFooter>
