@@ -236,14 +236,14 @@ export default function LineMonitoringPage() {
             // dry_run=false で実際に送信（他顧客は安全ガードでスキップ）
             const res = await executeLessonReminderCronAction({ dryRun: false })
             if (res.success) {
-                const count = res.data?.processed || 0
+                const count = ('processed' in res ? res.processed : 0) || 0
                 if (count === 0) {
                     toast.info('明日予定されている未送信のリマインド対象レッスンはありませんでした。')
                 } else {
                     toast.success(`明日のレッスン ${count}件 の前日連絡を送信完了しました。`)
                 }
             } else {
-                toast.error('前日連絡の実行に失敗しました: ' + res.error)
+                toast.error('前日連絡の実行に失敗しました: ' + (res.error || '不明なエラー'))
             }
         } catch (e: any) {
             toast.error('エラーが発生しました: ' + e.message)

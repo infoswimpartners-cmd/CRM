@@ -465,16 +465,10 @@ export async function executeLessonReminderCronAction(options?: { dryRun?: boole
         return { success: false, error: 'Unauthorized' }
     }
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-    const dryRunParam = options?.dryRun ? '&dry_run=true' : ''
-    const dateParam = options?.targetDate ? `&date=${options.targetDate}` : ''
-
     try {
-        const res = await fetch(`${appUrl}/api/cron/reminders?${dryRunParam}${dateParam}`, {
-            headers: { 'Cache-Control': 'no-cache' }
-        })
-        const data = await res.json()
-        return { success: true, data }
+        const { processLessonReminders } = await import('@/lib/reminders')
+        const result = await processLessonReminders(options)
+        return result
     } catch (e: any) {
         console.error('executeLessonReminderCronAction Error:', e)
         return { success: false, error: e.message }
