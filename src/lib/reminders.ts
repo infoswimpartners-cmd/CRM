@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { emailService } from '@/lib/email'
 import { lineService } from '@/lib/line'
 import { format } from 'date-fns'
@@ -45,7 +45,7 @@ export async function processLessonReminders(options: ReminderProcessOptions = {
 
     const isCronEnabled = process.env.ENABLE_LESSON_REMINDERS_CRON === 'true'
 
-    const supabase = await createClient()
+    const supabase = createAdminClient()
 
     // 1. 日本時間 (JST) で「明日」の開始・終了日時（00:00:00 〜 23:59:59）を正確に計算
     let targetYear: number
