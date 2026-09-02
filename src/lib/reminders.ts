@@ -175,6 +175,27 @@ export async function processLessonReminders(options: ReminderProcessOptions = {
 
         const results = []
 
+/**
+ * 日本時間 (JST) での日時・時刻フォーマッター (24時間表示)
+ */
+function formatJST(isoString: string) {
+    const d = new Date(isoString)
+    const jstStr = d.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' })
+    const jstDate = new Date(jstStr)
+
+    const month = jstDate.getMonth() + 1
+    const day = jstDate.getDate()
+    const weekday = ['日', '月', '火', '水', '木', '金', '土'][jstDate.getDay()]
+    const hours = String(jstDate.getHours()).padStart(2, '0')
+    const minutes = String(jstDate.getMinutes()).padStart(2, '0')
+
+    return {
+        dateStr: `${month}月${day}日(${weekday})`,
+        prevDateStr: `${month}/${day}(${weekday})`,
+        timeStr24: `${hours}:${minutes}`
+    }
+}
+
         // 6. 各レッスンについて配信処理
         for (const schedule of schedules) {
             const student = schedule.students as any
@@ -183,10 +204,10 @@ export async function processLessonReminders(options: ReminderProcessOptions = {
 
             if (!student) continue
 
-            const startTime = new Date(schedule.start_time)
-            const endTime = new Date(schedule.end_time)
-            const dateStr = format(startTime, 'M月d日(E)', { locale: ja })
-            const timeStr = `${format(startTime, 'HH:mm')}〜${format(endTime, 'HH:mm')}`
+            const startJST = formatJST(schedule.start_time)
+            const endJST = formatJST(schedule.end_time)
+            const dateStr = startJST.dateStr
+            const timeStr = `${startJST.timeStr24}〜${endJST.timeStr24}`
             const coachName = coach?.full_name || '担当コーチ'
             const locationStr = schedule.location || 'ご指定のプール'
             const notesStr = schedule.notes ? `・連絡事項: 「${schedule.notes}」` : ''
@@ -266,7 +287,8 @@ export async function processLessonReminders(options: ReminderProcessOptions = {
                         .maybeSingle()
 
                     if (prevLesson) {
-                        const prevDateStr = format(new Date(prevLesson.start_time), 'M/d(E)', { locale: ja })
+                        const prevJST = formatJST(prevLesson.start_time)
+                        const prevDateStr = prevJST.prevDateStr
                         const reports = (prevLesson.lesson_reports as any)
                         const report = Array.isArray(reports) ? reports[0] : reports
                         const menu = report?.practice_menu ? `メニュー: ${report.practice_menu}` : ''
