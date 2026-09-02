@@ -44,17 +44,30 @@ export async function GET(request: NextRequest) {
 
     const supabase = await createClient()
 
-    // 1. 日本時間 (JST) で「明日」の開始・終了日時を計算
-    const now = new Date()
-    let targetTomorrow = addDays(now, 1)
+    // 1. 日本時間 (JST) で「明日」の開始・終了日時（00:00:00 〜 23:59:59）を正確に計算
+    let targetYear: number
+    let targetMonth: number
+    let targetDay: number
 
-    if (targetDateParam) {
-        targetTomorrow = new Date(targetDateParam)
+    if (targetDateParam && /^\d{4}-\d{2}-\d{2}$/.test(targetDateParam)) {
+        const [y, m, d] = targetDateParam.split('-').map(Number)
+        targetYear = y
+        targetMonth = m
+        targetDay = d
+    } else {
+        // 現在のJST日時から翌日を算出
+        const jstNowStr = new Date().toLocaleString('en-US', { timeZone: 'Asia/Tokyo' })
+        const jstNow = new Date(jstNowStr)
+        const jstTomorrow = new Date(jstNow)
+        jstTomorrow.setDate(jstTomorrow.getDate() + 1)
+        targetYear = jstTomorrow.getFullYear()
+        targetMonth = jstTomorrow.getMonth() + 1
+        targetDay = jstTomorrow.getDate()
     }
 
-    // JSTの開始（00:00:00）と終了（23:59:59）
-    const startOfTomorrow = startOfDay(targetTomorrow).toISOString()
-    const endOfTomorrow = endOfDay(targetTomorrow).toISOString()
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const startOfTomorrow = new Date(`${targetYear}-${pad(targetMonth)}-${pad(targetDay)}T00:00:00+09:00`).toISOString()
+    const endOfTomorrow = new Date(`${targetYear}-${pad(targetMonth)}-${pad(targetDay)}T23:59:59.999+09:00`).toISOString()
 
     try {
         // 2. 翌日の予約枠（生徒が割り当てられているスケジュール）を取得
@@ -73,6 +86,7 @@ export async function GET(request: NextRequest) {
                 students (
                     id,
                     full_name,
+                    student_number,
                     contact_email,
                     line_user_id
                 ),
@@ -94,18 +108,28 @@ export async function GET(request: NextRequest) {
             query = query.is('reminder_sent_at', null)
         }
 
-        const { data: schedules, error: schedError } = await query
+        const { data: rawSchedules, error: schedError } = await query
 
         if (schedError) {
             console.error('[Cron Reminders] Supabase Error:', schedError)
             return NextResponse.json({ error: schedError.message }, { status: 500 })
         }
 
+        // 【安全ガード】
+        // 自動送信許可（ENABLE_LESSON_REMINDERS_CRON === 'true'）が出ていない場合は、
+        // テスト太郎（会員番号 0035）以外の他顧客をすべて安全に除外
+        const schedules = (rawSchedules || []).filter(sched => {
+            const student = sched.students as any
+            if (isCronEnabled) return true
+            return student?.student_number === '0035' || student?.full_name?.includes('テスト太郎')
+        })
+
         if (!schedules || schedules.length === 0) {
             return NextResponse.json({ 
                 success: true, 
                 message: 'No unreminded schedules found for tomorrow', 
-                target_date: startOfTomorrow,
+                target_date: `${targetYear}-${pad(targetMonth)}-${pad(targetDay)}`,
+                date_range: { start: startOfTomorrow, end: endOfTomorrow },
                 processed: 0 
             })
         }

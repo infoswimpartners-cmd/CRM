@@ -225,21 +225,22 @@ export default function LineMonitoringPage() {
         }
     }
 
-    // 前日リマインド手動実行
-    const handleTriggerReminder = async (dryRun: boolean = true) => {
-        if (!dryRun && !confirm('明日のレッスン予定について、生徒へのLINE/メールおよびコーチ用Google Chatスペースへの前日連絡を一斉送信してよろしいですか？')) {
+    // 前日リマインド手動実行（テスト太郎様対象）
+    const handleTriggerReminder = async () => {
+        if (!confirm('明日のレッスン予定（テスト太郎 様）について、前日リマインド（公式LINE/メール/担当コーチGoogle Chat）を送信テストしますか？\n\n※安全ガードにより、テスト太郎 様以外の他のお客様へは送信されません。')) {
             return
         }
 
         setIsTriggeringReminder(true)
         try {
-            const res = await executeLessonReminderCronAction({ dryRun })
+            // dry_run=false で実際に送信（他顧客は安全ガードでスキップ）
+            const res = await executeLessonReminderCronAction({ dryRun: false })
             if (res.success) {
                 const count = res.data?.processed || 0
                 if (count === 0) {
                     toast.info('明日予定されている未送信のリマインド対象レッスンはありませんでした。')
                 } else {
-                    toast.success(`${dryRun ? '【テスト確認】' : '【本送信完了】'} 明日のレッスン ${count}件 の前日連絡を処理しました。`)
+                    toast.success(`明日のレッスン ${count}件 の前日連絡を送信完了しました。`)
                 }
             } else {
                 toast.error('前日連絡の実行に失敗しました: ' + res.error)
@@ -627,7 +628,7 @@ export default function LineMonitoringPage() {
                             size="sm" 
                             disabled={isTriggeringReminder}
                             className="bg-indigo-900/40 text-indigo-200 border border-indigo-800 hover:bg-indigo-900/60"
-                            onClick={() => handleTriggerReminder(true)}
+                            onClick={() => handleTriggerReminder()}
                         >
                             <Send className="mr-2 h-4 w-4 text-indigo-400" />
                             {isTriggeringReminder ? '処理中...' : '明日の前日連絡テスト実行'}
