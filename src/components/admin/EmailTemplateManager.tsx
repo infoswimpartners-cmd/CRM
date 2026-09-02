@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, startTransition } from 'react'
 import { EmailTemplate, EmailTrigger, updateEmailTemplate, deleteEmailTemplate, addEmailTemplate, reorderEmailTemplates, updateEmailTrigger, updateLessonMasterEmailTemplate, duplicateEmailTemplate } from '@/actions/email-template'
+import { getLineConfigAction, saveLineConfigAction } from '@/actions/leads'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -9,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
-import { Loader2, Mail, Save, Trash2, SlidersHorizontal, Settings2, GripVertical, MessageSquare, ChevronDown, ChevronUp, ExternalLink, Copy, Edit3, Search, Eye, Smartphone, Filter } from 'lucide-react'
+import { Loader2, Mail, Save, Trash2, SlidersHorizontal, Settings2, GripVertical, MessageSquare, ChevronDown, ChevronUp, ExternalLink, Copy, Edit3, Search, Eye, Smartphone, Filter, MessageCircle } from 'lucide-react'
 import { TestEmailDialog } from './TestEmailDialog'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -69,8 +70,12 @@ const TRIGGER_VARIABLES: Record<string, { key: string; label: string }[]> = {
     trial_lesson_reserved: [
         { key: 'name', label: '氏名' },
         { key: 'lesson_date', label: 'レッスン日時' },
-        { key: 'amount', label: '金額' },
-        { key: 'payment_link', label: '決済リンク' },
+        { key: 'location', label: 'レッスン場所' },
+        { key: 'coach_name', label: '担当コーチ名' },
+        { key: 'coach_line_url', label: 'コーチLINE追加URL' },
+        { key: 'amount', label: '体験レッスン料金' },
+        { key: 'payment_link', label: '決済リンクURL' },
+        { key: 'second_student_info', label: '2人目の情報' },
     ],
     trial_payment_completed: [
         { key: 'full_name', label: '氏名' },
@@ -179,8 +184,11 @@ const TRIGGER_VARIABLES: Record<string, { key: string; label: string }[]> = {
     lead_assigned: [
         { key: 'name', label: '顧客氏名' },
         { key: 'coach_name', label: '担当コーチ名' },
+        { key: 'coach_line_url', label: 'コーチLINE追加URL' },
         { key: 'lesson_date', label: '確定体験日時' },
         { key: 'location', label: '確定レッスン場所' },
+        { key: 'amount', label: '体験レッスン料金' },
+        { key: 'payment_link', label: '決済リンクURL' },
         { key: 'second_student_info', label: '2人目の顧客情報' },
     ],
 }
@@ -247,6 +255,74 @@ export function EmailTemplateManager({ templates, triggers, trialMasters = [] }:
     const [chatTemplateBody, setChatTemplateBody] = useState('')
     const chatTextareaRef = useRef<HTMLTextAreaElement>(null)
     const savedChatSelection = useRef<{ start: number; end: number }>({ start: 0, end: 0 })
+
+    // LINE通知設定（アサイン確定時）の状態管理
+    const [lineToken, setLineToken] = useState('')
+    const [lineTemplate, setLineTemplate] = useState('')
+    const [loadingLineConfig, setLoadingLineConfig] = useState(false)
+    const [savingLineConfig, setSavingLineConfig] = useState(false)
+    const lineTextareaRef = useRef<HTMLTextAreaElement>(null)
+    const savedLineSelection = useRef<{ start: number; end: number }>({ start: 0, end: 0 })
+
+    const fetchLineConfig = useCallback(async () => {
+        setLoadingLineConfig(true)
+        try {
+            const res = await getLineConfigAction()
+            if (res.success) {
+                setLineToken(res.token)
+                setLineTemplate(res.template)
+            }
+        } catch (err) {
+            console.error('Failed to fetch LINE config:', err)
+        } finally {
+            setLoadingLineConfig(false)
+        }
+    }, [])
+
+    useEffect(() => {
+        fetchLineConfig()
+    }, [fetchLineConfig])
+
+    const handleSaveLineConfig = async () => {
+        setSavingLineConfig(true)
+        try {
+            const res = await saveLineConfigAction(lineToken, lineTemplate)
+            if (res.success) {
+                toast({ title: '保存しました', description: 'LINE通知設定を更新しました。' })
+            } else {
+                toast({ title: 'エラー', description: res.error || '保存に失敗しました。', variant: 'destructive' })
+            }
+        } catch {
+            toast({ title: 'エラー', description: '保存に失敗しました。', variant: 'destructive' })
+        } finally {
+            setSavingLineConfig(false)
+        }
+    }
+
+    const saveLineSelectionPos = useCallback(() => {
+        const el = lineTextareaRef.current
+        if (!el) return
+        savedLineSelection.current = { start: el.selectionStart ?? 0, end: el.selectionEnd ?? 0 }
+    }, [])
+
+    const insertVariableToLine = useCallback((variable: string) => {
+        const textToInsert = `{{${variable}}}`
+        const { start, end } = savedLineSelection.current
+
+        setLineTemplate(prev => {
+            const next = prev.substring(0, start) + textToInsert + prev.substring(end)
+            const newPos = start + textToInsert.length
+            savedLineSelection.current = { start: newPos, end: newPos }
+            setTimeout(() => {
+                const el = lineTextareaRef.current
+                if (el) {
+                    el.focus()
+                    el.setSelectionRange(newPos, newPos)
+                }
+            }, 0)
+            return next
+        })
+    }, [])
 
     const saveChatSelectionPos = useCallback(() => {
         const el = chatTextareaRef.current
@@ -742,16 +818,18 @@ export function EmailTemplateManager({ templates, triggers, trialMasters = [] }:
         date: '8月28日(金)',
         time: '10:00〜11:00',
         lesson_date: '8月28日(金) 10:00〜11:00',
-        coach_name: '新吉航大',
-        location: '東京体育館プール',
+        coach_name: '田中 健太',
+        coach_line_url: 'https://line.me/ti/p/coach_kenta',
+        location: '渋谷区立スポーツセンター プール',
         notes: '持ち物: 水着・キャップ',
         subject: 'お問い合わせ内容の確認',
         user_name: 'テスト太郎',
-        amount: '¥11,000',
+        amount: '7,000',
         plan_name: '月4回パーソナルプラン',
         start_date: '2026年9月1日',
-        payment_link: 'https://buy.stripe.com/...',
-        payment_url: 'https://buy.stripe.com/...',
+        payment_link: 'https://manager.swim-partners.com/pay/trial/sched_example123',
+        payment_url: 'https://manager.swim-partners.com/pay/trial/sched_example123',
+        second_student_info: '',
         phone: '090-1234-5678',
         email: 'test@example.com',
         previous_lesson: '━━━━━━━━━━━━━━\n【前回の練習内容 (8/20(木))】\n・ビート板を持った呼吸付きクロールの練習。足首の曲がりを次回修正。\n・次回への課題: キック時の足首の脱力\n・良かった点: 姿勢が安定してきた\n━━━━━━━━━━━━━━'
@@ -913,6 +991,9 @@ export function EmailTemplateManager({ templates, triggers, trialMasters = [] }:
                             </TabsTrigger>
                             <TabsTrigger value="triggers" className="flex items-center gap-1.5 px-4 py-1.5 text-xs">
                                 <SlidersHorizontal className="w-3.5 h-3.5" /> 自動送信ロジック設定
+                            </TabsTrigger>
+                            <TabsTrigger value="line" className="flex items-center gap-1.5 px-4 py-1.5 text-xs text-green-700 data-[state=active]:bg-white data-[state=active]:text-green-800">
+                                <MessageCircle className="w-3.5 h-3.5 text-green-600" /> LINE通知設定（体験確定）
                             </TabsTrigger>
                         </TabsList>
                     </div>
@@ -1328,6 +1409,142 @@ export function EmailTemplateManager({ templates, triggers, trialMasters = [] }:
                                     </div>
                                 </div>
                             ))}
+                        </div>
+                    </TabsContent>
+
+                    {/* ===== LINE通知設定（アサイン確定時）タブ ===== */}
+                    <TabsContent value="line" className="flex-1 min-h-0 mt-0 overflow-y-auto">
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 h-full pb-6">
+                            {/* 左カラム: エディタと設定 */}
+                            <div className="lg:col-span-7 flex flex-col gap-4">
+                                <Card className="border-slate-200 shadow-sm">
+                                    <CardHeader className="pb-3 border-b border-slate-100">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                                    <MessageCircle className="w-4 h-4 text-green-600" />
+                                                    体験アサイン確定時 LINE通知メッセージ
+                                                </CardTitle>
+                                                <CardDescription className="text-xs text-slate-500 mt-0.5">
+                                                    コーチをアサイン・体験確定した際に、顧客のLINEアカウントへ自動送信される確定メッセージです。
+                                                </CardDescription>
+                                            </div>
+                                            <Button
+                                                onClick={handleSaveLineConfig}
+                                                disabled={savingLineConfig || loadingLineConfig}
+                                                className="bg-green-600 hover:bg-green-700 text-white gap-1.5 h-8 text-xs font-bold shadow-sm"
+                                            >
+                                                {savingLineConfig ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                                                LINE設定を保存
+                                            </Button>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent className="p-4 space-y-4">
+                                        {/* LINE Access Token */}
+                                        <div className="space-y-1.5 bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                            <Label className="text-xs font-bold text-slate-700">
+                                                LINE Channel Access Token（Messaging API）
+                                            </Label>
+                                            <Input
+                                                type="password"
+                                                value={lineToken}
+                                                onChange={e => setLineToken(e.target.value)}
+                                                placeholder="LINE Developersコンソールで発行した長期Channel Access Token"
+                                                className="font-mono text-xs bg-white h-8"
+                                            />
+                                            <p className="text-[10px] text-slate-400">
+                                                ※顧客の `line_user_id` が登録されている場合にプッシュメッセージを自動送信するために使用します。
+                                            </p>
+                                        </div>
+
+                                        {/* 変数のクリック挿入パネル */}
+                                        <div className="space-y-1.5">
+                                            <div className="flex items-center justify-between">
+                                                <Label className="text-xs font-bold text-slate-700">利用可能な変数（クリックで挿入）</Label>
+                                                <span className="text-[10px] text-slate-400">カーソル位置に挿入されます</span>
+                                            </div>
+                                            <div className="flex flex-wrap gap-1.5 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                                                {[
+                                                    { key: 'name', label: '顧客氏名' },
+                                                    { key: 'coach_name', label: '担当コーチ名' },
+                                                    { key: 'lesson_date', label: '確定体験日時' },
+                                                    { key: 'location', label: 'レッスン場所' },
+                                                    { key: 'amount', label: '体験料金' },
+                                                    { key: 'payment_link', label: '決済リンクURL' },
+                                                    { key: 'coach_line_url', label: 'コーチLINE追加URL' },
+                                                    { key: 'second_student_info', label: '2人目の顧客情報' },
+                                                ].map(v => (
+                                                    <button
+                                                        key={v.key}
+                                                        type="button"
+                                                        onMouseDown={(e) => {
+                                                            e.preventDefault()
+                                                            insertVariableToLine(v.key)
+                                                        }}
+                                                        className="flex items-center gap-1 px-2 py-1 rounded border border-slate-200 bg-white hover:bg-green-50 hover:border-green-300 hover:text-green-800 transition-all text-left shadow-xs"
+                                                    >
+                                                        <code className="text-[11px] font-mono text-slate-800 font-semibold">{`{{${v.key}}}`}</code>
+                                                        <span className="text-[10px] text-slate-500">{v.label}</span>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* メッセージ本文エディタ */}
+                                        <div className="space-y-1.5">
+                                            <div className="flex items-center justify-between">
+                                                <Label className="text-xs font-bold text-slate-700">メッセージ本文</Label>
+                                                <span className="text-[10px] text-slate-400 font-mono">
+                                                    {lineTemplate.length} 文字
+                                                </span>
+                                            </div>
+                                            <Textarea
+                                                ref={lineTextareaRef}
+                                                value={lineTemplate}
+                                                onChange={e => setLineTemplate(e.target.value)}
+                                                onSelect={saveLineSelectionPos}
+                                                onKeyUp={saveLineSelectionPos}
+                                                onMouseUp={saveLineSelectionPos}
+                                                placeholder="アサイン確定時に送信するメッセージ本文を入力..."
+                                                className="font-mono text-xs h-[300px] leading-relaxed resize-none bg-white focus-visible:ring-green-500 focus-visible:border-green-500"
+                                            />
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </div>
+
+                            {/* 右カラム: スマホ風プレビュー */}
+                            <div className="lg:col-span-5 flex flex-col items-center">
+                                <div className="w-full max-w-[360px] bg-slate-900 rounded-[36px] p-3 shadow-2xl border-4 border-slate-800">
+                                    {/* スマホ画面風ヘッダー */}
+                                    <div className="bg-[#2c3e50] text-white px-4 py-2.5 rounded-t-[24px] flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center font-bold text-[10px]">
+                                                SP
+                                            </div>
+                                            <div className="text-xs font-bold">Swim Partners 公式</div>
+                                        </div>
+                                        <Badge variant="outline" className="text-[9px] border-white/20 text-white/80 h-5">
+                                            プレビュー
+                                        </Badge>
+                                    </div>
+
+                                    {/* LINEトーク画面風ボディ */}
+                                    <div className="bg-[#7494c0] min-h-[420px] max-h-[500px] overflow-y-auto p-3.5 space-y-3 rounded-b-[24px]">
+                                        <div className="flex items-end gap-2">
+                                            <div className="w-7 h-7 rounded-full bg-white flex items-center justify-center text-slate-700 font-bold text-[10px] shadow-sm flex-none">
+                                                SP
+                                            </div>
+                                            <div className="bg-white text-slate-800 p-3 rounded-2xl rounded-bl-xs text-xs shadow-md leading-relaxed whitespace-pre-wrap break-words max-w-[85%] font-sans">
+                                                {renderPreviewText(lineTemplate)}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <p className="text-[11px] text-slate-400 mt-2 text-center">
+                                    ※テスト太郎様のダミーデータでプレビュー表示しています。
+                                </p>
+                            </div>
                         </div>
                     </TabsContent>
                 </Tabs>

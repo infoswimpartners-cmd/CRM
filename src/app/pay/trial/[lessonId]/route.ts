@@ -43,6 +43,27 @@ export async function GET(
         const lessonMaster = Array.isArray(schedule.lesson_masters) ? schedule.lesson_masters[0] : schedule.lesson_masters;
 
         let stripeCustomerId = student?.stripe_customer_id
+        if (!stripeCustomerId && student?.id) {
+            console.log(`[Trial Payment] Creating new Stripe customer for student: ${student.id}`)
+            try {
+                const customer = await stripe.customers.create({
+                    email: student.contact_email || undefined,
+                    name: student.full_name || undefined,
+                    metadata: { studentId: student.id }
+                })
+                stripeCustomerId = customer.id
+
+                // Update student with new Stripe Customer ID
+                await supabaseAdmin
+                    .from('students')
+                    .update({ stripe_customer_id: stripeCustomerId })
+                    .eq('id', student.id)
+            } catch (stripeErr) {
+                console.error('[Trial Payment] Failed to create Stripe customer:', stripeErr)
+                return new NextResponse('Failed to create customer in Stripe', { status: 500 })
+            }
+        }
+
         if (!stripeCustomerId) {
             console.error('[Trial Payment] Student has no Stripe Customer ID.')
             return new NextResponse('Stripe Customer ID not found', { status: 400 })

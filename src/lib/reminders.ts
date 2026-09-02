@@ -128,12 +128,12 @@ export async function processLessonReminders(options: ReminderProcessOptions = {
         })
 
         if (!schedules || schedules.length === 0) {
-            return { 
-                success: true, 
-                message: 'No unreminded schedules found for tomorrow', 
+            return {
+                success: true,
+                message: 'No unreminded schedules found for tomorrow',
                 target_date: `${targetYear}-${pad(targetMonth)}-${pad(targetDay)}`,
                 date_range: { start: startOfTomorrow, end: endOfTomorrow },
-                processed: 0 
+                processed: 0
             }
         }
 
@@ -175,26 +175,26 @@ export async function processLessonReminders(options: ReminderProcessOptions = {
 
         const results = []
 
-/**
- * 日本時間 (JST) での日時・時刻フォーマッター (24時間表示)
- */
-function formatJST(isoString: string) {
-    const d = new Date(isoString)
-    const jstStr = d.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' })
-    const jstDate = new Date(jstStr)
+        /**
+         * 日本時間 (JST) での日時・時刻フォーマッター (24時間表示)
+         */
+        function formatJST(isoString: string) {
+            const d = new Date(isoString)
+            const jstStr = d.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' })
+            const jstDate = new Date(jstStr)
 
-    const month = jstDate.getMonth() + 1
-    const day = jstDate.getDate()
-    const weekday = ['日', '月', '火', '水', '木', '金', '土'][jstDate.getDay()]
-    const hours = String(jstDate.getHours()).padStart(2, '0')
-    const minutes = String(jstDate.getMinutes()).padStart(2, '0')
+            const month = jstDate.getMonth() + 1
+            const day = jstDate.getDate()
+            const weekday = ['日', '月', '火', '水', '木', '金', '土'][jstDate.getDay()]
+            const hours = String(jstDate.getHours()).padStart(2, '0')
+            const minutes = String(jstDate.getMinutes()).padStart(2, '0')
 
-    return {
-        dateStr: `${month}月${day}日(${weekday})`,
-        prevDateStr: `${month}/${day}(${weekday})`,
-        timeStr24: `${hours}:${minutes}`
-    }
-}
+            return {
+                dateStr: `${month}月${day}日(${weekday})`,
+                prevDateStr: `${month}/${day}(${weekday})`,
+                timeStr24: `${hours}:${minutes}`
+            }
+        }
 
         // 6. 各レッスンについて配信処理
         for (const schedule of schedules) {

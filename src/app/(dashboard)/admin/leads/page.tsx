@@ -2632,7 +2632,7 @@ export default function AdminLeadsPage() {
 
                                 <div className="bg-gray-50 rounded-lg p-4 border border-gray-100 space-y-2">
                                     <h3 className="text-xs font-bold text-gray-800">利用可能なプレースホルダー</h3>
-                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5 text-[11px]">
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 text-[11px]">
                                         <div className="flex gap-1.5 items-start">
                                             <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{name}}"}</code>
                                             <span className="text-gray-500">顧客氏名</span>
@@ -2652,6 +2652,14 @@ export default function AdminLeadsPage() {
                                         <div className="flex gap-1.5 items-start">
                                             <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{second_student_info}}"}</code>
                                             <span className="text-gray-500">2人目の顧客情報</span>
+                                        </div>
+                                        <div className="flex gap-1.5 items-start">
+                                            <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{amount}}"}</code>
+                                            <span className="text-gray-500">体験料金</span>
+                                        </div>
+                                        <div className="flex gap-1.5 items-start">
+                                            <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{payment_link}}"}</code>
+                                            <span className="text-gray-500">決済リンクURL</span>
                                         </div>
                                         <div className="flex gap-1.5 items-start">
                                             <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{coach_line_url}}"}</code>

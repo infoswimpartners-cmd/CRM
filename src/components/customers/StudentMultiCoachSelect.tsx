@@ -44,12 +44,23 @@ interface Props {
 export function StudentMultiCoachSelect({
     studentId,
     initialAssignedCoaches,
+    initialMainCoachId,
     coaches: propCoaches,
     triggerText,
     variant = 'outline',
     onSaveSuccess
 }: Props) {
-    const [assignedCoaches, setAssignedCoaches] = useState<string[]>(initialAssignedCoaches.map(c => c.coach_id))
+    const getInitialCoaches = () => {
+        if (initialAssignedCoaches.length > 0) {
+            return initialAssignedCoaches.map(c => c.coach_id)
+        }
+        if (initialMainCoachId) {
+            return [initialMainCoachId]
+        }
+        return []
+    }
+
+    const [assignedCoaches, setAssignedCoaches] = useState<string[]>(getInitialCoaches())
     const [optionFees, setOptionFees] = useState<{ [coachId: string]: number }>({})
     const [optionNotes, setOptionNotes] = useState<{ [coachId: string]: string }>({})
     const [localCoaches, setLocalCoaches] = useState<Coach[]>([])
@@ -60,7 +71,13 @@ export function StudentMultiCoachSelect({
     const router = useRouter()
 
     useEffect(() => {
-        setAssignedCoaches(initialAssignedCoaches.map(c => c.coach_id))
+        if (initialAssignedCoaches.length > 0) {
+            setAssignedCoaches(initialAssignedCoaches.map(c => c.coach_id))
+        } else if (initialMainCoachId) {
+            setAssignedCoaches([initialMainCoachId])
+        } else {
+            setAssignedCoaches([])
+        }
         
         const fees: { [coachId: string]: number } = {}
         const notes: { [coachId: string]: string } = {}
@@ -70,7 +87,7 @@ export function StudentMultiCoachSelect({
         })
         setOptionFees(fees)
         setOptionNotes(notes)
-    }, [initialAssignedCoaches])
+    }, [initialAssignedCoaches, initialMainCoachId])
 
     useEffect(() => {
         if (propCoaches && propCoaches.length > 0) {

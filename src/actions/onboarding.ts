@@ -25,11 +25,21 @@ export async function confirmTrialAndBill(studentId: string, lessonDate: Date, c
         // 2. [REMOVED] Pre-registration of lesson result (lessons table)
         // Lessons should only be registered via report after the lesson is completed.
 
-        // 3. Update Student Coach in Profile (Optional but good practice to sync)
-        await supabaseAdmin
-            .from('students')
-            .update({ coach_id: coachId })
-            .eq('id', studentId)
+        // 3. Update Student Coach in Profile & student_coaches table
+        if (coachId) {
+            await supabaseAdmin
+                .from('students')
+                .update({ coach_id: coachId })
+                .eq('id', studentId)
+
+            await supabaseAdmin
+                .from('student_coaches')
+                .upsert({
+                    student_id: studentId,
+                    coach_id: coachId,
+                    role: 'main'
+                }, { onConflict: 'student_id,coach_id' })
+        }
 
         // 4. Create Stripe Customer (if needed)
         let stripeCustomerId = student.stripe_customer_id
@@ -176,6 +186,7 @@ export async function confirmTrialAndBill(studentId: string, lessonDate: Date, c
         console.log('[Trial Confirm] Status updated to trial_billed')
 
         revalidatePath(`/customers/${studentId}`)
+        revalidatePath('/customers')
         return { success: true }
 
     } catch (error: any) {

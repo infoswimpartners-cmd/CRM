@@ -139,6 +139,21 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
     const schedules = schedulesRes.data
     const changeRequest = changeRequestRes.data && changeRequestRes.data.length > 0 ? changeRequestRes.data[0] : null
 
+    // 担当コーチ情報のフォールバック：student_coachesテーブルが空でstudents.coach_idがある場合
+    let finalAssignedCoaches: any[] = assignedCoaches || []
+    if (finalAssignedCoaches.length === 0 && student.coach_id) {
+        const primaryCoach = (coaches || []).find(c => c.id === student.coach_id)
+        if (primaryCoach) {
+            finalAssignedCoaches = [{
+                role: 'main',
+                coach_id: primaryCoach.id,
+                option_reward_fee: 0,
+                option_reward_note: null,
+                profiles: primaryCoach
+            }]
+        }
+    }
+
     const statusLabels: Record<string, string> = {}
     const statusColors: Record<string, string> = {}
     studentStatusMasters?.forEach((s) => {
@@ -388,7 +403,7 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
                     {/* Coach Assignment Card */}
                     <StudentCoachCardContainer
                         studentId={student.id}
-                        initialAssignedCoaches={assignedCoaches || []}
+                        initialAssignedCoaches={finalAssignedCoaches}
                         coaches={coaches || []}
                         isAdmin={isAdmin}
                     />

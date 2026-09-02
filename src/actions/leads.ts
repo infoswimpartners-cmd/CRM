@@ -87,7 +87,7 @@ function parseConfirmedDateTime(dateTimeStr: string): { start: string; end: stri
     }
 }
 
-// 体験アサイン時に仮スケジュールを登録するヘルパー関数
+// 体験アサイン時に体験スケジュールを登録し決済リンクを生成するヘルパー関数
 async function createTrialScheduleForLead(params: {
     leadId: string
     coachId: string
@@ -109,13 +109,31 @@ async function createTrialScheduleForLead(params: {
             .eq('active', true)
             .maybeSingle()
 
+        // 料金の計算（2名同時の場合はpair_unit_priceまたは1.5倍）
+        const baseUnitPrice = trialMaster?.unit_price || 7000
+        const pairPrice = trialMaster?.pair_unit_price || Math.round(baseUnitPrice * 1.5)
+        const lessonPrice = params.hasSecondStudent ? pairPrice : baseUnitPrice
+
         // 2. 日時のパース
         const { start, end } = parseConfirmedDateTime(params.confirmedDate)
 
-        const title = `【仮・体験】${params.studentName}様`
-        const notes = `[体験レッスン仮スケジュール]\n案件ID: ${params.leadId}\n確定日時: ${params.confirmedDate}\n確定場所: ${params.confirmedLocation}\nご要望・備考: ${params.leadNotes || 'なし'}`
+        // コーチ名の取得
+        let coachName = '担当コーチ'
+        if (params.coachId) {
+            const { data: coachProfile } = await supabaseAdmin
+                .from('profiles')
+                .select('full_name')
+                .eq('id', params.coachId)
+                .single()
+            if (coachProfile?.full_name) {
+                coachName = coachProfile.full_name
+            }
+        }
 
-        // 3. lesson_schedules へ登録（ステータスは pending = 確認待ち/仮スケジュール）
+        const title = `${params.studentName}様　担当：${coachName}`
+        const notes = `[体験レッスンスケジュール]\n案件ID: ${params.leadId}\n確定日時: ${params.confirmedDate}\n確定場所: ${params.confirmedLocation}\nご要望・備考: ${params.leadNotes || 'なし'}`
+
+        // 3. lesson_schedules へ登録
         const { data: insertedSchedule, error: insertError } = await supabaseAdmin
             .from('lesson_schedules')
             .insert({
@@ -127,10 +145,11 @@ async function createTrialScheduleForLead(params: {
                 end_time: end,
                 location: params.confirmedLocation || null,
                 notes: notes,
+                price: lessonPrice,
                 status: 'pending',
                 billing_status: 'awaiting_payment',
                 attendance_type: params.hasSecondStudent ? 'both' : 'single',
-                is_overage: false
+                is_overage: true
             })
             .select()
             .single()
@@ -139,6 +158,9 @@ async function createTrialScheduleForLead(params: {
             console.error('Failed to insert trial schedule:', insertError)
             return null
         }
+
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://manager.swim-partners.com'
+        const paymentLink = `${appUrl}/pay/trial/${insertedSchedule.id}`
 
         // 4. Googleカレンダーへの同期
         try {
@@ -189,7 +211,11 @@ async function createTrialScheduleForLead(params: {
             revalidatePath(`/customers/${params.studentId}`)
         }
 
-        return insertedSchedule
+        return {
+            schedule: insertedSchedule,
+            paymentLink: paymentLink,
+            price: lessonPrice
+        }
     } catch (err) {
         console.error('Error in createTrialScheduleForLead:', err)
         return null
@@ -370,51 +396,80 @@ export async function assignLeadAction(leadId: string, confirmedDate: string, co
         }
 
         // 3.5. 顧客マスタ（students）および紐付けテーブル（student_coaches）へのアサインコーチ紐付け
+        const supabaseAdmin = createAdminClient()
         let studentId: string | null = null
+        let studentEmail: string | null = lead.email || null
 
         // LINE ID での生徒検索
         if (lead.line_user_id) {
-            const { data: stdByLine } = await supabase
+            const { data: stdByLine } = await supabaseAdmin
                 .from('students')
-                .select('id')
+                .select('id, contact_email, stripe_customer_id, full_name')
                 .eq('line_user_id', lead.line_user_id)
                 .maybeSingle()
             if (stdByLine) {
                 studentId = stdByLine.id
+                if (stdByLine.contact_email) studentEmail = stdByLine.contact_email
             }
         }
 
         // メールアドレスでの生徒検索
         if (!studentId && lead.email) {
-            const { data: stdByEmail } = await supabase
+            const { data: stdByEmail } = await supabaseAdmin
                 .from('students')
-                .select('id')
-                .eq('contact_email', lead.email)
+                .select('id, contact_email, stripe_customer_id, full_name')
+                .ilike('contact_email', lead.email.trim())
                 .maybeSingle()
             if (stdByEmail) {
                 studentId = stdByEmail.id
+                if (stdByEmail.contact_email) studentEmail = stdByEmail.contact_email
             }
         }
 
         // お名前での生徒検索
         if (!studentId && lead.name) {
-            const { data: stdByName } = await supabase
+            const cleanLeadName = lead.name.replace(/[\s　]+/g, '')
+            const { data: allStudents } = await supabaseAdmin
                 .from('students')
-                .select('id')
-                .eq('full_name', lead.name)
-                .maybeSingle()
-            if (stdByName) {
-                studentId = stdByName.id
+                .select('id, contact_email, stripe_customer_id, full_name')
+                .limit(100)
+            const matchStd = allStudents?.find(s => (s.full_name || '').replace(/[\s　]+/g, '') === cleanLeadName)
+            if (matchStd) {
+                studentId = matchStd.id
+                if (matchStd.contact_email) studentEmail = matchStd.contact_email
             }
         }
 
         if (studentId) {
-            // students テーブルの coach_id と status を更新
-            const { error: studentUpdateError } = await supabase
+            // Stripe Customer ID の確認・自動作成
+            const { data: currentStd } = await supabaseAdmin
+                .from('students')
+                .select('stripe_customer_id, full_name, contact_email')
+                .eq('id', studentId)
+                .single()
+
+            let stripeCustomerId = currentStd?.stripe_customer_id
+            if (!stripeCustomerId) {
+                try {
+                    const { stripe } = await import('@/lib/stripe')
+                    const customer = await stripe.customers.create({
+                        email: currentStd?.contact_email || lead.email || undefined,
+                        name: currentStd?.full_name || lead.name || undefined,
+                        metadata: { studentId: studentId }
+                    })
+                    stripeCustomerId = customer.id
+                } catch (stripeErr) {
+                    console.error('Failed to create Stripe customer on lead confirm:', stripeErr)
+                }
+            }
+
+            // students テーブルの coach_id, status, stripe_customer_id を更新
+            const { error: studentUpdateError } = await supabaseAdmin
                 .from('students')
                 .update({
                     coach_id: profile.id,
-                    status: 'trial_confirmed'
+                    status: 'trial_billed',
+                    stripe_customer_id: stripeCustomerId || null
                 })
                 .eq('id', studentId)
 
@@ -422,34 +477,26 @@ export async function assignLeadAction(leadId: string, confirmedDate: string, co
                 console.error('Failed to update student coach_id and status:', studentUpdateError)
             }
 
-            // student_coaches テーブルの重複チェックとインサート
-            const { data: existRel } = await supabase
+            // student_coaches テーブルに確実に upsert
+            const { error: relError } = await supabaseAdmin
                 .from('student_coaches')
-                .select('id')
-                .eq('student_id', studentId)
-                .eq('coach_id', profile.id)
-                .maybeSingle()
+                .upsert({
+                    student_id: studentId,
+                    coach_id: profile.id,
+                    role: 'main'
+                }, { onConflict: 'student_id,coach_id' })
 
-            if (!existRel) {
-                const { error: relInsertError } = await supabase
-                    .from('student_coaches')
-                    .insert({
-                        student_id: studentId,
-                        coach_id: profile.id,
-                        role: 'main'
-                    })
-                
-                if (relInsertError) {
-                    console.error('Failed to insert student_coaches relation:', relInsertError)
-                }
+            if (relError) {
+                console.error('Failed to upsert student_coaches relation:', relError)
             }
 
             // 関連画面のキャッシュ再検証
             revalidatePath(`/customers/${studentId}`)
+            revalidatePath('/customers')
         }
 
-        // 3.6. 体験レッスンの仮スケジュール（lesson_schedules）を自動登録
-        await createTrialScheduleForLead({
+        // 3.6. 体験レッスンスケジュールを登録し、決済リンクを生成
+        const trialResult = await createTrialScheduleForLead({
             leadId: lead.id,
             coachId: profile.id,
             studentId: studentId,
@@ -460,16 +507,19 @@ export async function assignLeadAction(leadId: string, confirmedDate: string, co
             hasSecondStudent: !!lead.second_student_name
         })
 
+        const paymentLink = trialResult?.paymentLink || ''
+        const amountStr = trialResult?.price ? trialResult.price.toLocaleString() : '7,000'
+
         // 4. 顧客への自動確定通知（LINEプッシュメッセージ）の送信
         if (lead.line_user_id && lead.send_customer_notification !== false) {
             // app_configs から設定を取得
-            const { data: tokenConfig } = await supabase
+            const { data: tokenConfig } = await supabaseAdmin
                 .from('app_configs')
                 .select('value')
                 .eq('key', 'line_channel_access_token')
                 .single()
 
-            const { data: templateConfig } = await supabase
+            const { data: templateConfig } = await supabaseAdmin
                 .from('app_configs')
                 .select('value')
                 .eq('key', 'line_assigned_template')
@@ -485,8 +535,16 @@ export async function assignLeadAction(leadId: string, confirmedDate: string, co
 ■ 確定体験日時: {{lesson_date}}
 ■ レッスン場所: {{location}}
 {{second_student_info}}
+■ 体験レッスン料金: {{amount}}円
 
-別途、担当コーチよりレッスンの日時調整等のご連絡をさせていただきます。
+【お支払いのお願い】
+体験レッスン料金のお支払いは、以下の決済リンク（クレジットカード決済）よりお願いいたします。
+{{payment_link}}
+
+【担当コーチへのご連絡のお願い】
+当日の集合場所等の詳細確認のため、下記URLより担当コーチのLINEを追加いただき、メッセージをお送りいただけますようお願いいたします。
+{{coach_line_url}}
+
 ご連絡をお待ちいただけますようお願いいたします。
 
 Swim Partners`
@@ -508,11 +566,31 @@ Swim Partners`
                 .replace(/\{\{lesson_date\}\}/g, confirmedDate)
                 .replace(/\{\{location\}\}/g, confirmedLocation)
                 .replace(/\{\{second_student_info\}\}/g, secondStudentInfo)
+                .replace(/\{\{amount\}\}/g, amountStr)
+                .replace(/\{\{payment_link\}\}/g, paymentLink)
 
             const { lineService } = await import('@/lib/line')
             const success = await lineService.pushMessage(lead.line_user_id, message, token)
             if (!success) {
                 console.error('Failed to send LINE push notification to client')
+            }
+        }
+
+        // 4.5. 顧客へのメール通知送信（メールアドレスが存在する場合）
+        if (studentEmail) {
+            try {
+                const { emailService } = await import('@/lib/email')
+                await emailService.sendTriggerEmail('trial_lesson_reserved', studentEmail, {
+                    name: lead.name || 'お客様',
+                    lesson_date: confirmedDate,
+                    location: confirmedLocation,
+                    coach_name: profile.full_name || '',
+                    amount: amountStr,
+                    payment_link: paymentLink,
+                    coach_line_url: profile.line_friend_url || ''
+                })
+            } catch (mailErr) {
+                console.error('Failed to send trial reservation email:', mailErr)
             }
         }
 
@@ -668,51 +746,80 @@ export async function adminAssignLeadAction(
         }
 
         // 3.5. 顧客マスタ（students）および紐付けテーブル（student_coaches）へのアサインコーチ紐付け
+        const supabaseAdmin = createAdminClient()
         let studentId: string | null = null
+        let studentEmail: string | null = lead.email || null
 
         // LINE ID での生徒検索
         if (lead.line_user_id) {
-            const { data: stdByLine } = await supabase
+            const { data: stdByLine } = await supabaseAdmin
                 .from('students')
-                .select('id')
+                .select('id, contact_email, stripe_customer_id, full_name')
                 .eq('line_user_id', lead.line_user_id)
                 .maybeSingle()
             if (stdByLine) {
                 studentId = stdByLine.id
+                if (stdByLine.contact_email) studentEmail = stdByLine.contact_email
             }
         }
 
         // メールアドレスでの生徒検索
         if (!studentId && lead.email) {
-            const { data: stdByEmail } = await supabase
+            const { data: stdByEmail } = await supabaseAdmin
                 .from('students')
-                .select('id')
-                .eq('contact_email', lead.email)
+                .select('id, contact_email, stripe_customer_id, full_name')
+                .ilike('contact_email', lead.email.trim())
                 .maybeSingle()
             if (stdByEmail) {
                 studentId = stdByEmail.id
+                if (stdByEmail.contact_email) studentEmail = stdByEmail.contact_email
             }
         }
 
         // お名前での生徒検索
         if (!studentId && lead.name) {
-            const { data: stdByName } = await supabase
+            const cleanLeadName = lead.name.replace(/[\s　]+/g, '')
+            const { data: allStudents } = await supabaseAdmin
                 .from('students')
-                .select('id')
-                .eq('full_name', lead.name)
-                .maybeSingle()
-            if (stdByName) {
-                studentId = stdByName.id
+                .select('id, contact_email, stripe_customer_id, full_name')
+                .limit(100)
+            const matchStd = allStudents?.find(s => (s.full_name || '').replace(/[\s　]+/g, '') === cleanLeadName)
+            if (matchStd) {
+                studentId = matchStd.id
+                if (matchStd.contact_email) studentEmail = matchStd.contact_email
             }
         }
 
         if (studentId) {
-            // students テーブルの coach_id と status を更新
-            const { error: studentUpdateError } = await supabase
+            // Stripe Customer ID の確認・自動作成
+            const { data: currentStd } = await supabaseAdmin
+                .from('students')
+                .select('stripe_customer_id, full_name, contact_email')
+                .eq('id', studentId)
+                .single()
+
+            let stripeCustomerId = currentStd?.stripe_customer_id
+            if (!stripeCustomerId) {
+                try {
+                    const { stripe } = await import('@/lib/stripe')
+                    const customer = await stripe.customers.create({
+                        email: currentStd?.contact_email || lead.email || undefined,
+                        name: currentStd?.full_name || lead.name || undefined,
+                        metadata: { studentId: studentId }
+                    })
+                    stripeCustomerId = customer.id
+                } catch (stripeErr) {
+                    console.error('Failed to create Stripe customer on admin assign:', stripeErr)
+                }
+            }
+
+            // students テーブルの coach_id, status, stripe_customer_id を更新
+            const { error: studentUpdateError } = await supabaseAdmin
                 .from('students')
                 .update({
                     coach_id: targetCoach.id,
-                    status: 'trial_confirmed'
+                    status: 'trial_billed',
+                    stripe_customer_id: stripeCustomerId || null
                 })
                 .eq('id', studentId)
 
@@ -720,34 +827,26 @@ export async function adminAssignLeadAction(
                 console.error('Failed to update student coach_id and status:', studentUpdateError)
             }
 
-            // student_coaches テーブルの重複チェックとインサート
-            const { data: existRel } = await supabase
+            // student_coaches テーブルに確実に upsert
+            const { error: relError } = await supabaseAdmin
                 .from('student_coaches')
-                .select('id')
-                .eq('student_id', studentId)
-                .eq('coach_id', targetCoach.id)
-                .maybeSingle()
+                .upsert({
+                    student_id: studentId,
+                    coach_id: targetCoach.id,
+                    role: 'main'
+                }, { onConflict: 'student_id,coach_id' })
 
-            if (!existRel) {
-                const { error: relInsertError } = await supabase
-                    .from('student_coaches')
-                    .insert({
-                        student_id: studentId,
-                        coach_id: targetCoach.id,
-                        role: 'main'
-                    })
-                
-                if (relInsertError) {
-                    console.error('Failed to insert student_coaches relation:', relInsertError)
-                }
+            if (relError) {
+                console.error('Failed to upsert student_coaches relation:', relError)
             }
 
             // 関連画面のキャッシュ再検証
             revalidatePath(`/customers/${studentId}`)
+            revalidatePath('/customers')
         }
 
-        // 3.6. 体験レッスンの仮スケジュール（lesson_schedules）を自動登録
-        await createTrialScheduleForLead({
+        // 3.6. 体験レッスンスケジュールを登録し、決済リンクを生成
+        const trialResult = await createTrialScheduleForLead({
             leadId: lead.id,
             coachId: targetCoach.id,
             studentId: studentId,
@@ -758,15 +857,18 @@ export async function adminAssignLeadAction(
             hasSecondStudent: !!lead.second_student_name
         })
 
+        const paymentLink = trialResult?.paymentLink || ''
+        const amountStr = trialResult?.price ? trialResult.price.toLocaleString() : '7,000'
+
         // 4. 顧客への自動確定通知（LINEプッシュメッセージ）の送信
         if (lead.line_user_id && lead.send_customer_notification !== false) {
-            const { data: tokenConfig } = await supabase
+            const { data: tokenConfig } = await supabaseAdmin
                 .from('app_configs')
                 .select('value')
                 .eq('key', 'line_channel_access_token')
                 .single()
 
-            const { data: templateConfig } = await supabase
+            const { data: templateConfig } = await supabaseAdmin
                 .from('app_configs')
                 .select('value')
                 .eq('key', 'line_assigned_template')
@@ -774,7 +876,27 @@ export async function adminAssignLeadAction(
 
             const token = tokenConfig?.value || ''
             
-            const defaultLineAssignedTemplate = `{{name}} 様\n\nお申し込みいただいた体験レッスンの担当コーチが決定いたしました。\n\n■ 担当コーチ: {{coach_name}}\n■ 確定体験日時: {{lesson_date}}\n■ レッスン場所: {{location}}\n{{second_student_info}}\n\n別途、担当コーチよりレッスンの日時調整等のご連絡をさせていただきます。\nご連絡をお待ちいただけますようお願いいたします。\n\nSwim Partners`
+            const defaultLineAssignedTemplate = `{{name}} 様
+
+お申し込みいただいた体験レッスンの担当コーチが決定いたしました。
+
+■ 担当コーチ: {{coach_name}}
+■ 確定体験日時: {{lesson_date}}
+■ レッスン場所: {{location}}
+{{second_student_info}}
+■ 体験レッスン料金: {{amount}}円
+
+【お支払いのお願い】
+体験レッスン料金のお支払いは、以下の決済リンク（クレジットカード決済）よりお願いいたします。
+{{payment_link}}
+
+【担当コーチへのご連絡のお願い】
+当日の集合場所等の詳細確認のため、下記URLより担当コーチのLINEを追加いただき、メッセージをお送りいただけますようお願いいたします。
+{{coach_line_url}}
+
+ご連絡をお待ちいただけますようお願いいたします。
+
+Swim Partners`
 
             const bodyTemplate = templateConfig?.value || defaultLineAssignedTemplate
 
@@ -792,11 +914,31 @@ export async function adminAssignLeadAction(
                 .replace(/\{\{lesson_date\}\}/g, confirmedDate)
                 .replace(/\{\{location\}\}/g, confirmedLocation)
                 .replace(/\{\{second_student_info\}\}/g, secondStudentInfo)
+                .replace(/\{\{amount\}\}/g, amountStr)
+                .replace(/\{\{payment_link\}\}/g, paymentLink)
 
             const { lineService } = await import('@/lib/line')
             const success = await lineService.pushMessage(lead.line_user_id, message, token)
             if (!success) {
                 console.error('Failed to send LINE push notification to client')
+            }
+        }
+
+        // 4.5. 顧客へのメール通知送信（メールアドレスが存在する場合）
+        if (studentEmail) {
+            try {
+                const { emailService } = await import('@/lib/email')
+                await emailService.sendTriggerEmail('trial_lesson_reserved', studentEmail, {
+                    name: lead.name || 'お客様',
+                    lesson_date: confirmedDate,
+                    location: confirmedLocation,
+                    coach_name: targetCoach.full_name || '',
+                    amount: amountStr,
+                    payment_link: paymentLink,
+                    coach_line_url: targetCoach.line_friend_url || ''
+                })
+            } catch (mailErr) {
+                console.error('Failed to send trial reservation email:', mailErr)
             }
         }
 
@@ -1294,8 +1436,16 @@ export async function getLineConfigAction() {
 ■ 確定体験日時: {{lesson_date}}
 ■ レッスン場所: {{location}}
 {{second_student_info}}
+■ 体験レッスン料金: {{amount}}円
 
-別途、担当コーチよりレッスンの日時調整等のご連絡をさせていただきます。
+【お支払いのお願い】
+体験レッスン料金のお支払いは、以下の決済リンク（クレジットカード決済）よりお願いいたします。
+{{payment_link}}
+
+【担当コーチへのご連絡のお願い】
+当日の集合場所等の詳細確認のため、下記URLより担当コーチのLINEを追加いただき、メッセージをお送りいただけますようお願いいたします。
+{{coach_line_url}}
+
 ご連絡をお待ちいただけますようお願いいたします。
 
 Swim Partners`
@@ -1345,7 +1495,7 @@ export async function saveLineConfigAction(token: string, template: string) {
             .upsert({ 
                 key: 'line_assigned_template', 
                 value: template,
-                description: '体験レッスンの担当コーチ決定時（アサイン確定時）に顧客のLINEに送信するメッセージテンプレート（変数: {{name}}, {{coach_name}}, {{coach_line_url}}, {{lesson_date}}, {{location}}, {{second_student_info}}）'
+                description: '体験レッスンの担当コーチ決定時（アサイン確定時）に顧客のLINEに送信するメッセージテンプレート（変数: {{name}}, {{coach_name}}, {{coach_line_url}}, {{lesson_date}}, {{location}}, {{second_student_info}}, {{amount}}, {{payment_link}}）'
             }, { onConflict: 'key' })
 
         if (templateError) throw templateError
