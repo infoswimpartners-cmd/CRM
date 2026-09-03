@@ -281,7 +281,7 @@ export default function CoachLeadsPage() {
         
         const options: { label: string; value: string }[] = [];
         
-        for (let current = startMins; current + 60 <= endMins; current += 30) {
+        for (let current = startMins; current + 60 <= endMins; current += 10) {
             const currentStart = minutesToTime(current);
             const currentEnd = minutesToTime(current + 60);
             const timeLabel = `${currentStart}〜${currentEnd}`;

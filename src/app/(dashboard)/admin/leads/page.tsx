@@ -128,6 +128,78 @@ function calculateAge(birthDateString: string | null | undefined): number | null
     return age
 }
 
+function parseDateTimeString(dtStr: string | null | undefined): { dateStr: string; startTime: string | null; endTime: string | null } | null {
+    if (!dtStr) return null;
+    const trimmed = dtStr.trim();
+    if (!trimmed) return null;
+
+    const parts = trimmed.split(/\s+/);
+    const dateStr = parts[0];
+    const timeRangeStr = parts[1] || '';
+
+    if (!timeRangeStr) {
+        return { dateStr, startTime: null, endTime: null };
+    }
+
+    const timeParts = timeRangeStr.split(/[〜\-]/);
+    const startTime = timeParts[0] ? timeParts[0].trim() : null;
+    const endTime = timeParts[1] ? timeParts[1].trim() : null;
+
+    return { dateStr, startTime, endTime };
+}
+
+function generateTimeOptions(dtStr: string | null | undefined): { label: string; value: string }[] {
+    if (!dtStr) return [];
+    
+    const parsed = parseDateTimeString(dtStr);
+    if (!parsed) return [];
+    
+    const { dateStr, startTime, endTime } = parsed;
+    
+    if (!startTime || !endTime) {
+        return [{ label: dtStr, value: dtStr }];
+    }
+    
+    const timeToMinutes = (t: string): number | null => {
+        const match = t.match(/^(\d{1,2}):(\d{2})$/);
+        if (!match) return null;
+        return parseInt(match[1], 10) * 60 + parseInt(match[2], 10);
+    };
+    
+    const minutesToTime = (m: number): string => {
+        const hrs = Math.floor(m / 60);
+        const mins = m % 60;
+        return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+    };
+    
+    const startMins = timeToMinutes(startTime);
+    const endMins = timeToMinutes(endTime);
+    
+    if (startMins === null || endMins === null || endMins - startMins < 60) {
+        const timeLabel = `${startTime}〜${endTime}`;
+        return [{ label: timeLabel, value: dtStr }];
+    }
+    
+    const options: { label: string; value: string }[] = [];
+    
+    for (let current = startMins; current + 60 <= endMins; current += 10) {
+        const currentStart = minutesToTime(current);
+        const currentEnd = minutesToTime(current + 60);
+        const timeLabel = `${currentStart}〜${currentEnd}`;
+        const val = `${dateStr} ${timeLabel}`;
+        options.push({
+            label: timeLabel,
+            value: val
+        });
+    }
+    
+    if (options.length === 0) {
+        return [{ label: `${startTime}〜${endTime}`, value: dtStr }];
+    }
+    
+    return options;
+}
+
 interface Facility {
     id: string
     name: string
@@ -1855,13 +1927,43 @@ export default function AdminLeadsPage() {
                                                     <button
                                                         key={idx}
                                                         type="button"
-                                                        className="text-[10px] px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100 hover:bg-blue-100 transition-colors text-left cursor-pointer"
+                                                        className="text-[10px] px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100 hover:bg-blue-100 transition-colors text-left cursor-pointer font-medium"
                                                         onClick={() => setAssignConfirmedDate(d.val || '')}
                                                     >
                                                         {d.label}: {d.val}
                                                     </button>
                                                 ))}
                                             </div>
+                                            {/* 10分刻みの時間候補ボタン */}
+                                            {(() => {
+                                                const allOptions = [
+                                                    ...generateTimeOptions(assigningLead.datetime1),
+                                                    ...generateTimeOptions(assigningLead.datetime2),
+                                                    ...generateTimeOptions(assigningLead.datetime3),
+                                                ].filter((opt, idx, self) => opt.value !== opt.label && self.findIndex(o => o.value === opt.value) === idx)
+
+                                                if (allOptions.length === 0) return null
+
+                                                return (
+                                                    <div className="flex flex-wrap gap-1 mb-1.5 max-h-24 overflow-y-auto p-1.5 bg-slate-50 border border-slate-100 rounded">
+                                                        <span className="text-[9px] text-gray-400 w-full mb-0.5">10分刻み候補（クリックで反映）:</span>
+                                                        {allOptions.map((opt, idx) => (
+                                                            <button
+                                                                key={idx}
+                                                                type="button"
+                                                                className={`text-[9px] px-1.5 py-0.5 rounded border transition-colors cursor-pointer ${
+                                                                    assignConfirmedDate === opt.value
+                                                                        ? 'bg-blue-600 text-white border-blue-600 font-semibold'
+                                                                        : 'bg-white text-gray-700 border-gray-200 hover:bg-blue-50 hover:text-blue-700'
+                                                                }`}
+                                                                onClick={() => setAssignConfirmedDate(opt.value)}
+                                                            >
+                                                                {opt.value}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                )
+                                            })()}
                                             <Input
                                                 id="assignDate"
                                                 placeholder="例: 2026/09/01 10:00〜"
