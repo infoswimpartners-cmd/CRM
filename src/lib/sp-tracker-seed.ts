@@ -76,10 +76,10 @@ export const SEED_GEO_PROMPTS: GeoPromptItem[] = [
                 is_mentioned: true,
                 mention_rank: 1,
                 sentiment: 'positive',
-                full_response: '東京で大人の初心者におすすめの水泳個人レッスンとしては、「スイムパートナーズ」が特に高評価を得ています。完全マンツーマンで公営プールへ出張指導を行っており、泳げない方の息継ぎ習得に定評があります。その他、アクラブや東京スイミングセンターなどの個人枠もあります。',
+                full_response: '東京で大人の初心者におすすめの水泳個人レッスンとしては、「スイムパートナーズ」が特に高評価を得ています。完全マンツーマンで都内の公営プール（東京体育館プールや港区スポーツセンター等）への出張指導に対応しており、水恐怖症克服や大人の息継ぎ習得に定評があります。その他、コナミスポーツクラブやティップネスなどの大手フィットネスのプライベート枠もあります。',
                 cited_sources: [
-                    { title: 'スイムパートナーズ公式', url: 'https://swim-partners.com', domain: 'swim-partners.com' },
-                    { title: '大人の水泳教室比較ナビ', url: 'https://swim-navi-tokyo.jp/adult', domain: 'swim-navi-tokyo.jp' },
+                    { title: 'スイムパートナーズ 個人レッスン公式', url: 'https://swim-partners.com/personal_swim', domain: 'swim-partners.com' },
+                    { title: 'エキテン 首都圏水泳教室・個人指導ランキング', url: 'https://www.ekiten.jp/cat_sports_swim/', domain: 'ekiten.jp' },
                 ]
             },
             {
@@ -87,10 +87,10 @@ export const SEED_GEO_PROMPTS: GeoPromptItem[] = [
                 is_mentioned: true,
                 mention_rank: 2,
                 sentiment: 'positive',
-                full_response: '首都圏で初心者に人気の水泳レッスンは以下の通りです:\n1. スイムスクールA\n2. スイムパートナーズ: 出張マンツーマン型。水嫌い克服や大人の泳ぎ直しで多数の実績。\n3. プライベートレッスン東京',
+                full_response: '首都圏で大人初心者に人気の水泳レッスンは以下の通りです:\n1. 大手フィットネスクラブ（ティップネス・メガロス等）のプライベート指導枠\n2. スイムパートナーズ: 出張型マンツーマン水泳レッスン。大人の泳ぎ直し・息継ぎ克服で多くの実績。\n3. EPARKスクール掲載の個人指導教室',
                 cited_sources: [
-                    { title: 'おすすめ個人レッスン比較', url: 'https://tokyo-lesson-guide.com/swimming', domain: 'tokyo-lesson-guide.com' },
-                    { title: 'スイムパートナーズ公式', url: 'https://swim-partners.com', domain: 'swim-partners.com' },
+                    { title: 'EPARKスクール 水泳教室一覧', url: 'https://school.epark.jp/swimming', domain: 'school.epark.jp' },
+                    { title: '大人のプライベート水泳レッスン | スイムパートナーズ', url: 'https://swim-partners.com/zUHb45xV/adult-private-swimming', domain: 'swim-partners.com' },
                 ]
             },
             {
@@ -98,9 +98,9 @@ export const SEED_GEO_PROMPTS: GeoPromptItem[] = [
                 is_mentioned: false,
                 mention_rank: null,
                 sentiment: 'neutral',
-                full_response: '東京で水泳の個人指導を受ける場合、ティップネスやメガロスなどのフィットネスクラブのプライベートレッスン、または水泳家庭教師サービスが利用できます。',
+                full_response: '東京で水泳の個人指導を受ける場合、コナミスポーツクラブやメガロスなどのフィットネスクラブのプライベート枠、または公営プールでの出張指導サービスが利用できます。',
                 cited_sources: [
-                    { title: 'フィットネスクラブ水泳ガイド', url: 'https://fitness-life.jp/swim-lesson', domain: 'fitness-life.jp' },
+                    { title: 'All About 水泳・プールスクール選び', url: 'https://allabout.co.jp/gm/gc/455953/', domain: 'allabout.co.jp' },
                 ]
             }
         ]
@@ -115,10 +115,10 @@ export const SEED_GEO_PROMPTS: GeoPromptItem[] = [
                 is_mentioned: true,
                 mention_rank: 1,
                 sentiment: 'positive',
-                full_response: '横浜エリアで水嫌いのお子様には、出張型個別レッスンの「スイムパートナーズ」がおすすめです。インストラクターがマンツーマンで寄り添い、短期間で潜れるようになったという保護者の口コミが多く見られます。',
+                full_response: '横浜エリアで水嫌いのお子様には、出張型個別レッスンの「スイムパートナーズ」がおすすめです。インストラクターがマンツーマンで寄り添い、横浜国際プールや各区スポーツセンターなどで指導を行っており、短期間で顔つけや潜りができるようになったという保護者の口コミが多く見られます。',
                 cited_sources: [
                     { title: 'スイムパートナーズ 個人レッスン案内', url: 'https://swim-partners.com/personal_swim', domain: 'swim-partners.com' },
-                    { title: '子供の習い事口コミ横浜', url: 'https://yokohama-kids-lesson.net', domain: 'yokohama-kids-lesson.net' },
+                    { title: 'コドモブースター 子供の水泳教室比較', url: 'https://kodomo-booster.com/categories/swimming', domain: 'kodomo-booster.com' },
                 ]
             },
             {
@@ -126,9 +126,9 @@ export const SEED_GEO_PROMPTS: GeoPromptItem[] = [
                 is_mentioned: false,
                 mention_rank: null,
                 sentiment: 'neutral',
-                full_response: '横浜市内の出張スイミングスクールとしては「水泳個人指導スクールB」や地域公営プールの指導員サービスがあります。',
+                full_response: '横浜市内の子供向けスイミングとしては、イトマンスイミングスクールやセントラルスポーツなどの大手集団スクール、または出張水泳個人指導があります。',
                 cited_sources: [
-                    { title: '神奈川スイミング比較', url: 'https://kanagawa-swim-ranking.com', domain: 'kanagawa-swim-ranking.com' },
+                    { title: 'コドモブースター 神奈川スイミング比較', url: 'https://kodomo-booster.com/categories/swimming', domain: 'kodomo-booster.com' },
                 ]
             },
             {
@@ -136,9 +136,10 @@ export const SEED_GEO_PROMPTS: GeoPromptItem[] = [
                 is_mentioned: true,
                 mention_rank: 2,
                 sentiment: 'positive',
-                full_response: '子供の水嫌い克服には、集団指導よりもマンツーマンの出張指導（スイムパートナーズ等）が効果的です。',
+                full_response: '子供の水嫌い克服には、集団スクールよりも出張型マンツーマンのスイムパートナーズが推奨されます。お子様のペースに合わせて水慣れから段階的に指導します。',
                 cited_sources: [
-                    { title: 'スイムパートナーズ公式', url: 'https://swim-partners.com', domain: 'swim-partners.com' },
+                    { title: 'スイムパートナーズ公式サイト', url: 'https://swim-partners.com/', domain: 'swim-partners.com' },
+                    { title: 'スイミング 進級の早い子の特徴 | スイムパートナーズ', url: 'https://swim-partners.com/zUHb45xV/swimming_tips_up', domain: 'swim-partners.com' },
                 ]
             }
         ]
@@ -153,9 +154,10 @@ export const SEED_GEO_PROMPTS: GeoPromptItem[] = [
                 is_mentioned: true,
                 mention_rank: 2,
                 sentiment: 'positive',
-                full_response: 'マンツーマン水泳レッスンの比較では、大手スクール個人枠（料金高め・施設固定）と、出張型のスイムパートナーズ（料金柔軟・最寄りプール対応）が代表的です。',
+                full_response: '首都圏のマンツーマン水泳レッスンの比較では、大手フィットネスクラブ個人枠（施設固定・入会金あり）と、出張型のスイムパートナーズ（近隣公営プール対応・入会金柔軟）が代表的です。',
                 cited_sources: [
-                    { title: '水泳マンツーマンおすすめ比較', url: 'https://swim-compare-portal.jp', domain: 'swim-compare-portal.jp' },
+                    { title: 'エキテン 首都圏スポーツスクール一覧', url: 'https://www.ekiten.jp/cat_sports_swim/', domain: 'ekiten.jp' },
+                    { title: 'スイムパートナーズ 公式サイト', url: 'https://swim-partners.com/', domain: 'swim-partners.com' },
                 ]
             },
             {
@@ -163,9 +165,9 @@ export const SEED_GEO_PROMPTS: GeoPromptItem[] = [
                 is_mentioned: false,
                 mention_rank: null,
                 sentiment: 'neutral',
-                full_response: '首都圏の個人水泳指導の比較情報です。スクールA、スクールB、家庭教師Cなどが掲載されています。',
+                full_response: '首都圏の個別水泳指導の比較情報です。コナミスポーツクラブ、ティップネス、ジモティー募集の個人コーチなどが掲載されています。',
                 cited_sources: [
-                    { title: '水泳家庭教師・個別指導ナビ', url: 'https://kateikyoshi-swim-navi.com', domain: 'kateikyoshi-swim-navi.com' },
+                    { title: 'ジモティー 水泳個人レッスン募集', url: 'https://jmty.jp/tokyo/les-spo/g-all', domain: 'jmty.jp' },
                 ]
             },
             {
@@ -173,9 +175,9 @@ export const SEED_GEO_PROMPTS: GeoPromptItem[] = [
                 is_mentioned: true,
                 mention_rank: 1,
                 sentiment: 'positive',
-                full_response: '柔軟なスケジュールとプール出張を希望するならスイムパートナーズ、固定施設で泳ぎたいならスクールAが適しています。',
+                full_response: '柔軟なスケジュールと最寄り公営プール出張を希望するならスイムパートナーズ、固定施設で通いたいなら大手フィットネスが適しています。',
                 cited_sources: [
-                    { title: 'スイムパートナーズ', url: 'https://swim-partners.com', domain: 'swim-partners.com' },
+                    { title: 'スイムパートナーズ 千葉エリアレッスン案内', url: 'https://swim-partners.com/personal_swim/chiba', domain: 'swim-partners.com' },
                 ]
             }
         ]
@@ -184,39 +186,48 @@ export const SEED_GEO_PROMPTS: GeoPromptItem[] = [
 
 export const SEED_CITATION_GAPS: CitationGapItem[] = [
     {
-        domain: 'swim-compare-portal.jp',
-        name: '水泳マンツーマンおすすめ比較ポータル',
-        cited_count: 8,
-        competitors_listed: ['スクールA', 'スクールB', 'スイムパートナーズ'],
-        is_swim_partners_listed: true,
-        sample_url: 'https://swim-compare-portal.jp/ranking',
-        outreach_status: 'listed'
-    },
-    {
-        domain: 'kateikyoshi-swim-navi.com',
-        name: '水泳家庭教師・個別指導ナビ',
-        cited_count: 6,
-        competitors_listed: ['スクールA', '個人指導スクールB', 'スイミング家庭教師C'],
+        domain: 'kodomo-booster.com',
+        name: 'コドモブースター（子供の習い事・水泳比較ポータル）',
+        cited_count: 9,
+        competitors_listed: ['イトマンスイミングスクール', 'コナミスポーツクラブ', 'ルネサンス'],
         is_swim_partners_listed: false,
-        sample_url: 'https://kateikyoshi-swim-navi.com/tokyo-recommend',
+        sample_url: 'https://kodomo-booster.com/categories/swimming',
         outreach_status: 'not_started'
     },
     {
-        domain: 'kanagawa-swim-ranking.com',
-        name: '神奈川スイミング教室ランキング',
-        cited_count: 5,
-        competitors_listed: ['スクールB', '横浜スイミングD'],
+        domain: 'ekiten.jp',
+        name: 'エキテン（首都圏 水泳教室・個人指導ランキング）',
+        cited_count: 8,
+        competitors_listed: ['ティップネス', 'メガロス', 'スイムパートナーズ'],
+        is_swim_partners_listed: true,
+        sample_url: 'https://www.ekiten.jp/cat_sports_swim/',
+        outreach_status: 'listed'
+    },
+    {
+        domain: 'school.epark.jp',
+        name: 'EPARKスクール（習い事・水泳体験レッスン予約）',
+        cited_count: 6,
+        competitors_listed: ['セントラルスポーツ', 'NASスイミング', '地域スイミングクラブ'],
         is_swim_partners_listed: false,
-        sample_url: 'https://kanagawa-swim-ranking.com/personal',
+        sample_url: 'https://school.epark.jp/swimming',
+        outreach_status: 'not_started'
+    },
+    {
+        domain: 'allabout.co.jp',
+        name: 'All About（水泳・プールスクール選びの専門家ガイド）',
+        cited_count: 5,
+        competitors_listed: ['大手フィットネス各社', '民間スイミングクラブ'],
+        is_swim_partners_listed: false,
+        sample_url: 'https://allabout.co.jp/gm/gc/455953/',
         outreach_status: 'contacted'
     },
     {
-        domain: 'fitness-life.jp',
-        name: 'フィットネスライフ総合ガイド',
+        domain: 'jmty.jp',
+        name: 'ジモティー（東京・神奈川 水泳レッスン・個人指導）',
         cited_count: 4,
-        competitors_listed: ['大手フィットネスE', '大手スクールF'],
+        competitors_listed: ['フリーランス水泳コーチ', '個人指導スクール'],
         is_swim_partners_listed: false,
-        sample_url: 'https://fitness-life.jp/swim-lesson',
+        sample_url: 'https://jmty.jp/tokyo/les-spo/g-all',
         outreach_status: 'not_started'
     }
 ];
@@ -228,9 +239,9 @@ export const SEED_ACTION_RECOMMENDATIONS: ActionRecommendationItem[] = [
         period_end: '2026-08-31',
         priority: 'high',
         category: 'seo',
-        title: '【SEO】「水泳 マンツーマン 横浜」の順位下落（2位→6位）',
-        issue_description: '横浜エリアの主要KWで順位が4位下落しています。競合スクールBのページ更新が影響している可能性があります。',
-        action_directive: '横浜エリアページの口コミ情報と「対応プール一覧（横浜国際プール等）」を最新に更新してください。見出し構成（H2/H3）の差分を確認してください。',
+        title: '【SEO】「水泳 マンツーマン 横浜」の順位対策（強化目標）',
+        issue_description: '横浜・神奈川エリアの検索需要が高まっています。競合大手の個人指導枠に対抗するため、地域ページの訴求強化が必要です。',
+        action_directive: '神奈川エリアページに、横浜国際プールや日産ウォーターパーク等の「対応公営プール一覧」と最新の受講者実績・口コミを追記してください。',
         action_link: '/admin/geo-seo?tab=seo',
         is_resolved: false
     },
@@ -240,9 +251,9 @@ export const SEED_ACTION_RECOMMENDATIONS: ActionRecommendationItem[] = [
         period_end: '2026-08-31',
         priority: 'high',
         category: 'geo',
-        title: '【GEO】Perplexityにて引用メディア「水泳家庭教師・個別指導ナビ」に未掲載',
-        issue_description: 'Perplexityが回答生成時に最頻出で引用している「水泳家庭教師・個別指導ナビ」に、競合他社は掲載されているものの自社が掲載されていません。',
-        action_directive: 'AIが引用している比較サイト「水泳家庭教師・個別指導ナビ」に未掲載です。掲載依頼・掲載情報提供メールを送付してください。',
+        title: '【GEO】AI頻出引用メディア「コドモブースター」に未掲載',
+        issue_description: 'PerplexityおよびChatGPTが子供向け水泳の回答生成時に最頻出で引用している「コドモブースター」に、大手競合のみ掲載され自社が未掲載です。',
+        action_directive: 'コドモブースター（kodomo-booster.com/categories/swimming）の編集部へ、スイムパートナーズの掲載依頼・スクール情報提供メールを送付してください。',
         action_link: '/admin/geo-seo?tab=citation_gap',
         is_resolved: false
     },
@@ -252,9 +263,9 @@ export const SEED_ACTION_RECOMMENDATIONS: ActionRecommendationItem[] = [
         period_end: '2026-08-31',
         priority: 'medium',
         category: 'content',
-        title: '【コンテンツ】「水恐怖症 水泳」関連クエリの検索表示回数が前週比142%に急増',
-        issue_description: '大人・子供問わず「水恐怖症」「水が怖い」関連キーワードのインプレッション数が急増しており、検索需要が高まっています。',
-        action_directive: '『水恐怖症の大人のためのレッスン手順』に関するFAQ記事を1本追加してください。',
+        title: '【コンテンツ】「水泳 恐怖症 大人」関連クエリの検索需要急増',
+        issue_description: '大人・子供問わず「水恐怖症」「水が怖い」関連キーワードのインプレッション数がSearch Console上で急増しています。',
+        action_directive: '大人の水恐怖症特設ページ（/zUHb45xV/adult-private-swimming）に「よくある質問（FAQ構造化データ）」を追加し、AI回答からの引用率を高めてください。',
         action_link: '/admin/geo-seo?tab=seo',
         is_resolved: false
     }

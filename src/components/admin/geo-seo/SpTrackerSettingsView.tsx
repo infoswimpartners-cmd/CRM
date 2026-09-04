@@ -1,30 +1,35 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Settings, Plus, Send, ShieldCheck, CheckCircle2, AlertCircle, Save } from 'lucide-react';
+import { Settings, Plus, Send, ShieldCheck, CheckCircle2, AlertCircle, Save, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
     addKeywordAction,
+    removeKeywordAction,
     addGeoPromptAction,
     testSendGoogleChatReport,
     saveSpTrackerWebhookUrlAction,
 } from '@/actions/sp-tracker-actions';
+import { KeywordItem } from '@/lib/sp-tracker-seed';
 
 interface SpTrackerSettingsViewProps {
     webhookConfigured: boolean;
     currentWebhookUrl?: string;
+    keywords?: KeywordItem[];
     onRefresh: () => Promise<void>;
 }
 
 export function SpTrackerSettingsView({
     webhookConfigured,
     currentWebhookUrl = '',
+    keywords = [],
     onRefresh,
 }: SpTrackerSettingsViewProps) {
     const [newKeyword, setNewKeyword] = useState('');
     const [newArea, setNewArea] = useState('tokyo_23');
     const [newTarget, setNewTarget] = useState('adult');
     const [isSubmittingKw, setIsSubmittingKw] = useState(false);
+    const [deletingKw, setDeletingKw] = useState<string | null>(null);
 
     const [newPrompt, setNewPrompt] = useState('');
     const [newIntent, setNewIntent] = useState('adult');
@@ -72,6 +77,42 @@ export function SpTrackerSettingsView({
             }
         } finally {
             setIsSubmittingKw(false);
+        }
+    };
+
+    const handleRemoveKeyword = async (keyword: string) => {
+        setDeletingKw(keyword);
+        try {
+            const res = await removeKeywordAction(keyword);
+            if (res.success) {
+                toast.success(res.message);
+                await onRefresh();
+            } else {
+                toast.error(res.message || '削除に失敗しました');
+            }
+        } catch (err: any) {
+            toast.error(err.message || 'エラーが発生しました');
+        } finally {
+            setDeletingKw(null);
+        }
+    };
+
+    const getAreaBadgeLabel = (area: string) => {
+        switch (area) {
+            case 'tokyo_23': return '東京23区';
+            case 'kanagawa': return '神奈川・横浜';
+            case 'chiba': return '千葉';
+            default: return area;
+        }
+    };
+
+    const getTargetBadgeLabel = (target: string) => {
+        switch (target) {
+            case 'adult': return '大人・泳ぎ直し';
+            case 'junior': return '子供・ジュニア';
+            case 'phobia': return '水恐怖症克服';
+            case 'triathlon': return 'トライアスロン';
+            default: return target;
         }
     };
 
@@ -231,6 +272,56 @@ export function SpTrackerSettingsView({
                         </button>
                     </div>
                 </form>
+
+                {/* 登録済みキーワード一覧 */}
+                <div className="pt-6 border-t border-zinc-100 space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                            <h4 className="text-sm font-bold text-zinc-900 flex items-center gap-2">
+                                <span>現在追跡中のキーワード一覧</span>
+                                <span className="px-2 py-0.5 rounded-full text-xs font-mono font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                    {keywords.length} 件
+                                </span>
+                            </h4>
+                            <p className="text-[11px] text-zinc-500 mt-0.5">
+                                「SEO推移」タブにてGoogle Search Consoleの実順位・実在URLとリアルタイム連動して推移を追跡します。
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-80 overflow-y-auto pr-1">
+                        {keywords.map((kw) => (
+                            <div
+                                key={kw.id}
+                                className="p-3.5 rounded-xl border border-zinc-200/80 bg-zinc-50/60 hover:bg-white hover:border-zinc-300 transition-all flex items-center justify-between gap-3 shadow-[0_2px_8px_rgba(0,0,0,0.02)]"
+                            >
+                                <div className="space-y-1.5 min-w-0 flex-1">
+                                    <div className="font-bold text-xs text-zinc-900 truncate">
+                                        {kw.keyword}
+                                    </div>
+                                    <div className="flex items-center gap-1.5 text-[10px] font-mono">
+                                        <span className="px-1.5 py-0.5 rounded bg-zinc-200/80 text-zinc-700 font-medium">
+                                            {getAreaBadgeLabel(kw.area_category)}
+                                        </span>
+                                        <span className="px-1.5 py-0.5 rounded bg-indigo-100/70 text-indigo-700 font-medium">
+                                            {getTargetBadgeLabel(kw.target_category)}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={() => handleRemoveKeyword(kw.keyword)}
+                                    disabled={deletingKw === kw.keyword}
+                                    className="p-1.5 rounded-lg text-zinc-400 hover:text-rose-600 hover:bg-rose-50 transition-colors flex-shrink-0 disabled:opacity-50"
+                                    title="キーワードの追跡を解除"
+                                >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
             </div>
 
             {/* GEO想定質問プロンプト追加 */}

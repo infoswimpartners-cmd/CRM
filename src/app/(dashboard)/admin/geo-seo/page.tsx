@@ -203,6 +203,7 @@ function SpTrackerContent() {
                     <SpTrackerSettingsView
                         webhookConfigured={data.config.googleChatWebhookConfigured}
                         currentWebhookUrl={data.config.googleChatWebhookUrl}
+                        keywords={data.keywords}
                         onRefresh={loadDashboard}
                     />
                 )}
