@@ -1,16 +1,26 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Settings, Plus, Send, ShieldCheck, CheckCircle2, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Settings, Plus, Send, ShieldCheck, CheckCircle2, AlertCircle, Save } from 'lucide-react';
 import { toast } from 'sonner';
-import { addKeywordAction, addGeoPromptAction, testSendGoogleChatReport } from '@/actions/sp-tracker-actions';
+import {
+    addKeywordAction,
+    addGeoPromptAction,
+    testSendGoogleChatReport,
+    saveSpTrackerWebhookUrlAction,
+} from '@/actions/sp-tracker-actions';
 
 interface SpTrackerSettingsViewProps {
     webhookConfigured: boolean;
+    currentWebhookUrl?: string;
     onRefresh: () => Promise<void>;
 }
 
-export function SpTrackerSettingsView({ webhookConfigured, onRefresh }: SpTrackerSettingsViewProps) {
+export function SpTrackerSettingsView({
+    webhookConfigured,
+    currentWebhookUrl = '',
+    onRefresh,
+}: SpTrackerSettingsViewProps) {
     const [newKeyword, setNewKeyword] = useState('');
     const [newArea, setNewArea] = useState('tokyo_23');
     const [newTarget, setNewTarget] = useState('adult');
@@ -20,8 +30,32 @@ export function SpTrackerSettingsView({ webhookConfigured, onRefresh }: SpTracke
     const [newIntent, setNewIntent] = useState('adult');
     const [isSubmittingPrompt, setIsSubmittingPrompt] = useState(false);
 
-    const [webhookUrlInput, setWebhookUrlInput] = useState('');
+    const [webhookUrlInput, setWebhookUrlInput] = useState(currentWebhookUrl);
+    const [isSavingWebhook, setIsSavingWebhook] = useState(false);
     const [isTestingWebhook, setIsTestingWebhook] = useState(false);
+
+    useEffect(() => {
+        if (currentWebhookUrl) {
+            setWebhookUrlInput(currentWebhookUrl);
+        }
+    }, [currentWebhookUrl]);
+
+    const handleSaveWebhook = async () => {
+        setIsSavingWebhook(true);
+        try {
+            const res = await saveSpTrackerWebhookUrlAction(webhookUrlInput);
+            if (res.success) {
+                toast.success(res.message || 'Webhook URLを保存しました');
+                await onRefresh();
+            } else {
+                toast.error(res.message || '保存に失敗しました');
+            }
+        } catch (err: any) {
+            toast.error(err.message || 'エラーが発生しました');
+        } finally {
+            setIsSavingWebhook(false);
+        }
+    };
 
     const handleAddKeyword = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -94,7 +128,7 @@ export function SpTrackerSettingsView({ webhookConfigured, onRefresh }: SpTracke
 
                     {webhookConfigured ? (
                         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> 環境変数設定済み
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Webhook設定済み
                         </span>
                     ) : (
                         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold bg-amber-50 text-amber-700 border border-amber-200">
@@ -117,8 +151,16 @@ export function SpTrackerSettingsView({ webhookConfigured, onRefresh }: SpTracke
                                 className="flex-1 px-4 py-2.5 rounded-xl border border-zinc-200 bg-zinc-50 text-xs font-mono focus:outline-none focus:border-zinc-900"
                             />
                             <button
+                                onClick={handleSaveWebhook}
+                                disabled={isSavingWebhook}
+                                className="px-5 py-2.5 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 text-xs font-semibold transition-all inline-flex items-center justify-center gap-2 disabled:opacity-50 flex-shrink-0 shadow-sm"
+                            >
+                                <Save className={`w-3.5 h-3.5 ${isSavingWebhook ? 'animate-spin' : ''}`} />
+                                {isSavingWebhook ? '保存中...' : 'Webhookを保存'}
+                            </button>
+                            <button
                                 onClick={handleTestWebhook}
-                                disabled={isTestingWebhook}
+                                disabled={isTestingWebhook || !webhookUrlInput}
                                 className="px-5 py-2.5 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 text-xs font-semibold transition-all inline-flex items-center justify-center gap-2 disabled:opacity-50 flex-shrink-0"
                             >
                                 <Send className={`w-3.5 h-3.5 ${isTestingWebhook ? 'animate-spin' : ''}`} />
@@ -126,7 +168,7 @@ export function SpTrackerSettingsView({ webhookConfigured, onRefresh }: SpTracke
                             </button>
                         </div>
                         <p className="text-[11px] text-zinc-400 mt-1.5">
-                            ※ `.env.local` の `GOOGLE_CHAT_WEBHOOK_URL` に設定すると、毎週月曜日に完全自動で定期配信されます。
+                            ※ 入力したWebhook URLを「Webhookを保存」でデータベースに登録すると、毎週月曜 8:30 JST に定期自動配信されます。
                         </p>
                     </div>
                 </div>

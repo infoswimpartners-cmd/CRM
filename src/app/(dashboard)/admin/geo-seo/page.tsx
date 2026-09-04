@@ -202,6 +202,7 @@ function SpTrackerContent() {
                 {activeTab === 'settings' && (
                     <SpTrackerSettingsView
                         webhookConfigured={data.config.googleChatWebhookConfigured}
+                        currentWebhookUrl={data.config.googleChatWebhookUrl}
                         onRefresh={loadDashboard}
                     />
                 )}

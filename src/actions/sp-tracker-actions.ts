@@ -30,6 +30,7 @@ export interface SpTrackerDashboardData {
     ga4Data?: any;
     config: {
         googleChatWebhookConfigured: boolean;
+        googleChatWebhookUrl?: string;
         ga4Configured: boolean;
         searchConsoleConfigured: boolean;
     };
@@ -155,7 +156,21 @@ export async function getSpTrackerDashboard(): Promise<SpTrackerDashboardData> {
         // ④ 内部SEOヘルススコア (Core Web Vitals や Search Console 指標)
         const internalHealthScore = 92;
 
-        const googleChatWebhookUrl = process.env.GOOGLE_CHAT_WEBHOOK_URL || '';
+        let googleChatWebhookUrl = process.env.GOOGLE_CHAT_WEBHOOK_URL || '';
+        if (!googleChatWebhookUrl) {
+            const { data: webhookRow } = await supabase
+                .from('google_chat_webhooks')
+                .select('webhook_url')
+                .eq('space_name', 'SP-Tracker週次アクション')
+                .eq('active', true)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+            if (webhookRow?.webhook_url) {
+                googleChatWebhookUrl = webhookRow.webhook_url;
+            }
+        }
 
         return {
             statusMeters: {
@@ -172,6 +187,7 @@ export async function getSpTrackerDashboard(): Promise<SpTrackerDashboardData> {
             ga4Data,
             config: {
                 googleChatWebhookConfigured: Boolean(googleChatWebhookUrl),
+                googleChatWebhookUrl: googleChatWebhookUrl || undefined,
                 ga4Configured: Boolean(process.env.GA4_PROPERTY_ID),
                 searchConsoleConfigured: Boolean(process.env.SEARCH_CONSOLE_SITE_URL),
             },
@@ -262,7 +278,23 @@ export async function addGeoPromptAction(prompt_text: string, intent_category: s
  * Google Chat Webhook へ即時テスト配信
  */
 export async function testSendGoogleChatReport(customWebhookUrl?: string) {
-    const webhookUrl = customWebhookUrl || process.env.GOOGLE_CHAT_WEBHOOK_URL;
+    let webhookUrl = customWebhookUrl || process.env.GOOGLE_CHAT_WEBHOOK_URL;
+    if (!webhookUrl) {
+        const supabase = createAdminClient();
+        const { data: webhookRow } = await supabase
+            .from('google_chat_webhooks')
+            .select('webhook_url')
+            .eq('space_name', 'SP-Tracker週次アクション')
+            .eq('active', true)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        if (webhookRow?.webhook_url) {
+            webhookUrl = webhookRow.webhook_url;
+        }
+    }
+
     if (!webhookUrl) {
         return { success: false, message: 'Google Chat Incoming Webhook URLが指定されていません。' };
     }
@@ -282,3 +314,59 @@ export async function testSendGoogleChatReport(customWebhookUrl?: string) {
 
     return result;
 }
+
+/**
+ * SP-Tracker用のGoogle Chat Webhook URLを保存（google_chat_webhooksテーブルにUpsert）
+ */
+export async function saveSpTrackerWebhookUrlAction(webhookUrl: string) {
+    try {
+        const supabase = createAdminClient();
+        const trimmedUrl = webhookUrl.trim();
+
+        if (!trimmedUrl) {
+            // 空文字で保存された場合は非アクティブ化
+            await supabase
+                .from('google_chat_webhooks')
+                .update({ active: false })
+                .eq('space_name', 'SP-Tracker週次アクション');
+
+            return { success: true, message: 'Webhook URL設定を解除しました。' };
+        }
+
+        // 既存のSP-Trackerレコードを確認
+        const { data: existing } = await supabase
+            .from('google_chat_webhooks')
+            .select('id')
+            .eq('space_name', 'SP-Tracker週次アクション')
+            .limit(1)
+            .maybeSingle();
+
+        if (existing?.id) {
+            const { error } = await supabase
+                .from('google_chat_webhooks')
+                .update({
+                    webhook_url: trimmedUrl,
+                    active: true,
+                })
+                .eq('id', existing.id);
+
+            if (error) throw error;
+        } else {
+            const { error } = await supabase
+                .from('google_chat_webhooks')
+                .insert({
+                    space_name: 'SP-Tracker週次アクション',
+                    webhook_url: trimmedUrl,
+                    active: true,
+                });
+
+            if (error) throw error;
+        }
+
+        return { success: true, message: 'Google Chat Webhook URLを正常に保存しました。' };
+    } catch (err: any) {
+        console.error('saveSpTrackerWebhookUrlAction error:', err);
+        return { success: false, message: err.message || '保存中にエラーが発生しました。' };
+    }
+}
+

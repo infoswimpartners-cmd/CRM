@@ -8,12 +8,12 @@ import { sendSpTrackerWeeklyReport } from '@/lib/sp-tracker-notifier';
  */
 export async function GET(request: Request) {
     try {
-        const webhookUrl = process.env.GOOGLE_CHAT_WEBHOOK_URL;
-        if (!webhookUrl) {
-            return NextResponse.json({ error: 'GOOGLE_CHAT_WEBHOOK_URL is not configured.' }, { status: 400 });
-        }
-
         const dashboard = await getSpTrackerDashboard();
+        const webhookUrl = process.env.GOOGLE_CHAT_WEBHOOK_URL || dashboard.config.googleChatWebhookUrl;
+
+        if (!webhookUrl) {
+            return NextResponse.json({ error: 'GOOGLE_CHAT_WEBHOOK_URL is not configured in env or database.' }, { status: 400 });
+        }
         const now = new Date();
         const periodText = `${now.getFullYear()}年${now.getMonth() + 1}月第${Math.ceil(now.getDate() / 7)}週`;
 
