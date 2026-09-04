@@ -170,9 +170,28 @@ ${text}
             return false
         }
     }
-    async sendTriggerEmail(triggerId: string, to: string, variables: Record<string, string>, overrideTemplate?: { subject: string, body: string }): Promise<boolean> {
+    async sendTriggerEmail(
+        triggerId: string, 
+        to: string, 
+        variables: Record<string, string>, 
+        overrideTemplate?: { subject: string, body: string },
+        options?: { forceEmail?: boolean }
+    ): Promise<boolean> {
         try {
             const supabase = createAdminClient()
+
+            // 変数の相互互換補完
+            const mergedVariables = { ...variables }
+            if (mergedVariables.payment_link && !mergedVariables.payment_url) {
+                mergedVariables.payment_url = mergedVariables.payment_link
+            } else if (mergedVariables.payment_url && !mergedVariables.payment_link) {
+                mergedVariables.payment_link = mergedVariables.payment_url
+            }
+            if (mergedVariables.lesson_date && !mergedVariables.trial_date) {
+                mergedVariables.trial_date = mergedVariables.lesson_date
+            } else if (mergedVariables.trial_date && !mergedVariables.lesson_date) {
+                mergedVariables.lesson_date = mergedVariables.trial_date
+            }
 
             // 1. LINE連携の有無を事前に確認（同一メールアドレスの重複登録に対応）
             const { data: students } = await supabase
@@ -209,7 +228,7 @@ ${text}
                 renderedBody = overrideTemplate.body
 
                 // 変数を置換
-                for (const [k, v] of Object.entries(variables)) {
+                for (const [k, v] of Object.entries(mergedVariables)) {
                     const regex = new RegExp(`\\{\\{\\s*${k}\\s*\\}\\}`, 'g')
                     renderedSubject = renderedSubject.replace(regex, v)
                     renderedBody = renderedBody.replace(regex, v)
@@ -236,16 +255,27 @@ ${text}
                 isApprovalRequired = template.is_approval_required ?? false
 
                 // 変数を置換
-                for (const [k, v] of Object.entries(variables)) {
+                for (const [k, v] of Object.entries(mergedVariables)) {
                     const regex = new RegExp(`\\{\\{\\s*${k}\\s*\\}\\}`, 'g')
                     renderedSubject = renderedSubject.replace(regex, v)
                     renderedBody = renderedBody.replace(regex, v)
                 }
             }
 
-            // 2. LINE連携されており、かつLINE送信対象のトリガーである場合はLINEにのみ送信
+            // 【決済リンクの自動付加フォールバック】
+            // 決済リンクが渡されているのに本文に含まれていない場合、手動時と同様に確実に追記する
+            const payUrl = mergedVariables.payment_link || mergedVariables.payment_url
+            if (payUrl && !renderedBody.includes(payUrl)) {
+                if (renderedBody.includes('【実際の決済URLがここに挿入されます】')) {
+                    renderedBody = renderedBody.replace('【実際の決済URLがここに挿入されます】', payUrl)
+                } else {
+                    renderedBody += `\n\n【体験レッスン事前決済URL】\n${payUrl}`
+                }
+            }
+
+            // 2. LINE連携されており、かつLINE送信対象のトリガーである場合はLINEにのみ送信（forceEmailが指定されていない場合）
             const isLineTargetTrigger = ['trial_lesson_reserved', 'trial_payment_completed', 'trio_trial_payment_completed', 'payment_success', 'enrollment_completed'].includes(triggerId)
-            const shouldSendToLine = hasLineLinked && isLineTargetTrigger && student?.line_user_id
+            const shouldSendToLine = !options?.forceEmail && hasLineLinked && isLineTargetTrigger && student?.line_user_id
 
             if (shouldSendToLine) {
                 console.log(`[Notification] Student has LINE linked (${student.line_user_id}). Sending to LINE instead of email for trigger '${triggerId}'.`)

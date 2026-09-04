@@ -559,7 +559,7 @@ Swim Partners`
                 secondStudentInfo = `\n■ 2人目の情報\n名前: ${lead.second_student_name}（${lead.second_student_gender || '未設定'} / ${secondAgeStr}）`
             }
 
-            const message = bodyTemplate
+            let message = bodyTemplate
                 .replace(/\{\{name\}\}/g, lead.name || 'お客様')
                 .replace(/\{\{coach_name\}\}/g, profile.full_name || '')
                 .replace(/\{\{coach_line_url\}\}/g, profile.line_friend_url || '')
@@ -568,6 +568,16 @@ Swim Partners`
                 .replace(/\{\{second_student_info\}\}/g, secondStudentInfo)
                 .replace(/\{\{amount\}\}/g, amountStr)
                 .replace(/\{\{payment_link\}\}/g, paymentLink)
+                .replace(/\{\{payment_url\}\}/g, paymentLink)
+
+            // 【決済リンク自動付加フォールバック】テンプレートにリンクが未挿入の場合、確実に追記
+            if (paymentLink && !message.includes(paymentLink)) {
+                if (message.includes('【お支払いのお願い】') || message.includes('お支払いについて')) {
+                    message = message.replace(/(【お支払いのお願い】|[■\d\.\s]*お支払いについて[^\n]*)/, `$1\n▼ 体験レッスン決済URL\n${paymentLink}`)
+                } else {
+                    message += `\n\n【体験レッスン事前決済URL】\n${paymentLink}`
+                }
+            }
 
             const { lineService } = await import('@/lib/line')
             const success = await lineService.pushMessage(lead.line_user_id, message, token)
@@ -583,12 +593,14 @@ Swim Partners`
                 await emailService.sendTriggerEmail('trial_lesson_reserved', studentEmail, {
                     name: lead.name || 'お客様',
                     lesson_date: confirmedDate,
+                    trial_date: confirmedDate,
                     location: confirmedLocation,
                     coach_name: profile.full_name || '',
                     amount: amountStr,
                     payment_link: paymentLink,
+                    payment_url: paymentLink,
                     coach_line_url: profile.line_friend_url || ''
-                })
+                }, undefined, { forceEmail: true })
             } catch (mailErr) {
                 console.error('Failed to send trial reservation email:', mailErr)
             }
@@ -907,7 +919,7 @@ Swim Partners`
                 secondStudentInfo = `\n■ 2人目の情報\n名前: ${lead.second_student_name}（${lead.second_student_gender || '未設定'} / ${secondAgeStr}）`
             }
 
-            const message = bodyTemplate
+            let message = bodyTemplate
                 .replace(/\{\{name\}\}/g, lead.name || 'お客様')
                 .replace(/\{\{coach_name\}\}/g, targetCoach.full_name || '')
                 .replace(/\{\{coach_line_url\}\}/g, targetCoach.line_friend_url || '')
@@ -916,6 +928,16 @@ Swim Partners`
                 .replace(/\{\{second_student_info\}\}/g, secondStudentInfo)
                 .replace(/\{\{amount\}\}/g, amountStr)
                 .replace(/\{\{payment_link\}\}/g, paymentLink)
+                .replace(/\{\{payment_url\}\}/g, paymentLink)
+
+            // 【決済リンク自動付加フォールバック】テンプレートにリンクが未挿入の場合、確実に追記
+            if (paymentLink && !message.includes(paymentLink)) {
+                if (message.includes('【お支払いのお願い】') || message.includes('お支払いについて')) {
+                    message = message.replace(/(【お支払いのお願い】|[■\d\.\s]*お支払いについて[^\n]*)/, `$1\n▼ 体験レッスン決済URL\n${paymentLink}`)
+                } else {
+                    message += `\n\n【体験レッスン事前決済URL】\n${paymentLink}`
+                }
+            }
 
             const { lineService } = await import('@/lib/line')
             const success = await lineService.pushMessage(lead.line_user_id, message, token)
@@ -931,12 +953,14 @@ Swim Partners`
                 await emailService.sendTriggerEmail('trial_lesson_reserved', studentEmail, {
                     name: lead.name || 'お客様',
                     lesson_date: confirmedDate,
+                    trial_date: confirmedDate,
                     location: confirmedLocation,
                     coach_name: targetCoach.full_name || '',
                     amount: amountStr,
                     payment_link: paymentLink,
+                    payment_url: paymentLink,
                     coach_line_url: targetCoach.line_friend_url || ''
-                })
+                }, undefined, { forceEmail: true })
             } catch (mailErr) {
                 console.error('Failed to send trial reservation email:', mailErr)
             }
