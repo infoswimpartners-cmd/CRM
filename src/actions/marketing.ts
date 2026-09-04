@@ -2,6 +2,8 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { fetchGA4Analytics, GA4TrafficSummary } from '@/lib/google-analytics'
+import { fetchSearchConsoleAnalytics, SearchConsoleSummary } from '@/lib/google-search-console'
 
 export interface QuestItem {
     id: string
@@ -30,8 +32,13 @@ export interface MarketingDashboardData {
     }
     quests: QuestItem[]
     integrationData: {
+        isConfigured: boolean
+        ga4Connected: boolean
+        searchConsoleConnected: boolean
         lastSyncedAt: string
-        syncStatus: string
+        syncStatus: 'synced' | 'unconfigured' | 'error'
+        ga4Data?: GA4TrafficSummary | null
+        searchConsoleData?: SearchConsoleSummary | null
     }
 }
 
@@ -116,8 +123,42 @@ export async function getMarketingDashboardData(): Promise<MarketingDashboardDat
             }))
         }
 
-        // 2. スコア算出
-        const baseScore = 72
+        // 2. Google Cloud API（GA4 / Search Console）から実データ取得を試行
+        const hasServiceAccount = Boolean(process.env.GOOGLE_SERVICE_ACCOUNT_KEY)
+        const hasGa4 = Boolean(process.env.GA4_PROPERTY_ID)
+        const hasSearchConsole = Boolean(process.env.SEARCH_CONSOLE_SITE_URL)
+
+        let ga4Data: GA4TrafficSummary | null = null
+        let searchConsoleData: SearchConsoleSummary | null = null
+
+        if (hasServiceAccount) {
+            if (hasGa4) {
+                ga4Data = await fetchGA4Analytics()
+            }
+            if (hasSearchConsole) {
+                searchConsoleData = await fetchSearchConsoleAnalytics()
+            }
+        }
+
+        const isConfigured = Boolean(ga4Data || searchConsoleData)
+
+        // 3. スコア算出（実データがあれば実測値を反映、なければ基本値）
+        let baseScore = 72
+        let geoScore = 82
+        let seoScore = 88
+
+        if (ga4Data && ga4Data.totalSessions > 0) {
+            // AI検索比率が高いほどGEOスコア向上
+            const aiShareRatio = ga4Data.aiSearchSessions / ga4Data.totalSessions
+            geoScore = Math.min(100, Math.round(70 + aiShareRatio * 100))
+        }
+
+        if (searchConsoleData && searchConsoleData.impressions > 0) {
+            // 平均順位が良いほどSEOスコア向上 (例: 順位が10位以内でボーナス)
+            const avgPos = parseFloat(searchConsoleData.averagePosition) || 15
+            seoScore = Math.min(100, Math.max(50, Math.round(100 - avgPos * 2.5)))
+        }
+
         const completedBonus = quests
             .filter((q) => q.isCompleted)
             .reduce((sum, q) => sum + q.scoreReward, 0)
@@ -132,8 +173,8 @@ export async function getMarketingDashboardData(): Promise<MarketingDashboardDat
         const nextLevelXp = 1500
 
         const categoryScores = [
-            { name: 'GEO (生成AI引用)', score: 82, fullMark: 100, color: 'bg-purple-500' },
-            { name: 'SEO (検索最適化)', score: 88, fullMark: 100, color: 'bg-blue-500' },
+            { name: 'GEO (生成AI引用)', score: geoScore, fullMark: 100, color: 'bg-purple-500' },
+            { name: 'SEO (検索最適化)', score: seoScore, fullMark: 100, color: 'bg-blue-500' },
             { name: 'MEO (マップ集客)', score: 78, fullMark: 100, color: 'bg-amber-500' },
             { name: 'SNS / 短尺動画', score: 65, fullMark: 100, color: 'bg-rose-500' },
             { name: 'CRO (申込率)', score: 75, fullMark: 100, color: 'bg-emerald-500' },
@@ -150,8 +191,13 @@ export async function getMarketingDashboardData(): Promise<MarketingDashboardDat
             },
             quests,
             integrationData: {
+                isConfigured,
+                ga4Connected: Boolean(ga4Data),
+                searchConsoleConnected: Boolean(searchConsoleData),
                 lastSyncedAt: new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }),
-                syncStatus: 'synced',
+                syncStatus: isConfigured ? 'synced' : 'unconfigured',
+                ga4Data,
+                searchConsoleData,
             },
         }
     } catch (err) {
@@ -173,8 +219,11 @@ export async function getMarketingDashboardData(): Promise<MarketingDashboardDat
             },
             quests: DEFAULT_QUESTS,
             integrationData: {
-                lastSyncedAt: '16:30 JST',
-                syncStatus: 'synced',
+                isConfigured: false,
+                ga4Connected: false,
+                searchConsoleConnected: false,
+                lastSyncedAt: '未同期',
+                syncStatus: 'unconfigured',
             },
         }
     }

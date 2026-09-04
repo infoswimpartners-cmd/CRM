@@ -1,205 +1,219 @@
-'use client'
+'use client';
 
-import React, { useState, useEffect } from 'react'
-import { toast } from 'sonner'
-import { PriorityActionHero } from '@/components/admin/geo-seo/PriorityActionHero'
-import { ScoreOverviewCard } from '@/components/admin/geo-seo/ScoreOverviewCard'
-import { AnalyticsSyncCard } from '@/components/admin/geo-seo/AnalyticsSyncCard'
-import { GeoAuditPanel } from '@/components/admin/geo-seo/GeoAuditPanel'
-import { SeoMeoAuditPanel } from '@/components/admin/geo-seo/SeoMeoAuditPanel'
-import { SnsContentPlanner } from '@/components/admin/geo-seo/SnsContentPlanner'
-import { CroOptimizationPanel } from '@/components/admin/geo-seo/CroOptimizationPanel'
-import { GamifiedQuestList, Quest } from '@/components/admin/geo-seo/GamifiedQuestList'
-import { GeoAiPromptGenerator } from '@/components/admin/geo-seo/GeoAiPromptGenerator'
-import { getMarketingDashboardData, toggleMarketingQuest, QuestItem } from '@/actions/marketing'
+import React, { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { toast } from 'sonner';
+import { SpTrackerHeroActions } from '@/components/admin/geo-seo/SpTrackerHeroActions';
+import { SpTrackerStatusMeters } from '@/components/admin/geo-seo/SpTrackerStatusMeters';
+import { SpTrackerSeoView } from '@/components/admin/geo-seo/SpTrackerSeoView';
+import { SpTrackerGeoView } from '@/components/admin/geo-seo/SpTrackerGeoView';
+import { SpTrackerCitationGapView } from '@/components/admin/geo-seo/SpTrackerCitationGapView';
+import { SpTrackerSettingsView } from '@/components/admin/geo-seo/SpTrackerSettingsView';
+import { AnalyticsSyncCard } from '@/components/admin/geo-seo/AnalyticsSyncCard';
+import {
+    getSpTrackerDashboard,
+    toggleActionRecommendationResolved,
+    SpTrackerDashboardData,
+} from '@/actions/sp-tracker-actions';
+import { syncMarketingAnalytics } from '@/actions/marketing';
+import { RefreshCw } from 'lucide-react';
 
-export default function GeoSeoMarketingPage() {
-    const [activeTab, setActiveTab] = useState<'overview' | 'geo' | 'seo_meo' | 'sns' | 'cro' | 'quests' | 'ai_prompts'>('overview')
-    const [loading, setLoading] = useState(true)
+function SpTrackerContent() {
+    const searchParams = useSearchParams();
+    const tabParam = searchParams.get('tab');
 
-    // クエスト＆スコアのローカル・Server Actionステート
-    const [quests, setQuests] = useState<Quest[]>([])
-    const [scoreData, setScoreData] = useState({
-        totalScore: 78,
-        level: 14,
-        levelTitle: 'MARKETING ARCHITECT',
-        currentXp: 1420,
-        nextLevelXp: 1500,
-        categoryScores: [
-            { name: 'GEO (生成AI引用)', score: 82, fullMark: 100, color: 'bg-purple-500' },
-            { name: 'SEO (検索最適化)', score: 88, fullMark: 100, color: 'bg-blue-500' },
-            { name: 'MEO (マップ集客)', score: 78, fullMark: 100, color: 'bg-amber-500' },
-            { name: 'SNS / 短尺動画', score: 65, fullMark: 100, color: 'bg-rose-500' },
-            { name: 'CRO (申込率)', score: 75, fullMark: 100, color: 'bg-emerald-500' },
-        ],
-    })
+    const [activeTab, setActiveTab] = useState<'seo' | 'geo' | 'citation_gap' | 'analytics' | 'settings'>('seo');
+    const [loading, setLoading] = useState(true);
+    const [isRefreshing, setIsRefreshing] = useState(false);
 
-    // 初回データ読み込み (Server Action)
     useEffect(() => {
-        async function fetchDashboard() {
-            try {
-                const res = await getMarketingDashboardData()
-                if (res) {
-                    setQuests(res.quests)
-                    setScoreData(res.scoreData)
-                }
-            } catch (err) {
-                console.error('Failed to load marketing dashboard data:', err)
-            } finally {
-                setLoading(false)
-            }
+        if (tabParam && ['seo', 'geo', 'citation_gap', 'analytics', 'settings'].includes(tabParam)) {
+            setActiveTab(tabParam as any);
         }
-        fetchDashboard()
-    }, [])
+    }, [tabParam]);
 
-    // クエスト完了のリアルタイム更新・Server Action連携
-    const handleToggleQuest = async (id: string) => {
-        const target = quests.find((q) => q.id === id)
-        if (!target) return
+    const [data, setData] = useState<SpTrackerDashboardData>({
+        statusMeters: {
+            seoTopRate: 63,
+            geoSovRate: 67,
+            citationGapCount: 3,
+            internalHealthScore: 92,
+        },
+        actionRecommendations: [],
+        keywords: [],
+        geoPrompts: [],
+        citationGaps: [],
+        config: {
+            googleChatWebhookConfigured: false,
+            ga4Configured: false,
+            searchConsoleConfigured: false,
+        },
+    });
 
-        const currentStatus = target.isCompleted
-        const nextStatus = !currentStatus
+    const loadDashboard = async () => {
+        try {
+            const res = await getSpTrackerDashboard();
+            if (res) {
+                setData(res);
+            }
+        } catch (err) {
+            console.error('Failed to load SP-Tracker data:', err);
+        } finally {
+            setLoading(false);
+            setIsRefreshing(false);
+        }
+    };
 
-        // 画面上の即時フィードバック
-        setQuests((prev) =>
-            prev.map((q) => (q.id === id ? { ...q, isCompleted: nextStatus } : q))
-        )
+    useEffect(() => {
+        loadDashboard();
+    }, []);
 
-        // スコア再計算
-        const updatedQuests = quests.map((q) => (q.id === id ? { ...q, isCompleted: nextStatus } : q))
-        const baseScore = 72
-        const completedBonus = updatedQuests
-            .filter((q) => q.isCompleted)
-            .reduce((sum, q) => sum + q.scoreReward, 0)
-        const newTotalScore = Math.min(100, baseScore + completedBonus)
-
-        const baseCurrentXp = 1140
-        const completedXp = updatedQuests
-            .filter((q) => q.isCompleted)
-            .reduce((sum, q) => sum + q.xpReward, 0)
-        const newCurrentXp = baseCurrentXp + completedXp
-
-        setScoreData((prev) => ({
+    const handleResolveToggle = async (id: number, currentStatus: boolean) => {
+        const nextStatus = !currentStatus;
+        // 即座に画面上のステートを更新
+        setData((prev) => ({
             ...prev,
-            totalScore: newTotalScore,
-            currentXp: newCurrentXp,
-        }))
+            actionRecommendations: prev.actionRecommendations.map((a) =>
+                a.id === id ? { ...a, is_resolved: nextStatus } : a
+            ),
+        }));
 
         if (nextStatus) {
-            toast.success(`🎉 タスク達成！ +${target.xpReward} XP / スコア +${target.scoreReward}pt 獲得`, {
-                description: target.title,
-            })
+            toast.success('アクション指示を完了済みに更新しました');
         }
 
-        // Server Actionで永続化
         try {
-            await toggleMarketingQuest(id, currentStatus)
+            await toggleActionRecommendationResolved(id, currentStatus);
         } catch (err) {
-            console.error('Failed to sync quest status with DB:', err)
+            console.error('Failed to update recommendation status:', err);
         }
-    }
+    };
 
-    // 最優先実行タスク（Priority Action）
-    const priorityTask = quests.find((q) => !q.isCompleted) || quests[0] || {
-        id: 'q1',
-        title: 'FAQ構造化データ(JSON-LD)の設置',
-        category: 'GEO' as const,
-        difficulty: 'Easy' as const,
-        xpReward: 150,
-        scoreReward: 5,
-        isCompleted: false,
-        description: 'ChatGPT/Perplexityからの参照率を高めるため、FAQのJSON-LD構造化データをWebサイトヘッダーに追加します。',
-    }
+    const handleRefreshAll = async () => {
+        setIsRefreshing(true);
+        try {
+            await syncMarketingAnalytics();
+            await loadDashboard();
+            toast.success('最新のSEO/GEOデータを同期しました');
+        } catch (err) {
+            toast.error('同期に失敗しました');
+        }
+    };
 
     return (
         <div className="min-h-screen bg-[#fafafa] text-zinc-900 p-6 md:p-12 space-y-10">
-            {/* ページタイトル (Stripe/Linear風 エディトリアルヘッダー) */}
+            {/* ページタイトル (SP-Tracker ヘッダー) */}
             <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-zinc-200/80 pb-6 gap-4">
                 <div>
-                    <div className="text-[11px] font-mono font-bold tracking-widest text-zinc-400 uppercase mb-1">
-                        INTELLIGENT MARKETING & ACTION CENTER
+                    <div className="flex items-center gap-2 mb-1">
+                        <span className="text-[11px] font-mono font-bold tracking-widest text-zinc-400 uppercase">
+                            SP-TRACKER v1.0.0
+                        </span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                            SEO ✕ GEO INTEGRATED ENGINE
+                        </span>
                     </div>
                     <h1 className="text-3xl md:text-4xl lg:text-5xl font-black tracking-tight text-zinc-900">
-                        GEO ✕ SEO ✕ 集客支援
+                        スイムパートナーズ専用 SEO・GEO統合管理
                     </h1>
                 </div>
 
-                <div className="text-xs font-mono text-zinc-400 bg-white px-3 py-1.5 rounded-lg border border-zinc-200/80 shadow-sm">
-                    SWIM PARTNERS CRM v2.0
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={handleRefreshAll}
+                        disabled={isRefreshing}
+                        className="px-4 py-2.5 rounded-xl border border-zinc-900 text-xs font-semibold bg-zinc-900 text-white hover:bg-zinc-800 transition-all shadow-sm flex items-center gap-2 disabled:opacity-50"
+                    >
+                        <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                        {isRefreshing ? '同期中...' : '最新データを取得'}
+                    </button>
                 </div>
             </div>
 
-            {/* 1. 最優先アクション (何をすべきかが一目でわかるLinear風HERO) */}
-            <PriorityActionHero
-                title={priorityTask.title}
-                category={priorityTask.category}
-                impact={`スコア +${priorityTask.scoreReward}pt / +${priorityTask.xpReward} XP`}
-                effort={priorityTask.difficulty === 'Easy' ? '15分 (簡単)' : '30分'}
-                description={priorityTask.description}
-                reason="PerplexityやChatGPTにおけるFAQ参照スコアが向上傾向にあります。このタスクを完了することで、生成AIからの自社推薦数が推定+25%増加します。"
-                onExecute={() => handleToggleQuest(priorityTask.id)}
-                isCompleted={priorityTask.isCompleted}
+            {/* 1. 最上部: 今すぐやること（Today's / Weekly Action）カード */}
+            <SpTrackerHeroActions
+                actions={data.actionRecommendations}
+                onResolveToggle={handleResolveToggle}
             />
 
-            {/* 2. スコアボード */}
-            <ScoreOverviewCard
-                totalScore={scoreData.totalScore}
-                level={scoreData.level}
-                levelTitle={scoreData.levelTitle}
-                currentXp={scoreData.currentXp}
-                nextLevelXp={scoreData.nextLevelXp}
-                categoryScores={scoreData.categoryScores}
+            {/* 2. ステータスメーター（4つの主要診断指標） */}
+            <SpTrackerStatusMeters
+                seoTopRate={data.statusMeters.seoTopRate}
+                geoSovRate={data.statusMeters.geoSovRate}
+                citationGapCount={data.statusMeters.citationGapCount}
+                internalHealthScore={data.statusMeters.internalHealthScore}
             />
 
-            {/* 3. データ連携 */}
-            <AnalyticsSyncCard />
-
-            {/* 4. セグメントタブ (Linear風 ピクセルパーフェクト タブ) */}
+            {/* 3. 詳細ビュー タブ切り替え */}
             <div className="flex items-center gap-1.5 p-1 bg-zinc-200/60 rounded-xl max-w-fit overflow-x-auto">
                 {[
-                    { id: 'overview', label: '全体ロードマップ' },
-                    { id: 'geo', label: 'GEO (AI引用) 診断' },
-                    { id: 'seo_meo', label: 'SEO ✕ MEO 診断' },
-                    { id: 'sns', label: 'SNS短尺動画企画' },
-                    { id: 'cro', label: 'CRO (成約率) 改善' },
-                    { id: 'quests', label: '改善クエスト' },
-                    { id: 'ai_prompts', label: 'AIプロンプト' },
+                    { id: 'seo', label: 'SEO推移（エリア・セグメント）' },
+                    { id: 'geo', label: 'GEO分析（AI回答原文 & SOV）' },
+                    { id: 'citation_gap', label: '引用元ギャップリスト' },
+                    { id: 'analytics', label: 'GA4 / Search Console' },
+                    { id: 'settings', label: '設定（KW・プロンプト・Webhook）' },
                 ].map((tab) => {
-                    const isActive = activeTab === tab.id
+                    const isActive = activeTab === tab.id;
                     return (
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id as any)}
-                            className={`px-4 py-2 rounded-lg text-xs font-semibold tracking-wide transition-all duration-150 whitespace-nowrap ${isActive
+                            className={`px-4 py-2 rounded-lg text-xs font-semibold tracking-wide transition-all duration-150 whitespace-nowrap ${
+                                isActive
                                     ? 'bg-white text-zinc-900 shadow-[0_2px_8px_rgba(0,0,0,0.06)] font-bold'
                                     : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/50'
-                                }`}
+                            }`}
                         >
                             {tab.label}
                         </button>
-                    )
+                    );
                 })}
             </div>
 
-            {/* タブコンテンツ */}
+            {/* 4. タブコンテンツ表示 */}
             <div className="pt-2">
-                {activeTab === 'overview' && (
-                    <div className="space-y-10">
-                        <GamifiedQuestList quests={quests} onToggleQuest={handleToggleQuest} />
-                        <GeoAuditPanel />
-                        <SeoMeoAuditPanel />
-                    </div>
+                {activeTab === 'seo' && (
+                    <SpTrackerSeoView
+                        keywords={data.keywords}
+                        searchConsoleData={data.searchConsoleData}
+                    />
                 )}
 
-                {activeTab === 'geo' && <GeoAuditPanel />}
-                {activeTab === 'seo_meo' && <SeoMeoAuditPanel />}
-                {activeTab === 'sns' && <SnsContentPlanner />}
-                {activeTab === 'cro' && <CroOptimizationPanel />}
-                {activeTab === 'quests' && (
-                    <GamifiedQuestList quests={quests} onToggleQuest={handleToggleQuest} />
+                {activeTab === 'geo' && (
+                    <SpTrackerGeoView prompts={data.geoPrompts} />
                 )}
-                {activeTab === 'ai_prompts' && <GeoAiPromptGenerator />}
+
+                {activeTab === 'citation_gap' && (
+                    <SpTrackerCitationGapView citationGaps={data.citationGaps} />
+                )}
+
+                {activeTab === 'analytics' && (
+                    <AnalyticsSyncCard
+                        isConfigured={data.config.ga4Configured}
+                        ga4Connected={data.config.ga4Configured}
+                        searchConsoleConnected={data.config.searchConsoleConfigured}
+                        lastSynced="接続稼働中"
+                        ga4Data={data.ga4Data}
+                        searchConsoleData={data.searchConsoleData}
+                        onSync={handleRefreshAll}
+                    />
+                )}
+
+                {activeTab === 'settings' && (
+                    <SpTrackerSettingsView
+                        webhookConfigured={data.config.googleChatWebhookConfigured}
+                        onRefresh={loadDashboard}
+                    />
+                )}
             </div>
         </div>
-    )
+    );
+}
+
+export default function SpTrackerPage() {
+    return (
+        <Suspense fallback={<div className="p-12 text-zinc-400 font-mono text-xs">読み込み中...</div>}>
+            <SpTrackerContent />
+        </Suspense>
+    );
 }
