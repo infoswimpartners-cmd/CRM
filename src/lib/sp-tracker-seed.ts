@@ -48,13 +48,21 @@ export interface ActionRecommendationItem {
 
 export const SEED_KEYWORDS: KeywordItem[] = [
     { id: 1, keyword: 'スイムパートナーズ', area_category: 'tokyo_23', target_category: 'adult', current_rank: 1, previous_rank: 1, target_url: 'https://swim-partners.com/', competitor_top_url: '' },
-    { id: 2, keyword: '水泳個人レッスン 千葉', area_category: 'chiba', target_category: 'junior', current_rank: 3, previous_rank: 3, target_url: 'https://swim-partners.com/personal_swim/chiba', competitor_top_url: '' },
-    { id: 3, keyword: 'スイミング マンツーマン 目黒', area_category: 'tokyo_23', target_category: 'junior', current_rank: 2, previous_rank: 2, target_url: 'https://swim-partners.com/personal_swim/meguro', competitor_top_url: '' },
-    { id: 4, keyword: 'スイミング 進級の早い子', area_category: 'tokyo_23', target_category: 'junior', current_rank: 2, previous_rank: 2, target_url: 'https://swim-partners.com/zUHb45xV/swimming_tips_up', competitor_top_url: '' },
-    { id: 5, keyword: '大人のプライベート水泳レッスン', area_category: 'tokyo_23', target_category: 'adult', current_rank: 8, previous_rank: 9, target_url: 'https://swim-partners.com/zUHb45xV/adult-private-swimming', competitor_top_url: '' },
-    { id: 6, keyword: 'スイミングスクール マンツーマン', area_category: 'chiba', target_category: 'adult', current_rank: 3, previous_rank: 3, target_url: 'https://swim-partners.com/personal_swim/chiba', competitor_top_url: '' },
-    { id: 7, keyword: '水泳 マンツーマン 子供', area_category: 'chiba', target_category: 'junior', current_rank: 4, previous_rank: 4, target_url: 'https://swim-partners.com/personal_swim/chiba', competitor_top_url: '' },
-    { id: 8, keyword: 'スイミングスクール 個人レッスン', area_category: 'tokyo_23', target_category: 'junior', current_rank: 2, previous_rank: 2, target_url: 'https://swim-partners.com/personal_swim', competitor_top_url: '' },
+    { id: 2, keyword: '水泳 個人レッスン 東京', area_category: 'tokyo_23', target_category: 'adult', current_rank: 4, previous_rank: 5, target_url: 'https://swim-partners.com/personal_swim', competitor_top_url: '' },
+    { id: 3, keyword: '水泳 マンツーマン 横浜', area_category: 'kanagawa', target_category: 'adult', current_rank: 6, previous_rank: 7, target_url: 'https://swim-partners.com/personal_swim', competitor_top_url: '' },
+    { id: 4, keyword: 'プライベート水泳レッスン 千葉', area_category: 'chiba', target_category: 'adult', current_rank: 3, previous_rank: 3, target_url: 'https://swim-partners.com/personal_swim/chiba', competitor_top_url: '' },
+    { id: 5, keyword: 'スイミング マンツーマン 目黒', area_category: 'tokyo_23', target_category: 'junior', current_rank: 2, previous_rank: 2, target_url: 'https://swim-partners.com/personal_swim/meguro', competitor_top_url: '' },
+    { id: 6, keyword: '出張 水泳 指導 東京', area_category: 'tokyo_23', target_category: 'adult', current_rank: 5, previous_rank: 6, target_url: 'https://swim-partners.com/personal_swim', competitor_top_url: '' },
+    { id: 7, keyword: '水泳 マンツーマン 子供 東京', area_category: 'tokyo_23', target_category: 'junior', current_rank: 3, previous_rank: 4, target_url: 'https://swim-partners.com/personal_swim', competitor_top_url: '' },
+    { id: 8, keyword: 'スイミング 進級 できない 個別指導', area_category: 'tokyo_23', target_category: 'junior', current_rank: 2, previous_rank: 2, target_url: 'https://swim-partners.com/zUHb45xV/swimming_tips_up', competitor_top_url: '' },
+    { id: 9, keyword: '子供 水泳 短期集中 個人レッスン', area_category: 'tokyo_23', target_category: 'junior', current_rank: 5, previous_rank: 6, target_url: 'https://swim-partners.com/personal_swim', competitor_top_url: '' },
+    { id: 10, keyword: '水慣れ 子供 水泳 個人レッスン', area_category: 'tokyo_23', target_category: 'junior', current_rank: 4, previous_rank: 5, target_url: 'https://swim-partners.com/personal_swim', competitor_top_url: '' },
+    { id: 11, keyword: '水泳 恐怖症 大人 個人レッスン', area_category: 'tokyo_23', target_category: 'phobia', current_rank: 7, previous_rank: 8, target_url: 'https://swim-partners.com/zUHb45xV/adult-private-swimming', competitor_top_url: '' },
+    { id: 12, keyword: '大人 カナヅチ 克服 レッスン 東京', area_category: 'tokyo_23', target_category: 'phobia', current_rank: 6, previous_rank: 8, target_url: 'https://swim-partners.com/zUHb45xV/adult-private-swimming', competitor_top_url: '' },
+    { id: 13, keyword: '大人のプライベート水泳レッスン', area_category: 'tokyo_23', target_category: 'adult', current_rank: 8, previous_rank: 9, target_url: 'https://swim-partners.com/zUHb45xV/adult-private-swimming', competitor_top_url: '' },
+    { id: 14, keyword: 'クロール 息継ぎができない 大人 レッスン', area_category: 'tokyo_23', target_category: 'adult', current_rank: 9, previous_rank: 11, target_url: 'https://swim-partners.com/zUHb45xV/adult-private-swimming', competitor_top_url: '' },
+    { id: 15, keyword: 'トライアスロン スイム レッスン 東京', area_category: 'tokyo_23', target_category: 'triathlon', current_rank: 12, previous_rank: 14, target_url: 'https://swim-partners.com/personal_swim', competitor_top_url: '' },
+    { id: 16, keyword: 'クロール 疲れにくい 泳ぎ方 マンツーマン', area_category: 'tokyo_23', target_category: 'triathlon', current_rank: 11, previous_rank: 13, target_url: 'https://swim-partners.com/personal_swim', competitor_top_url: '' },
 ];
 
 export const SEED_GEO_PROMPTS: GeoPromptItem[] = [
