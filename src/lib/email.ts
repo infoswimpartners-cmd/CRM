@@ -61,72 +61,9 @@ export class EmailService {
         }
     }
 
-    async sendEmail({ to, subject, text, html, bcc, requireApproval = false }: EmailOptions): Promise<boolean> {
-        if (!requireApproval) {
-            return this._sendInternalEmail({ to, subject, text, html, bcc })
-        }
-
-        try {
-            const supabase = createAdminClient()
-
-            const { data: approval, error } = await supabase
-                .from('email_approvals')
-                .insert({
-                    to_email: to,
-                    bcc_email: bcc || null,
-                    subject,
-                    text_body: text,
-                    html_body: html || null,
-                    status: 'pending'
-                })
-                .select('id')
-                .single()
-
-            if (error || !approval) {
-                console.error('Failed to create email_approvals record:', error)
-                return false
-            }
-
-            const adminEmail = process.env.ADMIN_EMAIL || process.env.SMTP_USER
-            if (!adminEmail) {
-                console.error('ADMIN_EMAIL or SMTP_USER is not set. Cannot send approval request.')
-                return false
-            }
-
-            const appUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
-            const approveUrl = `${appUrl}/api/email/approve?id=${approval.id}`
-
-            const approvalText = `メール送信の承認依頼です。
-システムから以下の内容でメールが送信されようとしています。
-内容を確認し、問題なければ以下のリンクをクリックして送信を承認してください。
-
-■承認リンク（クリックすると直ちに送信されます）
-${approveUrl}
-
-■送信予定先: ${to}
-■件名: ${subject}
-■本文:
---------------------------------------------------
-${text}
---------------------------------------------------`
-
-            const sent = await this._sendInternalEmail({
-                to: adminEmail,
-                subject: '【要承認】メール送信の承認願い',
-                text: approvalText,
-            })
-
-            if (sent) {
-                console.log(`Email saved as pending (ID: ${approval.id}) and approval request sent to ${adminEmail}`)
-                return true
-            } else {
-                return false
-            }
-
-        } catch (error) {
-            console.error('Error queuing email for approval:', error)
-            return false
-        }
+    async sendEmail({ to, subject, text, html, bcc }: EmailOptions): Promise<boolean> {
+        // 承認フローは不要のため、常に直接即時送信します
+        return this._sendInternalEmail({ to, subject, text, html, bcc })
     }
 
     async sendTemplateEmail(key: string, to: string, variables: Record<string, string>): Promise<boolean> {
@@ -308,7 +245,7 @@ ${text}
                         to,
                         subject: renderedSubject,
                         text: renderedBody,
-                        requireApproval: isApprovalRequired,
+                        requireApproval: false,
                     })
                 } else {
                     console.log(`[Trigger No Template] Skipping email for '${triggerId}'`)
