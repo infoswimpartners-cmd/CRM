@@ -516,42 +516,59 @@ export async function assignLeadAction(leadId: string, confirmedDate: string, co
         const paymentLink = trialResult?.paymentLink || ''
         const amountStr = trialResult?.price ? trialResult.price.toLocaleString() : '6,000'
 
-        // 4. 顧客への自動確定通知（LINEプッシュメッセージ）の送信
+        // 4. 顧客への自動確定通知（LINEプッシュメッセージ）の送信（1通に統合）
         if (lead.line_user_id && lead.send_customer_notification !== false) {
-            // app_configs から設定を取得
-            const { data: tokenConfig } = await supabaseAdmin
-                .from('app_configs')
-                .select('value')
-                .eq('key', 'line_channel_access_token')
-                .single()
+            // 担当コーチに設定された公式LINEアクセストークンを優先取得
+            let token = ''
+            if (profile.id) {
+                const { data: coachBotConfig } = await supabaseAdmin
+                    .from('line_bot_configs')
+                    .select('channel_access_token')
+                    .eq('coach_id', profile.id)
+                    .maybeSingle()
+                if (coachBotConfig?.channel_access_token) {
+                    token = coachBotConfig.channel_access_token
+                }
+            }
+
+            // コーチ個別のトークンが未設定の場合は、システム全体設定（app_configs）から取得
+            if (!token) {
+                const { data: tokenConfig } = await supabaseAdmin
+                    .from('app_configs')
+                    .select('value')
+                    .eq('key', 'line_channel_access_token')
+                    .maybeSingle()
+                token = tokenConfig?.value || ''
+            }
 
             const { data: templateConfig } = await supabaseAdmin
                 .from('app_configs')
                 .select('value')
                 .eq('key', 'line_assigned_template')
-                .single()
-
-            const token = tokenConfig?.value || ''
+                .maybeSingle()
             
             const defaultLineAssignedTemplate = `{{name}} 様
 
-お申し込みいただいた体験レッスンの担当コーチが決定いたしました。
+スイムパートナーズにお申し込みいただきありがとうございます。
+体験レッスンの担当コーチおよび日程が確定いたしました。
 
 ■ 担当コーチ: {{coach_name}}
-■ 確定体験日時: {{lesson_date}}
+■ 確定日時: {{lesson_date}}
 ■ レッスン場所: {{location}}
 {{second_student_info}}
 ■ 体験レッスン料金: {{amount}}円
 
-【お支払いのお願い】
-体験レッスン料金のお支払いは、以下の決済リンク（クレジットカード決済）よりお願いいたします。
+【1. お支払いのお願い】
+体験レッスン料金のお支払いは、下記の専用決済URL（クレジットカード）よりお願いいたします。
+▼ 体験レッスン事前決済URL
 {{payment_link}}
 
-【担当コーチへのご連絡のお願い】
-当日の集合場所等の詳細確認のため、下記URLより担当コーチのLINEを追加いただき、メッセージをお送りいただけますようお願いいたします。
+【2. 担当コーチへご連絡のお願い】
+当日の集合場所や事前打ち合わせのため、下記URLより担当コーチのLINEを追加いただき、メッセージをお送りいただけますようお願いいたします。
+▼ 担当コーチLINE追加URL
 {{coach_line_url}}
 
-ご連絡をお待ちいただけますようお願いいたします。
+ご不明な点がございましたら、本メッセージまたは本部までお気軽にお問い合わせください。
 
 Swim Partners`
 
@@ -562,7 +579,7 @@ Swim Partners`
             if (lead.second_student_name) {
                 const secondAge = calculateAge(lead.second_student_birth_date)
                 const secondAgeStr = secondAge !== null ? `${secondAge}歳` : '未設定'
-                secondStudentInfo = `\n■ 2人目の情報\n名前: ${lead.second_student_name}（${lead.second_student_gender || '未設定'} / ${secondAgeStr}）`
+                secondStudentInfo = `\n■ 2人目の情報: ${lead.second_student_name}（${lead.second_student_gender || '未設定'} / ${secondAgeStr}）`
             }
 
             let message = bodyTemplate
@@ -578,8 +595,8 @@ Swim Partners`
 
             // 【決済リンク自動付加フォールバック】テンプレートにリンクが未挿入の場合、確実に追記
             if (paymentLink && !message.includes(paymentLink)) {
-                if (message.includes('【お支払いのお願い】') || message.includes('お支払いについて')) {
-                    message = message.replace(/(【お支払いのお願い】|[■\d\.\s]*お支払いについて[^\n]*)/, `$1\n▼ 体験レッスン決済URL\n${paymentLink}`)
+                if (message.includes('【1. お支払いのお願い】') || message.includes('【お支払いのお願い】') || message.includes('お支払いについて')) {
+                    message = message.replace(/(【1\. お支払いのお願い】|【お支払いのお願い】|[■\d\.\s]*お支払いについて[^\n]*)/, `$1\n▼ 体験レッスン事前決済URL\n${paymentLink}`)
                 } else {
                     message += `\n\n【体験レッスン事前決済URL】\n${paymentLink}`
                 }
@@ -878,41 +895,59 @@ export async function adminAssignLeadAction(
         const paymentLink = trialResult?.paymentLink || ''
         const amountStr = trialResult?.price ? trialResult.price.toLocaleString() : '6,000'
 
-        // 4. 顧客への自動確定通知（LINEプッシュメッセージ）の送信
+        // 4. 顧客への自動確定通知（LINEプッシュメッセージ）の送信（1通に統合）
         if (lead.line_user_id && lead.send_customer_notification !== false) {
-            const { data: tokenConfig } = await supabaseAdmin
-                .from('app_configs')
-                .select('value')
-                .eq('key', 'line_channel_access_token')
-                .single()
+            // 担当コーチに設定された公式LINEアクセストークンを優先取得
+            let token = ''
+            if (targetCoach.id) {
+                const { data: coachBotConfig } = await supabaseAdmin
+                    .from('line_bot_configs')
+                    .select('channel_access_token')
+                    .eq('coach_id', targetCoach.id)
+                    .maybeSingle()
+                if (coachBotConfig?.channel_access_token) {
+                    token = coachBotConfig.channel_access_token
+                }
+            }
+
+            // コーチ個別のトークンが未設定の場合は、システム全体設定（app_configs）から取得
+            if (!token) {
+                const { data: tokenConfig } = await supabaseAdmin
+                    .from('app_configs')
+                    .select('value')
+                    .eq('key', 'line_channel_access_token')
+                    .maybeSingle()
+                token = tokenConfig?.value || ''
+            }
 
             const { data: templateConfig } = await supabaseAdmin
                 .from('app_configs')
                 .select('value')
                 .eq('key', 'line_assigned_template')
-                .single()
+                .maybeSingle()
 
-            const token = tokenConfig?.value || ''
-            
             const defaultLineAssignedTemplate = `{{name}} 様
 
-お申し込みいただいた体験レッスンの担当コーチが決定いたしました。
+スイムパートナーズにお申し込みいただきありがとうございます。
+体験レッスンの担当コーチおよび日程が確定いたしました。
 
 ■ 担当コーチ: {{coach_name}}
-■ 確定体験日時: {{lesson_date}}
+■ 確定日時: {{lesson_date}}
 ■ レッスン場所: {{location}}
 {{second_student_info}}
 ■ 体験レッスン料金: {{amount}}円
 
-【お支払いのお願い】
-体験レッスン料金のお支払いは、以下の決済リンク（クレジットカード決済）よりお願いいたします。
+【1. お支払いのお願い】
+体験レッスン料金のお支払いは、下記の専用決済URL（クレジットカード）よりお願いいたします。
+▼ 体験レッスン事前決済URL
 {{payment_link}}
 
-【担当コーチへのご連絡のお願い】
-当日の集合場所等の詳細確認のため、下記URLより担当コーチのLINEを追加いただき、メッセージをお送りいただけますようお願いいたします。
+【2. 担当コーチへご連絡のお願い】
+当日の集合場所や事前打ち合わせのため、下記URLより担当コーチのLINEを追加いただき、メッセージをお送りいただけますようお願いいたします。
+▼ 担当コーチLINE追加URL
 {{coach_line_url}}
 
-ご連絡をお待ちいただけますようお願いいたします。
+ご不明な点がございましたら、本メッセージまたは本部までお気軽にお問い合わせください。
 
 Swim Partners`
 
@@ -922,7 +957,7 @@ Swim Partners`
             if (lead.second_student_name) {
                 const secondAge = calculateAge(lead.second_student_birth_date)
                 const secondAgeStr = secondAge !== null ? `${secondAge}歳` : '未設定'
-                secondStudentInfo = `\n■ 2人目の情報\n名前: ${lead.second_student_name}（${lead.second_student_gender || '未設定'} / ${secondAgeStr}）`
+                secondStudentInfo = `\n■ 2人目の情報: ${lead.second_student_name}（${lead.second_student_gender || '未設定'} / ${secondAgeStr}）`
             }
 
             let message = bodyTemplate
@@ -938,8 +973,8 @@ Swim Partners`
 
             // 【決済リンク自動付加フォールバック】テンプレートにリンクが未挿入の場合、確実に追記
             if (paymentLink && !message.includes(paymentLink)) {
-                if (message.includes('【お支払いのお願い】') || message.includes('お支払いについて')) {
-                    message = message.replace(/(【お支払いのお願い】|[■\d\.\s]*お支払いについて[^\n]*)/, `$1\n▼ 体験レッスン決済URL\n${paymentLink}`)
+                if (message.includes('【1. お支払いのお願い】') || message.includes('【お支払いのお願い】') || message.includes('お支払いについて')) {
+                    message = message.replace(/(【1\. お支払いのお願い】|【お支払いのお願い】|[■\d\.\s]*お支払いについて[^\n]*)/, `$1\n▼ 体験レッスン事前決済URL\n${paymentLink}`)
                 } else {
                     message += `\n\n【体験レッスン事前決済URL】\n${paymentLink}`
                 }
@@ -1460,23 +1495,26 @@ export async function getLineConfigAction() {
 
         const defaultLineAssignedTemplate = `{{name}} 様
 
-お申し込みいただいた体験レッスンの担当コーチが決定いたしました。
+スイムパートナーズにお申し込みいただきありがとうございます。
+体験レッスンの担当コーチおよび日程が確定いたしました。
 
 ■ 担当コーチ: {{coach_name}}
-■ 確定体験日時: {{lesson_date}}
+■ 確定日時: {{lesson_date}}
 ■ レッスン場所: {{location}}
 {{second_student_info}}
 ■ 体験レッスン料金: {{amount}}円
 
-【お支払いのお願い】
-体験レッスン料金のお支払いは、以下の決済リンク（クレジットカード決済）よりお願いいたします。
+【1. お支払いのお願い】
+体験レッスン料金のお支払いは、下記の専用決済URL（クレジットカード）よりお願いいたします。
+▼ 体験レッスン事前決済URL
 {{payment_link}}
 
-【担当コーチへのご連絡のお願い】
-当日の集合場所等の詳細確認のため、下記URLより担当コーチのLINEを追加いただき、メッセージをお送りいただけますようお願いいたします。
+【2. 担当コーチへご連絡のお願い】
+当日の集合場所や事前打ち合わせのため、下記URLより担当コーチのLINEを追加いただき、メッセージをお送りいただけますようお願いいたします。
+▼ 担当コーチLINE追加URL
 {{coach_line_url}}
 
-ご連絡をお待ちいただけますようお願いいたします。
+ご不明な点がございましたら、本メッセージまたは本部までお気軽にお問い合わせください。
 
 Swim Partners`
 

@@ -186,20 +186,8 @@ export async function processLessonBilling(scheduleId: string, forceManualEmail:
             const isTrial = data.title && (data.title.includes('体験') || data.title.includes('トライアル'))
 
             if (isTrial) {
-                console.log('[Billing] Detected Trial Lesson. Sending trial_lesson_reserved trigger.')
-                await emailService.sendTriggerEmail(
-                    'trial_lesson_reserved',
-                    student.contact_email,
-                    {
-                        name: student.full_name,
-                        student_name: student.full_name,
-                        lesson_date: format(lessonDate, 'yyyy/MM/dd HH:mm') + '〜' + format(addMinutes(lessonDate, 60), 'HH:mm'),
-                        trial_date: format(lessonDate, 'yyyy/MM/dd HH:mm'),
-                        amount: price.toLocaleString(),
-                        payment_link: paymentUrl,
-                        payment_url: paymentUrl
-                    }
-                )
+                // 体験レッスンはアサイン確定時に「コーチ確定＋事前決済案内」が1通の統合メッセージとして送信済みのため、二重送信を防止
+                console.log('[Billing] Detected Trial Lesson. Skipping redundant trial_lesson_reserved trigger as it is already sent on assign.')
             } else {
                 // Regular Overage
                 // Helper to format names

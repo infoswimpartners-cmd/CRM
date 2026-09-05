@@ -266,7 +266,9 @@ ${text}
             // 決済リンクが渡されているのに本文に含まれていない場合、手動時と同様に確実に追記する
             const payUrl = mergedVariables.payment_link || mergedVariables.payment_url
             if (payUrl && !renderedBody.includes(payUrl)) {
-                if (renderedBody.includes('【実際の決済URLがここに挿入されます】')) {
+                if (renderedBody.includes('【1. お支払いのお願い】') || renderedBody.includes('【お支払いのお願い】') || renderedBody.includes('お支払いについて')) {
+                    renderedBody = renderedBody.replace(/(【1\. お支払いのお願い】|【お支払いのお願い】|[■\d\.\s]*お支払いについて[^\n]*)/, `$1\n▼ 体験レッスン事前決済URL\n${payUrl}`)
+                } else if (renderedBody.includes('【実際の決済URLがここに挿入されます】')) {
                     renderedBody = renderedBody.replace('【実際の決済URLがここに挿入されます】', payUrl)
                 } else {
                     renderedBody += `\n\n【体験レッスン事前決済URL】\n${payUrl}`
