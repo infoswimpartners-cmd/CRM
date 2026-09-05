@@ -228,15 +228,69 @@ async function createTrialScheduleForLead(params: {
     }
 }
 
-// 1. Google Chatへ案件情報を通知し、リードを募集開始ステータスにする
+// リードに紐付く全通知先Webhook IDを取得するヘルパー関数
+export async function getLeadWebhookIds(supabase: any, leadId: string, fallbackId: string | null): Promise<string[]> {
+    try {
+        const { data: config } = await supabase
+            .from('app_configs')
+            .select('value')
+            .eq('key', `lead_webhooks_${leadId}`)
+            .maybeSingle()
+
+        if (config?.value) {
+            const parsed = JSON.parse(config.value)
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                return parsed
+            }
+        }
+    } catch (e) {
+        console.error('Error fetching lead_webhooks config:', e)
+    }
+    return fallbackId ? [fallbackId] : []
+}
+
+// 全リードの通知先スペース（Webhook）マッピングを一括取得するサーバーアクション
+export async function getLeadWebhookMappingsAction(): Promise<Record<string, string[]>> {
+    try {
+        const supabase = await createClient()
+        const { data: configs } = await supabase
+            .from('app_configs')
+            .select('key, value')
+            .like('key', 'lead_webhooks_%')
+
+        const mapping: Record<string, string[]> = {}
+        if (configs) {
+            configs.forEach(c => {
+                const leadId = c.key.replace('lead_webhooks_', '')
+                try {
+                    const ids = JSON.parse(c.value)
+                    if (Array.isArray(ids)) {
+                        mapping[leadId] = ids
+                    }
+                } catch (e) {}
+            })
+        }
+        return mapping
+    } catch (e) {
+        console.error('Failed to get lead webhook mappings:', e)
+        return {}
+    }
+}
+
+// 1. Google Chatへ案件情報を通知し、リードを募集開始ステータスにする（複数スペース対応）
 export async function sendLeadNotificationAction(
     leadId: string,
     location: string,
-    webhookId: string
+    webhookIds: string | string[]
 ) {
     const supabase = await createClient()
 
     try {
+        const ids = (Array.isArray(webhookIds) ? webhookIds : [webhookIds]).filter(Boolean)
+        if (ids.length === 0) {
+            throw new Error('通知先スペース（Webhook）を選択してください')
+        }
+
         // リード情報の取得
         const { data: lead, error: leadError } = await supabase
             .from('leads')
@@ -248,16 +302,18 @@ export async function sendLeadNotificationAction(
             throw new Error('リードが見つかりません')
         }
 
-        // Webhook URLの取得
-        const { data: webhook, error: webhookError } = await supabase
+        // Webhook URLをすべて取得
+        const { data: webhooks, error: webhookError } = await supabase
             .from('google_chat_webhooks')
-            .select('webhook_url, space_name')
-            .eq('id', webhookId)
-            .single()
+            .select('id, webhook_url, space_name')
+            .in('id', ids)
 
-        if (webhookError || !webhook) {
+        if (webhookError || !webhooks || webhooks.length === 0) {
             throw new Error('通知先スペース（Webhook）が見つかりません')
         }
+
+        // 代表のWebhook ID（UUID）
+        const primaryWebhookId = ids[0]
 
         // リードの場所を設定し、ステータスを「募集開始」に更新
         const { error: updateError } = await supabase
@@ -265,13 +321,23 @@ export async function sendLeadNotificationAction(
             .update({
                 lesson_location: location,
                 status: '募集開始',
-                notification_webhook_id: webhookId
+                notification_webhook_id: primaryWebhookId
             })
             .eq('id', leadId)
 
         if (updateError) {
             throw updateError
         }
+
+        // 複数Webhook ID一覧を app_configs に保存
+        const supabaseAdmin = createAdminClient()
+        await supabaseAdmin
+            .from('app_configs')
+            .upsert({
+                key: `lead_webhooks_${leadId}`,
+                value: JSON.stringify(ids),
+                description: `リード ${leadId} の通知先Google Chat Webhook IDリスト`
+            }, { onConflict: 'key' })
 
         // app_configs から lead_notification_template を取得
         const { data: configData } = await supabase
@@ -334,9 +400,18 @@ export async function sendLeadNotificationAction(
             .replace(/\{\{second_student_info\}\}/g, secondStudentInfo)
             .replace(/\{\{available_times\}\}/g, lead.available_times || '未設定')
 
-        // メッセージ送信
-        const sent = await sendGoogleChatMessage(webhook.webhook_url, message, `lead_${leadId}`)
-        if (!sent) {
+        // 選択されたすべてのスペース（Webhook）に送信
+        let anySent = false
+        for (const wh of webhooks) {
+            try {
+                const sent = await sendGoogleChatMessage(wh.webhook_url, message, `lead_${leadId}`)
+                if (sent) anySent = true
+            } catch (err) {
+                console.error(`Failed to send to space ${wh.space_name}:`, err)
+            }
+        }
+
+        if (!anySent) {
             throw new Error('Google Chatへの通知送信に失敗しました')
         }
 
@@ -616,15 +691,15 @@ Swim Partners`
         }
 
         // 5. アサイン確定の Google Chat 通知を、通知元スペースに送信（スレッド返信）
-        if (lead.notification_webhook_id) {
+        const targetWebhookIds = await getLeadWebhookIds(supabase, leadId, lead.notification_webhook_id)
+        if (targetWebhookIds.length > 0) {
             try {
-                const { data: webhook } = await supabase
+                const { data: webhooks } = await supabase
                     .from('google_chat_webhooks')
                     .select('webhook_url')
-                    .eq('id', lead.notification_webhook_id)
-                    .single()
+                    .in('id', targetWebhookIds)
                 
-                if (webhook?.webhook_url) {
+                if (webhooks && webhooks.length > 0) {
                     const { data: templateConfig } = await supabase
                         .from('app_configs')
                         .select('value')
@@ -646,7 +721,7 @@ Swim Partners`
 
                     let secondStudentNameInfo = ''
                     if (lead.second_student_name) {
-                        secondStudentNameInfo = `\n·2人目の名前： ${lead.second_student_name} 様`
+                        secondStudentNameInfo = `\n・2人目の名前： ${lead.second_student_name} 様`
                     }
 
                     const gchatMessage = bodyTemplate
@@ -656,7 +731,16 @@ Swim Partners`
                         .replace(/\{\{confirmed_location\}\}/g, confirmedLocation || '未設定')
                         .replace(/\{\{second_student_info\}\}/g, secondStudentNameInfo)
 
-                    await sendGoogleChatMessage(webhook.webhook_url, gchatMessage, `lead_${leadId}`)
+                    // 紐づくすべての通知先スペース（スレッド）に送信
+                    for (const wh of webhooks) {
+                        if (wh.webhook_url) {
+                            try {
+                                await sendGoogleChatMessage(wh.webhook_url, gchatMessage, `lead_${leadId}`)
+                            } catch (singleErr) {
+                                console.error('Failed to send assign notification to space:', singleErr)
+                            }
+                        }
+                    }
 
                     // 指定のWebhook（追加通知先）への新規送信
                     try {
@@ -980,15 +1064,15 @@ Swim Partners`
         }
 
         // 5. アサイン確定の Google Chat 通知
-        if (lead.notification_webhook_id) {
+        const targetWebhookIds = await getLeadWebhookIds(supabase, leadId, lead.notification_webhook_id)
+        if (targetWebhookIds.length > 0) {
             try {
-                const { data: webhook } = await supabase
+                const { data: webhooks } = await supabase
                     .from('google_chat_webhooks')
                     .select('webhook_url')
-                    .eq('id', lead.notification_webhook_id)
-                    .single()
+                    .in('id', targetWebhookIds)
                 
-                if (webhook?.webhook_url) {
+                if (webhooks && webhooks.length > 0) {
                     const { data: templateConfig } = await supabase
                         .from('app_configs')
                         .select('value')
@@ -1011,7 +1095,16 @@ Swim Partners`
                         .replace(/\{\{confirmed_location\}\}/g, confirmedLocation || '未設定')
                         .replace(/\{\{second_student_info\}\}/g, secondStudentNameInfo)
 
-                    await sendGoogleChatMessage(webhook.webhook_url, gchatMessage, `lead_${leadId}`)
+                    // 紐づくすべての通知先スペース（スレッド）に送信
+                    for (const wh of webhooks) {
+                        if (wh.webhook_url) {
+                            try {
+                                await sendGoogleChatMessage(wh.webhook_url, gchatMessage, `lead_${leadId}`)
+                            } catch (singleErr) {
+                                console.error('Failed to send admin assign notification to space:', singleErr)
+                            }
+                        }
+                    }
 
                     try {
                         const { data: assignedWebhookConfig } = await supabase
@@ -1902,15 +1995,15 @@ export async function cancelLeadAssignmentAction(leadId: string) {
         }
 
         // 5. アサインキャンセルの Google Chat 通知を送信（スレッド返信）
-        if (lead.notification_webhook_id) {
+        const targetWebhookIds = await getLeadWebhookIds(supabase, leadId, lead.notification_webhook_id)
+        if (targetWebhookIds.length > 0) {
             try {
-                const { data: webhook } = await supabase
+                const { data: webhooks } = await supabase
                     .from('google_chat_webhooks')
                     .select('webhook_url')
-                    .eq('id', lead.notification_webhook_id)
-                    .single()
+                    .in('id', targetWebhookIds)
                 
-                if (webhook?.webhook_url) {
+                if (webhooks && webhooks.length > 0) {
                     const gchatMessage = `❌ *【体験アサイン解除】*
 案件のアサインがキャンセル（解除）されました。
 ステータスを「募集開始」に戻しました。再度アサインが可能です。
@@ -1918,7 +2011,16 @@ export async function cancelLeadAssignmentAction(leadId: string) {
 *■ 対象顧客*
 ・名前： ${lead.name || '未設定'} 様`
 
-                    await sendGoogleChatMessage(webhook.webhook_url, gchatMessage, `lead_${leadId}`)
+                    // 紐づくすべての通知先スペース（スレッド）に送信
+                    for (const wh of webhooks) {
+                        if (wh.webhook_url) {
+                            try {
+                                await sendGoogleChatMessage(wh.webhook_url, gchatMessage, `lead_${leadId}`)
+                            } catch (singleErr) {
+                                console.error('Failed to send cancel notification to space:', singleErr)
+                            }
+                        }
+                    }
 
                     // 指定のWebhook（追加通知先）への新規送信
                     try {

@@ -43,7 +43,8 @@ import {
     createLeadManuallyAction,
     updateLeadAction,
     cancelLeadAssignmentAction,
-    adminAssignLeadAction
+    adminAssignLeadAction,
+    getLeadWebhookMappingsAction
 } from '@/actions/leads'
 import {
     Dialog,
@@ -238,7 +239,7 @@ export default function AdminLeadsPage() {
 
     // 各リードごとの設定状態
     const [selectedLocations, setSelectedLocations] = useState<Record<string, string>>({})
-    const [selectedWebhooks, setSelectedWebhooks] = useState<Record<string, string>>({})
+    const [selectedWebhooks, setSelectedWebhooks] = useState<Record<string, string[]>>({})
     const [sendingStates, setSendingStates] = useState<Record<string, boolean>>({})
     const [completingStates, setCompletingStates] = useState<Record<string, boolean>>({})
     const [cancelingStates, setCancelingStates] = useState<Record<string, boolean>>({})
@@ -250,6 +251,7 @@ export default function AdminLeadsPage() {
 
     // ポップオーバーの開閉制御
     const [openPopoverId, setOpenPopoverId] = useState<string | null>(null)
+    const [openWebhookPopoverId, setOpenWebhookPopoverId] = useState<string | null>(null)
 
     // テンプレート設定のステート
     const [notificationTemplate, setNotificationTemplate] = useState('')
@@ -641,6 +643,9 @@ export default function AdminLeadsPage() {
                 setLineTemplate(lineConfigRes.template || '')
             }
 
+            // 各リードのWebhook設定マッピングを取得
+            const webhookMappings = await getLeadWebhookMappingsAction()
+
             if (leadsData) {
                 setLeads(leadsData)
                 // 初期値設定
@@ -656,13 +661,19 @@ export default function AdminLeadsPage() {
                 
                 // 有効なWebhookを抽出して初期値設定
                 const activeWebhooks = webhooksData.filter(w => w.active)
-                if (activeWebhooks.length > 0) {
-                    const defaultWebhooks: Record<string, string> = {}
-                    leadsData?.forEach(l => {
-                        defaultWebhooks[l.id] = activeWebhooks[0].id
-                    })
-                    setSelectedWebhooks(defaultWebhooks)
-                }
+                const defaultWebhooks: Record<string, string[]> = {}
+                leadsData?.forEach(l => {
+                    if (webhookMappings[l.id] && webhookMappings[l.id].length > 0) {
+                        defaultWebhooks[l.id] = webhookMappings[l.id]
+                    } else if (l.notification_webhook_id) {
+                        defaultWebhooks[l.id] = [l.notification_webhook_id]
+                    } else if (activeWebhooks.length > 0) {
+                        defaultWebhooks[l.id] = [activeWebhooks[0].id]
+                    } else {
+                        defaultWebhooks[l.id] = []
+                    }
+                })
+                setSelectedWebhooks(defaultWebhooks)
             }
         } catch (error) {
             console.error('Error fetching data:', error)
@@ -844,22 +855,22 @@ export default function AdminLeadsPage() {
 
     const handleSendNotification = async (leadId: string) => {
         const location = selectedLocations[leadId]?.trim()
-        const webhookId = selectedWebhooks[leadId]
+        const webhookIds = selectedWebhooks[leadId] || []
 
         if (!location) {
             toast.error('レッスン予定場所を入力または選択してください')
             return
         }
 
-        if (!webhookId) {
-            toast.error('通知先 Google Chat スペースを選択してください')
+        if (webhookIds.length === 0) {
+            toast.error('通知先 Google Chat スペースを1つ以上選択してください')
             return
         }
 
         setSendingStates(prev => ({ ...prev, [leadId]: true }))
 
         try {
-            const res = await sendLeadNotificationAction(leadId, location, webhookId)
+            const res = await sendLeadNotificationAction(leadId, location, webhookIds)
             if (res.success) {
                 toast.success('Google Chatへ案件を通知しました')
                 await fetchData() // リロードしてステータス更新を反映
@@ -2236,21 +2247,86 @@ export default function AdminLeadsPage() {
                                                                  <span>Webhook未設定</span>
                                                              </div>
                                                          ) : (
-                                                             <Select
-                                                                 value={selectedWebhooks[lead.id] || ''}
-                                                                 onValueChange={(val) => setSelectedWebhooks(prev => ({ ...prev, [lead.id]: val }))}
+                                                             <Popover
+                                                                 open={openWebhookPopoverId === lead.id}
+                                                                 onOpenChange={(open) => setOpenWebhookPopoverId(open ? lead.id : null)}
                                                              >
-                                                                 <SelectTrigger className="h-8 w-full text-xs bg-gray-50/50 border-gray-200">
-                                                                     <SelectValue placeholder="スペースを選択" />
-                                                                 </SelectTrigger>
-                                                                 <SelectContent>
-                                                                     {activeWebhooks.map((w) => (
-                                                                         <SelectItem key={w.id} value={w.id} className="text-xs">
-                                                                             {w.space_name}
-                                                                         </SelectItem>
-                                                                     ))}
-                                                                 </SelectContent>
-                                                             </Select>
+                                                                 <PopoverTrigger asChild>
+                                                                     <Button
+                                                                         variant="outline"
+                                                                         size="sm"
+                                                                         className="h-8 w-full justify-between text-xs bg-gray-50/50 border-gray-200 px-2 font-normal hover:bg-white"
+                                                                     >
+                                                                         <span className="truncate">
+                                                                             {(() => {
+                                                                                 const currentList = selectedWebhooks[lead.id] || []
+                                                                                 if (currentList.length === 0) return 'スペースを選択'
+                                                                                 if (currentList.length === 1) {
+                                                                                     const matched = activeWebhooks.find(w => w.id === currentList[0])
+                                                                                     return matched ? matched.space_name : '1件選択中'
+                                                                                 }
+                                                                                 if (currentList.length === activeWebhooks.length) return '全スペース選択中'
+                                                                                 return `${currentList.length}件選択中`
+                                                                             })()}
+                                                                         </span>
+                                                                         <span className="text-[10px] text-gray-400 shrink-0 ml-1">▼</span>
+                                                                     </Button>
+                                                                 </PopoverTrigger>
+                                                                 <PopoverContent className="w-[200px] p-0" align="start">
+                                                                     <Command>
+                                                                         <div className="flex items-center justify-between p-1.5 border-b border-gray-100 bg-gray-50/60">
+                                                                             <span className="text-[11px] font-semibold text-gray-600">通知先スペース</span>
+                                                                             <button
+                                                                                 type="button"
+                                                                                 className="text-[10px] text-blue-600 hover:text-blue-800 font-medium px-1 py-0.5 rounded hover:bg-blue-50 cursor-pointer"
+                                                                                 onClick={() => {
+                                                                                     const currentList = selectedWebhooks[lead.id] || []
+                                                                                     if (currentList.length === activeWebhooks.length) {
+                                                                                         setSelectedWebhooks(prev => ({ ...prev, [lead.id]: [] }))
+                                                                                     } else {
+                                                                                         setSelectedWebhooks(prev => ({ ...prev, [lead.id]: activeWebhooks.map(w => w.id) }))
+                                                                                     }
+                                                                                 }}
+                                                                             >
+                                                                                 {(selectedWebhooks[lead.id] || []).length === activeWebhooks.length ? '全解除' : 'すべて選択'}
+                                                                             </button>
+                                                                         </div>
+                                                                         <CommandList>
+                                                                             <CommandEmpty className="py-2 text-center text-xs text-gray-500">
+                                                                                 スペースが見つかりません
+                                                                             </CommandEmpty>
+                                                                             <CommandGroup className="p-1">
+                                                                                 {activeWebhooks.map((w) => {
+                                                                                     const currentList = selectedWebhooks[lead.id] || []
+                                                                                     const isChecked = currentList.includes(w.id)
+
+                                                                                     return (
+                                                                                         <CommandItem
+                                                                                             key={w.id}
+                                                                                             value={w.space_name}
+                                                                                             onSelect={() => {
+                                                                                                 let newList = [...currentList]
+                                                                                                 if (isChecked) {
+                                                                                                     newList = newList.filter(id => id !== w.id)
+                                                                                                 } else {
+                                                                                                     newList.push(w.id)
+                                                                                                 }
+                                                                                                 setSelectedWebhooks(prev => ({ ...prev, [lead.id]: newList }))
+                                                                                             }}
+                                                                                             className="text-xs flex items-center justify-between cursor-pointer py-1.5 px-2 rounded hover:bg-gray-100"
+                                                                                         >
+                                                                                             <span className="truncate">{w.space_name}</span>
+                                                                                             {isChecked && (
+                                                                                                 <span className="text-primary text-[11px] font-bold shrink-0 ml-1">✓</span>
+                                                                                             )}
+                                                                                         </CommandItem>
+                                                                                     )
+                                                                                 })}
+                                                                             </CommandGroup>
+                                                                         </CommandList>
+                                                                     </Command>
+                                                                 </PopoverContent>
+                                                             </Popover>
                                                          )}
                                                      </div>
                                                  </TableCell>
