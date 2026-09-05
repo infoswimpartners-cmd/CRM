@@ -1541,6 +1541,7 @@ export async function saveLineConfigAction(token: string, template: string) {
         if (templateError) throw templateError
 
         revalidatePath('/admin/leads')
+        revalidatePath('/admin/email-templates')
         return { success: true }
     } catch (error: any) {
         console.error('Failed to save LINE config:', error)
