@@ -517,29 +517,15 @@ export async function assignLeadAction(leadId: string, confirmedDate: string, co
         const amountStr = trialResult?.price ? trialResult.price.toLocaleString() : '6,000'
 
         // 4. 顧客への自動確定通知（LINEプッシュメッセージ）の送信（1通に統合）
+        // ※体験アサイン時点では担当コーチのLINEはまだ未追加のため、必ず「SWIM PARTNERS 公式LINE」から送信します
         if (lead.line_user_id && lead.send_customer_notification !== false) {
-            // 担当コーチに設定された公式LINEアクセストークンを優先取得
-            let token = ''
-            if (profile.id) {
-                const { data: coachBotConfig } = await supabaseAdmin
-                    .from('line_bot_configs')
-                    .select('channel_access_token')
-                    .eq('coach_id', profile.id)
-                    .maybeSingle()
-                if (coachBotConfig?.channel_access_token) {
-                    token = coachBotConfig.channel_access_token
-                }
-            }
-
-            // コーチ個別のトークンが未設定の場合は、システム全体設定（app_configs）から取得
-            if (!token) {
-                const { data: tokenConfig } = await supabaseAdmin
-                    .from('app_configs')
-                    .select('value')
-                    .eq('key', 'line_channel_access_token')
-                    .maybeSingle()
-                token = tokenConfig?.value || ''
-            }
+            // SWIM PARTNERS 公式LINEのアクセストークンを取得
+            const { data: tokenConfig } = await supabaseAdmin
+                .from('app_configs')
+                .select('value')
+                .eq('key', 'line_channel_access_token')
+                .maybeSingle()
+            const token = tokenConfig?.value || process.env.LINE_CHANNEL_ACCESS_TOKEN || ''
 
             const { data: templateConfig } = await supabaseAdmin
                 .from('app_configs')
@@ -896,29 +882,15 @@ export async function adminAssignLeadAction(
         const amountStr = trialResult?.price ? trialResult.price.toLocaleString() : '6,000'
 
         // 4. 顧客への自動確定通知（LINEプッシュメッセージ）の送信（1通に統合）
+        // ※体験アサイン時点では担当コーチのLINEはまだ未追加のため、必ず「SWIM PARTNERS 公式LINE」から送信します
         if (lead.line_user_id && lead.send_customer_notification !== false) {
-            // 担当コーチに設定された公式LINEアクセストークンを優先取得
-            let token = ''
-            if (targetCoach.id) {
-                const { data: coachBotConfig } = await supabaseAdmin
-                    .from('line_bot_configs')
-                    .select('channel_access_token')
-                    .eq('coach_id', targetCoach.id)
-                    .maybeSingle()
-                if (coachBotConfig?.channel_access_token) {
-                    token = coachBotConfig.channel_access_token
-                }
-            }
-
-            // コーチ個別のトークンが未設定の場合は、システム全体設定（app_configs）から取得
-            if (!token) {
-                const { data: tokenConfig } = await supabaseAdmin
-                    .from('app_configs')
-                    .select('value')
-                    .eq('key', 'line_channel_access_token')
-                    .maybeSingle()
-                token = tokenConfig?.value || ''
-            }
+            // SWIM PARTNERS 公式LINEのアクセストークンを取得
+            const { data: tokenConfig } = await supabaseAdmin
+                .from('app_configs')
+                .select('value')
+                .eq('key', 'line_channel_access_token')
+                .maybeSingle()
+            const token = tokenConfig?.value || process.env.LINE_CHANNEL_ACCESS_TOKEN || ''
 
             const { data: templateConfig } = await supabaseAdmin
                 .from('app_configs')
