@@ -109,13 +109,19 @@ async function createTrialScheduleForLead(params: {
             .eq('active', true)
             .maybeSingle()
 
-        // 料金の計算（2名同時の場合はpair_unit_priceまたは1.5倍）
-        const baseUnitPrice = trialMaster?.unit_price || 7000
-        const pairPrice = trialMaster?.pair_unit_price || Math.round(baseUnitPrice * 1.5)
-        const lessonPrice = params.hasSecondStudent ? pairPrice : baseUnitPrice
-
         // 2. 日時のパース
         const { start, end } = parseConfirmedDateTime(params.confirmedDate)
+
+        // 所要時間（分）の判定（90分判定）
+        const durationMinutes = Math.round((new Date(end).getTime() - new Date(start).getTime()) / (60 * 1000))
+        const is90Min = durationMinutes >= 80 || params.confirmedDate.includes('90分') || (params.leadNotes || '').includes('90分')
+
+        // 料金の計算（基本6,000円、2名同時または90分の場合は9,000円）
+        const baseUnitPrice = trialMaster?.unit_price || 6000
+        let lessonPrice = baseUnitPrice
+        if (params.hasSecondStudent || is90Min) {
+            lessonPrice = trialMaster?.pair_unit_price || 9000
+        }
 
         // コーチ名の取得
         let coachName = '担当コーチ'
@@ -508,7 +514,7 @@ export async function assignLeadAction(leadId: string, confirmedDate: string, co
         })
 
         const paymentLink = trialResult?.paymentLink || ''
-        const amountStr = trialResult?.price ? trialResult.price.toLocaleString() : '7,000'
+        const amountStr = trialResult?.price ? trialResult.price.toLocaleString() : '6,000'
 
         // 4. 顧客への自動確定通知（LINEプッシュメッセージ）の送信
         if (lead.line_user_id && lead.send_customer_notification !== false) {
@@ -870,7 +876,7 @@ export async function adminAssignLeadAction(
         })
 
         const paymentLink = trialResult?.paymentLink || ''
-        const amountStr = trialResult?.price ? trialResult.price.toLocaleString() : '7,000'
+        const amountStr = trialResult?.price ? trialResult.price.toLocaleString() : '6,000'
 
         // 4. 顧客への自動確定通知（LINEプッシュメッセージ）の送信
         if (lead.line_user_id && lead.send_customer_notification !== false) {

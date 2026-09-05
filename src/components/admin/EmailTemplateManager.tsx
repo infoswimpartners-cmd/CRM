@@ -824,7 +824,7 @@ export function EmailTemplateManager({ templates, triggers, trialMasters = [] }:
         notes: '持ち物: 水着・キャップ',
         subject: 'お問い合わせ内容の確認',
         user_name: 'テスト太郎',
-        amount: '7,000',
+        amount: '6,000',
         plan_name: '月4回パーソナルプラン',
         start_date: '2026年9月1日',
         payment_link: 'https://manager.swim-partners.com/pay/trial/sched_example123',
