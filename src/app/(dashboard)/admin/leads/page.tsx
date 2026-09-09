@@ -33,6 +33,8 @@ import {
     saveLeadAssignedNotificationTemplateAction,
     getLeadAssignedAdditionalWebhookTemplateAction,
     saveLeadAssignedAdditionalWebhookTemplateAction,
+    getLeadAssignedCoachNotificationTemplateAction,
+    saveLeadAssignedCoachNotificationTemplateAction,
     getLeadAssignedWebhookUrlAction,
     saveLeadAssignedWebhookUrlAction,
     getDisplaySettingsAction,
@@ -262,6 +264,8 @@ export default function AdminLeadsPage() {
     const [savingTemplate, setSavingTemplate] = useState(false)
     const [assignedNotificationTemplate, setAssignedNotificationTemplate] = useState('')
     const [savingAssignedTemplate, setSavingAssignedTemplate] = useState(false)
+    const [assignedCoachNotificationTemplate, setAssignedCoachNotificationTemplate] = useState('')
+    const [savingAssignedCoachTemplate, setSavingAssignedCoachTemplate] = useState(false)
     const [assignedWebhookUrl, setAssignedWebhookUrl] = useState('')
     const [savingAssignedWebhookUrl, setSavingAssignedWebhookUrl] = useState(false)
     const [assignedAdditionalTemplate, setAssignedAdditionalTemplate] = useState('')
@@ -651,6 +655,7 @@ export default function AdminLeadsPage() {
                 getLeadAssignedNotificationTemplateAction(),
                 getLeadAssignedWebhookUrlAction(),
                 getLeadAssignedAdditionalWebhookTemplateAction(),
+                getLeadAssignedCoachNotificationTemplateAction(),
                 getDisplaySettingsAction(),
                 getLineConfigAction(),
             ])
@@ -712,6 +717,7 @@ export default function AdminLeadsPage() {
                 assignedTemplateRes,
                 assignedWebhookUrlRes,
                 assignedAdditionalTemplateRes,
+                assignedCoachTemplateRes,
                 settingsRes,
                 lineConfigRes,
             ] = await secondaryPromise
@@ -728,6 +734,9 @@ export default function AdminLeadsPage() {
             }
             if (assignedAdditionalTemplateRes.success) {
                 setAssignedAdditionalTemplate(assignedAdditionalTemplateRes.value || '')
+            }
+            if (assignedCoachTemplateRes.success) {
+                setAssignedCoachNotificationTemplate(assignedCoachTemplateRes.value || '')
             }
             if (settingsRes.success) {
                 setDisplaySettings(settingsRes.value)
@@ -813,6 +822,24 @@ export default function AdminLeadsPage() {
             toast.error('エラーが発生しました')
         } finally {
             setSavingAssignedAdditionalTemplate(false)
+        }
+    }
+
+    const handleSaveAssignedCoachTemplate = async () => {
+        setSavingAssignedCoachTemplate(true)
+        try {
+            const res = await saveLeadAssignedCoachNotificationTemplateAction(assignedCoachNotificationTemplate)
+            if (res.success) {
+                toast.success('コーチ宛て詳細通知テンプレートを保存しました')
+                await fetchData()
+            } else {
+                toast.error(res.error || '保存に失敗しました')
+            }
+        } catch (error) {
+            console.error(error)
+            toast.error('エラーが発生しました')
+        } finally {
+            setSavingAssignedCoachTemplate(false)
         }
     }
 
@@ -2828,6 +2855,101 @@ export default function AdminLeadsPage() {
                                         {savingAssignedAdditionalTemplate ? '保存中...' : '追加通知用テンプレートを保存'}
                                     </Button>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-xs space-y-6 max-w-4xl mt-6">
+                        <div>
+                            <h2 className="text-sm font-bold text-gray-950">コーチ連絡用スペース宛て アサイン詳細通知テンプレート設定（Google Chat）</h2>
+                            <p className="text-[11px] text-gray-400 mt-0.5">
+                                アサイン確定時に、担当コーチ個別のGoogle Chatスペースへ送信する案件詳細メッセージの文面を設定します。プレースホルダー（<code>{"{{...}}"}</code>）は自動で顧客情報に置換されます。
+                            </p>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="assignedCoachTemplateText" className="text-xs font-semibold text-gray-700">テンプレート本文</Label>
+                                <textarea
+                                    id="assignedCoachTemplateText"
+                                    rows={14}
+                                    value={assignedCoachNotificationTemplate}
+                                    onChange={(e) => setAssignedCoachNotificationTemplate(e.target.value)}
+                                    placeholder="🏊‍♂️ *【体験レッスンアサイン確定・案件詳細】*&#10;担当コーチとして体験レッスンのアサインが確定いたしました。&#10;&#10;*■ レッスン基本情報*&#10;・担当コーチ： {{coach_name}}&#10;・確定体験日時： {{confirmed_datetime}}&#10;・確定レッスン場所： {{confirmed_location}}&#10;・体験レッスン料金： {{amount}}円&#10;&#10;*■ お客様（生徒）情報*&#10;・お名前： {{name}} 様{{second_student_info}}&#10;・性別 / 年齢： {{age_gender}}&#10;・電話番号： {{phone}}&#10;・メールアドレス： {{email}}&#10;・希望エリア： {{area}}&#10;・泳力レベル / ご要望： {{notes}}&#10;&#10;*■ 体験レッスン決済URL（事前決済用）*&#10;{{payment_link}}&#10;※お客様へは公式LINEより上記決済リンクと担当コーチへのご連絡案内を自動送信しております。&#10;集合場所等の事前確認のため、お客様からのLINE追加・ご連絡をお待ちください。"
+                                    className="w-full text-xs font-mono p-3 rounded-md border border-gray-200 bg-gray-50/50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors"
+                                />
+                            </div>
+
+                            <div className="bg-gray-50 rounded-lg p-4 border border-gray-100 space-y-2">
+                                <h3 className="text-xs font-bold text-gray-800">利用可能なプレースホルダー</h3>
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5 text-[11px]">
+                                    <div className="flex gap-1.5 items-start">
+                                        <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{coach_name}}"}</code>
+                                        <span className="text-gray-500">担当コーチ名</span>
+                                    </div>
+                                    <div className="flex gap-1.5 items-start">
+                                        <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{name}}"}</code>
+                                        <span className="text-gray-500">顧客氏名</span>
+                                    </div>
+                                    <div className="flex gap-1.5 items-start">
+                                        <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{confirmed_datetime}}"}</code>
+                                        <span className="text-gray-500">確定レッスン日時</span>
+                                    </div>
+                                    <div className="flex gap-1.5 items-start">
+                                        <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{confirmed_location}}"}</code>
+                                        <span className="text-gray-500">確定レッスン場所</span>
+                                    </div>
+                                    <div className="flex gap-1.5 items-start">
+                                        <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{amount}}"}</code>
+                                        <span className="text-gray-500">体験レッスン料金</span>
+                                    </div>
+                                    <div className="flex gap-1.5 items-start">
+                                        <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{phone}}"}</code>
+                                        <span className="text-gray-500">電話番号</span>
+                                    </div>
+                                    <div className="flex gap-1.5 items-start">
+                                        <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{email}}"}</code>
+                                        <span className="text-gray-500">メールアドレス</span>
+                                    </div>
+                                    <div className="flex gap-1.5 items-start">
+                                        <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{area}}"}</code>
+                                        <span className="text-gray-500">希望エリア</span>
+                                    </div>
+                                    <div className="flex gap-1.5 items-start">
+                                        <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{age_gender}}"}</code>
+                                        <span className="text-gray-500">性別 / 年齢</span>
+                                    </div>
+                                    <div className="flex gap-1.5 items-start">
+                                        <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{gender}}"}</code>
+                                        <span className="text-gray-500">性別</span>
+                                    </div>
+                                    <div className="flex gap-1.5 items-start">
+                                        <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{age}}"}</code>
+                                        <span className="text-gray-500">年齢</span>
+                                    </div>
+                                    <div className="flex gap-1.5 items-start">
+                                        <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{second_student_info}}"}</code>
+                                        <span className="text-gray-500">2人目の顧客情報</span>
+                                    </div>
+                                    <div className="flex gap-1.5 items-start">
+                                        <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{notes}}"}</code>
+                                        <span className="text-gray-500">泳力レベル / ご要望メモ</span>
+                                    </div>
+                                    <div className="flex gap-1.5 items-start">
+                                        <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{payment_link}}"}</code>
+                                        <span className="text-gray-500">事前決済URL</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end pt-1">
+                                <Button
+                                    onClick={handleSaveAssignedCoachTemplate}
+                                    disabled={savingAssignedCoachTemplate}
+                                    className="text-xs h-9 px-6 font-semibold"
+                                >
+                                    {savingAssignedCoachTemplate ? '保存中...' : 'コーチ宛てテンプレートを保存'}
+                                </Button>
                             </div>
                         </div>
                     </div>

@@ -333,27 +333,58 @@ async function sendCoachDetailNotification(params: {
             secondStudentInfo = `\n・2人目のお名前： ${lead.second_student_name} 様（${lead.second_student_gender || '未設定'} / ${secondAgeStr}）`
         }
 
-        const coachMessage = `🏊‍♂️ *【体験レッスンアサイン確定・案件詳細】*
+        const defaultCoachTemplate = `🏊‍♂️ *【体験レッスンアサイン確定・案件詳細】*
 担当コーチとして体験レッスンのアサインが確定いたしました。
 
 *■ レッスン基本情報*
-・担当コーチ： ${coachName}
-・確定体験日時： ${confirmedDate}
-・確定レッスン場所： ${confirmedLocation}
-・体験レッスン料金： ${amountStr}円
+・担当コーチ： {{coach_name}}
+・確定体験日時： {{confirmed_datetime}}
+・確定レッスン場所： {{confirmed_location}}
+・体験レッスン料金： {{amount}}円
 
 *■ お客様（生徒）情報*
-・お名前： ${lead.name || '未設定'} 様${secondStudentInfo}
-・性別 / 年齢： ${ageGender}
-・電話番号： ${lead.phone || '未設定'}
-・メールアドレス： ${lead.email || '未設定'}
-・希望エリア： ${lead.area || '未設定'}
-・泳力レベル / ご要望： ${lead.notes || 'なし'}
+・お名前： {{name}} 様{{second_student_info}}
+・性別 / 年齢： {{age_gender}}
+・電話番号： {{phone}}
+・メールアドレス： {{email}}
+・希望エリア： {{area}}
+・泳力レベル / ご要望： {{notes}}
 
 *■ 体験レッスン決済URL（事前決済用）*
-${paymentLink}
+{{payment_link}}
 ※お客様へは公式LINEより上記決済リンクと担当コーチへのご連絡案内を自動送信しております。
 集合場所等の事前確認のため、お客様からのLINE追加・ご連絡をお待ちください。`
+
+        // テンプレート設定を取得
+        const { data: templateConfig } = await supabaseAdmin
+            .from('app_configs')
+            .select('value')
+            .eq('key', 'lead_assigned_coach_notification_template')
+            .maybeSingle()
+
+        const bodyTemplate = templateConfig?.value || defaultCoachTemplate
+
+        let coachMessage = bodyTemplate
+            .replace(/\{\{coach_name\}\}/g, coachName || '未設定')
+            .replace(/\{\{confirmed_datetime\}\}/g, confirmedDate || '未設定')
+            .replace(/\{\{confirmed_location\}\}/g, confirmedLocation || '未設定')
+            .replace(/\{\{amount\}\}/g, amountStr || '6,000')
+            .replace(/\{\{name\}\}/g, lead.name || '未設定')
+            .replace(/\{\{second_student_info\}\}/g, secondStudentInfo)
+            .replace(/\{\{age_gender\}\}/g, ageGender)
+            .replace(/\{\{gender\}\}/g, genderStr)
+            .replace(/\{\{age\}\}/g, ageStr)
+            .replace(/\{\{phone\}\}/g, lead.phone || '未設定')
+            .replace(/\{\{email\}\}/g, lead.email || '未設定')
+            .replace(/\{\{area\}\}/g, lead.area || '未設定')
+            .replace(/\{\{notes\}\}/g, lead.notes || 'なし')
+            .replace(/\{\{payment_link\}\}/g, paymentLink || '')
+            .replace(/\{\{payment_url\}\}/g, paymentLink || '')
+
+        // 決済リンクがテンプレートに含まれていない場合の自動追記フォールバック
+        if (paymentLink && !coachMessage.includes(paymentLink)) {
+            coachMessage += `\n\n*■ 体験レッスン決済URL（事前決済用）*\n${paymentLink}`
+        }
 
         console.log(`[Coach Detail Notification] Sending notification to coach space: ${targetSpaceName}`)
         await sendGoogleChatMessage(webhookUrl, coachMessage)
@@ -1589,6 +1620,58 @@ export async function saveLeadAssignedAdditionalWebhookTemplateAction(template: 
     } catch (error: any) {
         console.error('Failed to save lead assigned additional template:', error)
         return { success: false, error: error.message || '追加通知テンプレートの保存に失敗しました' }
+    }
+}
+
+// 6.6.7. コーチ連絡用スペース宛てアサイン詳細通知（Google Chat）のメッセージテンプレートの取得
+export async function getLeadAssignedCoachNotificationTemplateAction() {
+    const supabase = await createClient()
+
+    try {
+        const { data, error } = await supabase
+            .from('app_configs')
+            .select('value')
+            .eq('key', 'lead_assigned_coach_notification_template')
+            .single()
+
+        if (error && error.code !== 'PGRST116') throw error // PGRST116 is single row empty
+        return { success: true, value: data?.value || '' }
+    } catch (error: any) {
+        console.error('Failed to get lead assigned coach template:', error)
+        return { success: false, error: error.message || 'コーチ宛て詳細通知テンプレートの取得に失敗しました' }
+    }
+}
+
+// 6.6.8. コーチ連絡用スペース宛てアサイン詳細通知（Google Chat）のメッセージテンプレートの保存
+export async function saveLeadAssignedCoachNotificationTemplateAction(template: string) {
+    try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user?.id || '')
+            .single()
+
+        if (profile?.role !== 'admin') {
+            return { success: false, error: '管理者権限が必要です。' }
+        }
+
+        const supabaseAdmin = createAdminClient()
+        const { error } = await supabaseAdmin
+            .from('app_configs')
+            .upsert({ 
+                key: 'lead_assigned_coach_notification_template', 
+                value: template,
+                description: 'コーチ連絡用スペース宛てアサイン詳細通知（Google Chat）のメッセージテンプレート'
+            }, { onConflict: 'key' })
+
+        if (error) throw error
+        revalidatePath('/admin/leads')
+        return { success: true }
+    } catch (error: any) {
+        console.error('Failed to save lead assigned coach template:', error)
+        return { success: false, error: error.message || 'コーチ宛て詳細通知テンプレートの保存に失敗しました' }
     }
 }
 
