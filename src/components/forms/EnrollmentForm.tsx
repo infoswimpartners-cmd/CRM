@@ -514,22 +514,22 @@ export default function EnrollmentForm({
                 {activePlan.id ? (
                   <div className="mt-3 space-y-3">
                     {/* ① 本日お支払い額 */}
-                    <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 shadow-sm space-y-2">
-                      <div className="flex justify-between items-center text-xs text-slate-500 font-bold">
-                        <span className="flex items-center gap-1.5">
-                          <span className="w-4 h-4 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-[10px] font-black">1</span>
+                    <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-sm space-y-3">
+                      <div className="flex justify-between items-center text-xs sm:text-sm text-slate-700 font-bold pb-0.5">
+                        <span className="flex items-center gap-2">
+                          <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-black">1</span>
                           本日の即時決済額
                         </span>
                         {selectedParentPlan === 'single' ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
                             初回即時決済
                           </span>
                         ) : activePlan.isPackage ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
                             一括決済
                           </span>
                         ) : (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-600">
                             本日¥0
                           </span>
                         )}
@@ -547,11 +547,11 @@ export default function EnrollmentForm({
                         </span>
                       </div>
                       {selectedParentPlan === 'single' ? (
-                        <p className="text-[11px] text-slate-500 pt-1 leading-relaxed font-medium">
+                        <p className="text-[11px] text-slate-500 pt-1.5 border-t border-slate-100 leading-relaxed font-medium">
                           ※単発受講のシステム管理料として年会費3,300円（税込）が本日即時決済されます（以降1年ごとに自動更新）。
                         </p>
                       ) : !activePlan.isPackage ? (
-                        <p className="text-[10px] text-slate-500 pt-1 leading-relaxed">
+                        <p className="text-[10px] text-slate-500 pt-1.5 border-t border-slate-100 leading-relaxed">
                           ※本日は決済用クレジットカード情報の登録（安全なStripeシステム経由）のみを行います。本日時点で決済は発生いたしません。
                         </p>
                       ) : null}
@@ -559,34 +559,38 @@ export default function EnrollmentForm({
 
                     {/* ② 翌月1日以降のお支払い / レッスン受講時のお支払い */}
                     {selectedParentPlan === 'single' ? (
-                      <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 shadow-sm space-y-2">
-                        <div className="flex justify-between items-center text-xs text-slate-500 font-bold">
-                          <span className="flex items-center gap-1.5">
-                            <span className="w-4 h-4 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-[10px] font-black">2</span>
+                      <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-sm space-y-3">
+                        {/* タイトル行 */}
+                        <div className="flex justify-between items-center pb-0.5">
+                          <span className="text-xs sm:text-sm text-slate-700 font-bold flex items-center gap-2">
+                            <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-black">2</span>
                             レッスン受講時のお支払い形式
                           </span>
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
                             受講分のみ後払い
                           </span>
                         </div>
 
-                        <div className="bg-slate-50/90 p-3 rounded-xl border border-slate-100 space-y-1.5">
-                          <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
-                            <span className="text-xs font-bold text-slate-600">レッスン受講料:</span>
-                            <span className="text-sm font-black text-blue-700 tracking-tight">
+                        {/* メインボックス */}
+                        <div className="bg-slate-50/90 p-3.5 sm:p-4 rounded-xl border border-slate-200/60 space-y-2">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                            <span className="text-xs font-bold text-slate-600">
+                              レッスン受講料
+                            </span>
+                            <span className="text-sm sm:text-base font-black text-blue-700 tracking-tight">
                               受講した分だけ次月5日に決済
                             </span>
                           </div>
-                          <p className="text-[11px] text-slate-500 leading-relaxed font-medium">
+                          <p className="text-[11px] text-slate-500 pt-1.5 border-t border-slate-200/60 leading-relaxed font-medium">
                             ※システム都合により決済日が前後することがあります。
                           </p>
                         </div>
                       </div>
                     ) : (
-                      <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 shadow-sm space-y-2">
-                        <div className="flex justify-between items-center text-xs text-slate-500 font-bold">
-                          <span className="flex items-center gap-1.5">
-                            <span className="w-4 h-4 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-[10px] font-black">2</span>
+                      <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-sm space-y-3">
+                        <div className="flex justify-between items-center text-xs sm:text-sm text-slate-700 font-bold pb-0.5">
+                          <span className="flex items-center gap-2">
+                            <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-black">2</span>
                             お支払い形式（基本料金）
                           </span>
                         </div>
@@ -624,21 +628,26 @@ export default function EnrollmentForm({
 
                     {/* 単発プラン選択時の標準レッスン料金表示 */}
                     {selectedParentPlan === 'single' && showSinglePrices && singleLessons.length > 0 && (
-                      <div className="bg-white p-3 rounded-lg border border-slate-200/80 shadow-sm space-y-1.5 animate-fadeIn">
-                        <span className="text-[11px] text-slate-500 font-bold block mb-1">
-                          ③ 登録されている標準レッスン受講料 (1回あたり)
+                      <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-sm space-y-3 animate-fadeIn">
+                        <span className="text-xs sm:text-sm text-slate-700 font-bold flex items-center gap-2 pb-0.5">
+                          <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-black">3</span>
+                          登録されている標準レッスン受講料 (1回あたり)
                         </span>
-                        <div className="divide-y divide-slate-100">
+                        <div className="divide-y divide-slate-100 bg-slate-50/80 rounded-xl px-3.5 py-1 border border-slate-200/60">
                           {singleLessons.map(lesson => (
-                            <div key={lesson.id} className="flex justify-between items-center py-1.5 text-[11px]">
+                            <div key={lesson.id} className="flex justify-between items-center py-2 text-xs">
                               <span className="font-bold text-slate-600">{lesson.name.replace('【単発】', '')} コース</span>
-                              <span className="font-black text-slate-800">¥{lesson.unit_price.toLocaleString()} (税込)</span>
+                              <span className="font-black text-slate-800 text-sm">
+                                ¥{lesson.unit_price.toLocaleString()}{' '}
+                                <span className="text-[10px] font-normal text-slate-400">(税込)</span>
+                              </span>
                             </div>
                           ))}
                         </div>
-                        <p className="text-[10px] text-slate-500 leading-relaxed mt-1 font-medium">
-                          ※入会時にシステム管理料として年会費3,300円（税込）が即時決済されます（以降1年ごとに自動更新）。レッスン受講料は受講した分だけ次月5日に決済されます（システム都合により前後することがあります）。
-                        </p>
+                        <div className="text-[11px] text-slate-500 pt-1 space-y-0.5 leading-relaxed font-medium">
+                          <p>※入会時にシステム管理料として年会費3,300円（税込）が即時決済されます（以降1年ごとに自動更新）。</p>
+                          <p>※レッスン受講料は受講した分だけ次月5日に決済されます（システム都合により前後することがあります）。</p>
+                        </div>
                       </div>
                     )}
 
