@@ -118,13 +118,28 @@ export async function processLessonReminders(options: ReminderProcessOptions = {
             return { success: false, error: schedError.message }
         }
 
-        // 【安全ガード】
-        // 自動送信許可（ENABLE_LESSON_REMINDERS_CRON === 'true'）が出ていない場合は、
-        // テスト太郎（会員番号 0035）以外の他顧客をすべて安全に除外
+        // 3. 全コーチの LINEボット設定＆Google Chat設定 を取得
+        const { data: botConfigs } = await supabase
+            .from('line_bot_configs')
+            .select('coach_id, bot_name, channel_access_token, gchat_webhook_id')
+
+        const botConfigMap = new Map((botConfigs || []).map(b => [b.coach_id, b]))
+
+        // 【対象スケジュールの抽出】
+        // ① テスト太郎（会員番号 0035）
+        // ② または、担当コーチの LINE設定（channel_access_token）が完了しているスケジュール
+        // ※ これにより、設定完了済みのコーチから順次自動で送信対象となり、未設定のコーチは除外されます。
+        // ※ 環境変数 ENABLE_LESSON_REMINDERS_CRON === 'true' の場合も全体許可として機能します。
         const schedules = (rawSchedules || []).filter(sched => {
             const student = sched.students as any
-            if (isCronEnabled) return true
-            return student?.student_number === '0035' || student?.full_name?.includes('テスト太郎')
+            const isTestStudent = student?.student_number === '0035' || student?.full_name?.includes('テスト太郎')
+            if (isTestStudent || isCronEnabled) return true
+
+            // 担当コーチのLINE設定（アクセストークン）が存在し、空でないか判定
+            if (!sched.coach_id) return false
+            const coachConfig = botConfigMap.get(sched.coach_id)
+            const isCoachConfigured = !!(coachConfig?.channel_access_token && coachConfig.channel_access_token.trim().length > 0)
+            return isCoachConfigured
         })
 
         if (!schedules || schedules.length === 0) {
@@ -136,13 +151,6 @@ export async function processLessonReminders(options: ReminderProcessOptions = {
                 processed: 0
             }
         }
-
-        // 3. 全コーチの LINEボット設定＆Google Chat設定 を取得
-        const { data: botConfigs } = await supabase
-            .from('line_bot_configs')
-            .select('coach_id, bot_name, channel_access_token, gchat_webhook_id')
-
-        const botConfigMap = new Map((botConfigs || []).map(b => [b.coach_id, b]))
 
         // 4. 有効な Google Chat Webhook 一覧を取得
         const { data: webhooks } = await supabase
