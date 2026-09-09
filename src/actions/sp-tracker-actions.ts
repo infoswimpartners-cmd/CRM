@@ -24,6 +24,10 @@ import {
     writeImprovementLogs,
     appendRankHistory,
 } from '@/lib/seo-rank-watch';
+import {
+    getSpreadsheetAnalyticsAction,
+} from '@/actions/spreadsheet-analytics-actions';
+import { SpreadsheetAnalyticsData } from '@/lib/spreadsheet-types';
 
 export interface SpTrackerDashboardData {
     statusMeters: {
@@ -39,6 +43,7 @@ export interface SpTrackerDashboardData {
     rankWatchState?: SeoRankWatchState;
     searchConsoleData?: any;
     ga4Data?: any;
+    spreadsheetAnalytics?: SpreadsheetAnalyticsData;
     config: {
         googleChatWebhookConfigured: boolean;
         googleChatWebhookUrl?: string;
@@ -54,10 +59,11 @@ export async function getSpTrackerDashboard(): Promise<SpTrackerDashboardData> {
     try {
         const supabase = createAdminClient();
 
-        // 1. Google API実データ取得試行
-        const [ga4Data, searchConsoleData] = await Promise.all([
+        // 1. Google API実データ & スプレッドシートデータ取得試行
+        const [ga4Data, searchConsoleData, spreadsheetAnalytics] = await Promise.all([
             fetchGA4Analytics().catch(() => null),
             fetchSearchConsoleAnalytics().catch(() => null),
+            getSpreadsheetAnalyticsAction().catch(() => undefined),
         ]);
 
         // 2. キーワード・順位データ (推奨追跡キーワード ✕ Search Console実データ連携)
@@ -255,6 +261,7 @@ export async function getSpTrackerDashboard(): Promise<SpTrackerDashboardData> {
             rankWatchState,
             searchConsoleData,
             ga4Data,
+            spreadsheetAnalytics,
             config: {
                 googleChatWebhookConfigured: Boolean(googleChatWebhookUrl),
                 googleChatWebhookUrl: googleChatWebhookUrl || undefined,

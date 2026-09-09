@@ -11,6 +11,8 @@ import { SpTrackerGeoView } from '@/components/admin/geo-seo/SpTrackerGeoView';
 import { SpTrackerCitationGapView } from '@/components/admin/geo-seo/SpTrackerCitationGapView';
 import { SpTrackerSettingsView } from '@/components/admin/geo-seo/SpTrackerSettingsView';
 import { AnalyticsSyncCard } from '@/components/admin/geo-seo/AnalyticsSyncCard';
+import { SpTrackerConversionCustomerView } from '@/components/admin/geo-seo/SpTrackerConversionCustomerView';
+import { DEFAULT_SPREADSHEET_ANALYTICS } from '@/lib/spreadsheet-types';
 import {
     getSpTrackerDashboard,
     toggleActionRecommendationResolved,
@@ -23,12 +25,12 @@ function SpTrackerContent() {
     const searchParams = useSearchParams();
     const tabParam = searchParams.get('tab');
 
-    const [activeTab, setActiveTab] = useState<'seo' | 'geo' | 'citation_gap' | 'analytics' | 'settings'>('seo');
+    const [activeTab, setActiveTab] = useState<'seo' | 'geo' | 'citation_gap' | 'conversion' | 'analytics' | 'settings'>('seo');
     const [loading, setLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
 
     useEffect(() => {
-        if (tabParam && ['seo', 'geo', 'citation_gap', 'analytics', 'settings'].includes(tabParam)) {
+        if (tabParam && ['seo', 'geo', 'citation_gap', 'conversion', 'analytics', 'settings'].includes(tabParam)) {
             setActiveTab(tabParam as any);
         }
     }, [tabParam]);
@@ -155,6 +157,7 @@ function SpTrackerContent() {
             <div className="flex items-center gap-1.5 p-1 bg-zinc-200/60 rounded-xl max-w-fit overflow-x-auto">
                 {[
                     { id: 'seo', label: 'SEO推移（エリア・セグメント）' },
+                    { id: 'conversion', label: 'CV・顧客分析（スプレッドシート連携）' },
                     { id: 'geo', label: 'GEO分析（AI回答原文 & SOV）' },
                     { id: 'citation_gap', label: '引用元ギャップリスト' },
                     { id: 'analytics', label: 'GA4 / Search Console' },
@@ -184,6 +187,13 @@ function SpTrackerContent() {
                         keywords={data.keywords}
                         searchConsoleData={data.searchConsoleData}
                         rankWatchState={data.rankWatchState}
+                        onRefresh={loadDashboard}
+                    />
+                )}
+
+                {activeTab === 'conversion' && (
+                    <SpTrackerConversionCustomerView
+                        analyticsData={data.spreadsheetAnalytics || DEFAULT_SPREADSHEET_ANALYTICS}
                         onRefresh={loadDashboard}
                     />
                 )}
