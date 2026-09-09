@@ -6,6 +6,7 @@ import { SeoRankWatchState } from '@/lib/seo-rank-watch';
 import { Search, ArrowUp, ArrowDown, Minus, ExternalLink, Filter, Trophy, Hourglass, Target, RefreshCw } from 'lucide-react';
 import { syncGscRanksAction } from '@/actions/sp-tracker-actions';
 import { toast } from 'sonner';
+import { SpTrackerGrowthCharts } from './SpTrackerGrowthCharts';
 
 interface SpTrackerSeoViewProps {
     keywords: KeywordItem[];
@@ -119,9 +120,18 @@ export function SpTrackerSeoView({ keywords, searchConsoleData, rankWatchState, 
         );
     };
 
+    // GSCのクエリ別実績マップ
+    const gscPerformanceMap = new Map((searchConsoleData?.keywordPages || []).map((p: any) => [p.keyword, p]));
+
     return (
         <div className="space-y-6">
-            {/* Search Console 実データ連動パフォーマンス */}
+            {/* 1. SEO成長トレンド ✕ 順位推移グラフ */}
+            <SpTrackerGrowthCharts
+                dailyPerformance={searchConsoleData?.dailyPerformance}
+                keywords={keywords}
+            />
+
+            {/* 2. Search Console 実データ連動パフォーマンスサマリー */}
             {searchConsoleData && (
                 <div className="bg-white rounded-2xl border border-zinc-200/80 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] space-y-4">
                     <div className="flex items-center justify-between">
@@ -154,8 +164,8 @@ export function SpTrackerSeoView({ keywords, searchConsoleData, rankWatchState, 
                 </div>
             )}
 
-            {/* キーワード順位推移テーブル */}
-            <div className="bg-white rounded-2xl border border-zinc-200/80 p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] space-y-6">
+            {/* 3. キーワード順位推移テーブル */}
+            <div className="bg-white rounded-2xl border border-zinc-200/80 p-6 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] space-y-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-zinc-100 gap-4">
                     <div>
                         <div className="text-[11px] font-mono font-bold tracking-widest text-zinc-400 uppercase mb-1">
@@ -224,55 +234,72 @@ export function SpTrackerSeoView({ keywords, searchConsoleData, rankWatchState, 
                                 <th className="pb-3 px-3">セグメント軸</th>
                                 <th className="pb-3 px-3 text-center">現在順位</th>
                                 <th className="pb-3 px-3 text-center">前週比</th>
+                                <th className="pb-3 px-3 text-center">Clicks / Imp</th>
                                 <th className="pb-3 px-3">自社URL</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-100 text-sm">
-                            {filteredKeywords.map((kw) => (
-                                <tr key={kw.id} className="hover:bg-zinc-50/80 transition-colors">
-                                    <td className="py-4 px-3 font-bold text-zinc-900">
-                                        {kw.keyword}
-                                    </td>
-                                    <td className="py-4 px-3 text-center">
-                                        {getStatusBadge(kw.keyword, kw.current_rank)}
-                                    </td>
-                                    <td className="py-4 px-3 text-xs font-mono text-zinc-500">
-                                        <span className="px-2 py-0.5 rounded bg-zinc-100 border border-zinc-200">
-                                            {getAreaLabel(kw.area_category)}
-                                        </span>
-                                    </td>
-                                    <td className="py-4 px-3 text-xs font-mono text-zinc-500">
-                                        <span className="px-2 py-0.5 rounded bg-zinc-100 border border-zinc-200">
-                                            {getTargetLabel(kw.target_category)}
-                                        </span>
-                                    </td>
-                                    <td className="py-4 px-3 text-center">
-                                        <span className={`text-lg font-black font-mono ${
-                                            (kw.current_rank || 100) <= 3
-                                                ? 'text-emerald-600'
-                                                : (kw.current_rank || 100) <= 10
-                                                ? 'text-blue-600'
-                                                : 'text-zinc-500'
-                                        }`}>
-                                            {kw.current_rank} 位
-                                        </span>
-                                    </td>
-                                    <td className="py-4 px-3 text-center font-mono">
-                                        {renderRankDiff(kw.current_rank, kw.previous_rank)}
-                                    </td>
-                                    <td className="py-4 px-3 text-xs text-zinc-500 max-w-xs truncate">
-                                        <a
-                                            href={kw.target_url || '#'}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="inline-flex items-center gap-1 text-indigo-600 hover:underline"
-                                        >
-                                            <span className="truncate">{kw.target_url}</span>
-                                            <ExternalLink className="w-3 h-3 flex-shrink-0" />
-                                        </a>
-                                    </td>
-                                </tr>
-                            ))}
+                            {filteredKeywords.map((kw) => {
+                                const gscPerf: any = gscPerformanceMap.get(kw.keyword);
+                                return (
+                                    <tr key={kw.id} className="hover:bg-zinc-50/80 transition-colors">
+                                        <td className="py-4 px-3 font-bold text-zinc-900">
+                                            {kw.keyword}
+                                        </td>
+                                        <td className="py-4 px-3 text-center">
+                                            {getStatusBadge(kw.keyword, kw.current_rank)}
+                                        </td>
+                                        <td className="py-4 px-3 text-xs font-mono text-zinc-500">
+                                            <span className="px-2 py-0.5 rounded bg-zinc-100 border border-zinc-200">
+                                                {getAreaLabel(kw.area_category)}
+                                            </span>
+                                        </td>
+                                        <td className="py-4 px-3 text-xs font-mono text-zinc-500">
+                                            <span className="px-2 py-0.5 rounded bg-zinc-100 border border-zinc-200">
+                                                {getTargetLabel(kw.target_category)}
+                                            </span>
+                                        </td>
+                                        <td className="py-4 px-3 text-center">
+                                            <span className={`text-lg font-black font-mono ${
+                                                (kw.current_rank || 100) === 1
+                                                    ? 'text-amber-600 font-extrabold'
+                                                    : (kw.current_rank || 100) <= 3
+                                                    ? 'text-emerald-600'
+                                                    : (kw.current_rank || 100) <= 10
+                                                    ? 'text-blue-600'
+                                                    : 'text-zinc-500'
+                                            }`}>
+                                                {kw.current_rank} 位
+                                            </span>
+                                        </td>
+                                        <td className="py-4 px-3 text-center font-mono">
+                                            {renderRankDiff(kw.current_rank, kw.previous_rank)}
+                                        </td>
+                                        <td className="py-4 px-3 text-center font-mono text-xs text-zinc-600">
+                                            {gscPerf ? (
+                                                <span className="inline-flex items-center gap-1 font-bold">
+                                                    <span className="text-indigo-600">{gscPerf.clicks}</span>
+                                                    <span className="text-zinc-300">/</span>
+                                                    <span className="text-zinc-500">{gscPerf.impressions}</span>
+                                                </span>
+                                            ) : (
+                                                <span className="text-zinc-300">-</span>
+                                            )}
+                                        </td>
+                                        <td className="py-4 px-3 text-xs text-zinc-500 max-w-xs truncate">
+                                            <a
+                                                href={kw.target_url || '#'}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="inline-flex items-center gap-1 text-indigo-600 hover:underline"
+                                            >
+                                                <span className="truncate">{kw.target_url}</span>
+                                                <ExternalLink className="w-3 h-3 flex-shrink-0" />
+                                            </a>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>

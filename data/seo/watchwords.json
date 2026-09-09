@@ -12,6 +12,50 @@
   },
   {
     "id": 2,
+    "keyword": "スイミング 進級の 早い子",
+    "target_path": "/zUHb45xV/swimming_tips_up",
+    "priority": "high",
+    "status": "observing",
+    "target_rank": 1,
+    "current_rank": 2,
+    "area_category": "tokyo_23",
+    "target_category": "junior"
+  },
+  {
+    "id": 3,
+    "keyword": "スイミング 上達する子",
+    "target_path": "/zUHb45xV/swimming_tips_up",
+    "priority": "high",
+    "status": "active",
+    "target_rank": 1,
+    "current_rank": 2,
+    "area_category": "tokyo_23",
+    "target_category": "junior"
+  },
+  {
+    "id": 4,
+    "keyword": "スイミング センスのある子",
+    "target_path": "/zUHb45xV/swimming_tips_up",
+    "priority": "medium",
+    "status": "active",
+    "target_rank": 1,
+    "current_rank": 6,
+    "area_category": "tokyo_23",
+    "target_category": "junior"
+  },
+  {
+    "id": 5,
+    "keyword": "水泳個人レッスン 千葉",
+    "target_path": "/personal_swim/chiba",
+    "priority": "high",
+    "status": "active",
+    "target_rank": 1,
+    "current_rank": 4,
+    "area_category": "chiba",
+    "target_category": "adult"
+  },
+  {
+    "id": 6,
     "keyword": "スイミング マンツーマン 目黒",
     "target_path": "/personal_swim/meguro",
     "priority": "high",
@@ -22,40 +66,18 @@
     "target_category": "junior"
   },
   {
-    "id": 3,
-    "keyword": "スイミング 進級 できない 個別指導",
-    "target_path": "/zUHb45xV/swimming_tips_up",
+    "id": 7,
+    "keyword": "スイミング マンツーマン 子供",
+    "target_path": "/personal_swim/meguro",
     "priority": "high",
-    "status": "observing",
+    "status": "active",
     "target_rank": 1,
     "current_rank": 2,
     "area_category": "tokyo_23",
     "target_category": "junior"
   },
   {
-    "id": 4,
-    "keyword": "プライベート水泳レッスン 千葉",
-    "target_path": "/personal_swim/chiba",
-    "priority": "high",
-    "status": "active",
-    "target_rank": 1,
-    "current_rank": 3,
-    "area_category": "chiba",
-    "target_category": "adult"
-  },
-  {
-    "id": 5,
-    "keyword": "水泳 マンツーマン 子供 東京",
-    "target_path": "/personal_swim",
-    "priority": "high",
-    "status": "active",
-    "target_rank": 1,
-    "current_rank": 3,
-    "area_category": "tokyo_23",
-    "target_category": "junior"
-  },
-  {
-    "id": 6,
+    "id": 8,
     "keyword": "水泳 個人レッスン 東京",
     "target_path": "/personal_swim",
     "priority": "high",
@@ -66,40 +88,7 @@
     "target_category": "adult"
   },
   {
-    "id": 7,
-    "keyword": "水慣れ 子供 水泳 個人レッスン",
-    "target_path": "/personal_swim",
-    "priority": "medium",
-    "status": "active",
-    "target_rank": 1,
-    "current_rank": 4,
-    "area_category": "tokyo_23",
-    "target_category": "junior"
-  },
-  {
-    "id": 8,
-    "keyword": "出張 水泳 指導 東京",
-    "target_path": "/personal_swim",
-    "priority": "medium",
-    "status": "active",
-    "target_rank": 1,
-    "current_rank": 5,
-    "area_category": "tokyo_23",
-    "target_category": "adult"
-  },
-  {
     "id": 9,
-    "keyword": "子供 水泳 短期集中 個人レッスン",
-    "target_path": "/personal_swim",
-    "priority": "medium",
-    "status": "active",
-    "target_rank": 1,
-    "current_rank": 5,
-    "area_category": "tokyo_23",
-    "target_category": "junior"
-  },
-  {
-    "id": 10,
     "keyword": "水泳 マンツーマン 横浜",
     "target_path": "/personal_swim",
     "priority": "high",
@@ -110,7 +99,51 @@
     "target_category": "adult"
   },
   {
+    "id": 10,
+    "keyword": "50代 水泳 初心者",
+    "target_path": "/zUHb45xV/adult-private-swimming",
+    "priority": "medium",
+    "status": "active",
+    "target_rank": 1,
+    "current_rank": 9,
+    "area_category": "tokyo_23",
+    "target_category": "adult"
+  },
+  {
     "id": 11,
+    "keyword": "40代 水泳",
+    "target_path": "/zUHb45xV/adult-private-swimming",
+    "priority": "medium",
+    "status": "active",
+    "target_rank": 1,
+    "current_rank": 9,
+    "area_category": "tokyo_23",
+    "target_category": "adult"
+  },
+  {
+    "id": 12,
+    "keyword": "水泳 始めたい 大人",
+    "target_path": "/zUHb45xV/adult-private-swimming",
+    "priority": "medium",
+    "status": "active",
+    "target_rank": 1,
+    "current_rank": 4,
+    "area_category": "tokyo_23",
+    "target_category": "adult"
+  },
+  {
+    "id": 13,
+    "keyword": "水泳 恐怖症 大人 個人レッスン",
+    "target_path": "/zUHb45xV/adult-private-swimming",
+    "priority": "medium",
+    "status": "active",
+    "target_rank": 1,
+    "current_rank": 4,
+    "area_category": "tokyo_23",
+    "target_category": "phobia"
+  },
+  {
+    "id": 14,
     "keyword": "大人 カナヅチ 克服 レッスン 東京",
     "target_path": "/zUHb45xV/adult-private-swimming",
     "priority": "medium",
@@ -121,48 +154,15 @@
     "target_category": "phobia"
   },
   {
-    "id": 12,
-    "keyword": "水泳 恐怖症 大人 個人レッスン",
-    "target_path": "/zUHb45xV/adult-private-swimming",
-    "priority": "high",
-    "status": "active",
-    "target_rank": 1,
-    "current_rank": 4,
-    "area_category": "tokyo_23",
-    "target_category": "phobia"
-  },
-  {
-    "id": 13,
-    "keyword": "大人のプライベート水泳レッスン",
-    "target_path": "/zUHb45xV/adult-private-swimming",
-    "priority": "medium",
-    "status": "active",
-    "target_rank": 1,
-    "current_rank": 4,
-    "area_category": "tokyo_23",
-    "target_category": "adult"
-  },
-  {
-    "id": 14,
-    "keyword": "クロール 息継ぎができない 大人 レッスン",
-    "target_path": "/zUHb45xV/adult-private-swimming",
-    "priority": "medium",
-    "status": "active",
-    "target_rank": 1,
-    "current_rank": 4,
-    "area_category": "tokyo_23",
-    "target_category": "adult"
-  },
-  {
     "id": 15,
-    "keyword": "クロール 疲れにくい 泳ぎ方 マンツーマン",
-    "target_path": "/personal_swim",
+    "keyword": "スイミングスクール 大人 安い",
+    "target_path": "/zUHb45xV/yhCGMmjW",
     "priority": "medium",
     "status": "active",
     "target_rank": 1,
-    "current_rank": 11,
+    "current_rank": 6,
     "area_category": "tokyo_23",
-    "target_category": "triathlon"
+    "target_category": "adult"
   },
   {
     "id": 16,
