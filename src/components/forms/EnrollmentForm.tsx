@@ -252,7 +252,7 @@ export default function EnrollmentForm({
         id: dbPlan?.id || 'single',
         stripePriceId: dbPlan?.stripe_price_id || 'price_1UDkQlP0UQGtpYXmb0jVWVrp',
         name: '単発プラン',
-        price: dbPlan?.fee ?? 3300,
+        price: (dbPlan?.fee && dbPlan.fee > 0) ? dbPlan.fee : 3300,
         period: '年',
         isPackage: false,
         description: dbPlan?.description || defaultDesc,
@@ -527,7 +527,7 @@ export default function EnrollmentForm({
                             : 'クレジットカード登録 (本日決済なし)'}
                         </span>
                         <span className="text-2xl font-black text-blue-600">
-                          ¥{(activePlan.isPackage || selectedParentPlan === 'single' ? activePlan.price : 0).toLocaleString()}
+                          ¥{(activePlan.isPackage ? activePlan.price : selectedParentPlan === 'single' ? (activePlan.price || 3300) : 0).toLocaleString()}
                         </span>
                       </div>
                       {selectedParentPlan === 'single' ? (
