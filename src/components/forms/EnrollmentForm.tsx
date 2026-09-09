@@ -206,6 +206,7 @@ export default function EnrollmentForm({
           if (r.target === 'all') return true;
           if (isPkg && r.target === 'package') return true;
           if (!isPkg && !isSingle && r.target === 'monthly') return true;
+          if (isSingle && r.target === 'single') return true;
           return false;
         }).map(r => r.text);
       } catch (e) {
@@ -235,7 +236,7 @@ export default function EnrollmentForm({
 
     if (selectedParentPlan === 'single') {
       const dbPlan = dbPlans.find(p => p.name === '単発' || p.name === '単発プラン');
-      const defaultDesc = '定期的に通うのが難しい方へ。月会費0円で、受講した分だけその都度決済されるプランです。';
+      const defaultDesc = '定期的に通うのが難しい方へ。受講した分だけその都度決済されるプランです。※単発受講の方のみ初回受講時及び1年ごとの更新で、システム管理料として3,300円/年（税込）を頂戴しております。';
       
       // 動的レッスン料金を整形してルールに追加（表示設定が有効な場合のみ）
       const lessonPriceRules = showSinglePrices
@@ -244,14 +245,15 @@ export default function EnrollmentForm({
 
       const defaultRules = [
         ...parsedConsentRules,
+        '単発受講の方のみ初回受講時及び1年ごとの更新で、システム管理料として3,300円/年を頂戴しております。',
         ...lessonPriceRules
       ];
       return {
         id: dbPlan?.id || 'single',
-        stripePriceId: dbPlan?.stripe_price_id || 'price_1SwKVdP0UQGtpYXmjXxiPSK6',
+        stripePriceId: dbPlan?.stripe_price_id || 'price_1UDkQlP0UQGtpYXmb0jVWVrp',
         name: '単発プラン',
-        price: dbPlan?.fee ?? 0,
-        period: '月',
+        price: dbPlan?.fee ?? 3300,
+        period: '年',
         isPackage: false,
         description: dbPlan?.description || defaultDesc,
         rules: parseRules(dbPlan?.rules, defaultRules),
@@ -302,11 +304,13 @@ export default function EnrollmentForm({
     try {
       const allTerms: any[] = JSON.parse(consentTermsJson);
       const isPkg = activePlan?.isPackage; // true or false
+      const isSingle = selectedParentPlan === 'single';
       
       return allTerms.filter(t => {
         if (t.target === 'all') return true;
         if (isPkg && t.target === 'package') return true;
-        if (!isPkg && t.target === 'monthly') return true;
+        if (!isPkg && !isSingle && t.target === 'monthly') return true;
+        if (isSingle && t.target === 'single') return true;
         return false;
       });
     } catch (e) {
@@ -535,12 +539,19 @@ export default function EnrollmentForm({
                         ② お支払い形式（基本料金）
                       </span>
                       <div className="flex justify-between items-baseline">
-                        <span className="text-xs font-bold text-slate-700">{activePlan.isPackage ? '一括請求額 (税込)' : '基本月額料金 (税込)'}</span>
+                        <span className="text-xs font-bold text-slate-700">
+                          {activePlan.isPackage ? '一括請求額 (税込)' : selectedParentPlan === 'single' ? 'システム管理料・年会費 (税込)' : '基本月額料金 (税込)'}
+                        </span>
                         <span className="text-xl font-bold text-slate-800">
                           {activePlan.isPackage ? (
                             <>
                               ¥{activePlan.price.toLocaleString()}
                               <span className="text-xs font-bold text-slate-500 ml-1">（追加自動継続課金なし）</span>
+                            </>
+                          ) : selectedParentPlan === 'single' ? (
+                            <>
+                              ¥{activePlan.price.toLocaleString()}
+                              <span className="text-xs font-bold text-slate-500 ml-1">/ 年</span>
                             </>
                           ) : (
                             <>
@@ -577,8 +588,8 @@ export default function EnrollmentForm({
                             </div>
                           ))}
                         </div>
-                        <p className="text-[10px] text-slate-400 leading-relaxed mt-1">
-                          ※初期決済（クレジットカード登録時）の請求は0円ですが、レッスン受講ごとに上記の料金が自動決済されます。
+                        <p className="text-[10px] text-slate-500 leading-relaxed mt-1 font-medium">
+                          ※入会時にシステム管理料として年会費3,300円（税込）が即時決済されます（以降1年ごとに自動更新）。レッスン受講料は受講ごとに上記の料金が自動決済されます。
                         </p>
                       </div>
                     )}

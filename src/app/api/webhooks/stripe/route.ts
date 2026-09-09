@@ -297,7 +297,8 @@ export async function POST(req: NextRequest) {
                             nextMonth = 1
                             nextYear += 1
                         }
-                        const startDateStr = isPackage 
+                        const isSingle = planDisplayName.includes('単発')
+                        const startDateStr = (isPackage || isSingle)
                             ? `${jstNow.getUTCFullYear()}年${jstNow.getUTCMonth() + 1}月${jstNow.getUTCDate()}日`
                             : `${nextYear}年${nextMonth}月1日`
 

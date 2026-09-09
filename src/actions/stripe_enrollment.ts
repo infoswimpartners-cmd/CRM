@@ -21,6 +21,8 @@ const PRICE_ID_MAP: Record<string, string> = {
     'price_1T10NRP0UQGtpYXm9a9qqBZK': 'price_1TSX3TP0UQGtpYXmAfC6TLIO',
     // パッケージプラン（one_time）- テスト環境用マッピング
     'price_1TbyknP0UQGtpYXmhBnVRsx6': 'price_1Tc4e6P0UQGtpYXmufqAYO2o',
+    // 単発プラン（年会費・システム管理料）- テスト環境用マッピング
+    'price_1UDkQlP0UQGtpYXmb0jVWVrp': 'price_1UDkQmP0UQGtpYXmMYM0n7FE',
 }
 
 /**
@@ -222,39 +224,54 @@ export async function createEnrollmentCheckoutSession(planId: string, lineUserId
 
         // サブスクリプションの場合は subscription_data にもメタデータを格納
         if (!isPackage) {
-            // 日本時間の翌月1日0:00のUNIXタイムスタンプを算出
-            const now = new Date()
-            // サーバーのタイムゾーンに影響されないよう、JST（UTC+9）ベースで計算
-            const jstNow = new Date(now.getTime() + (9 * 60 * 60 * 1000))
-            let nextYear = jstNow.getUTCFullYear()
-            let nextMonth = jstNow.getUTCMonth() + 2; // getUTCMonthは0-11のため、当月は+1、翌月は+2
-            if (nextMonth > 12) {
-                nextMonth = 1
-                nextYear += 1
-            }
-            
-            // JSTの翌月1日0:00:00は、UTCでは前日（当月末日）の15:00:00
-            const utcNextMonthFirst = Date.UTC(nextYear, nextMonth - 1, 1, 0, 0, 0)
-            let jstNextMonthFirstUnix = Math.floor((utcNextMonthFirst - (9 * 60 * 60 * 1000)) / 1000)
+            const isSingle = planName.includes('単発') || plan.name?.includes('単発')
 
-            // Stripeの制限「trial_endは少なくとも48時間未来でなければならない」への対応
-            // 月末に入会した場合、翌月1日が48時間以内になるためエラーが発生します。
-            const nowUnix = Math.floor(Date.now() / 1000)
-            const minTrialEnd = nowUnix + (48 * 60 * 60) + 3600 // 48時間 + 1時間の安全バッファ
+            if (isSingle) {
+                // 単発プラン（年会費・システム管理料）は入会時に即時決済（1年ごとの自動更新サブスクリプション）
+                console.log(`[Stripe Checkout] Single plan detected. Charging annual fee immediately (no trial_end).`)
+                sessionConfig.subscription_data = {
+                    metadata: {
+                        type: 'membership_enrollment',
+                        line_user_id: lineUserId,
+                        membership_type_id: planId,
+                        studentId: student?.id || '',
+                    },
+                }
+            } else {
+                // 月謝プランの場合は日本時間の翌月1日0:00のUNIXタイムスタンプを算出（初月無料トライアル）
+                const now = new Date()
+                // サーバーのタイムゾーンに影響されないよう、JST（UTC+9）ベースで計算
+                const jstNow = new Date(now.getTime() + (9 * 60 * 60 * 1000))
+                let nextYear = jstNow.getUTCFullYear()
+                let nextMonth = jstNow.getUTCMonth() + 2; // getUTCMonthは0-11のため、当月は+1、翌月は+2
+                if (nextMonth > 12) {
+                    nextMonth = 1
+                    nextYear += 1
+                }
+                
+                // JSTの翌月1日0:00:00は、UTCでは前日（当月末日）の15:00:00
+                const utcNextMonthFirst = Date.UTC(nextYear, nextMonth - 1, 1, 0, 0, 0)
+                let jstNextMonthFirstUnix = Math.floor((utcNextMonthFirst - (9 * 60 * 60 * 1000)) / 1000)
 
-            if (jstNextMonthFirstUnix < minTrialEnd) {
-                console.log(`[Stripe Checkout] trial_end (${jstNextMonthFirstUnix}) is less than 48 hours away. Shifting to minTrialEnd (${minTrialEnd}).`)
-                jstNextMonthFirstUnix = minTrialEnd
-            }
+                // Stripeの制限「trial_endは少なくとも48時間未来でなければならない」への対応
+                // 月末に入会した場合、翌月1日が48時間以内になるためエラーが発生します。
+                const nowUnix = Math.floor(Date.now() / 1000)
+                const minTrialEnd = nowUnix + (48 * 60 * 60) + 3600 // 48時間 + 1時間の安全バッファ
 
-            sessionConfig.subscription_data = {
-                trial_end: jstNextMonthFirstUnix,
-                metadata: {
-                    type: 'membership_enrollment',
-                    line_user_id: lineUserId,
-                    membership_type_id: planId,
-                    studentId: student?.id || '',
-                },
+                if (jstNextMonthFirstUnix < minTrialEnd) {
+                    console.log(`[Stripe Checkout] trial_end (${jstNextMonthFirstUnix}) is less than 48 hours away. Shifting to minTrialEnd (${minTrialEnd}).`)
+                    jstNextMonthFirstUnix = minTrialEnd
+                }
+
+                sessionConfig.subscription_data = {
+                    trial_end: jstNextMonthFirstUnix,
+                    metadata: {
+                        type: 'membership_enrollment',
+                        line_user_id: lineUserId,
+                        membership_type_id: planId,
+                        studentId: student?.id || '',
+                    },
+                }
             }
         }
 

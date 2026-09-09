@@ -12,7 +12,7 @@ interface RuleTerm {
   id: string;
   label: string;
   text: string;
-  target: 'all' | 'monthly' | 'package';
+  target: 'all' | 'monthly' | 'package' | 'single';
 }
 
 interface EnrollRulesSettingsFormProps {
@@ -146,6 +146,7 @@ export function EnrollRulesSettingsForm({ initialRulesJson }: EnrollRulesSetting
                         <option value="all">すべてのプランで表示</option>
                         <option value="monthly">月謝プランのみ表示</option>
                         <option value="package">パッケージプランのみ表示</option>
+                        <option value="single">単発プランのみ表示</option>
                       </select>
                     </div>
 
