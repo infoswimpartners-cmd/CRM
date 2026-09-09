@@ -67,21 +67,30 @@ async function savePersistedSpreadsheetConfig(supabase: any, config: { spreadshe
 }
 
 /**
- * スプレッドシート連携データおよび顧客・CV分析データを取得
+ * スプレッドシート連携データおよび顧客・CV分析データを取得（CRM実データ常時連動）
  */
 export async function getSpreadsheetAnalyticsAction(): Promise<SpreadsheetAnalyticsData> {
     try {
         const supabase = createAdminClient();
         const persisted = await getPersistedSpreadsheetConfig(supabase);
 
-        const spreadsheetId = persisted?.spreadsheetId || process.env.SPREADSHEET_ANALYTICS_ID || '';
-        const data = await fetchSpreadsheetAnalytics(spreadsheetId);
+        // 1. CRMデータベース（students, lessons, leads, membership_types）から実測値を常時集計
+        const { calculateRealCrmAnalytics } = await import('@/lib/crm-analytics-engine');
+        const realData = await calculateRealCrmAnalytics(supabase);
 
-        if (persisted?.spreadsheetUrl) {
-            data.spreadsheetUrl = persisted.spreadsheetUrl;
+        // 2. スプレッドシート連携があれば取得してマージ
+        const spreadsheetId = persisted?.spreadsheetId || process.env.SPREADSHEET_ANALYTICS_ID || '';
+        if (spreadsheetId) {
+            const sheetData = await fetchSpreadsheetAnalytics(spreadsheetId);
+            realData.spreadsheetId = spreadsheetId;
+            realData.spreadsheetUrl = persisted?.spreadsheetUrl || `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
+            realData.source = 'google_sheets';
+            if (sheetData.totalConversions.inquiries > 0) {
+                realData.totalConversions = sheetData.totalConversions;
+            }
         }
 
-        return data;
+        return realData;
     } catch (err) {
         console.error('getSpreadsheetAnalyticsAction error:', err);
         return DEFAULT_SPREADSHEET_ANALYTICS;
