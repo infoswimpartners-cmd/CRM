@@ -381,15 +381,19 @@ export async function createStudent(formData: any) {
             }
         }
 
-        // 3. Handle multiple coaches
-        if (formData.coach_ids && Array.isArray(formData.coach_ids)) {
-            const records = formData.coach_ids.map((cId: string, index: number) => ({
+        // 3. Handle multiple coaches (or fallback to single coach_id)
+        let coachIds = formData.coach_ids
+        if ((!coachIds || !Array.isArray(coachIds) || coachIds.length === 0) && studentData.coach_id) {
+            coachIds = [studentData.coach_id]
+        }
+        if (coachIds && Array.isArray(coachIds)) {
+            const records = coachIds.map((cId: string, index: number) => ({
                 student_id: data.id,
                 coach_id: cId,
                 role: (cId === studentData.coach_id || (studentData.coach_id === null && index === 0)) ? 'main' : 'sub'
             }))
             if (records.length > 0) {
-                await supabase.from('student_coaches').insert(records)
+                await supabase.from('student_coaches').upsert(records, { onConflict: 'student_id,coach_id' })
             }
         }
 

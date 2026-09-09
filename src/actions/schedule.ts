@@ -167,6 +167,17 @@ export async function getStudentsForCoach(coachId: string) {
     const supabaseAdmin = createAdminClient()
 
     try {
+        let studentIds: string[] = []
+        if (coachId && coachId !== 'all') {
+            const { data: assigned } = await supabaseAdmin
+                .from('student_coaches')
+                .select('student_id')
+                .eq('coach_id', coachId)
+            if (assigned) {
+                studentIds = assigned.map(a => a.student_id)
+            }
+        }
+
         let query = supabaseAdmin
             .from('students')
             .select(`
@@ -177,18 +188,22 @@ export async function getStudentsForCoach(coachId: string) {
                 coach_id,
                 is_default_distant_option,
                 default_transport_option_fee,
-                student_coaches!inner(coach_id),
                 membership_types:membership_type_id (
                     default_lesson_master_id,
                     name
                 )
             `)
+            .neq('status', 'withdrawn')
 
         if (coachId && coachId !== 'all') {
-            query = query.eq('student_coaches.coach_id', coachId)
+            if (studentIds.length > 0) {
+                query = query.or(`coach_id.eq.${coachId},id.in.(${studentIds.join(',')})`)
+            } else {
+                query = query.eq('coach_id', coachId)
+            }
         }
 
-        const { data, error } = await query
+        const { data, error } = await query.order('full_name', { ascending: true })
 
         if (error) throw error
 
