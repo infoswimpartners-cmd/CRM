@@ -2,22 +2,80 @@
 
 import React, { useState } from 'react';
 import { KeywordItem } from '@/lib/sp-tracker-seed';
-import { Search, ArrowUp, ArrowDown, Minus, ExternalLink, Filter } from 'lucide-react';
+import { SeoRankWatchState } from '@/lib/seo-rank-watch';
+import { Search, ArrowUp, ArrowDown, Minus, ExternalLink, Filter, Trophy, Hourglass, Target, RefreshCw } from 'lucide-react';
+import { syncGscRanksAction } from '@/actions/sp-tracker-actions';
+import { toast } from 'sonner';
 
 interface SpTrackerSeoViewProps {
     keywords: KeywordItem[];
     searchConsoleData?: any;
+    rankWatchState?: SeoRankWatchState;
+    onRefresh?: () => Promise<void>;
 }
 
-export function SpTrackerSeoView({ keywords, searchConsoleData }: SpTrackerSeoViewProps) {
+export function SpTrackerSeoView({ keywords, searchConsoleData, rankWatchState, onRefresh }: SpTrackerSeoViewProps) {
     const [areaFilter, setAreaFilter] = useState<string>('all');
     const [targetFilter, setTargetFilter] = useState<string>('all');
+    const [statusFilter, setStatusFilter] = useState<string>('all');
+    const [isSyncing, setIsSyncing] = useState(false);
+
+    // watchwordsのマッピング (statusを取得)
+    const watchwordMap = new Map((rankWatchState?.watchwords || []).map((w) => [w.keyword, w]));
 
     const filteredKeywords = keywords.filter((k) => {
         if (areaFilter !== 'all' && k.area_category !== areaFilter) return false;
         if (targetFilter !== 'all' && k.target_category !== targetFilter) return false;
+
+        if (statusFilter !== 'all') {
+            const w = watchwordMap.get(k.keyword);
+            const status = w?.status || (k.current_rank === 1 ? 'achieved' : 'active');
+            if (status !== statusFilter) return false;
+        }
+
         return true;
     });
+
+    const handleSyncRanks = async () => {
+        setIsSyncing(true);
+        try {
+            const res = await syncGscRanksAction();
+            if (res.success) {
+                toast.success(res.message);
+                if (onRefresh) await onRefresh();
+            } else {
+                toast.error(res.message);
+            }
+        } catch (err: any) {
+            toast.error(err.message || '同期エラーが発生しました');
+        } finally {
+            setIsSyncing(false);
+        }
+    };
+
+    const getStatusBadge = (keyword: string, rank?: number) => {
+        const w = watchwordMap.get(keyword);
+        const status = w?.status || (rank === 1 ? 'achieved' : 'active');
+
+        if (status === 'achieved') {
+            return (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-50 text-amber-800 border border-amber-300">
+                    <Trophy className="w-3 h-3 text-amber-600" /> 1位達成
+                </span>
+            );
+        } else if (status === 'observing') {
+            return (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-50 text-indigo-800 border border-indigo-300">
+                    <Hourglass className="w-3 h-3 text-indigo-600 animate-spin" /> 7日観察中
+                </span>
+            );
+        }
+        return (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-zinc-100 text-zinc-700 border border-zinc-200">
+                <Target className="w-3 h-3 text-zinc-500" /> 改善候補
+            </span>
+        );
+    };
 
     const getAreaLabel = (area: string) => {
         switch (area) {
@@ -108,8 +166,19 @@ export function SpTrackerSeoView({ keywords, searchConsoleData }: SpTrackerSeoVi
                         </h3>
                     </div>
 
-                    {/* フィルタボタン */}
+                    {/* フィルタ & GSC同期ボタン */}
                     <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
+                        <select
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value)}
+                            className="px-3 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50/50 text-indigo-900 font-bold focus:outline-none"
+                        >
+                            <option value="all">全ステータス</option>
+                            <option value="achieved">👑 1位達成</option>
+                            <option value="observing">⏳ 7日間観察中</option>
+                            <option value="active">🎯 改善候補</option>
+                        </select>
+
                         <select
                             value={areaFilter}
                             onChange={(e) => setAreaFilter(e.target.value)}
@@ -132,6 +201,16 @@ export function SpTrackerSeoView({ keywords, searchConsoleData }: SpTrackerSeoVi
                             <option value="phobia">水恐怖症</option>
                             <option value="triathlon">トライアスロン</option>
                         </select>
+
+                        <button
+                            onClick={handleSyncRanks}
+                            disabled={isSyncing}
+                            className="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white font-semibold flex items-center gap-1.5 transition-all disabled:opacity-50"
+                            title="Google Search Consoleの最新順位を取得して履歴に追記"
+                        >
+                            <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} />
+                            {isSyncing ? '同期中...' : 'GSC順位計測'}
+                        </button>
                     </div>
                 </div>
 
@@ -140,6 +219,7 @@ export function SpTrackerSeoView({ keywords, searchConsoleData }: SpTrackerSeoVi
                         <thead>
                             <tr className="border-b border-zinc-200 text-[11px] font-mono font-bold text-zinc-400 uppercase">
                                 <th className="pb-3 px-3">キーワード</th>
+                                <th className="pb-3 px-3 text-center">Rank Watch</th>
                                 <th className="pb-3 px-3">エリア軸</th>
                                 <th className="pb-3 px-3">セグメント軸</th>
                                 <th className="pb-3 px-3 text-center">現在順位</th>
@@ -152,6 +232,9 @@ export function SpTrackerSeoView({ keywords, searchConsoleData }: SpTrackerSeoVi
                                 <tr key={kw.id} className="hover:bg-zinc-50/80 transition-colors">
                                     <td className="py-4 px-3 font-bold text-zinc-900">
                                         {kw.keyword}
+                                    </td>
+                                    <td className="py-4 px-3 text-center">
+                                        {getStatusBadge(kw.keyword, kw.current_rank)}
                                     </td>
                                     <td className="py-4 px-3 text-xs font-mono text-zinc-500">
                                         <span className="px-2 py-0.5 rounded bg-zinc-100 border border-zinc-200">

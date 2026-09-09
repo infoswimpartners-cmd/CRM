@@ -3,6 +3,7 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
+import { SpTrackerRankWatchCard } from '@/components/admin/geo-seo/SpTrackerRankWatchCard';
 import { SpTrackerHeroActions } from '@/components/admin/geo-seo/SpTrackerHeroActions';
 import { SpTrackerStatusMeters } from '@/components/admin/geo-seo/SpTrackerStatusMeters';
 import { SpTrackerSeoView } from '@/components/admin/geo-seo/SpTrackerSeoView';
@@ -130,13 +131,19 @@ function SpTrackerContent() {
                 </div>
             </div>
 
-            {/* 1. 最上部: 今すぐやること（Today's / Weekly Action）カード */}
+            {/* 1. 最上部: SEO Rank Watch（1位狙撃 ✕ 7日間検証サイクル）カード */}
+            <SpTrackerRankWatchCard
+                state={data.rankWatchState}
+                onRefresh={loadDashboard}
+            />
+
+            {/* 2. 週次最優先アクション（Today's / Weekly Action）カード */}
             <SpTrackerHeroActions
                 actions={data.actionRecommendations}
                 onResolveToggle={handleResolveToggle}
             />
 
-            {/* 2. ステータスメーター（4つの主要診断指標） */}
+            {/* 3. ステータスメーター（4つの主要診断指標） */}
             <SpTrackerStatusMeters
                 seoTopRate={data.statusMeters.seoTopRate}
                 geoSovRate={data.statusMeters.geoSovRate}
@@ -144,7 +151,7 @@ function SpTrackerContent() {
                 internalHealthScore={data.statusMeters.internalHealthScore}
             />
 
-            {/* 3. 詳細ビュー タブ切り替え */}
+            {/* 4. 詳細ビュー タブ切り替え */}
             <div className="flex items-center gap-1.5 p-1 bg-zinc-200/60 rounded-xl max-w-fit overflow-x-auto">
                 {[
                     { id: 'seo', label: 'SEO推移（エリア・セグメント）' },
@@ -170,12 +177,14 @@ function SpTrackerContent() {
                 })}
             </div>
 
-            {/* 4. タブコンテンツ表示 */}
+            {/* 5. タブコンテンツ表示 */}
             <div className="pt-2">
                 {activeTab === 'seo' && (
                     <SpTrackerSeoView
                         keywords={data.keywords}
                         searchConsoleData={data.searchConsoleData}
+                        rankWatchState={data.rankWatchState}
+                        onRefresh={loadDashboard}
                     />
                 )}
 

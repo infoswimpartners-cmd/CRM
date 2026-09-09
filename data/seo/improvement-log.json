@@ -1,0 +1,28 @@
+[
+  {
+    "id": "imp-20260904-01",
+    "keyword": "スイミング 進級 できない 個別指導",
+    "target_path": "/zUHb45xV/swimming_tips_up",
+    "action_title": "進級テスト停滞の具体的原因FAQとバタ足・息継ぎ図解の追加",
+    "action_detail": "スクール別進級基準（クロール25m、息継ぎ）で落ちやすいポイントをFAQ形式（JSON-LD構造化データ対応）で追加し、保護者向けチェックシートを追記。",
+    "implemented_at": "2026-09-04",
+    "review_date": "2026-09-11",
+    "status": "observing",
+    "rank_before": 3,
+    "current_rank": 2,
+    "notes": "現在7日間観察中（残り2日）。順位が3位から2位へ上昇中。1位獲得まで再変更を控え効果を測定。"
+  },
+  {
+    "id": "imp-20260825-01",
+    "keyword": "スイムパートナーズ",
+    "target_path": "/",
+    "action_title": "トップページのブランド指名メタディスクリプションと構造化マークアップ最適化",
+    "action_detail": "Organization構造化データと出張可能エリア一覧をトップページに明記。",
+    "implemented_at": "2026-08-25",
+    "review_date": "2026-09-01",
+    "status": "achieved",
+    "rank_before": 2,
+    "current_rank": 1,
+    "notes": "検索順位1位を達成し安定維持中。"
+  }
+]

@@ -15,6 +15,16 @@ import { fetchGA4Analytics } from '@/lib/google-analytics';
 import { fetchSearchConsoleAnalytics } from '@/lib/google-search-console';
 import { sendSpTrackerWeeklyReport } from '@/lib/sp-tracker-notifier';
 
+import {
+    SeoRankWatchState,
+    getSeoRankWatchState,
+    readWatchwords,
+    writeWatchwords,
+    readImprovementLogs,
+    writeImprovementLogs,
+    appendRankHistory,
+} from '@/lib/seo-rank-watch';
+
 export interface SpTrackerDashboardData {
     statusMeters: {
         seoTopRate: number;        // SEO主要KW上位率 (TOP3以内 %)
@@ -26,6 +36,7 @@ export interface SpTrackerDashboardData {
     keywords: KeywordItem[];
     geoPrompts: GeoPromptItem[];
     citationGaps: CitationGapItem[];
+    rankWatchState?: SeoRankWatchState;
     searchConsoleData?: any;
     ga4Data?: any;
     config: {
@@ -213,6 +224,23 @@ export async function getSpTrackerDashboard(): Promise<SpTrackerDashboardData> {
             }
         }
 
+        const rankWatchState = getSeoRankWatchState();
+
+        // Search Consoleデータがあればrank-history.jsonに最新日別データを追記
+        if (searchConsoleData?.keywordPages && searchConsoleData.keywordPages.length > 0) {
+            const todayStr = new Date().toISOString().split('T')[0];
+            const historyToAppend = searchConsoleData.keywordPages.slice(0, 10).map((p: any) => ({
+                date: todayStr,
+                keyword: p.keyword,
+                rank_position: Math.round(p.position),
+                impressions: p.impressions,
+                clicks: p.clicks,
+                ctr: p.ctr,
+                page_url: p.pageUrl,
+            }));
+            appendRankHistory(historyToAppend);
+        }
+
         return {
             statusMeters: {
                 seoTopRate,
@@ -224,6 +252,7 @@ export async function getSpTrackerDashboard(): Promise<SpTrackerDashboardData> {
             keywords,
             geoPrompts,
             citationGaps,
+            rankWatchState,
             searchConsoleData,
             ga4Data,
             config: {
@@ -500,4 +529,169 @@ export async function saveSpTrackerWebhookUrlAction(webhookUrl: string) {
         return { success: false, message: err.message || '保存中にエラーが発生しました。' };
     }
 }
+
+/**
+ * SEO Rank Watch: 改善アクションの実行（7日間観察中 observing へ遷移）
+ */
+export async function startObservingAction(
+    keyword: string,
+    actionTitle: string,
+    actionDetail: string,
+    targetPath?: string
+) {
+    try {
+        const watchwords = readWatchwords();
+        const item = watchwords.find((w) => w.keyword === keyword);
+        if (!item) {
+            return { success: false, message: `キーワード「${keyword}」が見つかりません。` };
+        }
+
+        // ステータスを observing に更新
+        item.status = 'observing';
+        writeWatchwords(watchwords);
+
+        // 改善ログに追記 (次回レビュー日は7日後)
+        const logs = readImprovementLogs();
+        const now = new Date();
+        const implementedAt = now.toISOString().split('T')[0];
+        const reviewDate = new Date(now.getTime() + 7 * 86400000).toISOString().split('T')[0];
+
+        const newLogEntry = {
+            id: `imp-${Date.now()}`,
+            keyword,
+            target_path: targetPath || item.target_path,
+            action_title: actionTitle,
+            action_detail: actionDetail,
+            implemented_at: implementedAt,
+            review_date: reviewDate,
+            status: 'observing' as const,
+            rank_before: item.current_rank,
+            current_rank: item.current_rank,
+            notes: `7日間の観察期間中（レビュー予定日: ${reviewDate}）。再変更を控え効果を測定中。`,
+        };
+
+        logs.unshift(newLogEntry);
+        writeImprovementLogs(logs);
+
+        return {
+            success: true,
+            message: `「${keyword}」の改善を実行し、7日間の観察モード（次回レビュー日: ${reviewDate}）に設定しました。`,
+            log: newLogEntry,
+        };
+    } catch (err: any) {
+        console.error('startObservingAction error:', err);
+        return { success: false, message: err.message || '観察モードへの遷移に失敗しました。' };
+    }
+}
+
+/**
+ * SEO Rank Watch: 検索1位達成マーク（achieved へ遷移）
+ */
+export async function markAsAchievedAction(keyword: string) {
+    try {
+        const watchwords = readWatchwords();
+        const item = watchwords.find((w) => w.keyword === keyword);
+        if (!item) {
+            return { success: false, message: `キーワード「${keyword}」が見つかりません。` };
+        }
+
+        item.status = 'achieved';
+        item.current_rank = 1;
+        writeWatchwords(watchwords);
+
+        const logs = readImprovementLogs();
+        const targetLog = logs.find((l) => l.keyword === keyword && l.status === 'observing');
+        if (targetLog) {
+            targetLog.status = 'achieved';
+            targetLog.current_rank = 1;
+            targetLog.notes = '検索順位1位を達成しました！今後は定点観測を継続します。';
+            writeImprovementLogs(logs);
+        }
+
+        return { success: true, message: `おめでとうございます！「${keyword}」の検索順位1位達成を認定しました。` };
+    } catch (err: any) {
+        console.error('markAsAchievedAction error:', err);
+        return { success: false, message: err.message || '1位達成の更新に失敗しました。' };
+    }
+}
+
+/**
+ * SEO Rank Watch: 7日間観察完了・ステータス更新
+ */
+export async function completeObservingAction(keyword: string, notes: string, nextStatus: 'active' | 'achieved') {
+    try {
+        const watchwords = readWatchwords();
+        const item = watchwords.find((w) => w.keyword === keyword);
+        if (!item) {
+            return { success: false, message: `キーワード「${keyword}」が見つかりません。` };
+        }
+
+        item.status = nextStatus;
+        if (nextStatus === 'achieved') {
+            item.current_rank = 1;
+        }
+        writeWatchwords(watchwords);
+
+        const logs = readImprovementLogs();
+        const targetLog = logs.find((l) => l.keyword === keyword && l.status === 'observing');
+        if (targetLog) {
+            targetLog.status = nextStatus;
+            targetLog.notes = notes;
+            writeImprovementLogs(logs);
+        }
+
+        return { success: true, message: `「${keyword}」の7日間観察期間を完了し、ステータスを更新しました。` };
+    } catch (err: any) {
+        console.error('completeObservingAction error:', err);
+        return { success: false, message: err.message || '完了処理に失敗しました。' };
+    }
+}
+
+/**
+ * Google Search Consoleの最新順位を取得してrank-history.jsonに追記同期
+ */
+export async function syncGscRanksAction() {
+    try {
+        const scData = await fetchSearchConsoleAnalytics();
+        if (!scData || !scData.keywordPages) {
+            return { success: false, message: 'Search Consoleデータを取得できませんでした。' };
+        }
+
+        const watchwords = readWatchwords();
+        const todayStr = new Date().toISOString().split('T')[0];
+        const entries = [];
+
+        for (const item of watchwords) {
+            const matched = scData.keywordPages.find((p: any) => p.keyword === item.keyword) ||
+                            scData.keywordPages.find((p: any) => p.keyword.includes(item.keyword) || item.keyword.includes(p.keyword));
+
+            if (matched) {
+                entries.push({
+                    date: todayStr,
+                    keyword: item.keyword,
+                    rank_position: Math.round(matched.position),
+                    impressions: matched.impressions,
+                    clicks: matched.clicks,
+                    ctr: matched.ctr,
+                    page_url: matched.pageUrl,
+                });
+                item.current_rank = Math.round(matched.position);
+                if (item.current_rank === 1) {
+                    item.status = 'achieved';
+                }
+            }
+        }
+
+        if (entries.length > 0) {
+            appendRankHistory(entries);
+            writeWatchwords(watchwords);
+        }
+
+        return { success: true, message: `${entries.length}件のSearch Console順位実績を追記同期しました。` };
+    } catch (err: any) {
+        console.error('syncGscRanksAction error:', err);
+        return { success: false, message: err.message || '順位同期中にエラーが発生しました。' };
+    }
+}
+
 
