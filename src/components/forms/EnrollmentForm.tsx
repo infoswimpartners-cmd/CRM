@@ -513,75 +513,114 @@ export default function EnrollmentForm({
 
                 {activePlan.id ? (
                   <div className="mt-3 space-y-3">
-                    {/* 本日お支払い額 */}
-                    <div className="bg-white p-3 rounded-lg border border-slate-200/80 shadow-sm">
+                    {/* ① 本日お支払い額 */}
+                    <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 shadow-sm space-y-2">
                       <div className="flex justify-between items-center text-xs text-slate-500 font-bold">
-                        <span>① 本日の即時決済額</span>
+                        <span className="flex items-center gap-1.5">
+                          <span className="w-4 h-4 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-[10px] font-black">1</span>
+                          本日の即時決済額
+                        </span>
+                        {selectedParentPlan === 'single' ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                            初回即時決済
+                          </span>
+                        ) : activePlan.isPackage ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
+                            一括決済
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600">
+                            本日¥0
+                          </span>
+                        )}
                       </div>
-                      <div className="mt-1 flex justify-between items-baseline">
-                        <span className="text-xs font-bold text-slate-700">
+                      <div className="flex justify-between items-baseline pt-0.5">
+                        <span className="text-xs sm:text-sm font-bold text-slate-700">
                           {activePlan.isPackage
                             ? '本日お支払い額 (税込)'
                             : selectedParentPlan === 'single'
                             ? 'システム管理料・年会費 (税込)'
                             : 'クレジットカード登録 (本日決済なし)'}
                         </span>
-                        <span className="text-2xl font-black text-blue-600">
+                        <span className="text-2xl sm:text-3xl font-black text-blue-600">
                           ¥{(activePlan.isPackage ? activePlan.price : selectedParentPlan === 'single' ? (activePlan.price || 3300) : 0).toLocaleString()}
                         </span>
                       </div>
                       {selectedParentPlan === 'single' ? (
-                        <p className="text-[10px] text-slate-500 mt-1.5 leading-relaxed font-medium">
+                        <p className="text-[11px] text-slate-500 pt-1 leading-relaxed font-medium">
                           ※単発受講のシステム管理料として年会費3,300円（税込）が本日即時決済されます（以降1年ごとに自動更新）。
                         </p>
                       ) : !activePlan.isPackage ? (
-                        <p className="text-[10px] text-slate-500 mt-1.5 leading-relaxed">
+                        <p className="text-[10px] text-slate-500 pt-1 leading-relaxed">
                           ※本日は決済用クレジットカード情報の登録（安全なStripeシステム経由）のみを行います。本日時点で決済は発生いたしません。
                         </p>
                       ) : null}
                     </div>
 
-                    {/* 翌月1日以降のお支払い / レッスン都度払い */}
-                    <div className="bg-white p-3 rounded-lg border border-slate-200/80 shadow-sm">
-                      <span className="text-xs text-slate-500 font-bold block mb-1">
-                        ② {selectedParentPlan === 'single' ? 'レッスン受講時のお支払い形式' : 'お支払い形式（基本料金）'}
-                      </span>
-                      <div className="flex justify-between items-baseline">
-                        <span className="text-xs font-bold text-slate-700">
-                          {activePlan.isPackage
-                            ? '一括請求額 (税込)'
-                            : selectedParentPlan === 'single'
-                            ? 'レッスン受講料'
-                            : '基本月額料金 (税込)'}
-                        </span>
-                        <span className="text-xl font-bold text-slate-800">
-                          {activePlan.isPackage ? (
-                            <>
-                              ¥{activePlan.price.toLocaleString()}
-                              <span className="text-xs font-bold text-slate-500 ml-1">（追加自動継続課金なし）</span>
-                            </>
-                          ) : selectedParentPlan === 'single' ? (
-                            <span className="text-xs sm:text-sm font-bold text-blue-700">受講した分だけ次月5日に決済（システム都合により前後することがあります。）</span>
-                          ) : (
-                            <>
-                              ¥{activePlan.price.toLocaleString()}
-                              <span className="text-xs font-bold text-slate-500 ml-1">/ 月</span>
-                            </>
-                          )}
-                        </span>
-                      </div>
-                      {!activePlan.isPackage && selectedParentPlan !== 'single' && (
-                        <div className="mt-2 pt-2 border-t border-slate-100 space-y-1 text-[10px] text-slate-500 leading-relaxed">
-                          <p className="font-bold text-amber-600">📅 体験レッスン後〜翌月1日までに先行受講された場合：</p>
-                          <p>
-                            実際の受講実績に基づき、<strong>受講日（日付）が明記された状態で、翌月1日の初回月謝引き落とし時に自動合算（追加請求）</strong>されます。
-                          </p>
-                          <p className="mt-1 text-slate-400">
-                            ※月会費の自動引き落としは翌月1日から開始されます（毎月25日引落）。
+                    {/* ② 翌月1日以降のお支払い / レッスン受講時のお支払い */}
+                    {selectedParentPlan === 'single' ? (
+                      <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 shadow-sm space-y-2">
+                        <div className="flex justify-between items-center text-xs text-slate-500 font-bold">
+                          <span className="flex items-center gap-1.5">
+                            <span className="w-4 h-4 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-[10px] font-black">2</span>
+                            レッスン受講時のお支払い形式
+                          </span>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
+                            受講分のみ後払い
+                          </span>
+                        </div>
+
+                        <div className="bg-slate-50/90 p-3 rounded-xl border border-slate-100 space-y-1.5">
+                          <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
+                            <span className="text-xs font-bold text-slate-600">レッスン受講料:</span>
+                            <span className="text-sm font-black text-blue-700 tracking-tight">
+                              受講した分だけ次月5日に決済
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 leading-relaxed font-medium">
+                            ※システム都合により決済日が前後することがあります。
                           </p>
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    ) : (
+                      <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 shadow-sm space-y-2">
+                        <div className="flex justify-between items-center text-xs text-slate-500 font-bold">
+                          <span className="flex items-center gap-1.5">
+                            <span className="w-4 h-4 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-[10px] font-black">2</span>
+                            お支払い形式（基本料金）
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-baseline pt-0.5">
+                          <span className="text-xs sm:text-sm font-bold text-slate-700">
+                            {activePlan.isPackage ? '一括請求額 (税込)' : '基本月額料金 (税込)'}
+                          </span>
+                          <span className="text-xl sm:text-2xl font-bold text-slate-800">
+                            {activePlan.isPackage ? (
+                              <>
+                                ¥{activePlan.price.toLocaleString()}
+                                <span className="text-xs font-bold text-slate-500 ml-1">（追加自動継続課金なし）</span>
+                              </>
+                            ) : (
+                              <>
+                                ¥{activePlan.price.toLocaleString()}
+                                <span className="text-xs font-bold text-slate-500 ml-1">/ 月</span>
+                              </>
+                            )}
+                          </span>
+                        </div>
+                        {!activePlan.isPackage && (
+                          <div className="mt-2 pt-2 border-t border-slate-100 space-y-1 text-[10px] text-slate-500 leading-relaxed">
+                            <p className="font-bold text-amber-600">📅 体験レッスン後〜翌月1日までに先行受講された場合：</p>
+                            <p>
+                              実際の受講実績に基づき、<strong>受講日（日付）が明記された状態で、翌月1日の初回月謝引き落とし時に自動合算（追加請求）</strong>されます。
+                            </p>
+                            <p className="mt-1 text-slate-400">
+                              ※月会費の自動引き落としは翌月1日から開始されます（毎月25日引落）。
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
                     {/* 単発プラン選択時の標準レッスン料金表示 */}
                     {selectedParentPlan === 'single' && showSinglePrices && singleLessons.length > 0 && (
