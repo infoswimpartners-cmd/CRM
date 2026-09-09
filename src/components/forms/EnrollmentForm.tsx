@@ -236,7 +236,7 @@ export default function EnrollmentForm({
 
     if (selectedParentPlan === 'single') {
       const dbPlan = dbPlans.find(p => p.name === '単発' || p.name === '単発プラン');
-      const defaultDesc = '定期的に通うのが難しい方へ。受講した分だけその都度決済されるプランです。※単発受講の方のみ初回受講時及び1年ごとの更新で、システム管理料として3,300円/年（税込）を頂戴しております。';
+      const defaultDesc = '定期的に通うのが難しい方へ。レッスン受講料は受講した分だけ次月5日に決済されます（システム都合により前後することがあります）。※単発受講の方のみ初回受講時及び1年ごとの更新で、システム管理料として3,300円/年（税込）を頂戴しております。';
       
       // 動的レッスン料金を整形してルールに追加（表示設定が有効な場合のみ）
       const lessonPriceRules = showSinglePrices
@@ -561,7 +561,7 @@ export default function EnrollmentForm({
                               <span className="text-xs font-bold text-slate-500 ml-1">（追加自動継続課金なし）</span>
                             </>
                           ) : selectedParentPlan === 'single' ? (
-                            <span className="text-sm font-bold text-blue-700">受講した分だけ都度決済</span>
+                            <span className="text-xs sm:text-sm font-bold text-blue-700">受講した分だけ次月5日に決済（システム都合により前後することがあります。）</span>
                           ) : (
                             <>
                               ¥{activePlan.price.toLocaleString()}
@@ -598,7 +598,7 @@ export default function EnrollmentForm({
                           ))}
                         </div>
                         <p className="text-[10px] text-slate-500 leading-relaxed mt-1 font-medium">
-                          ※入会時にシステム管理料として年会費3,300円（税込）が即時決済されます（以降1年ごとに自動更新）。レッスン受講料は受講ごとに上記の料金が自動決済されます。
+                          ※入会時にシステム管理料として年会費3,300円（税込）が即時決済されます（以降1年ごとに自動更新）。レッスン受講料は受講した分だけ次月5日に決済されます（システム都合により前後することがあります）。
                         </p>
                       </div>
                     )}
