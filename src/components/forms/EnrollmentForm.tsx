@@ -520,27 +520,39 @@ export default function EnrollmentForm({
                       </div>
                       <div className="mt-1 flex justify-between items-baseline">
                         <span className="text-xs font-bold text-slate-700">
-                          {activePlan.isPackage ? '本日お支払い額 (税込)' : 'クレジットカード登録 (本日決済なし)'}
+                          {activePlan.isPackage
+                            ? '本日お支払い額 (税込)'
+                            : selectedParentPlan === 'single'
+                            ? 'システム管理料・年会費 (税込)'
+                            : 'クレジットカード登録 (本日決済なし)'}
                         </span>
                         <span className="text-2xl font-black text-blue-600">
-                          ¥{(activePlan.isPackage ? activePlan.price : 0).toLocaleString()}
+                          ¥{(activePlan.isPackage || selectedParentPlan === 'single' ? activePlan.price : 0).toLocaleString()}
                         </span>
                       </div>
-                      {!activePlan.isPackage && (
+                      {selectedParentPlan === 'single' ? (
+                        <p className="text-[10px] text-slate-500 mt-1.5 leading-relaxed font-medium">
+                          ※単発受講のシステム管理料として年会費3,300円（税込）が本日即時決済されます（以降1年ごとに自動更新）。
+                        </p>
+                      ) : !activePlan.isPackage ? (
                         <p className="text-[10px] text-slate-500 mt-1.5 leading-relaxed">
                           ※本日は決済用クレジットカード情報の登録（安全なStripeシステム経由）のみを行います。本日時点で決済は発生いたしません。
                         </p>
-                      )}
+                      ) : null}
                     </div>
 
-                    {/* 翌月1日以降のお支払い (継続月会費 ＆ 先行受講分合算) */}
+                    {/* 翌月1日以降のお支払い / レッスン都度払い */}
                     <div className="bg-white p-3 rounded-lg border border-slate-200/80 shadow-sm">
                       <span className="text-xs text-slate-500 font-bold block mb-1">
-                        ② お支払い形式（基本料金）
+                        ② {selectedParentPlan === 'single' ? 'レッスン受講時のお支払い形式' : 'お支払い形式（基本料金）'}
                       </span>
                       <div className="flex justify-between items-baseline">
                         <span className="text-xs font-bold text-slate-700">
-                          {activePlan.isPackage ? '一括請求額 (税込)' : selectedParentPlan === 'single' ? 'システム管理料・年会費 (税込)' : '基本月額料金 (税込)'}
+                          {activePlan.isPackage
+                            ? '一括請求額 (税込)'
+                            : selectedParentPlan === 'single'
+                            ? 'レッスン受講料'
+                            : '基本月額料金 (税込)'}
                         </span>
                         <span className="text-xl font-bold text-slate-800">
                           {activePlan.isPackage ? (
@@ -549,10 +561,7 @@ export default function EnrollmentForm({
                               <span className="text-xs font-bold text-slate-500 ml-1">（追加自動継続課金なし）</span>
                             </>
                           ) : selectedParentPlan === 'single' ? (
-                            <>
-                              ¥{activePlan.price.toLocaleString()}
-                              <span className="text-xs font-bold text-slate-500 ml-1">/ 年</span>
-                            </>
+                            <span className="text-sm font-bold text-blue-700">受講した分だけ都度決済</span>
                           ) : (
                             <>
                               ¥{activePlan.price.toLocaleString()}
