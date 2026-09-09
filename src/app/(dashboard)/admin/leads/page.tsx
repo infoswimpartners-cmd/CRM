@@ -278,6 +278,7 @@ export default function AdminLeadsPage() {
     // LINE通知設定のステート
     const [lineToken, setLineToken] = useState('')
     const [lineTemplate, setLineTemplate] = useState('')
+    const [linePaymentTemplate, setLinePaymentTemplate] = useState('')
     const [savingLineConfig, setSavingLineConfig] = useState(false)
     const [showLineToken, setShowLineToken] = useState(false)
 
@@ -744,6 +745,7 @@ export default function AdminLeadsPage() {
             if (lineConfigRes.success) {
                 setLineToken(lineConfigRes.token || '')
                 setLineTemplate(lineConfigRes.template || '')
+                setLinePaymentTemplate(lineConfigRes.paymentTemplate || '')
             }
         } catch (error) {
             console.error('Error fetching data:', error)
@@ -871,7 +873,7 @@ export default function AdminLeadsPage() {
     const handleSaveLineConfig = async () => {
         setSavingLineConfig(true)
         try {
-            const res = await saveLineConfigAction(lineToken, lineTemplate)
+            const res = await saveLineConfigAction(lineToken, lineTemplate, linePaymentTemplate)
             if (res.success) {
                 toast.success('LINE通知設定を保存しました')
                 await fetchData()
@@ -3076,66 +3078,112 @@ export default function AdminLeadsPage() {
                         </div>
 
                         {/* 右：メッセージテンプレート設定 */}
-                        <div className="lg:col-span-2 bg-white p-6 rounded-lg border border-gray-200 shadow-xs space-y-6">
-                            <div>
-                                <h2 className="text-sm font-bold text-gray-950">コーチ確定時LINEテンプレート設定</h2>
-                                <p className="text-[11px] text-gray-400 mt-0.5">
-                                    コーチのアサインが確定した際に、顧客のLINEへ自動送信するメッセージ文面を設定します。
-                                </p>
-                            </div>
-
-                            <div className="space-y-4">
-                                <div className="space-y-1.5">
-                                    <Label htmlFor="lineTemplateText" className="text-xs font-semibold text-gray-700">メッセージ本文</Label>
-                                    <textarea
-                                        id="lineTemplateText"
-                                        rows={12}
-                                        value={lineTemplate}
-                                        onChange={(e) => setLineTemplate(e.target.value)}
-                                        placeholder="テンプレートを入力してください..."
-                                        className="w-full text-xs font-mono p-3 rounded-md border border-gray-200 bg-gray-50/50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors"
-                                    />
+                        <div className="lg:col-span-2 space-y-6">
+                            {/* 1通目：アサイン連絡テンプレート */}
+                            <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-xs space-y-5">
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="inline-flex items-center justify-center bg-blue-100 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-full">1通目</span>
+                                        <h2 className="text-sm font-bold text-gray-950">コーチ確定・アサイン連絡LINEテンプレート設定</h2>
+                                    </div>
+                                    <p className="text-[11px] text-gray-400 mt-0.5">
+                                        コーチのアサインが確定した際に、担当コーチや確定日時を顧客のLINEへ送信するメッセージ文面です（1通目）。
+                                    </p>
                                 </div>
 
-                                <div className="bg-gray-50 rounded-lg p-4 border border-gray-100 space-y-2">
-                                    <h3 className="text-xs font-bold text-gray-800">利用可能なプレースホルダー</h3>
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 text-[11px]">
-                                        <div className="flex gap-1.5 items-start">
-                                            <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{name}}"}</code>
-                                            <span className="text-gray-500">顧客氏名</span>
-                                        </div>
-                                        <div className="flex gap-1.5 items-start">
-                                            <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{coach_name}}"}</code>
-                                            <span className="text-gray-500">担当コーチ名</span>
-                                        </div>
-                                        <div className="flex gap-1.5 items-start">
-                                            <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{lesson_date}}"}</code>
-                                            <span className="text-gray-500">確定レッスン日時</span>
-                                        </div>
-                                        <div className="flex gap-1.5 items-start">
-                                            <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{location}}"}</code>
-                                            <span className="text-gray-500">レッスン場所</span>
-                                        </div>
-                                        <div className="flex gap-1.5 items-start">
-                                            <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{second_student_info}}"}</code>
-                                            <span className="text-gray-500">2人目の顧客情報</span>
-                                        </div>
-                                        <div className="flex gap-1.5 items-start">
-                                            <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{amount}}"}</code>
-                                            <span className="text-gray-500">体験料金</span>
-                                        </div>
-                                        <div className="flex gap-1.5 items-start">
-                                            <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{payment_link}}"}</code>
-                                            <span className="text-gray-500">決済リンクURL</span>
-                                        </div>
-                                        <div className="flex gap-1.5 items-start">
-                                            <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{coach_line_url}}"}</code>
-                                            <span className="text-gray-500">コーチLINE追加URL</span>
+                                <div className="space-y-4">
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="lineTemplateText" className="text-xs font-semibold text-gray-700">アサイン連絡メッセージ本文</Label>
+                                        <textarea
+                                            id="lineTemplateText"
+                                            rows={10}
+                                            value={lineTemplate}
+                                            onChange={(e) => setLineTemplate(e.target.value)}
+                                            placeholder="アサイン連絡テンプレートを入力してください..."
+                                            className="w-full text-xs font-mono p-3 rounded-md border border-gray-200 bg-gray-50/50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors"
+                                        />
+                                    </div>
+
+                                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-100 space-y-2">
+                                        <h3 className="text-xs font-bold text-gray-800">利用可能なプレースホルダー</h3>
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5 text-[11px]">
+                                            <div className="flex gap-1.5 items-start">
+                                                <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{name}}"}</code>
+                                                <span className="text-gray-500">顧客氏名</span>
+                                            </div>
+                                            <div className="flex gap-1.5 items-start">
+                                                <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{coach_name}}"}</code>
+                                                <span className="text-gray-500">担当コーチ名</span>
+                                            </div>
+                                            <div className="flex gap-1.5 items-start">
+                                                <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{lesson_date}}"}</code>
+                                                <span className="text-gray-500">確定レッスン日時</span>
+                                            </div>
+                                            <div className="flex gap-1.5 items-start">
+                                                <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{location}}"}</code>
+                                                <span className="text-gray-500">レッスン場所</span>
+                                            </div>
+                                            <div className="flex gap-1.5 items-start">
+                                                <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{second_student_info}}"}</code>
+                                                <span className="text-gray-500">2人目の顧客情報</span>
+                                            </div>
+                                            <div className="flex gap-1.5 items-start">
+                                                <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{coach_line_url}}"}</code>
+                                                <span className="text-gray-500">コーチLINE追加URL</span>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                                
-                                <div className="flex justify-end pt-2">
+                            </div>
+
+                            {/* 2通目：確定・体験料お支払い案内テンプレート */}
+                            <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-xs space-y-5">
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="inline-flex items-center justify-center bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full">2通目</span>
+                                        <h2 className="text-sm font-bold text-gray-950">体験料お支払い案内LINEテンプレート設定</h2>
+                                    </div>
+                                    <p className="text-[11px] text-gray-400 mt-0.5">
+                                        アサイン確定と同時に、体験レッスンの料金と専用クレジットカード決済URLを顧客のLINEへ送信するメッセージ文面です（2通目）。
+                                    </p>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <div className="space-y-1.5">
+                                        <Label htmlFor="linePaymentTemplateText" className="text-xs font-semibold text-gray-700">お支払い案内メッセージ本文</Label>
+                                        <textarea
+                                            id="linePaymentTemplateText"
+                                            rows={8}
+                                            value={linePaymentTemplate}
+                                            onChange={(e) => setLinePaymentTemplate(e.target.value)}
+                                            placeholder="お支払い案内テンプレートを入力してください..."
+                                            className="w-full text-xs font-mono p-3 rounded-md border border-gray-200 bg-gray-50/50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors"
+                                        />
+                                    </div>
+
+                                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-100 space-y-2">
+                                        <h3 className="text-xs font-bold text-gray-800">利用可能なプレースホルダー</h3>
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5 text-[11px]">
+                                            <div className="flex gap-1.5 items-start">
+                                                <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{name}}"}</code>
+                                                <span className="text-gray-500">顧客氏名</span>
+                                            </div>
+                                            <div className="flex gap-1.5 items-start">
+                                                <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{amount}}"}</code>
+                                                <span className="text-gray-500">体験料金</span>
+                                            </div>
+                                            <div className="flex gap-1.5 items-start">
+                                                <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{payment_link}}"}</code>
+                                                <span className="text-gray-500">決済リンクURL</span>
+                                            </div>
+                                        </div>
+                                        <p className="text-[10px] text-gray-400 mt-1">
+                                            ※ メッセージ内に {"{{payment_link}}"} が含まれていない場合でも、決済URLはメッセージ末尾に自動付与されます。
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-end pt-2 border-t border-gray-100">
                                     <Button
                                         onClick={handleSaveLineConfig}
                                         disabled={savingLineConfig}

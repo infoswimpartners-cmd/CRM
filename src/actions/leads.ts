@@ -787,7 +787,7 @@ export async function assignLeadAction(leadId: string, confirmedDate: string, co
         const paymentLink = trialResult?.paymentLink || ''
         const amountStr = trialResult?.price ? trialResult.price.toLocaleString() : '6,000'
 
-        // 4. 顧客への自動確定通知（LINEプッシュメッセージ）の送信（1通に統合）
+        // 4. 顧客への自動確定通知（LINEプッシュメッセージ）の送信（アサイン連絡とお支払い連絡の2通に分けて送信）
         // ※体験アサイン時点では担当コーチのLINEはまだ未追加のため、必ず「SWIM PARTNERS 公式LINE」から送信します
         if (lead.line_user_id && lead.send_customer_notification !== false) {
             // SWIM PARTNERS 公式LINEのアクセストークンを取得
@@ -798,7 +798,8 @@ export async function assignLeadAction(leadId: string, confirmedDate: string, co
                 .maybeSingle()
             const token = tokenConfig?.value || process.env.LINE_CHANNEL_ACCESS_TOKEN || ''
 
-            const { data: templateConfig } = await supabaseAdmin
+            // 1通目：アサイン連絡テンプレート
+            const { data: assignedTemplateConfig } = await supabaseAdmin
                 .from('app_configs')
                 .select('value')
                 .eq('key', 'line_assigned_template')
@@ -813,14 +814,8 @@ export async function assignLeadAction(leadId: string, confirmedDate: string, co
 ■ 確定日時: {{lesson_date}}
 ■ レッスン場所: {{location}}
 {{second_student_info}}
-■ 体験レッスン料金: {{amount}}円
 
-【1. お支払いのお願い】
-体験レッスン料金のお支払いは、下記の専用決済URL（クレジットカード）よりお願いいたします。
-▼ 体験レッスン事前決済URL
-{{payment_link}}
-
-【2. 担当コーチへご連絡のお願い】
+【担当コーチへご連絡のお願い】
 当日の集合場所や事前打ち合わせのため、下記URLより担当コーチのLINEを追加いただき、メッセージをお送りいただけますようお願いいたします。
 ▼ 担当コーチLINE追加URL
 {{coach_line_url}}
@@ -829,7 +824,28 @@ export async function assignLeadAction(leadId: string, confirmedDate: string, co
 
 Swim Partners`
 
-            const bodyTemplate = templateConfig?.value || defaultLineAssignedTemplate
+            // 2通目：確定・お支払い連絡テンプレート
+            const { data: paymentTemplateConfig } = await supabaseAdmin
+                .from('app_configs')
+                .select('value')
+                .eq('key', 'line_payment_template')
+                .maybeSingle()
+
+            const defaultLinePaymentTemplate = `{{name}} 様
+
+体験レッスン料金のお支払いについてご案内いたします。
+
+■ 体験レッスン料金: {{amount}}円
+
+【お支払いのお願い】
+体験レッスン料金のお支払いは、下記の専用決済URL（クレジットカード）よりお願いいたします。
+▼ 体験レッスン事前決済URL
+{{payment_link}}
+
+※レッスン前日までの事前決済をお願いしております。
+ご不明な点がございましたらお気軽にお問い合わせください。
+
+Swim Partners`
 
             // 2人目の情報の組み立て
             let secondStudentInfo = ''
@@ -839,7 +855,9 @@ Swim Partners`
                 secondStudentInfo = `\n■ 2人目の情報: ${lead.second_student_name}（${lead.second_student_gender || '未設定'} / ${secondAgeStr}）`
             }
 
-            let message = bodyTemplate
+            // 1通目メッセージの生成
+            const assignedBodyTemplate = assignedTemplateConfig?.value || defaultLineAssignedTemplate
+            const assignedMessage = assignedBodyTemplate
                 .replace(/\{\{name\}\}/g, lead.name || 'お客様')
                 .replace(/\{\{coach_name\}\}/g, profile.full_name || '')
                 .replace(/\{\{coach_line_url\}\}/g, profile.line_friend_url || '')
@@ -850,19 +868,35 @@ Swim Partners`
                 .replace(/\{\{payment_link\}\}/g, paymentLink)
                 .replace(/\{\{payment_url\}\}/g, paymentLink)
 
-            // 【決済リンク自動付加フォールバック】テンプレートにリンクが未挿入の場合、確実に追記
-            if (paymentLink && !message.includes(paymentLink)) {
-                if (message.includes('【1. お支払いのお願い】') || message.includes('【お支払いのお願い】') || message.includes('お支払いについて')) {
-                    message = message.replace(/(【1\. お支払いのお願い】|【お支払いのお願い】|[■\d\.\s]*お支払いについて[^\n]*)/, `$1\n▼ 体験レッスン事前決済URL\n${paymentLink}`)
-                } else {
-                    message += `\n\n【体験レッスン事前決済URL】\n${paymentLink}`
-                }
+            // 2通目メッセージの生成
+            const paymentBodyTemplate = paymentTemplateConfig?.value || defaultLinePaymentTemplate
+            let paymentMessage = paymentBodyTemplate
+                .replace(/\{\{name\}\}/g, lead.name || 'お客様')
+                .replace(/\{\{coach_name\}\}/g, profile.full_name || '')
+                .replace(/\{\{coach_line_url\}\}/g, profile.line_friend_url || '')
+                .replace(/\{\{lesson_date\}\}/g, confirmedDate)
+                .replace(/\{\{location\}\}/g, confirmedLocation)
+                .replace(/\{\{second_student_info\}\}/g, secondStudentInfo)
+                .replace(/\{\{amount\}\}/g, amountStr)
+                .replace(/\{\{payment_link\}\}/g, paymentLink)
+                .replace(/\{\{payment_url\}\}/g, paymentLink)
+
+            // 【決済リンク自動付加フォールバック】2通目に決済URLが未挿入の場合、確実に追記
+            if (paymentLink && !paymentMessage.includes(paymentLink)) {
+                paymentMessage += `\n\n▼ 体験レッスン事前決済URL\n${paymentLink}`
             }
 
             const { lineService } = await import('@/lib/line')
-            const success = await lineService.pushMessage(lead.line_user_id, message, token)
-            if (!success) {
-                console.error('Failed to send LINE push notification to client')
+            // 1通目（アサイン連絡）を送信
+            const success1 = await lineService.pushMessage(lead.line_user_id, assignedMessage, token)
+            if (!success1) {
+                console.error('Failed to send LINE assigned message to client')
+            }
+
+            // 2通目（確定・お支払い連絡）を送信
+            const success2 = await lineService.pushMessage(lead.line_user_id, paymentMessage, token)
+            if (!success2) {
+                console.error('Failed to send LINE payment message to client')
             }
         }
 
@@ -1222,7 +1256,7 @@ export async function adminAssignLeadAction(
         const paymentLink = trialResult?.paymentLink || ''
         const amountStr = trialResult?.price ? trialResult.price.toLocaleString() : '6,000'
 
-        // 4. 顧客への自動確定通知（LINEプッシュメッセージ）の送信（1通に統合）
+        // 4. 顧客への自動確定通知（LINEプッシュメッセージ）の送信（アサイン連絡とお支払い連絡の2通に分けて送信）
         // ※体験アサイン時点では担当コーチのLINEはまだ未追加のため、必ず「SWIM PARTNERS 公式LINE」から送信します
         if (lead.line_user_id && lead.send_customer_notification !== false) {
             // SWIM PARTNERS 公式LINEのアクセストークンを取得
@@ -1233,7 +1267,8 @@ export async function adminAssignLeadAction(
                 .maybeSingle()
             const token = tokenConfig?.value || process.env.LINE_CHANNEL_ACCESS_TOKEN || ''
 
-            const { data: templateConfig } = await supabaseAdmin
+            // 1通目：アサイン連絡テンプレート
+            const { data: assignedTemplateConfig } = await supabaseAdmin
                 .from('app_configs')
                 .select('value')
                 .eq('key', 'line_assigned_template')
@@ -1248,14 +1283,8 @@ export async function adminAssignLeadAction(
 ■ 確定日時: {{lesson_date}}
 ■ レッスン場所: {{location}}
 {{second_student_info}}
-■ 体験レッスン料金: {{amount}}円
 
-【1. お支払いのお願い】
-体験レッスン料金のお支払いは、下記の専用決済URL（クレジットカード）よりお願いいたします。
-▼ 体験レッスン事前決済URL
-{{payment_link}}
-
-【2. 担当コーチへご連絡のお願い】
+【担当コーチへご連絡のお願い】
 当日の集合場所や事前打ち合わせのため、下記URLより担当コーチのLINEを追加いただき、メッセージをお送りいただけますようお願いいたします。
 ▼ 担当コーチLINE追加URL
 {{coach_line_url}}
@@ -1264,7 +1293,28 @@ export async function adminAssignLeadAction(
 
 Swim Partners`
 
-            const bodyTemplate = templateConfig?.value || defaultLineAssignedTemplate
+            // 2通目：確定・お支払い連絡テンプレート
+            const { data: paymentTemplateConfig } = await supabaseAdmin
+                .from('app_configs')
+                .select('value')
+                .eq('key', 'line_payment_template')
+                .maybeSingle()
+
+            const defaultLinePaymentTemplate = `{{name}} 様
+
+体験レッスン料金のお支払いについてご案内いたします。
+
+■ 体験レッスン料金: {{amount}}円
+
+【お支払いのお願い】
+体験レッスン料金のお支払いは、下記の専用決済URL（クレジットカード）よりお願いいたします。
+▼ 体験レッスン事前決済URL
+{{payment_link}}
+
+※レッスン前日までの事前決済をお願いしております。
+ご不明な点がございましたらお気軽にお問い合わせください。
+
+Swim Partners`
 
             let secondStudentInfo = ''
             if (lead.second_student_name) {
@@ -1273,7 +1323,9 @@ Swim Partners`
                 secondStudentInfo = `\n■ 2人目の情報: ${lead.second_student_name}（${lead.second_student_gender || '未設定'} / ${secondAgeStr}）`
             }
 
-            let message = bodyTemplate
+            // 1通目メッセージの生成
+            const assignedBodyTemplate = assignedTemplateConfig?.value || defaultLineAssignedTemplate
+            const assignedMessage = assignedBodyTemplate
                 .replace(/\{\{name\}\}/g, lead.name || 'お客様')
                 .replace(/\{\{coach_name\}\}/g, targetCoach.full_name || '')
                 .replace(/\{\{coach_line_url\}\}/g, targetCoach.line_friend_url || '')
@@ -1284,19 +1336,35 @@ Swim Partners`
                 .replace(/\{\{payment_link\}\}/g, paymentLink)
                 .replace(/\{\{payment_url\}\}/g, paymentLink)
 
-            // 【決済リンク自動付加フォールバック】テンプレートにリンクが未挿入の場合、確実に追記
-            if (paymentLink && !message.includes(paymentLink)) {
-                if (message.includes('【1. お支払いのお願い】') || message.includes('【お支払いのお願い】') || message.includes('お支払いについて')) {
-                    message = message.replace(/(【1\. お支払いのお願い】|【お支払いのお願い】|[■\d\.\s]*お支払いについて[^\n]*)/, `$1\n▼ 体験レッスン事前決済URL\n${paymentLink}`)
-                } else {
-                    message += `\n\n【体験レッスン事前決済URL】\n${paymentLink}`
-                }
+            // 2通目メッセージの生成
+            const paymentBodyTemplate = paymentTemplateConfig?.value || defaultLinePaymentTemplate
+            let paymentMessage = paymentBodyTemplate
+                .replace(/\{\{name\}\}/g, lead.name || 'お客様')
+                .replace(/\{\{coach_name\}\}/g, targetCoach.full_name || '')
+                .replace(/\{\{coach_line_url\}\}/g, targetCoach.line_friend_url || '')
+                .replace(/\{\{lesson_date\}\}/g, confirmedDate)
+                .replace(/\{\{location\}\}/g, confirmedLocation)
+                .replace(/\{\{second_student_info\}\}/g, secondStudentInfo)
+                .replace(/\{\{amount\}\}/g, amountStr)
+                .replace(/\{\{payment_link\}\}/g, paymentLink)
+                .replace(/\{\{payment_url\}\}/g, paymentLink)
+
+            // 【決済リンク自動付加フォールバック】2通目に決済URLが未挿入の場合、確実に追記
+            if (paymentLink && !paymentMessage.includes(paymentLink)) {
+                paymentMessage += `\n\n▼ 体験レッスン事前決済URL\n${paymentLink}`
             }
 
             const { lineService } = await import('@/lib/line')
-            const success = await lineService.pushMessage(lead.line_user_id, message, token)
-            if (!success) {
-                console.error('Failed to send LINE push notification to client')
+            // 1通目（アサイン連絡）を送信
+            const success1 = await lineService.pushMessage(lead.line_user_id, assignedMessage, token)
+            if (!success1) {
+                console.error('Failed to send LINE assigned message to client')
+            }
+
+            // 2通目（確定・お支払い連絡）を送信
+            const success2 = await lineService.pushMessage(lead.line_user_id, paymentMessage, token)
+            if (!success2) {
+                console.error('Failed to send LINE payment message to client')
             }
         }
 
@@ -1906,6 +1974,12 @@ export async function getLineConfigAction() {
             .eq('key', 'line_assigned_template')
             .single()
 
+        const { data: paymentTemplateData } = await supabase
+            .from('app_configs')
+            .select('value')
+            .eq('key', 'line_payment_template')
+            .single()
+
         const defaultLineAssignedTemplate = `{{name}} 様
 
 スイムパートナーズにお申し込みいただきありがとうございます。
@@ -1915,14 +1989,8 @@ export async function getLineConfigAction() {
 ■ 確定日時: {{lesson_date}}
 ■ レッスン場所: {{location}}
 {{second_student_info}}
-■ 体験レッスン料金: {{amount}}円
 
-【1. お支払いのお願い】
-体験レッスン料金のお支払いは、下記の専用決済URL（クレジットカード）よりお願いいたします。
-▼ 体験レッスン事前決済URL
-{{payment_link}}
-
-【2. 担当コーチへご連絡のお願い】
+【担当コーチへご連絡のお願い】
 当日の集合場所や事前打ち合わせのため、下記URLより担当コーチのLINEを追加いただき、メッセージをお送りいただけますようお願いいたします。
 ▼ 担当コーチLINE追加URL
 {{coach_line_url}}
@@ -1931,10 +1999,27 @@ export async function getLineConfigAction() {
 
 Swim Partners`
 
+        const defaultLinePaymentTemplate = `{{name}} 様
+
+体験レッスンの確定に伴い、体験料のお支払いについてご案内いたします。
+
+■ 体験レッスン料金: {{amount}}円
+
+【体験料お支払いのお願い】
+体験レッスン料金のお支払いは、下記の専用決済URL（クレジットカード）よりお願いいたします。
+▼ 体験レッスン事前決済URL
+{{payment_link}}
+
+※レッスン前日までにお手続きいただけますようお願い申し上げます。
+ご不明な点がございましたら、本部までお気軽にお問い合わせください。
+
+Swim Partners`
+
         return {
             success: true,
             token: tokenData?.value || '',
-            template: templateData?.value || defaultLineAssignedTemplate
+            template: templateData?.value || defaultLineAssignedTemplate,
+            paymentTemplate: paymentTemplateData?.value || defaultLinePaymentTemplate
         }
     } catch (error: any) {
         console.error('Failed to get LINE config:', error)
@@ -1942,8 +2027,8 @@ Swim Partners`
     }
 }
 
-// 13. LINE通知設定（トークンとテンプレート）の保存
-export async function saveLineConfigAction(token: string, template: string) {
+// 13. LINE通知設定（トークンと各種テンプレート）の保存
+export async function saveLineConfigAction(token: string, template: string, paymentTemplate?: string) {
     try {
         const supabase = await createClient()
         const { data: { user } } = await supabase.auth.getUser()
@@ -1970,16 +2055,29 @@ export async function saveLineConfigAction(token: string, template: string) {
 
         if (tokenError) throw tokenError
 
-        // テンプレートの upsert
+        // アサイン確定時テンプレートの upsert
         const { error: templateError } = await supabaseAdmin
             .from('app_configs')
             .upsert({ 
                 key: 'line_assigned_template', 
                 value: template,
-                description: '体験レッスンの担当コーチ決定時（アサイン確定時）に顧客のLINEに送信するメッセージテンプレート（変数: {{name}}, {{coach_name}}, {{coach_line_url}}, {{lesson_date}}, {{location}}, {{second_student_info}}, {{amount}}, {{payment_link}}）'
+                description: '体験レッスンの担当コーチ決定時（アサイン確定時）に顧客のLINEに送信するメッセージテンプレート（変数: {{name}}, {{coach_name}}, {{coach_line_url}}, {{lesson_date}}, {{location}}, {{second_student_info}}）'
             }, { onConflict: 'key' })
 
         if (templateError) throw templateError
+
+        // お支払い案内テンプレートの upsert
+        if (paymentTemplate !== undefined) {
+            const { error: paymentTemplateError } = await supabaseAdmin
+                .from('app_configs')
+                .upsert({ 
+                    key: 'line_payment_template', 
+                    value: paymentTemplate,
+                    description: '体験レッスン確定時に顧客のLINEに送信する体験料お支払い案内のメッセージテンプレート（変数: {{name}}, {{amount}}, {{payment_link}}）'
+                }, { onConflict: 'key' })
+
+            if (paymentTemplateError) throw paymentTemplateError
+        }
 
         revalidatePath('/admin/leads')
         revalidatePath('/admin/email-templates')
