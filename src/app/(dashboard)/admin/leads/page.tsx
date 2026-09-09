@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { ChevronLeft, Send, MapPin, AlertCircle, Plus, Trash2, Eye, EyeOff, CheckCircle, Pencil } from 'lucide-react'
+import { ChevronLeft, Send, MapPin, AlertCircle, Plus, Trash2, Eye, EyeOff, CheckCircle, Pencil, CreditCard, Copy, ExternalLink, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import {
     Table,
@@ -44,7 +44,8 @@ import {
     updateLeadAction,
     cancelLeadAssignmentAction,
     adminAssignLeadAction,
-    getLeadWebhookMappingsAction
+    getLeadWebhookMappingsAction,
+    getOrCreateTrialPaymentUrlAction
 } from '@/actions/leads'
 import {
     Dialog,
@@ -243,6 +244,9 @@ export default function AdminLeadsPage() {
     const [sendingStates, setSendingStates] = useState<Record<string, boolean>>({})
     const [completingStates, setCompletingStates] = useState<Record<string, boolean>>({})
     const [cancelingStates, setCancelingStates] = useState<Record<string, boolean>>({})
+    const [copyingPaymentUrl, setCopyingPaymentUrl] = useState<Record<string, boolean>>({})
+    const [modalPaymentLink, setModalPaymentLink] = useState<string>('')
+    const [loadingModalPaymentLink, setLoadingModalPaymentLink] = useState<boolean>(false)
 
     // 新規Webhook追加用フォームのステート
     const [newSpaceName, setNewSpaceName] = useState('')
@@ -471,6 +475,26 @@ export default function AdminLeadsPage() {
         }
     }
 
+    const handleCopyPaymentUrl = async (leadId: string) => {
+        setCopyingPaymentUrl(prev => ({ ...prev, [leadId]: true }))
+        try {
+            const res = await getOrCreateTrialPaymentUrlAction(leadId)
+            if (res.success && res.paymentLink) {
+                await navigator.clipboard.writeText(res.paymentLink)
+                toast.success('💳 体験料決済URLをコピーしました！', {
+                    description: `${res.studentName || 'お客様'}様 (${res.amount ? res.amount.toLocaleString() + '円' : ''})\n${res.paymentLink}`
+                })
+            } else {
+                toast.error(res.error || '決済URLの取得・発行に失敗しました')
+            }
+        } catch (err: any) {
+            console.error('Failed to copy payment URL:', err)
+            toast.error('決済URLのコピーに失敗しました')
+        } finally {
+            setCopyingPaymentUrl(prev => ({ ...prev, [leadId]: false }))
+        }
+    }
+
     const handleOpenEditDialog = (lead: any) => {
         setEditingLeadId(lead.id)
         setEditFormName(lead.name || '')
@@ -495,6 +519,25 @@ export default function AdminLeadsPage() {
         setEditFormSecondStudentBirthDate(lead.second_student_birth_date || '')
         setEditFormSendCustomerNotification(lead.send_customer_notification !== false)
         setEditFormStatus(lead.status || '')
+
+        // アサイン済みリードの場合、決済URLを非同期取得
+        if (lead.assigned_coach_id || lead.status === '体験確定') {
+            setLoadingModalPaymentLink(true)
+            getOrCreateTrialPaymentUrlAction(lead.id).then(res => {
+                if (res.success && res.paymentLink) {
+                    setModalPaymentLink(res.paymentLink)
+                } else {
+                    setModalPaymentLink('')
+                }
+            }).catch(() => {
+                setModalPaymentLink('')
+            }).finally(() => {
+                setLoadingModalPaymentLink(false)
+            })
+        } else {
+            setModalPaymentLink('')
+        }
+
         setIsEditDialogOpen(true)
     }
 
@@ -1836,6 +1879,72 @@ export default function AdminLeadsPage() {
                                         </div>
                                     </div>
 
+                                     {/* 体験料支払いURL（アサイン確定時・担当コーチ設定時） */}
+                                    {(editFormStatus === '体験確定' || modalPaymentLink) && (
+                                        <div className="bg-emerald-50/70 p-3.5 rounded-lg border border-emerald-200 space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <Label className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                                                    <CreditCard className="w-4 h-4 text-emerald-600" />
+                                                    体験レッスン決済URL（クレジットカード事前決済）
+                                                </Label>
+                                                {modalPaymentLink && (
+                                                    <a
+                                                        href={modalPaymentLink}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-[11px] text-emerald-700 hover:text-emerald-900 font-semibold flex items-center gap-1 hover:underline"
+                                                    >
+                                                        <ExternalLink className="w-3 h-3" />
+                                                        決済ページを開く
+                                                    </a>
+                                                )}
+                                            </div>
+                                            <div className="flex gap-2 items-center">
+                                                <Input
+                                                    readOnly
+                                                    value={loadingModalPaymentLink ? '決済URLを取得・生成中...' : (modalPaymentLink || '未発行（右のボタンで発行できます）')}
+                                                    className="text-xs font-mono bg-white h-9 border-emerald-200 text-gray-700 select-all"
+                                                />
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    className="h-9 px-3.5 shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold gap-1 shadow-2xs"
+                                                    disabled={loadingModalPaymentLink || !editingLeadId}
+                                                    onClick={async () => {
+                                                        if (!editingLeadId) return
+                                                        setLoadingModalPaymentLink(true)
+                                                        try {
+                                                            const res = await getOrCreateTrialPaymentUrlAction(editingLeadId)
+                                                            if (res.success && res.paymentLink) {
+                                                                setModalPaymentLink(res.paymentLink)
+                                                                await navigator.clipboard.writeText(res.paymentLink)
+                                                                toast.success('💳 体験料決済URLをコピーしました！', {
+                                                                    description: `${res.studentName || 'お客様'}様 (${res.amount ? res.amount.toLocaleString() + '円' : ''})\n${res.paymentLink}`
+                                                                })
+                                                            } else {
+                                                                toast.error(res.error || '決済URLの発行に失敗しました')
+                                                            }
+                                                        } catch {
+                                                            toast.error('エラーが発生しました')
+                                                        } finally {
+                                                            setLoadingModalPaymentLink(false)
+                                                        }
+                                                    }}
+                                                >
+                                                    {loadingModalPaymentLink ? (
+                                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                    ) : (
+                                                        <Copy className="w-3.5 h-3.5" />
+                                                    )}
+                                                    {modalPaymentLink ? 'URLをコピー' : 'URLを発行してコピー'}
+                                                </Button>
+                                            </div>
+                                            <p className="text-[10px] text-emerald-700/80">
+                                                ※顧客へ手動で案内する場合や、LINE以外の方法（メール・SMS等）でお支払いリンクを渡す際にご使用ください。
+                                            </p>
+                                        </div>
+                                    )}
+
                                     {/* 顧客通知設定 */}
                                     <div className="flex items-center space-x-2 border-t pt-4">
                                         <Switch
@@ -2168,6 +2277,21 @@ export default function AdminLeadsPage() {
                                                                                 解除
                                                                             </Button>
                                                                         </div>
+                                                                        <Button
+                                                                            type="button"
+                                                                            size="sm"
+                                                                            variant="outline"
+                                                                            className="h-6 mt-1 text-[10px] font-bold text-emerald-700 bg-emerald-50/80 border-emerald-300 hover:bg-emerald-100 hover:text-emerald-900 px-2 flex items-center gap-1 shadow-2xs"
+                                                                            disabled={copyingPaymentUrl[lead.id]}
+                                                                            onClick={() => handleCopyPaymentUrl(lead.id)}
+                                                                        >
+                                                                            {copyingPaymentUrl[lead.id] ? (
+                                                                                <Loader2 className="h-3 w-3 animate-spin" />
+                                                                            ) : (
+                                                                                <CreditCard className="h-3 w-3 text-emerald-600" />
+                                                                            )}
+                                                                            決済URLコピー
+                                                                        </Button>
                                                                     </div>
                                                                 )
                                                             })()
@@ -2371,6 +2495,23 @@ export default function AdminLeadsPage() {
                                                             <CheckCircle className="h-3 w-3" />
                                                             手動完了
                                                         </Button>
+                                                        {/* 決済URLボタン（アサイン済み時） */}
+                                                        {(lead.assigned_coach_id || lead.status === '体験確定') && (
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                className="h-7 w-full gap-1 text-[11px] font-bold whitespace-nowrap border-emerald-300 text-emerald-700 bg-emerald-50/60 hover:bg-emerald-100 hover:text-emerald-900 shadow-2xs"
+                                                                disabled={copyingPaymentUrl[lead.id]}
+                                                                onClick={() => handleCopyPaymentUrl(lead.id)}
+                                                            >
+                                                                {copyingPaymentUrl[lead.id] ? (
+                                                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                                                ) : (
+                                                                    <CreditCard className="h-3 w-3 text-emerald-600" />
+                                                                )}
+                                                                決済URL
+                                                            </Button>
+                                                        )}
                                                     </div>
                                                 </TableCell>
                                             </TableRow>
@@ -2610,6 +2751,14 @@ export default function AdminLeadsPage() {
                                     <div className="flex gap-1.5 items-start">
                                         <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{second_student_info}}"}</code>
                                         <span className="text-gray-500">2人目の名前（存在時のみ改行付きで出力）</span>
+                                    </div>
+                                    <div className="flex gap-1.5 items-start">
+                                        <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{amount}}"}</code>
+                                        <span className="text-gray-500">体験レッスン料金</span>
+                                    </div>
+                                    <div className="flex gap-1.5 items-start">
+                                        <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{payment_link}}"}</code>
+                                        <span className="text-gray-500">体験料決済リンクURL</span>
                                     </div>
                                 </div>
                             </div>

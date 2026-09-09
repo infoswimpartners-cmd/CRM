@@ -139,34 +139,67 @@ async function createTrialScheduleForLead(params: {
         const title = `${params.studentName}様　担当：${coachName}`
         const notes = `[体験レッスンスケジュール]\n案件ID: ${params.leadId}\n確定日時: ${params.confirmedDate}\n確定場所: ${params.confirmedLocation}\nご要望・備考: ${params.leadNotes || 'なし'}`
 
-        // 3. lesson_schedules へ登録
-        const { data: insertedSchedule, error: insertError } = await supabaseAdmin
+        // 3. 既存スケジュールの確認（二重登録防止・既存更新）
+        const { data: existingSchedules } = await supabaseAdmin
             .from('lesson_schedules')
-            .insert({
-                coach_id: params.coachId,
-                student_id: params.studentId || null,
-                lesson_master_id: trialMaster?.id || null,
-                title: title,
-                start_time: start,
-                end_time: end,
-                location: params.confirmedLocation || null,
-                notes: notes,
-                price: lessonPrice,
-                status: 'pending',
-                billing_status: 'awaiting_payment',
-                attendance_type: params.hasSecondStudent ? 'both' : 'single',
-                is_overage: true
-            })
-            .select()
-            .single()
+            .select('*')
+            .ilike('notes', `%案件ID: ${params.leadId}%`)
+            .order('created_at', { ascending: false })
+            .limit(1)
 
-        if (insertError) {
-            console.error('Failed to insert trial schedule:', insertError)
-            return null
+        let targetScheduleId: string | null = null
+
+        if (existingSchedules && existingSchedules.length > 0) {
+            const existing = existingSchedules[0]
+            targetScheduleId = existing.id
+            // 既存スケジュールの内容を更新
+            await supabaseAdmin
+                .from('lesson_schedules')
+                .update({
+                    coach_id: params.coachId,
+                    student_id: params.studentId || existing.student_id || null,
+                    lesson_master_id: trialMaster?.id || existing.lesson_master_id || null,
+                    title: title,
+                    start_time: start,
+                    end_time: end,
+                    location: params.confirmedLocation || null,
+                    notes: notes,
+                    price: lessonPrice,
+                    billing_status: existing.billing_status === 'paid' ? 'paid' : 'awaiting_payment',
+                    attendance_type: params.hasSecondStudent ? 'both' : 'single',
+                    is_overage: true
+                })
+                .eq('id', existing.id)
+        } else {
+            // lesson_schedules へ新規登録
+            const { data: insertedSchedule, error: insertError } = await supabaseAdmin
+                .from('lesson_schedules')
+                .insert({
+                    coach_id: params.coachId,
+                    student_id: params.studentId || null,
+                    lesson_master_id: trialMaster?.id || null,
+                    title: title,
+                    start_time: start,
+                    end_time: end,
+                    location: params.confirmedLocation || null,
+                    notes: notes,
+                    price: lessonPrice,
+                    billing_status: 'awaiting_payment',
+                    attendance_type: params.hasSecondStudent ? 'both' : 'single',
+                    is_overage: true
+                })
+                .select('id')
+                .single()
+
+            if (insertError || !insertedSchedule) {
+                console.error('Failed to insert trial schedule:', insertError)
+                return null
+            }
+            targetScheduleId = insertedSchedule.id
         }
 
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://manager.swim-partners.com'
-        const paymentLink = `${appUrl}/pay/trial/${insertedSchedule.id}`
+        const paymentLink = `${appUrl}/pay/trial/${targetScheduleId}`
 
         // 4. Googleカレンダーへの同期
         try {
@@ -200,11 +233,11 @@ async function createTrialScheduleForLead(params: {
                 if (!finalEventId) finalEventId = adminEventId
             }
 
-            if (finalEventId && insertedSchedule?.id) {
+            if (finalEventId && targetScheduleId) {
                 await supabaseAdmin
                     .from('lesson_schedules')
                     .update({ google_event_id: finalEventId })
-                    .eq('id', insertedSchedule.id)
+                    .eq('id', targetScheduleId)
             }
         } catch (calErr) {
             console.error('Google Calendar sync failed for trial schedule:', calErr)
@@ -218,13 +251,114 @@ async function createTrialScheduleForLead(params: {
         }
 
         return {
-            schedule: insertedSchedule,
+            scheduleId: targetScheduleId,
             paymentLink: paymentLink,
             price: lessonPrice
         }
-    } catch (err) {
-        console.error('Error in createTrialScheduleForLead:', err)
+    } catch (error) {
+        console.error('Error in createTrialScheduleForLead:', error)
         return null
+    }
+}
+
+/**
+ * コーチ連絡用Google Chatスペースへアサイン詳細通知を送信する
+ */
+async function sendCoachDetailNotification(params: {
+    supabaseAdmin: any
+    coachId: string
+    coachName: string
+    lead: any
+    confirmedDate: string
+    confirmedLocation: string
+    amountStr: string
+    paymentLink: string
+}) {
+    const { supabaseAdmin, coachId, coachName, lead, confirmedDate, confirmedLocation, amountStr, paymentLink } = params
+    try {
+        let webhookUrl: string | null = null
+        let targetSpaceName: string | null = null
+
+        // 1. line_bot_configs から該当コーチの gchat_webhook_id を取得
+        const { data: botConfig } = await supabaseAdmin
+            .from('line_bot_configs')
+            .select('gchat_webhook_id, google_chat_webhooks(id, space_name, webhook_url)')
+            .eq('coach_id', coachId)
+            .maybeSingle()
+
+        if (botConfig?.google_chat_webhooks?.webhook_url) {
+            webhookUrl = botConfig.google_chat_webhooks.webhook_url
+            targetSpaceName = botConfig.google_chat_webhooks.space_name
+        }
+
+        // 2. もし line_bot_configs に未設定の場合は、google_chat_webhooks の space_name からコーチ名で検索
+        if (!webhookUrl && coachName) {
+            const cleanCoachName = coachName.replace(/[\s　]+/g, '')
+            const { data: allWebhooks } = await supabaseAdmin
+                .from('google_chat_webhooks')
+                .select('id, space_name, webhook_url')
+                .eq('active', true)
+
+            if (allWebhooks && allWebhooks.length > 0) {
+                const lastName = cleanCoachName.substring(0, 2)
+                const matched = allWebhooks.find((w: any) => 
+                    w.space_name && (
+                        w.space_name.includes(cleanCoachName) || 
+                        (lastName.length >= 2 && w.space_name.includes(lastName))
+                    )
+                )
+                if (matched?.webhook_url) {
+                    webhookUrl = matched.webhook_url
+                    targetSpaceName = matched.space_name
+                }
+            }
+        }
+
+        if (!webhookUrl) {
+            console.log(`[Coach Detail Notification] No Google Chat webhook found for coach: ${coachName} (${coachId})`)
+            return
+        }
+
+        // 年齢計算
+        const studentAge = calculateAge(lead.birth_date)
+        const ageStr = studentAge !== null ? `${studentAge}歳` : '未設定'
+        const genderStr = lead.gender || '未設定'
+        const ageGender = `${genderStr} / ${ageStr}`
+
+        // 2人目情報
+        let secondStudentInfo = ''
+        if (lead.second_student_name) {
+            const secondAge = calculateAge(lead.second_student_birth_date)
+            const secondAgeStr = secondAge !== null ? `${secondAge}歳` : '未設定'
+            secondStudentInfo = `\n・2人目のお名前： ${lead.second_student_name} 様（${lead.second_student_gender || '未設定'} / ${secondAgeStr}）`
+        }
+
+        const coachMessage = `🏊‍♂️ *【体験レッスンアサイン確定・案件詳細】*
+担当コーチとして体験レッスンのアサインが確定いたしました。
+
+*■ レッスン基本情報*
+・担当コーチ： ${coachName}
+・確定体験日時： ${confirmedDate}
+・確定レッスン場所： ${confirmedLocation}
+・体験レッスン料金： ${amountStr}円
+
+*■ お客様（生徒）情報*
+・お名前： ${lead.name || '未設定'} 様${secondStudentInfo}
+・性別 / 年齢： ${ageGender}
+・電話番号： ${lead.phone || '未設定'}
+・メールアドレス： ${lead.email || '未設定'}
+・希望エリア： ${lead.area || '未設定'}
+・泳力レベル / ご要望： ${lead.notes || 'なし'}
+
+*■ 体験レッスン決済URL（事前決済用）*
+${paymentLink}
+※お客様へは公式LINEより上記決済リンクと担当コーチへのご連絡案内を自動送信しております。
+集合場所等の事前確認のため、お客様からのLINE追加・ご連絡をお待ちください。`
+
+        console.log(`[Coach Detail Notification] Sending notification to coach space: ${targetSpaceName}`)
+        await sendGoogleChatMessage(webhookUrl, coachMessage)
+    } catch (err) {
+        console.error('[Coach Detail Notification] Error sending notification to coach space:', err)
     }
 }
 
@@ -521,6 +655,37 @@ export async function assignLeadAction(leadId: string, confirmedDate: string, co
             }
         }
 
+        // 生徒マスタに存在しない場合は、リード情報から新規生徒を自動作成
+        if (!studentId) {
+            const { data: newStudent, error: createStudentErr } = await supabaseAdmin
+                .from('students')
+                .insert({
+                    full_name: lead.name || 'お客様',
+                    full_name_kana: lead.full_name_kana || null,
+                    contact_email: lead.email || null,
+                    phone: lead.phone || null,
+                    line_user_id: lead.line_user_id || null,
+                    gender: lead.gender || null,
+                    birth_date: lead.birth_date || null,
+                    second_student_name: lead.second_student_name || null,
+                    second_student_kana: lead.second_student_kana || null,
+                    second_student_gender: lead.second_student_gender || null,
+                    second_student_birth_date: lead.second_student_birth_date || null,
+                    notes: lead.notes || null,
+                    status: 'trial_billed',
+                    coach_id: profile.id
+                })
+                .select('id, contact_email, full_name')
+                .single()
+
+            if (!createStudentErr && newStudent) {
+                studentId = newStudent.id
+                if (newStudent.contact_email) studentEmail = newStudent.contact_email
+            } else {
+                console.error('Failed to auto-create student from lead in confirmLeadCoachAction:', createStudentErr)
+            }
+        }
+
         if (studentId) {
             // Stripe Customer ID の確認・自動作成
             const { data: currentStd } = await supabaseAdmin
@@ -715,7 +880,11 @@ Swim Partners`
 ・確定体験場所： {{confirmed_location}}
 
 *■ 確定顧客*
-・名前： {{name}} 様{{second_student_info}}`
+・名前： {{name}} 様{{second_student_info}}
+・体験レッスン料金： {{amount}}円
+
+*■ 体験レッスン決済URL*
+{{payment_link}}`
 
                     const bodyTemplate = templateConfig?.value || defaultTemplate
 
@@ -724,12 +893,20 @@ Swim Partners`
                         secondStudentNameInfo = `\n・2人目の名前： ${lead.second_student_name} 様`
                     }
 
-                    const gchatMessage = bodyTemplate
+                    let gchatMessage = bodyTemplate
                         .replace(/\{\{name\}\}/g, lead.name || '未設定')
                         .replace(/\{\{coach_name\}\}/g, profile.full_name || '未設定')
                         .replace(/\{\{confirmed_datetime\}\}/g, confirmedDate || '未設定')
                         .replace(/\{\{confirmed_location\}\}/g, confirmedLocation || '未設定')
                         .replace(/\{\{second_student_info\}\}/g, secondStudentNameInfo)
+                        .replace(/\{\{amount\}\}/g, amountStr)
+                        .replace(/\{\{payment_link\}\}/g, paymentLink)
+                        .replace(/\{\{payment_url\}\}/g, paymentLink)
+
+                    // テンプレートに payment_link が含まれていない場合の自動追記フォールバック
+                    if (paymentLink && !gchatMessage.includes(paymentLink)) {
+                        gchatMessage += `\n\n*■ 体験レッスン決済URL*\n${paymentLink}`
+                    }
 
                     // 紐づくすべての通知先スペース（スレッド）に送信
                     for (const wh of webhooks) {
@@ -758,24 +935,42 @@ Swim Partners`
                                 .eq('key', 'lead_assigned_additional_webhook_template')
                                 .maybeSingle()
 
-                            const additionalTemplate = additionalTemplateConfig?.value || bodyTemplate
-                            const additionalGchatMessage = additionalTemplate
+                            let additionalMessage = (additionalTemplateConfig?.value || defaultTemplate)
                                 .replace(/\{\{name\}\}/g, lead.name || '未設定')
                                 .replace(/\{\{coach_name\}\}/g, profile.full_name || '未設定')
                                 .replace(/\{\{confirmed_datetime\}\}/g, confirmedDate || '未設定')
                                 .replace(/\{\{confirmed_location\}\}/g, confirmedLocation || '未設定')
                                 .replace(/\{\{second_student_info\}\}/g, secondStudentNameInfo)
+                                .replace(/\{\{amount\}\}/g, amountStr)
+                                .replace(/\{\{payment_link\}\}/g, paymentLink)
+                                .replace(/\{\{payment_url\}\}/g, paymentLink)
 
-                            await sendGoogleChatMessage(assignedWebhookConfig.value, additionalGchatMessage)
+                            if (paymentLink && !additionalMessage.includes(paymentLink)) {
+                                additionalMessage += `\n\n*■ 体験レッスン決済URL*\n${paymentLink}`
+                            }
+
+                            await sendGoogleChatMessage(assignedWebhookConfig.value, additionalMessage)
                         }
-                    } catch (additionalGchatErr) {
-                        console.error('Failed to send additional assign notification:', additionalGchatErr)
+                    } catch (additionalWebhookErr) {
+                        console.error('Failed to send to additional webhook:', additionalWebhookErr)
                     }
                 }
             } catch (gchatErr) {
-                console.error('Failed to send assign notification to Google Chat:', gchatErr)
+                console.error('Failed to send assign notification to google chat:', gchatErr)
             }
         }
+
+        // 6. コーチ連絡用Google Chatスペースへアサイン詳細通知を送信
+        await sendCoachDetailNotification({
+            supabaseAdmin,
+            coachId: profile.id,
+            coachName: profile.full_name || '',
+            lead,
+            confirmedDate,
+            confirmedLocation,
+            amountStr,
+            paymentLink
+        })
 
         revalidatePath('/coach/leads')
         revalidatePath('/admin/leads')
@@ -892,6 +1087,37 @@ export async function adminAssignLeadAction(
             if (matchStd) {
                 studentId = matchStd.id
                 if (matchStd.contact_email) studentEmail = matchStd.contact_email
+            }
+        }
+
+        // 生徒マスタに存在しない場合は、リード情報から新規生徒を自動作成
+        if (!studentId) {
+            const { data: newStudent, error: createStudentErr } = await supabaseAdmin
+                .from('students')
+                .insert({
+                    full_name: lead.name || 'お客様',
+                    full_name_kana: lead.full_name_kana || null,
+                    contact_email: lead.email || null,
+                    phone: lead.phone || null,
+                    line_user_id: lead.line_user_id || null,
+                    gender: lead.gender || null,
+                    birth_date: lead.birth_date || null,
+                    second_student_name: lead.second_student_name || null,
+                    second_student_kana: lead.second_student_kana || null,
+                    second_student_gender: lead.second_student_gender || null,
+                    second_student_birth_date: lead.second_student_birth_date || null,
+                    notes: lead.notes || null,
+                    status: 'trial_billed',
+                    coach_id: targetCoach.id
+                })
+                .select('id, contact_email, full_name')
+                .single()
+
+            if (!createStudentErr && newStudent) {
+                studentId = newStudent.id
+                if (newStudent.contact_email) studentEmail = newStudent.contact_email
+            } else {
+                console.error('Failed to auto-create student from lead in adminAssignLeadAction:', createStudentErr)
             }
         }
 
@@ -1079,7 +1305,20 @@ Swim Partners`
                         .eq('key', 'lead_assigned_notification_template')
                         .maybeSingle()
 
-                    const defaultTemplate = `✅ *【体験レッスンアサイン確定】*\n案件のアサインが確定いたしました。\n\n*■ アサインコーチ*\n・名前： {{coach_name}}\n・確定体験日時： {{confirmed_datetime}}\n・確定体験場所： {{confirmed_location}}\n\n*■ 確定顧客*\n・名前： {{name}} 様{{second_student_info}}`
+                    const defaultTemplate = `✅ *【体験レッスンアサイン確定】*
+案件のアサインが確定いたしました。
+
+*■ アサインコーチ*
+・名前： {{coach_name}}
+・確定体験日時： {{confirmed_datetime}}
+・確定体験場所： {{confirmed_location}}
+
+*■ 確定顧客*
+・名前： {{name}} 様{{second_student_info}}
+・体験レッスン料金： {{amount}}円
+
+*■ 体験レッスン決済URL*
+{{payment_link}}`
 
                     const bodyTemplate = templateConfig?.value || defaultTemplate
 
@@ -1088,12 +1327,20 @@ Swim Partners`
                         secondStudentNameInfo = `\n・2人目の名前： ${lead.second_student_name} 様`
                     }
 
-                    const gchatMessage = bodyTemplate
+                    let gchatMessage = bodyTemplate
                         .replace(/\{\{name\}\}/g, lead.name || '未設定')
                         .replace(/\{\{coach_name\}\}/g, targetCoach.full_name || '未設定')
                         .replace(/\{\{confirmed_datetime\}\}/g, confirmedDate || '未設定')
                         .replace(/\{\{confirmed_location\}\}/g, confirmedLocation || '未設定')
                         .replace(/\{\{second_student_info\}\}/g, secondStudentNameInfo)
+                        .replace(/\{\{amount\}\}/g, amountStr)
+                        .replace(/\{\{payment_link\}\}/g, paymentLink)
+                        .replace(/\{\{payment_url\}\}/g, paymentLink)
+
+                    // テンプレートに payment_link が含まれていない場合の自動追記フォールバック
+                    if (paymentLink && !gchatMessage.includes(paymentLink)) {
+                        gchatMessage += `\n\n*■ 体験レッスン決済URL*\n${paymentLink}`
+                    }
 
                     // 紐づくすべての通知先スペース（スレッド）に送信
                     for (const wh of webhooks) {
@@ -1120,15 +1367,21 @@ Swim Partners`
                                 .eq('key', 'lead_assigned_additional_webhook_template')
                                 .maybeSingle()
 
-                            const additionalTemplate = additionalTemplateConfig?.value || bodyTemplate
-                            const additionalGchatMessage = additionalTemplate
+                            let additionalMessage = (additionalTemplateConfig?.value || defaultTemplate)
                                 .replace(/\{\{name\}\}/g, lead.name || '未設定')
                                 .replace(/\{\{coach_name\}\}/g, targetCoach.full_name || '未設定')
                                 .replace(/\{\{confirmed_datetime\}\}/g, confirmedDate || '未設定')
                                 .replace(/\{\{confirmed_location\}\}/g, confirmedLocation || '未設定')
                                 .replace(/\{\{second_student_info\}\}/g, secondStudentNameInfo)
+                                .replace(/\{\{amount\}\}/g, amountStr)
+                                .replace(/\{\{payment_link\}\}/g, paymentLink)
+                                .replace(/\{\{payment_url\}\}/g, paymentLink)
 
-                            await sendGoogleChatMessage(assignedWebhookConfig.value, additionalGchatMessage)
+                            if (paymentLink && !additionalMessage.includes(paymentLink)) {
+                                additionalMessage += `\n\n*■ 体験レッスン決済URL*\n${paymentLink}`
+                            }
+
+                            await sendGoogleChatMessage(assignedWebhookConfig.value, additionalMessage)
                         }
                     } catch (additionalGchatErr) {
                         console.error('Failed to send additional assign notification:', additionalGchatErr)
@@ -1138,6 +1391,18 @@ Swim Partners`
                 console.error('Failed to send assign notification to Google Chat:', gchatErr)
             }
         }
+
+        // 6. コーチ連絡用Google Chatスペースへアサイン詳細通知を送信
+        await sendCoachDetailNotification({
+            supabaseAdmin,
+            coachId: targetCoach.id,
+            coachName: targetCoach.full_name || '',
+            lead,
+            confirmedDate,
+            confirmedLocation,
+            amountStr,
+            paymentLink
+        })
 
         revalidatePath('/coach/leads')
         revalidatePath('/admin/leads')
@@ -2048,6 +2313,140 @@ export async function cancelLeadAssignmentAction(leadId: string) {
     } catch (error: any) {
         console.error('Failed to cancel assignment:', error)
         return { success: false, error: error.message || 'アサイン解除処理に失敗しました' }
+    }
+}
+
+/**
+ * リードの体験料決済URLを取得、またはオンデマンドで生成する
+ */
+export async function getOrCreateTrialPaymentUrlAction(leadId: string): Promise<{
+    success: boolean
+    paymentLink?: string
+    amount?: number
+    scheduleId?: string | null
+    studentName?: string
+    confirmedDate?: string
+    error?: string
+}> {
+    try {
+        const supabaseAdmin = createAdminClient()
+
+        // 1. リード情報の取得
+        const { data: lead, error: leadError } = await supabaseAdmin
+            .from('leads')
+            .select('*')
+            .eq('id', leadId)
+            .single()
+
+        if (leadError || !lead) {
+            return { success: false, error: '案件が見つかりません' }
+        }
+
+        // 2. 既存スケジュールの確認
+        const { data: existingSchedules } = await supabaseAdmin
+            .from('lesson_schedules')
+            .select('*')
+            .ilike('notes', `%案件ID: ${leadId}%`)
+            .order('created_at', { ascending: false })
+            .limit(1)
+
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://manager.swim-partners.com'
+
+        if (existingSchedules && existingSchedules.length > 0) {
+            const schedule = existingSchedules[0]
+            return {
+                success: true,
+                paymentLink: `${appUrl}/pay/trial/${schedule.id}`,
+                amount: schedule.price || 6000,
+                scheduleId: schedule.id,
+                studentName: lead.name || undefined,
+                confirmedDate: lead.confirmed_datetime || undefined
+            }
+        }
+
+        // 3. アサインコーチの確認
+        const coachId = lead.assigned_coach_id
+        if (!coachId) {
+            return {
+                success: false,
+                error: '担当コーチがまだアサインされていません。先にコーチをアサインしてください。'
+            }
+        }
+
+        // 4. 生徒マスタの検索・自動作成
+        let studentId: string | null = null
+        if (lead.line_user_id) {
+            const { data: s } = await supabaseAdmin.from('students').select('id').eq('line_user_id', lead.line_user_id).maybeSingle()
+            if (s) studentId = s.id
+        }
+        if (!studentId && lead.email) {
+            const { data: s } = await supabaseAdmin.from('students').select('id').ilike('contact_email', lead.email.trim()).maybeSingle()
+            if (s) studentId = s.id
+        }
+        if (!studentId && lead.name) {
+            const cleanLeadName = lead.name.replace(/[\s　]+/g, '')
+            const { data: allStudents } = await supabaseAdmin.from('students').select('id, full_name').limit(100)
+            const matchStd = allStudents?.find(s => (s.full_name || '').replace(/[\s　]+/g, '') === cleanLeadName)
+            if (matchStd) studentId = matchStd.id
+        }
+
+        if (!studentId) {
+            const { data: newStudent, error: createStudentErr } = await supabaseAdmin
+                .from('students')
+                .insert({
+                    full_name: lead.name || 'お客様',
+                    full_name_kana: lead.full_name_kana || null,
+                    contact_email: lead.email || null,
+                    phone: lead.phone || null,
+                    line_user_id: lead.line_user_id || null,
+                    gender: lead.gender || null,
+                    birth_date: lead.birth_date || null,
+                    second_student_name: lead.second_student_name || null,
+                    second_student_kana: lead.second_student_kana || null,
+                    second_student_gender: lead.second_student_gender || null,
+                    second_student_birth_date: lead.second_student_birth_date || null,
+                    notes: lead.notes || null,
+                    status: 'trial_billed',
+                    coach_id: coachId
+                })
+                .select('id')
+                .single()
+
+            if (!createStudentErr && newStudent) {
+                studentId = newStudent.id
+            }
+        }
+
+        // 5. 体験レッスンスケジュールを作成
+        const confirmedDate = lead.confirmed_datetime || lead.datetime1 || '日時未定'
+        const confirmedLocation = lead.confirmed_location || lead.lesson_location || lead.area || ''
+
+        const trialResult = await createTrialScheduleForLead({
+            leadId: lead.id,
+            coachId: coachId,
+            studentId: studentId,
+            studentName: lead.name || 'お客様',
+            confirmedDate: confirmedDate,
+            confirmedLocation: confirmedLocation,
+            leadNotes: lead.notes,
+            hasSecondStudent: !!lead.second_student_name
+        })
+
+        if (!trialResult) {
+            return { success: false, error: '決済URLの発行に失敗しました' }
+        }
+
+        return {
+            success: true,
+            paymentLink: trialResult.paymentLink,
+            amount: trialResult.price,
+            scheduleId: trialResult.scheduleId,
+            studentName: lead.name || undefined,
+            confirmedDate: confirmedDate || undefined
+        }
+    } catch (error: any) {
+        console.error('Failed to get or create trial payment url:', error)
+        return { success: false, error: error.message || '体験料決済URLの発行に失敗しました' }
     }
 }
 
