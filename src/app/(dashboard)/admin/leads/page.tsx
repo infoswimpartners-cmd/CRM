@@ -578,73 +578,56 @@ export default function AdminLeadsPage() {
     const fetchData = async () => {
         setLoading(true)
         try {
-            // 全てのリードを取得
-            const { data: leadsData } = await supabase
-                .from('leads')
-                .select('*')
-                .order('created_at', { ascending: false })
+            // リード一覧表示に必要なデータを最優先で並列取得
+            const primaryPromise = Promise.all([
+                supabase
+                    .from('leads')
+                    .select('*')
+                    .order('created_at', { ascending: false }),
+                supabase
+                    .from('profiles')
+                    .select('id, full_name, role'),
+                supabase
+                    .from('facilities')
+                    .select('id, name')
+                    .order('name', { ascending: true }),
+                supabase
+                    .from('google_chat_webhooks')
+                    .select('*')
+                    .order('space_name', { ascending: true }),
+                getLeadWebhookMappingsAction(),
+            ])
 
-            // プロフィール一覧を取得してコーチ一覧として設定
-            const { data: profilesData } = await supabase
-                .from('profiles')
-                .select('id, full_name, role')
+            // 別タブ・モーダル用の設定データを並行取得（リード一覧の初期表示をブロックしない）
+            const secondaryPromise = Promise.all([
+                supabase
+                    .from('students')
+                    .select('*')
+                    .order('full_name', { ascending: true }),
+                getLeadNotificationTemplateAction(),
+                getLeadAssignedNotificationTemplateAction(),
+                getLeadAssignedWebhookUrlAction(),
+                getLeadAssignedAdditionalWebhookTemplateAction(),
+                getDisplaySettingsAction(),
+                getLineConfigAction(),
+            ])
+
+            // 最優先のリード一覧データを待機
+            const [
+                leadsRes,
+                profilesRes,
+                facilitiesRes,
+                webhooksRes,
+                webhookMappings,
+            ] = await primaryPromise
+
+            const leadsData = leadsRes.data
+            const profilesData = profilesRes.data
+            const facilitiesData = facilitiesRes.data
+            const webhooksData = webhooksRes.data
+
             if (profilesData) setCoaches(profilesData)
-
-            // 施設マスタを取得
-            const { data: facilitiesData } = await supabase
-                .from('facilities')
-                .select('id, name')
-                .order('name', { ascending: true })
-
-            // Webhookマスタを取得（全件）
-            const { data: webhooksData } = await supabase
-                .from('google_chat_webhooks')
-                .select('*')
-                .order('space_name', { ascending: true })
-
-            // 既存生徒を取得
-            const { data: studentsData } = await supabase
-                .from('students')
-                .select('*')
-                .order('full_name', { ascending: true })
-            if (studentsData) setStudents(studentsData)
-
-            // テンプレートマスタを取得
-            const templateRes = await getLeadNotificationTemplateAction()
-            if (templateRes.success) {
-                setNotificationTemplate(templateRes.value || '')
-            }
-
-            const assignedTemplateRes = await getLeadAssignedNotificationTemplateAction()
-            if (assignedTemplateRes.success) {
-                setAssignedNotificationTemplate(assignedTemplateRes.value || '')
-            }
-
-            const assignedWebhookUrlRes = await getLeadAssignedWebhookUrlAction()
-            if (assignedWebhookUrlRes.success) {
-                setAssignedWebhookUrl(assignedWebhookUrlRes.value || '')
-            }
-
-            const assignedAdditionalTemplateRes = await getLeadAssignedAdditionalWebhookTemplateAction()
-            if (assignedAdditionalTemplateRes.success) {
-                setAssignedAdditionalTemplate(assignedAdditionalTemplateRes.value || '')
-            }
-
-            // 表示設定を取得
-            const settingsRes = await getDisplaySettingsAction()
-            if (settingsRes.success) {
-                setDisplaySettings(settingsRes.value)
-            }
-
-            // LINE設定を取得
-            const lineConfigRes = await getLineConfigAction()
-            if (lineConfigRes.success) {
-                setLineToken(lineConfigRes.token || '')
-                setLineTemplate(lineConfigRes.template || '')
-            }
-
-            // 各リードのWebhook設定マッピングを取得
-            const webhookMappings = await getLeadWebhookMappingsAction()
+            if (facilitiesData) setFacilities(facilitiesData)
 
             if (leadsData) {
                 setLeads(leadsData)
@@ -655,7 +638,7 @@ export default function AdminLeadsPage() {
                 })
                 setSelectedLocations(locations)
             }
-            if (facilitiesData) setFacilities(facilitiesData)
+
             if (webhooksData) {
                 setWebhooks(webhooksData)
                 
@@ -674,6 +657,41 @@ export default function AdminLeadsPage() {
                     }
                 })
                 setSelectedWebhooks(defaultWebhooks)
+            }
+
+            // リード一覧データが揃った時点で即座に画面を描画
+            setLoading(false)
+
+            // 並行取得していた別タブ・モーダル用のデータを反映
+            const [
+                studentsRes,
+                templateRes,
+                assignedTemplateRes,
+                assignedWebhookUrlRes,
+                assignedAdditionalTemplateRes,
+                settingsRes,
+                lineConfigRes,
+            ] = await secondaryPromise
+
+            if (studentsRes.data) setStudents(studentsRes.data)
+            if (templateRes.success) {
+                setNotificationTemplate(templateRes.value || '')
+            }
+            if (assignedTemplateRes.success) {
+                setAssignedNotificationTemplate(assignedTemplateRes.value || '')
+            }
+            if (assignedWebhookUrlRes.success) {
+                setAssignedWebhookUrl(assignedWebhookUrlRes.value || '')
+            }
+            if (assignedAdditionalTemplateRes.success) {
+                setAssignedAdditionalTemplate(assignedAdditionalTemplateRes.value || '')
+            }
+            if (settingsRes.success) {
+                setDisplaySettings(settingsRes.value)
+            }
+            if (lineConfigRes.success) {
+                setLineToken(lineConfigRes.token || '')
+                setLineTemplate(lineConfigRes.template || '')
             }
         } catch (error) {
             console.error('Error fetching data:', error)
