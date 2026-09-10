@@ -218,7 +218,15 @@ export async function processLessonReminders(options: ReminderProcessOptions = {
             const timeStr = `${startJST.timeStr24}〜${endJST.timeStr24}`
             const coachName = coach?.full_name || '担当コーチ'
             const locationStr = schedule.location || 'ご指定のプール'
-            const notesStr = schedule.notes ? `・連絡事項: 「${schedule.notes}」` : ''
+            // スケジュールメモ内の「案件ID」等のシステム管理情報を通知文面から除外
+            const cleanNotes = schedule.notes
+                ? schedule.notes
+                    .split('\n')
+                    .filter((line: string) => !line.match(/案件ID\s*[:：]/i))
+                    .join('\n')
+                    .trim()
+                : ''
+            const notesStr = cleanNotes ? `・連絡事項: 「${cleanNotes}」` : ''
 
             let lineSent = false
             let emailSent = false
