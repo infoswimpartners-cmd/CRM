@@ -179,7 +179,7 @@ export async function processLessonReminders(options: ReminderProcessOptions = {
 
         // ③ コーチGoogle Chat用
         const coachTmpl = templateMap.get('lesson_reminder_coach')
-        const coachBodyTmpl = coachTmpl?.body || '【明日のレッスン予定（前日リマインド）】\n・担当コーチ: {{coach_name}}\n・生徒名: {{name}} 様\n・日時: {{date}} {{time}}\n・場所: {{location}}\n{{notes}}\n{{previous_lesson}}\n・ステータス: 予約確定'
+        const coachBodyTmpl = coachTmpl?.body || '【明日のレッスン予定（前日リマインド）】\n・担当コーチ: {{coach_name}}\n・生徒名: {{name}} 様\n・日時: {{date}} {{time}}\n・場所: {{location}}\n{{previous_lesson}}\n・ステータス: 予約確定'
 
         const results = []
 
