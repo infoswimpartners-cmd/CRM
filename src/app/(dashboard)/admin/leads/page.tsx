@@ -2877,7 +2877,7 @@ export default function AdminLeadsPage() {
                                     rows={14}
                                     value={assignedCoachNotificationTemplate}
                                     onChange={(e) => setAssignedCoachNotificationTemplate(e.target.value)}
-                                    placeholder="🏊‍♂️ *【体験レッスンアサイン確定・案件詳細】*&#10;担当コーチとして体験レッスンのアサインが確定いたしました。&#10;&#10;*■ レッスン基本情報*&#10;・担当コーチ： {{coach_name}}&#10;・確定体験日時： {{confirmed_datetime}}&#10;・確定レッスン場所： {{confirmed_location}}&#10;・体験レッスン料金： {{amount}}円&#10;&#10;*■ お客様（生徒）情報*&#10;・お名前： {{name}} 様{{second_student_info}}&#10;・性別 / 年齢： {{age_gender}}&#10;・電話番号： {{phone}}&#10;・メールアドレス： {{email}}&#10;・希望エリア： {{area}}&#10;・泳力レベル / ご要望： {{notes}}&#10;&#10;*■ 体験レッスン決済URL（事前決済用）*&#10;{{payment_link}}&#10;※お客様へは公式LINEより上記決済リンクと担当コーチへのご連絡案内を自動送信しております。&#10;集合場所等の事前確認のため、お客様からのLINE追加・ご連絡をお待ちください。"
+                                    placeholder="🏊‍♂️ *【体験レッスンアサイン確定・案件詳細】*&#10;担当コーチとして体験レッスンのアサインが確定いたしました。&#10;&#10;*■ レッスン基本情報*&#10;・担当コーチ： {{coach_name}}&#10;・確定体験日時： {{confirmed_datetime}}&#10;・確定レッスン場所： {{confirmed_location}}&#10;・体験レッスン料金： {{amount}}円&#10;&#10;*■ お客様（生徒）情報*&#10;・お名前： {{name}} 様{{second_student_info}}&#10;・性別 / 年齢： {{age_gender}}&#10;・希望エリア： {{area}}&#10;・現在の泳力レベル： {{skill_level}}&#10;・お悩み・課題： {{concern}}&#10;・希望頻度： {{frequency}}&#10;・可能な曜日・時間帯： {{available_times}}&#10;・ご要望・備考メモ： {{notes}}&#10;&#10;※お客様へは公式LINEより担当コーチへのご連絡案内を自動送信しております。&#10;集合場所等の事前確認のため、お客様からのLINE追加・ご連絡をお待ちください。"
                                     className="w-full text-xs font-mono p-3 rounded-md border border-gray-200 bg-gray-50/50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-colors"
                                 />
                             </div>
@@ -2906,14 +2906,6 @@ export default function AdminLeadsPage() {
                                         <span className="text-gray-500">体験レッスン料金</span>
                                     </div>
                                     <div className="flex gap-1.5 items-start">
-                                        <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{phone}}"}</code>
-                                        <span className="text-gray-500">電話番号</span>
-                                    </div>
-                                    <div className="flex gap-1.5 items-start">
-                                        <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{email}}"}</code>
-                                        <span className="text-gray-500">メールアドレス</span>
-                                    </div>
-                                    <div className="flex gap-1.5 items-start">
                                         <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{area}}"}</code>
                                         <span className="text-gray-500">希望エリア</span>
                                     </div>
@@ -2922,24 +2914,36 @@ export default function AdminLeadsPage() {
                                         <span className="text-gray-500">性別 / 年齢</span>
                                     </div>
                                     <div className="flex gap-1.5 items-start">
-                                        <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{gender}}"}</code>
-                                        <span className="text-gray-500">性別</span>
-                                    </div>
-                                    <div className="flex gap-1.5 items-start">
-                                        <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{age}}"}</code>
-                                        <span className="text-gray-500">年齢</span>
-                                    </div>
-                                    <div className="flex gap-1.5 items-start">
                                         <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{second_student_info}}"}</code>
                                         <span className="text-gray-500">2人目の顧客情報</span>
                                     </div>
                                     <div className="flex gap-1.5 items-start">
-                                        <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{notes}}"}</code>
-                                        <span className="text-gray-500">泳力レベル / ご要望メモ</span>
+                                        <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{skill_level}}"}</code>
+                                        <span className="text-gray-500">泳力レベル</span>
                                     </div>
                                     <div className="flex gap-1.5 items-start">
-                                        <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{payment_link}}"}</code>
-                                        <span className="text-gray-500">事前決済URL</span>
+                                        <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{concern}}"}</code>
+                                        <span className="text-gray-500">お悩み・課題</span>
+                                    </div>
+                                    <div className="flex gap-1.5 items-start">
+                                        <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{frequency}}"}</code>
+                                        <span className="text-gray-500">希望頻度</span>
+                                    </div>
+                                    <div className="flex gap-1.5 items-start">
+                                        <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{available_times}}"}</code>
+                                        <span className="text-gray-500">可能な曜日・時間帯</span>
+                                    </div>
+                                    <div className="flex gap-1.5 items-start">
+                                        <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{notes}}"}</code>
+                                        <span className="text-gray-500">ご要望・備考メモ</span>
+                                    </div>
+                                    <div className="flex gap-1.5 items-start">
+                                        <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{phone}}"}</code>
+                                        <span className="text-gray-500">電話番号</span>
+                                    </div>
+                                    <div className="flex gap-1.5 items-start">
+                                        <code className="text-primary font-mono font-semibold bg-primary/5 px-1 rounded">{"{{email}}"}</code>
+                                        <span className="text-gray-500">メールアドレス</span>
                                     </div>
                                 </div>
                             </div>

@@ -345,14 +345,14 @@ async function sendCoachDetailNotification(params: {
 *■ お客様（生徒）情報*
 ・お名前： {{name}} 様{{second_student_info}}
 ・性別 / 年齢： {{age_gender}}
-・電話番号： {{phone}}
-・メールアドレス： {{email}}
 ・希望エリア： {{area}}
-・泳力レベル / ご要望： {{notes}}
+・現在の泳力レベル： {{skill_level}}
+・お悩み・課題： {{concern}}
+・希望頻度： {{frequency}}
+・可能な曜日・時間帯： {{available_times}}
+・ご要望・備考メモ： {{notes}}
 
-*■ 体験レッスン決済URL（事前決済用）*
-{{payment_link}}
-※お客様へは公式LINEより上記決済リンクと担当コーチへのご連絡案内を自動送信しております。
+※お客様へは公式LINEより担当コーチへのご連絡案内を自動送信しております。
 集合場所等の事前確認のため、お客様からのLINE追加・ご連絡をお待ちください。`
 
         // テンプレート設定を取得
@@ -374,17 +374,16 @@ async function sendCoachDetailNotification(params: {
             .replace(/\{\{age_gender\}\}/g, ageGender)
             .replace(/\{\{gender\}\}/g, genderStr)
             .replace(/\{\{age\}\}/g, ageStr)
+            .replace(/\{\{area\}\}/g, lead.area || '未設定')
+            .replace(/\{\{skill_level\}\}/g, lead.skill_level || '未設定')
+            .replace(/\{\{concern\}\}/g, lead.concern || 'なし')
+            .replace(/\{\{frequency\}\}/g, lead.frequency || '未設定')
+            .replace(/\{\{available_times\}\}/g, lead.available_times || '未設定')
+            .replace(/\{\{notes\}\}/g, lead.notes || 'なし')
             .replace(/\{\{phone\}\}/g, lead.phone || '未設定')
             .replace(/\{\{email\}\}/g, lead.email || '未設定')
-            .replace(/\{\{area\}\}/g, lead.area || '未設定')
-            .replace(/\{\{notes\}\}/g, lead.notes || 'なし')
             .replace(/\{\{payment_link\}\}/g, paymentLink || '')
             .replace(/\{\{payment_url\}\}/g, paymentLink || '')
-
-        // 決済リンクがテンプレートに含まれていない場合の自動追記フォールバック
-        if (paymentLink && !coachMessage.includes(paymentLink)) {
-            coachMessage += `\n\n*■ 体験レッスン決済URL（事前決済用）*\n${paymentLink}`
-        }
 
         console.log(`[Coach Detail Notification] Sending notification to coach space: ${targetSpaceName}`)
         await sendGoogleChatMessage(webhookUrl, coachMessage)
