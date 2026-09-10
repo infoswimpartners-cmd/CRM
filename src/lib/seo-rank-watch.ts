@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { isStudioCmsPath, generateSeoImprovementKit } from './seo-improvement-generator';
 
 export interface WatchwordItem {
     id: number;
@@ -37,11 +38,27 @@ export interface ImprovementLogEntry {
     notes: string;
 }
 
+export interface SeoActionTask {
+    id: string;
+    keyword: string;
+    targetPath: string;
+    currentRank: number;
+    priority: 'high' | 'medium';
+    pageType: 'studio_cms' | 'studio_static';
+    pageTypeLabel: string;
+    actionTitle: string;
+    actionDetail: string;
+    status: 'ready' | 'executed_today' | 'observing';
+    executedAt?: string;
+    nextAvailableDate?: string; // 翌日日付（YYYY-MM-DD）
+}
+
 export interface SeoRankWatchState {
     watchwords: WatchwordItem[];
     rankHistory: RankHistoryEntry[];
     improvementLogs: ImprovementLogEntry[];
     topContender: WatchwordItem | null;
+    topActions: SeoActionTask[]; // 常に提示される3つのアクションリスト
     observingItem: (WatchwordItem & { remainingDays: number; log: ImprovementLogEntry }) | null;
     stats: {
         achievedCount: number;
@@ -50,6 +67,7 @@ export interface SeoRankWatchState {
         totalCount: number;
     };
 }
+
 
 const DATA_DIR = path.join(process.cwd(), 'data/seo');
 const WATCHWORDS_PATH = path.join(DATA_DIR, 'watchwords.json');
@@ -186,7 +204,68 @@ export function getSeoRankWatchState(): SeoRankWatchState {
 
     const topContender = activeContenders[0] || null;
 
-    // 3. 統計集計
+    // 3. 3つの具体的改善アクション（SeoActionTask）の自動生成 & 翌日補充サイクル
+    const todayStr = new Date().toISOString().split('T')[0];
+    const nextDateStr = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+
+    const topActions: SeoActionTask[] = [];
+
+    // ① 本日実行された改善ログを抽出（本日実行済みタスクとして最大2件まで表示）
+    const todayLogs = improvementLogs.filter((l) => l.implemented_at === todayStr);
+    for (const tLog of todayLogs) {
+        if (topActions.length >= 3) break;
+        const kwItem = watchwords.find((w) => w.keyword === tLog.keyword);
+        const isCms = isStudioCmsPath(tLog.target_path);
+        topActions.push({
+            id: `task_${tLog.id}`,
+            keyword: tLog.keyword,
+            targetPath: tLog.target_path,
+            currentRank: kwItem?.current_rank || tLog.current_rank,
+            priority: kwItem?.priority || 'high',
+            pageType: isCms ? 'studio_cms' : 'studio_static',
+            pageTypeLabel: isCms ? 'STUDIO CMS記事' : 'STUDIO 通常ページ',
+            actionTitle: tLog.action_title,
+            actionDetail: tLog.action_detail,
+            status: 'executed_today',
+            executedAt: tLog.implemented_at,
+            nextAvailableDate: nextDateStr,
+        });
+    }
+
+    // ② 残りの枠（合計3件になるまで）、未実行の候補（active）から優先度順に補充
+    // ※ 前日以前に実行されたものは除外され、翌日になれば自動的に新しい未実施キーワードがスライドインして補充される
+    const executedKwToday = new Set(todayLogs.map((l) => l.keyword));
+    const candidateKeywords = watchwords
+        .filter((w) => w.status !== 'achieved' && !executedKwToday.has(w.keyword))
+        .sort((a, b) => {
+            // observing 中のものは ready の後に回す
+            if (a.status === 'active' && b.status === 'observing') return -1;
+            if (a.status === 'observing' && b.status === 'active') return 1;
+            if (a.priority === 'high' && b.priority !== 'high') return -1;
+            if (b.priority === 'high' && a.priority !== 'high') return 1;
+            return (a.current_rank || 100) - (b.current_rank || 100);
+        });
+
+    for (const cand of candidateKeywords) {
+        if (topActions.length >= 3) break;
+        const isCms = isStudioCmsPath(cand.target_path);
+        const kit = generateSeoImprovementKit(cand.keyword, cand.target_path, cand.current_rank);
+
+        topActions.push({
+            id: `task_cand_${cand.id}`,
+            keyword: cand.keyword,
+            targetPath: cand.target_path,
+            currentRank: cand.current_rank,
+            priority: cand.priority,
+            pageType: isCms ? 'studio_cms' : 'studio_static',
+            pageTypeLabel: isCms ? 'STUDIO CMS記事' : 'STUDIO 通常ページ',
+            actionTitle: kit.actionTitle,
+            actionDetail: kit.actionDetail,
+            status: cand.status === 'observing' ? 'observing' : 'ready',
+        });
+    }
+
+    // 4. 統計集計
     const stats = {
         achievedCount: watchwords.filter((w) => w.status === 'achieved').length,
         observingCount: watchwords.filter((w) => w.status === 'observing').length,
@@ -199,7 +278,9 @@ export function getSeoRankWatchState(): SeoRankWatchState {
         rankHistory,
         improvementLogs,
         topContender,
+        topActions,
         observingItem,
         stats,
     };
 }
+
