@@ -1,5 +1,6 @@
 'use server';
 
+import { revalidatePath } from 'next/cache';
 import { createAdminClient } from '@/lib/supabase/admin';
 import {
     KeywordItem,
@@ -580,6 +581,8 @@ export async function startObservingAction(
         logs.unshift(newLogEntry);
         writeImprovementLogs(logs);
 
+        revalidatePath('/admin/geo-seo');
+
         return {
             success: true,
             message: `「${keyword}」の改善を実行し、7日間の観察モード（次回レビュー日: ${reviewDate}）に設定しました。`,
@@ -615,6 +618,8 @@ export async function markAsAchievedAction(keyword: string) {
             writeImprovementLogs(logs);
         }
 
+        revalidatePath('/admin/geo-seo');
+
         return { success: true, message: `おめでとうございます！「${keyword}」の検索順位1位達成を認定しました。` };
     } catch (err: any) {
         console.error('markAsAchievedAction error:', err);
@@ -647,11 +652,14 @@ export async function completeObservingAction(keyword: string, notes: string, ne
             writeImprovementLogs(logs);
         }
 
+        revalidatePath('/admin/geo-seo');
+
         return { success: true, message: `「${keyword}」の7日間観察期間を完了し、ステータスを更新しました。` };
     } catch (err: any) {
         console.error('completeObservingAction error:', err);
         return { success: false, message: err.message || '完了処理に失敗しました。' };
     }
+
 }
 
 /**

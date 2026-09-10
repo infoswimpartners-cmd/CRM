@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Trophy,
     Hourglass,
@@ -20,9 +20,10 @@ import {
     Code2,
     Layers,
     ChevronRight,
+    PartyPopper,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { SeoRankWatchState, ImprovementLogEntry } from '@/lib/seo-rank-watch';
+import { SeoRankWatchState, ImprovementLogEntry, SeoActionTask } from '@/lib/seo-rank-watch';
 import { generateSeoImprovementKit, SeoImprovementKit } from '@/lib/seo-improvement-generator';
 import { startObservingAction, markAsAchievedAction, completeObservingAction } from '@/actions/sp-tracker-actions';
 
@@ -39,8 +40,27 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
     const [copiedField, setCopiedField] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    if (!state) return null;
+    // 楽観的UI更新用のローカルアクション状態
+    const [localActions, setLocalActions] = useState<SeoActionTask[]>(state?.topActions || []);
 
+    // 7日間検証スプリント開始 完了モーダル用ステート
+    const [startedSprintInfo, setStartedSprintInfo] = useState<{
+        keyword: string;
+        targetPath: string;
+        currentRank: number;
+        reviewDate: string;
+        actionTitle: string;
+        nextDay: string;
+    } | null>(null);
+
+    // state.topActions が親から更新されたら同期
+    useEffect(() => {
+        if (state?.topActions && state.topActions.length > 0) {
+            setLocalActions(state.topActions);
+        }
+    }, [state?.topActions]);
+
+    if (!state) return null;
 
     const { topContender, observingItem, stats, improvementLogs } = state;
 
@@ -66,11 +86,46 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
         setIsKitModalOpen(true);
     };
 
-
-    // 改善アクション実施 -> observingへ
+    // 改善アクション実施 -> observingへ (Optimistic UI + 即座に完了モーダル表示)
     const handleStartObservingWithKit = async (kit?: SeoImprovementKit | null) => {
         const target = kit || (topContender ? generateSeoImprovementKit(topContender.keyword, topContender.target_path, topContender.current_rank) : null);
         if (!target) return;
+
+        // 本日の日付、次回レビュー日(7日後)、明日(次回アクション追加日)を算出
+        const today = new Date();
+        const reviewDateObj = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+        const tomorrowObj = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+        
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        const reviewDateStr = `${reviewDateObj.getFullYear()}-${String(reviewDateObj.getMonth() + 1).padStart(2, '0')}-${String(reviewDateObj.getDate()).padStart(2, '0')}`;
+        const tomorrowStr = `${tomorrowObj.getFullYear()}-${String(tomorrowObj.getMonth() + 1).padStart(2, '0')}-${String(tomorrowObj.getDate()).padStart(2, '0')}`;
+
+        // ① 楽観的UI更新: 該当のアクションカードを即座に「本日反映済み（検証中）」へビジュアル変化させる
+        setLocalActions((prev) =>
+            prev.map((a) => {
+                if (a.keyword === target.keyword) {
+                    return {
+                        ...a,
+                        status: 'executed_today',
+                        executedAt: todayStr,
+                        nextAvailableDate: tomorrowStr,
+                    };
+                }
+                return a;
+            })
+        );
+
+        // ② STUDIO改善キットモーダルを閉じ、即座に「🎉 7日間検証スプリント開始 完了モーダル」をポップアップ！
+        setIsKitModalOpen(false);
+        setStartedSprintInfo({
+            keyword: target.keyword,
+            targetPath: target.targetPath,
+            currentRank: target.currentRank,
+            reviewDate: reviewDateStr,
+            actionTitle: target.actionTitle,
+            nextDay: tomorrowStr,
+        });
+
         setIsSubmitting(true);
         try {
             const res = await startObservingAction(
@@ -81,13 +136,14 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
             );
             if (res.success) {
                 toast.success(res.message);
-                setIsKitModalOpen(false);
                 await onRefresh();
             } else {
                 toast.error(res.message);
+                await onRefresh();
             }
         } catch (err: any) {
             toast.error(err.message || 'エラーが発生しました');
+            await onRefresh();
         } finally {
             setIsSubmitting(false);
         }
@@ -202,9 +258,42 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                         </div>
                     </div>
 
+                    {/* 本日のスプリント進捗インジケーター */}
+                    {(() => {
+                        const actionsList = localActions.length > 0 ? localActions : (state.topActions || []);
+                        const completedActionsCount = actionsList.filter((a) => a.status === 'executed_today' || a.status === 'observing').length;
+                        const totalCount = actionsList.length || 3;
+                        const percent = Math.min(100, Math.round((completedActionsCount / totalCount) * 100));
+
+                        return (
+                            <div className="p-3.5 rounded-xl bg-zinc-800/40 border border-zinc-700/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                                <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-zinc-200">
+                                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                                        本日の改善進捗: <span className="text-emerald-400 text-sm">{completedActionsCount}</span> / {totalCount} 件完了
+                                    </div>
+                                    <div className="w-28 sm:w-44 bg-zinc-700/60 h-2.5 rounded-full overflow-hidden">
+                                        <div
+                                            className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-500"
+                                            style={{ width: `${percent}%` }}
+                                        />
+                                    </div>
+                                    <span className="text-xs font-mono font-bold text-zinc-400">{percent}%</span>
+                                </div>
+                                <div className="text-[11px] font-mono text-zinc-400">
+                                    {completedActionsCount === totalCount && totalCount > 0
+                                        ? '🎉 本日の全タスク完了！明日新しい改善アクションが自動補充されます'
+                                        : completedActionsCount > 0
+                                        ? '✓ 本日分を反映済み（7日間効果測定中）。残りのアクションも実施できます'
+                                        : '未実施: STUDIOへの反映完了後「実行済みにする」を押してください'}
+                                </div>
+                            </div>
+                        );
+                    })()}
+
                     {/* アクションリスト (3件) */}
                     <div className="grid grid-cols-1 gap-4">
-                        {(state.topActions && state.topActions.length > 0 ? state.topActions : (
+                        {(localActions.length > 0 ? localActions : (state.topActions && state.topActions.length > 0 ? state.topActions : (
                             topContender ? [{
                                 id: 'fallback_1',
                                 keyword: topContender.keyword,
@@ -217,7 +306,7 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                                 actionDetail: '検索ユーザーの具体的疑問（進級基準・脱力・料金）を満たすQ&Aを追加し、Titleを最適化。',
                                 status: 'ready' as const,
                             }] : []
-                        )).map((action, idx) => {
+                        ))).map((action, idx) => {
                             const isExecutedToday = action.status === 'executed_today';
                             const isObserving = action.status === 'observing';
 
@@ -226,7 +315,7 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                                     key={action.id || idx}
                                     className={`relative p-5 rounded-xl border transition-all ${
                                         isExecutedToday
-                                            ? 'bg-emerald-950/20 border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.1)]'
+                                            ? 'bg-emerald-950/20 border-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.15)] ring-1 ring-emerald-500/30'
                                             : isObserving
                                             ? 'bg-indigo-950/20 border-indigo-500/40'
                                             : 'bg-zinc-800/50 border-zinc-700/70 hover:border-zinc-600 hover:bg-zinc-800/80'
@@ -250,14 +339,14 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                                                     現在: <strong className="text-white">{action.currentRank}位</strong> ➔ 目標: 1位
                                                 </span>
                                                 {isExecutedToday && (
-                                                    <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold flex items-center gap-1">
-                                                        <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                                                        本日反映済み（検証中）
+                                                    <span className="px-2.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold flex items-center gap-1 animate-in zoom-in-90 duration-150">
+                                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                                                        本日反映済み（7日間検証中）
                                                     </span>
                                                 )}
                                                 {isObserving && (
-                                                    <span className="px-2 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 font-bold flex items-center gap-1">
-                                                        <Hourglass className="w-3 h-3 text-indigo-400" />
+                                                    <span className="px-2.5 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 font-bold flex items-center gap-1">
+                                                        <Hourglass className="w-3.5 h-3.5 text-indigo-400" />
                                                         7日間検証中
                                                     </span>
                                                 )}
@@ -285,7 +374,7 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                                             {isExecutedToday && (
                                                 <div className="text-[11px] text-emerald-300/90 font-mono flex items-center gap-1.5 pt-1">
                                                     <Calendar className="w-3.5 h-3.5" />
-                                                    反映完了: {action.executedAt} ➔ 明日（{action.nextAvailableDate}）に次の改善アクションが自動補充されます
+                                                    反映完了: {action.executedAt || '本日'} ➔ 明日（{action.nextAvailableDate || '翌日'}）に次の改善アクションが自動補充されます
                                                 </div>
                                             )}
                                         </div>
@@ -300,7 +389,17 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                                                 STUDIO改善キットを開く
                                             </button>
 
-                                            {!isExecutedToday && !isObserving && (
+                                            {isExecutedToday ? (
+                                                <div className="px-4 py-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center gap-1.5 shadow-sm">
+                                                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                                                    本日反映済み (効果測定中)
+                                                </div>
+                                            ) : isObserving ? (
+                                                <div className="px-4 py-2.5 rounded-xl bg-indigo-500/15 border border-indigo-500/40 text-indigo-300 text-xs font-bold flex items-center gap-1.5 shadow-sm">
+                                                    <Hourglass className="w-4 h-4 text-indigo-400" />
+                                                    7日間検証中
+                                                </div>
+                                            ) : (
                                                 <button
                                                     onClick={() => handleStartObservingWithKit(generateSeoImprovementKit(action.keyword, action.targetPath, action.currentRank))}
                                                     disabled={isSubmitting}
@@ -786,6 +885,76 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                                 </div>
                             ))}
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* 🎉 7日間検証スプリント開始 完了モーダル */}
+            {startedSprintInfo && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+                    <div className="bg-zinc-900 border border-zinc-700/80 rounded-2xl max-w-lg w-full text-zinc-100 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.7)] p-6 sm:p-8 space-y-6 animate-in zoom-in-95 duration-200">
+                        {/* アイコン & タイトル */}
+                        <div className="text-center space-y-3">
+                            <div className="inline-flex p-3.5 rounded-2xl bg-gradient-to-tr from-emerald-500/20 to-teal-500/20 border border-emerald-500/40 text-emerald-400 shadow-[0_0_30px_rgba(16,185,129,0.2)]">
+                                <PartyPopper className="w-8 h-8 animate-bounce" />
+                            </div>
+                            <div className="space-y-1">
+                                <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                                    7日間検証スプリントを開始しました！
+                                </h3>
+                                <p className="text-xs sm:text-sm text-zinc-400">
+                                    STUDIOへの反映と観察ログの記録が正常に完了しました。
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* スプリント概要カード */}
+                        <div className="p-4 sm:p-5 rounded-xl bg-zinc-950/80 border border-zinc-800 space-y-3.5 text-xs">
+                            <div className="flex items-center justify-between pb-3 border-b border-zinc-800/80">
+                                <span className="text-zinc-400 font-medium">対象キーワード</span>
+                                <span className="font-bold text-white text-sm">「{startedSprintInfo.keyword}」</span>
+                            </div>
+                            <div className="flex items-center justify-between pb-3 border-b border-zinc-800/80">
+                                <span className="text-zinc-400 font-medium">現在順位 ➔ 目標</span>
+                                <span className="font-mono text-zinc-300">
+                                    現在 <strong className="text-white">{startedSprintInfo.currentRank}位</strong> ➔ <strong className="text-amber-300 font-bold">1位</strong>
+                                </span>
+                            </div>
+                            <div className="flex items-center justify-between pb-3 border-b border-zinc-800/80">
+                                <span className="text-zinc-400 font-medium">7日間検証期間</span>
+                                <span className="font-mono font-bold text-indigo-300 flex items-center gap-1">
+                                    <Calendar className="w-3.5 h-3.5" />
+                                    本日 〜 {startedSprintInfo.reviewDate} (判定日)
+                                </span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-zinc-400 font-medium">次回新アクション追加</span>
+                                <span className="font-mono font-bold text-emerald-400 flex items-center gap-1">
+                                    <Sparkles className="w-3.5 h-3.5" />
+                                    明日（{startedSprintInfo.nextDay}）自動補充
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* ガイドメッセージ */}
+                        <div className="p-3.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-xs text-indigo-200 leading-relaxed space-y-1">
+                            <div className="font-bold flex items-center gap-1.5 text-indigo-300">
+                                <Clock className="w-3.5 h-3.5" />
+                                検索エンジンの評価定着を監視中
+                            </div>
+                            <div className="text-[11px] text-zinc-300">
+                                Googleクローラーが変更を検知・再評価するまで数日間かかります。観察期間中は該当ページの追加編集は控え、順位推移を静観します。
+                            </div>
+                        </div>
+
+                        {/* 閉じるボタン */}
+                        <button
+                            onClick={() => setStartedSprintInfo(null)}
+                            className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-zinc-950 font-bold text-sm transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] flex items-center justify-center gap-2"
+                        >
+                            <CheckCircle2 className="w-4 h-4" />
+                            了解してダッシュボードに戻る
+                        </button>
                     </div>
                 </div>
             )}
