@@ -361,17 +361,21 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                     <div className="bg-zinc-900 border border-zinc-800 rounded-2xl max-w-3xl w-full p-6 md:p-8 text-zinc-100 space-y-6 shadow-2xl max-h-[90vh] flex flex-col">
                         {/* モーダルヘッダー */}
                         <div className="flex items-start justify-between border-b border-zinc-800 pb-4">
-                            <div className="space-y-1">
-                                <div className="flex items-center gap-2">
-                                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-400/20 text-amber-300 border border-amber-400/40">
-                                        STUDIO 貼り付け用 改善キット
+                            <div className="space-y-1.5">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold border ${
+                                        activeKit.pageType === 'studio_cms'
+                                            ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
+                                            : 'bg-amber-400/20 text-amber-300 border-amber-400/40'
+                                    }`}>
+                                        {activeKit.pageTypeLabel}
                                     </span>
                                     <span className="text-xs text-zinc-400 font-mono">
                                         現在 {activeKit.currentRank}位 ➔ 目標 1位
                                     </span>
                                 </div>
                                 <h3 className="text-xl font-black text-white">
-                                    「{activeKit.keyword}」1位獲得用コンテンツ
+                                    「{activeKit.keyword}」1位獲得スプリント
                                 </h3>
                                 <p className="text-xs text-zinc-400">
                                     対象ページ: <span className="font-mono text-indigo-300">{activeKit.targetPath}</span>
@@ -385,10 +389,26 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                             </button>
                         </div>
 
-                        {/* 手順ガイド */}
+                        {/* 実測データ監査（Fact Audit）: なぜ現在2位なのか？ */}
+                        <div className="p-4 rounded-xl bg-zinc-800/80 border border-zinc-700/80 text-xs space-y-2">
+                            <div className="font-bold flex items-center gap-1.5 text-amber-300 text-[11px] font-mono uppercase tracking-wider">
+                                <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
+                                実測データ監査（現在2位の要因分析）:
+                            </div>
+                            <div className="text-zinc-300 space-y-1">
+                                <div><span className="text-zinc-500">現状のタイトル:</span> <span className="text-zinc-200 font-medium">「{activeKit.factAudit.existingTitle}」</span></div>
+                                <div><span className="text-zinc-500">既存コンテンツ:</span> <span className="text-zinc-300">{activeKit.factAudit.existingHeadingsSummary}</span></div>
+                                <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-200 leading-relaxed text-[11px] mt-1">
+                                    <strong>【データに基づく改善点】</strong> {activeKit.factAudit.missingGapReason}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* STUDIO反映手順ガイド */}
                         <div className="p-4 rounded-xl bg-indigo-950/40 border border-indigo-500/30 text-xs text-indigo-200 space-y-1.5">
                             <div className="font-bold flex items-center gap-1.5 text-indigo-300">
-                                <Sparkles className="w-4 h-4" /> STUDIOへの反映手順（所要時間: 約1分）
+                                <Sparkles className="w-4 h-4" />
+                                {activeKit.pageType === 'studio_cms' ? 'STUDIO CMSでの反映手順（約1分）' : 'STUDIOエディタでの反映手順（約1分）'}
                             </div>
                             <ol className="list-decimal list-inside space-y-0.5 text-zinc-300 pl-1">
                                 {activeKit.studioSteps.map((step, idx) => (
@@ -399,15 +419,42 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
 
                         {/* コンテンツタブ / カード一覧 */}
                         <div className="overflow-y-auto space-y-5 pr-2 flex-1 text-xs">
-                            {/* ① 本文テキストブロック */}
+                            {/* ① タイトル改善案（CMS記事設定用） */}
+                            <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-800/40 space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <div className="font-bold text-sm text-white flex items-center gap-2">
+                                        <Layers className="w-4 h-4 text-purple-400" />
+                                        ① {activeKit.pageType === 'studio_cms' ? 'CMS記事タイトル修正案（キーワード補正）' : '推奨ページタイトル'}
+                                    </div>
+                                    <button
+                                        onClick={() => handleCopy(activeKit.proposedTitle, 'title', 'タイトル')}
+                                        className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold flex items-center gap-1.5 transition-all shadow-sm"
+                                    >
+                                        {copiedField === 'title' ? (
+                                            <>
+                                                <Check className="w-3.5 h-3.5" /> コピー完了
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Copy className="w-3.5 h-3.5" /> タイトルをコピー
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                                <div className="p-3 rounded-lg bg-zinc-950 text-purple-200 font-sans text-xs border border-zinc-800 leading-relaxed">
+                                    {activeKit.proposedTitle}
+                                </div>
+                            </div>
+
+                            {/* ② FAQテキストブロック（CMSリッチテキスト用） */}
                             <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-800/40 space-y-3">
                                 <div className="flex items-center justify-between">
                                     <div className="font-bold text-sm text-white flex items-center gap-2">
                                         <FileText className="w-4 h-4 text-amber-400" />
-                                        ① STUDIOエディタ用 本文テキスト（見出し・チェックシート）
+                                        ② {activeKit.pageType === 'studio_cms' ? 'CMSリッチテキスト追記用 よくある質問（FAQ）' : 'STUDIO本文追記用 よくある質問（FAQ）'}
                                     </div>
                                     <button
-                                        onClick={() => handleCopy(activeKit.bodyText, 'body', '本文テキスト')}
+                                        onClick={() => handleCopy(activeKit.bodyText, 'body', 'FAQ追記テキスト')}
                                         className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold flex items-center gap-1.5 transition-all shadow-sm"
                                     >
                                         {copiedField === 'body' ? (
@@ -416,7 +463,7 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                                             </>
                                         ) : (
                                             <>
-                                                <Copy className="w-3.5 h-3.5" /> 本文をコピー
+                                                <Copy className="w-3.5 h-3.5" /> FAQテキストをコピー
                                             </>
                                         )}
                                     </button>
@@ -426,34 +473,7 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                                 </pre>
                             </div>
 
-                            {/* ② FAQ Q&Aブロック */}
-                            <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-800/40 space-y-3">
-                                <div className="flex items-center justify-between">
-                                    <div className="font-bold text-sm text-white flex items-center gap-2">
-                                        <FileText className="w-4 h-4 text-indigo-400" />
-                                        ② STUDIOエディタ用 よくある質問（FAQセクション）
-                                    </div>
-                                    <button
-                                        onClick={() => handleCopy(activeKit.faqText, 'faq', 'FAQテキスト')}
-                                        className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold flex items-center gap-1.5 transition-all shadow-sm"
-                                    >
-                                        {copiedField === 'faq' ? (
-                                            <>
-                                                <Check className="w-3.5 h-3.5" /> コピー完了
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Copy className="w-3.5 h-3.5" /> FAQをコピー
-                                            </>
-                                        )}
-                                    </button>
-                                </div>
-                                <pre className="p-3 rounded-lg bg-zinc-950 text-zinc-300 font-sans text-xs whitespace-pre-wrap leading-relaxed max-h-40 overflow-y-auto border border-zinc-800">
-                                    {activeKit.faqText}
-                                </pre>
-                            </div>
-
-                            {/* ③ STUDIO Custom Code用 JSON-LD構造化データ */}
+                            {/* ③ 構造化データ（JSON-LD） */}
                             <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-800/40 space-y-3">
                                 <div className="flex items-center justify-between">
                                     <div>
@@ -462,7 +482,7 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                                             ③ STUDIOカスタムコード用 JSON-LD構造化データ
                                         </div>
                                         <div className="text-[11px] text-zinc-400">
-                                            ※ STUDIOの「ページ設定 ➔ カスタムコード ➔ &lt;head&gt;内 または &lt;body&gt;末尾」に貼り付け
+                                            ※ デザインエディタの「ページ設定 ➔ カスタムコード (&lt;head&gt;)」に貼り付け
                                         </div>
                                     </div>
                                     <button
@@ -480,34 +500,20 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                                         )}
                                     </button>
                                 </div>
-                                <pre className="p-3 rounded-lg bg-zinc-950 text-emerald-300 font-mono text-[11px] whitespace-pre-wrap leading-relaxed max-h-40 overflow-y-auto border border-zinc-800">
+                                <pre className="p-3 rounded-lg bg-zinc-950 text-emerald-300 font-mono text-[11px] whitespace-pre-wrap leading-relaxed max-h-36 overflow-y-auto border border-zinc-800">
                                     {activeKit.jsonLdScript}
                                 </pre>
-                            </div>
-
-                            {/* ④ メタタイトル & メタディスクリプション */}
-                            <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-800/40 space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <div className="font-bold text-sm text-white flex items-center gap-2">
-                                        <Layers className="w-4 h-4 text-sky-400" />
-                                        ④ 推奨タイトル & ディスクリプション
+                                {activeKit.technicalNotes && activeKit.technicalNotes.length > 0 && (
+                                    <div className="space-y-1 text-[11px] text-zinc-400 pt-1">
+                                        {activeKit.technicalNotes.map((note, nIdx) => (
+                                            <div key={nIdx}>{note}</div>
+                                        ))}
                                     </div>
-                                    <button
-                                        onClick={() => handleCopy(`Title: ${activeKit.metaTitle}\nDescription: ${activeKit.metaDescription}`, 'meta', 'メタ情報')}
-                                        className="px-2.5 py-1 rounded bg-zinc-700 hover:bg-zinc-600 text-zinc-200 text-xs font-medium flex items-center gap-1"
-                                    >
-                                        {copiedField === 'meta' ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                                        メタ情報をコピー
-                                    </button>
-                                </div>
-                                <div className="text-zinc-300 font-mono text-xs bg-zinc-950 p-2.5 rounded border border-zinc-800 space-y-1">
-                                    <div><span className="text-zinc-500">Title:</span> {activeKit.metaTitle}</div>
-                                    <div><span className="text-zinc-500">Desc:</span> {activeKit.metaDescription}</div>
-                                </div>
+                                )}
                             </div>
                         </div>
 
-                        {/* モーダルフッター: 反映完了ボタン */}
+                        {/* モーダルフッター */}
                         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-zinc-800">
                             <a
                                 href="https://studio.design"
@@ -515,7 +521,7 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                                 rel="noreferrer"
                                 className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium flex items-center justify-center gap-1.5 transition-colors"
                             >
-                                STUDIOエディタを開く
+                                STUDIOを開く
                                 <ExternalLink className="w-3.5 h-3.5" />
                             </a>
 
