@@ -74,6 +74,18 @@ const WATCHWORDS_PATH = path.join(DATA_DIR, 'watchwords.json');
 const RANK_HISTORY_PATH = path.join(DATA_DIR, 'rank-history.json');
 const IMPROVEMENT_LOG_PATH = path.join(DATA_DIR, 'improvement-log.json');
 
+const DB_KEY_WATCHWORDS = 'SP_TRACKER_SEO_WATCHWORDS';
+const DB_KEY_IMPROVEMENT_LOGS = 'SP_TRACKER_SEO_IMPROVEMENT_LOGS';
+
+/**
+ * 日本時間（JST, UTC+9）の YYYY-MM-DD 文字列を取得
+ */
+export function getJstDateString(date = new Date()): string {
+    const jstOffset = 9 * 60 * 60 * 1000;
+    const jstDate = new Date(date.getTime() + jstOffset);
+    return jstDate.toISOString().split('T')[0];
+}
+
 function ensureDataFiles() {
     if (!fs.existsSync(DATA_DIR)) {
         fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -99,6 +111,73 @@ export function writeWatchwords(data: WatchwordItem[]): void {
         fs.writeFileSync(WATCHWORDS_PATH, JSON.stringify(data, null, 2), 'utf8');
     } catch (e) {
         console.error('writeWatchwords error:', e);
+    }
+}
+
+/**
+ * SupabaseからWatchwordsを取得（なければローカルJSONから取得して初期保存）
+ */
+export async function getPersistedWatchwords(supabase?: any): Promise<WatchwordItem[]> {
+    if (!supabase) return readWatchwords();
+    try {
+        const { data } = await supabase
+            .from('google_chat_webhooks')
+            .select('webhook_url')
+            .eq('space_name', DB_KEY_WATCHWORDS)
+            .limit(1)
+            .maybeSingle();
+
+        if (data?.webhook_url) {
+            return JSON.parse(data.webhook_url);
+        }
+
+        // Supabaseにレコードがまだ無ければローカルJSONを初期値として投入
+        const local = readWatchwords();
+        if (local.length > 0) {
+            await savePersistedWatchwords(supabase, local);
+        }
+        return local;
+    } catch (e) {
+        console.error('getPersistedWatchwords error:', e);
+        return readWatchwords();
+    }
+}
+
+/**
+ * SupabaseにWatchwordsを永続化保存
+ */
+export async function savePersistedWatchwords(supabase: any, data: WatchwordItem[]): Promise<boolean> {
+    // ローカルファイルにもバックアップ書き込み
+    writeWatchwords(data);
+    if (!supabase) return true;
+
+    try {
+        const jsonStr = JSON.stringify(data);
+        const { data: existing } = await supabase
+            .from('google_chat_webhooks')
+            .select('id')
+            .eq('space_name', DB_KEY_WATCHWORDS)
+            .limit(1)
+            .maybeSingle();
+
+        if (existing?.id) {
+            await supabase
+                .from('google_chat_webhooks')
+                .update({ webhook_url: jsonStr, active: true })
+                .eq('id', existing.id);
+        } else {
+            await supabase
+                .from('google_chat_webhooks')
+                .insert({
+                    space_name: DB_KEY_WATCHWORDS,
+                    webhook_url: jsonStr,
+                    active: true,
+                });
+        }
+        return true;
+    } catch (e) {
+        console.error('savePersistedWatchwords error:', e);
+        return false;
     }
 }
 
@@ -152,13 +231,83 @@ export function writeImprovementLogs(data: ImprovementLogEntry[]): void {
 }
 
 /**
- * SEO Rank Watch の現在状態を算出
+ * Supabaseから改善ログを取得（なければローカルJSONから取得して初期保存）
  */
-export function getSeoRankWatchState(): SeoRankWatchState {
-    const watchwords = readWatchwords();
-    const rankHistory = readRankHistory();
-    const improvementLogs = readImprovementLogs();
+export async function getPersistedImprovementLogs(supabase?: any): Promise<ImprovementLogEntry[]> {
+    if (!supabase) return readImprovementLogs();
+    try {
+        const { data } = await supabase
+            .from('google_chat_webhooks')
+            .select('webhook_url')
+            .eq('space_name', DB_KEY_IMPROVEMENT_LOGS)
+            .limit(1)
+            .maybeSingle();
 
+        if (data?.webhook_url) {
+            return JSON.parse(data.webhook_url);
+        }
+
+        // Supabaseにレコードがまだ無ければローカルJSONを初期値として投入
+        const local = readImprovementLogs();
+        if (local.length > 0) {
+            await savePersistedImprovementLogs(supabase, local);
+        }
+        return local;
+    } catch (e) {
+        console.error('getPersistedImprovementLogs error:', e);
+        return readImprovementLogs();
+    }
+}
+
+/**
+ * Supabaseに改善ログを永続化保存
+ */
+export async function savePersistedImprovementLogs(supabase: any, data: ImprovementLogEntry[]): Promise<boolean> {
+    // ローカルファイルにもバックアップ書き込み
+    writeImprovementLogs(data);
+    if (!supabase) return true;
+
+    try {
+        const jsonStr = JSON.stringify(data);
+        const { data: existing } = await supabase
+            .from('google_chat_webhooks')
+            .select('id')
+            .eq('space_name', DB_KEY_IMPROVEMENT_LOGS)
+            .limit(1)
+            .maybeSingle();
+
+        if (existing?.id) {
+            await supabase
+                .from('google_chat_webhooks')
+                .update({ webhook_url: jsonStr, active: true })
+                .eq('id', existing.id);
+        } else {
+            await supabase
+                .from('google_chat_webhooks')
+                .insert({
+                    space_name: DB_KEY_IMPROVEMENT_LOGS,
+                    webhook_url: jsonStr,
+                    active: true,
+                });
+        }
+        return true;
+    } catch (e) {
+        console.error('savePersistedImprovementLogs error:', e);
+        return false;
+    }
+}
+
+/**
+ * SEO Rank Watch の現在状態を算出（Supabase永続化対応）
+ */
+export async function getSeoRankWatchState(supabase?: any): Promise<SeoRankWatchState> {
+    const [watchwords, improvementLogs] = await Promise.all([
+        getPersistedWatchwords(supabase),
+        getPersistedImprovementLogs(supabase),
+    ]);
+    const rankHistory = readRankHistory();
+
+    const todayStr = getJstDateString();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -173,8 +322,8 @@ export function getSeoRankWatchState(): SeoRankWatchState {
                         target_path: observingKw.target_path,
                         action_title: '本質的なコンテンツ・FAQ改善',
                         action_detail: '検索ニーズに合わせた訴求と構造化データの追加',
-                        implemented_at: new Date().toISOString().split('T')[0],
-                        review_date: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
+                        implemented_at: todayStr,
+                        review_date: getJstDateString(new Date(Date.now() + 7 * 86400000)),
                         status: 'observing' as const,
                         rank_before: observingKw.current_rank + 1,
                         current_rank: observingKw.current_rank,
@@ -205,12 +354,10 @@ export function getSeoRankWatchState(): SeoRankWatchState {
     const topContender = activeContenders[0] || null;
 
     // 3. 3つの具体的改善アクション（SeoActionTask）の自動生成 & 翌日補充サイクル
-    const todayStr = new Date().toISOString().split('T')[0];
-    const nextDateStr = new Date(Date.now() + 86400000).toISOString().split('T')[0];
-
+    const nextDateStr = getJstDateString(new Date(Date.now() + 86400000));
     const topActions: SeoActionTask[] = [];
 
-    // ① 本日実行された改善ログを抽出（本日実行済みタスクとして最大2件まで表示）
+    // ① 本日実行された改善ログを抽出（本日実行済みタスクとして最大3件まで表示）
     const todayLogs = improvementLogs.filter((l) => l.implemented_at === todayStr);
     for (const tLog of todayLogs) {
         if (topActions.length >= 3) break;
@@ -233,12 +380,10 @@ export function getSeoRankWatchState(): SeoRankWatchState {
     }
 
     // ② 残りの枠（合計3件になるまで）、未実行の候補（active）から優先度順に補充
-    // ※ 前日以前に実行されたものは除外され、翌日になれば自動的に新しい未実施キーワードがスライドインして補充される
     const executedKwToday = new Set(todayLogs.map((l) => l.keyword));
     const candidateKeywords = watchwords
         .filter((w) => w.status !== 'achieved' && !executedKwToday.has(w.keyword))
         .sort((a, b) => {
-            // observing 中のものは ready の後に回す
             if (a.status === 'active' && b.status === 'observing') return -1;
             if (a.status === 'observing' && b.status === 'active') return 1;
             if (a.priority === 'high' && b.priority !== 'high') return -1;

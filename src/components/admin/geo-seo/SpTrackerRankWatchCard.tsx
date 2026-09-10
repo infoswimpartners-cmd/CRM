@@ -32,6 +32,40 @@ interface SpTrackerRankWatchCardProps {
     onRefresh: () => Promise<void>;
 }
 
+// 日本時間（JST）の日付キー（YYYY-MM-DD）
+const getTodayJstKey = () => {
+    const now = new Date();
+    const jstDate = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+    return jstDate.toISOString().split('T')[0];
+};
+
+// LocalStorage から本日実行済みキーワードのセットを取得
+const getExecutedKeywordsFromStorage = (): string[] => {
+    if (typeof window === 'undefined') return [];
+    try {
+        const key = `sp_tracker_executed_${getTodayJstKey()}`;
+        const val = localStorage.getItem(key);
+        return val ? JSON.parse(val) : [];
+    } catch {
+        return [];
+    }
+};
+
+// LocalStorage に本日実行済みキーワードを保存
+const saveExecutedKeywordToStorage = (keyword: string) => {
+    if (typeof window === 'undefined') return;
+    try {
+        const key = `sp_tracker_executed_${getTodayJstKey()}`;
+        const current = getExecutedKeywordsFromStorage();
+        if (!current.includes(keyword)) {
+            current.push(keyword);
+            localStorage.setItem(key, JSON.stringify(current));
+        }
+    } catch (e) {
+        console.error('LocalStorage save error:', e);
+    }
+};
+
 export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchCardProps) {
     const [isLogModalOpen, setIsLogModalOpen] = useState(false);
     const [isKitModalOpen, setIsKitModalOpen] = useState(false);
@@ -40,8 +74,21 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
     const [copiedField, setCopiedField] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // 楽観的UI更新用のローカルアクション状態
-    const [localActions, setLocalActions] = useState<SeoActionTask[]>(state?.topActions || []);
+    // 楽観的UI更新用のローカルアクション状態（初期値にもLocalStorageの実行済み情報を即座に反映）
+    const [localActions, setLocalActions] = useState<SeoActionTask[]>(() => {
+        if (!state?.topActions) return [];
+        const executedKwList = getExecutedKeywordsFromStorage();
+        return state.topActions.map((action) => {
+            if (executedKwList.includes(action.keyword)) {
+                return {
+                    ...action,
+                    status: 'executed_today' as const,
+                    executedAt: action.executedAt || getTodayJstKey(),
+                };
+            }
+            return action;
+        });
+    });
 
     // 7日間検証スプリント開始 完了モーダル用ステート
     const [startedSprintInfo, setStartedSprintInfo] = useState<{
@@ -53,10 +100,21 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
         nextDay: string;
     } | null>(null);
 
-    // state.topActions が親から更新されたら同期
+    // state.topActions が親から更新されたら同期（ただしLocalStorageで本日実行済みのものはexecuted_todayを死守）
     useEffect(() => {
         if (state?.topActions && state.topActions.length > 0) {
-            setLocalActions(state.topActions);
+            const executedKwList = getExecutedKeywordsFromStorage();
+            const merged = state.topActions.map((action) => {
+                if (executedKwList.includes(action.keyword) || action.status === 'executed_today') {
+                    return {
+                        ...action,
+                        status: 'executed_today' as const,
+                        executedAt: action.executedAt || getTodayJstKey(),
+                    };
+                }
+                return action;
+            });
+            setLocalActions(merged);
         }
     }, [state?.topActions]);
 
@@ -86,21 +144,24 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
         setIsKitModalOpen(true);
     };
 
-    // 改善アクション実施 -> observingへ (Optimistic UI + 即座に完了モーダル表示)
+    // 改善アクション実施 -> observingへ (Optimistic UI + LocalStorage + 即座に完了モーダル表示)
     const handleStartObservingWithKit = async (kit?: SeoImprovementKit | null) => {
         const target = kit || (topContender ? generateSeoImprovementKit(topContender.keyword, topContender.target_path, topContender.current_rank) : null);
         if (!target) return;
 
         // 本日の日付、次回レビュー日(7日後)、明日(次回アクション追加日)を算出
+        const todayStr = getTodayJstKey();
         const today = new Date();
         const reviewDateObj = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
         const tomorrowObj = new Date(today.getTime() + 24 * 60 * 60 * 1000);
         
-        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
         const reviewDateStr = `${reviewDateObj.getFullYear()}-${String(reviewDateObj.getMonth() + 1).padStart(2, '0')}-${String(reviewDateObj.getDate()).padStart(2, '0')}`;
         const tomorrowStr = `${tomorrowObj.getFullYear()}-${String(tomorrowObj.getMonth() + 1).padStart(2, '0')}-${String(tomorrowObj.getDate()).padStart(2, '0')}`;
 
-        // ① 楽観的UI更新: 該当のアクションカードを即座に「本日反映済み（検証中）」へビジュアル変化させる
+        // ① LocalStorage に永続保存（ブラウザをリロードしても再取得しても元に戻らない）
+        saveExecutedKeywordToStorage(target.keyword);
+
+        // ② 楽観的UI更新: 該当のアクションカードを即座に「本日反映済み（検証中）」へビジュアル変化させる
         setLocalActions((prev) =>
             prev.map((a) => {
                 if (a.keyword === target.keyword) {
@@ -115,7 +176,7 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
             })
         );
 
-        // ② STUDIO改善キットモーダルを閉じ、即座に「🎉 7日間検証スプリント開始 完了モーダル」をポップアップ！
+        // ③ STUDIO改善キットモーダルを閉じ、即座に「🎉 7日間検証スプリント開始 完了モーダル」をポップアップ！
         setIsKitModalOpen(false);
         setStartedSprintInfo({
             keyword: target.keyword,

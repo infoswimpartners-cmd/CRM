@@ -24,6 +24,11 @@ import {
     readImprovementLogs,
     writeImprovementLogs,
     appendRankHistory,
+    getPersistedWatchwords,
+    savePersistedWatchwords,
+    getPersistedImprovementLogs,
+    savePersistedImprovementLogs,
+    getJstDateString,
 } from '@/lib/seo-rank-watch';
 import {
     getSpreadsheetAnalyticsAction,
@@ -231,7 +236,7 @@ export async function getSpTrackerDashboard(): Promise<SpTrackerDashboardData> {
             }
         }
 
-        const rankWatchState = getSeoRankWatchState();
+        const rankWatchState = await getSeoRankWatchState(supabase);
 
         // Search Consoleデータがあればrank-history.jsonに最新日別データを追記
         if (searchConsoleData?.keywordPages && searchConsoleData.keywordPages.length > 0) {
@@ -539,7 +544,7 @@ export async function saveSpTrackerWebhookUrlAction(webhookUrl: string) {
 }
 
 /**
- * SEO Rank Watch: 改善アクションの実行（7日間観察中 observing へ遷移）
+ * SEO Rank Watch: 改善アクションの実行（7日間観察中 observing へ遷移・Supabase永続化）
  */
 export async function startObservingAction(
     keyword: string,
@@ -548,7 +553,8 @@ export async function startObservingAction(
     targetPath?: string
 ) {
     try {
-        const watchwords = readWatchwords();
+        const supabase = createAdminClient();
+        const watchwords = await getPersistedWatchwords(supabase);
         const item = watchwords.find((w) => w.keyword === keyword);
         if (!item) {
             return { success: false, message: `キーワード「${keyword}」が見つかりません。` };
@@ -556,13 +562,12 @@ export async function startObservingAction(
 
         // ステータスを observing に更新
         item.status = 'observing';
-        writeWatchwords(watchwords);
+        await savePersistedWatchwords(supabase, watchwords);
 
-        // 改善ログに追記 (次回レビュー日は7日後)
-        const logs = readImprovementLogs();
-        const now = new Date();
-        const implementedAt = now.toISOString().split('T')[0];
-        const reviewDate = new Date(now.getTime() + 7 * 86400000).toISOString().split('T')[0];
+        // 改善ログに追記 (次回レビュー日は7日後, JSTで算出)
+        const logs = await getPersistedImprovementLogs(supabase);
+        const implementedAt = getJstDateString();
+        const reviewDate = getJstDateString(new Date(Date.now() + 7 * 86400000));
 
         const newLogEntry = {
             id: `imp-${Date.now()}`,
@@ -579,7 +584,7 @@ export async function startObservingAction(
         };
 
         logs.unshift(newLogEntry);
-        writeImprovementLogs(logs);
+        await savePersistedImprovementLogs(supabase, logs);
 
         revalidatePath('/admin/geo-seo');
 
@@ -595,11 +600,12 @@ export async function startObservingAction(
 }
 
 /**
- * SEO Rank Watch: 検索1位達成マーク（achieved へ遷移）
+ * SEO Rank Watch: 検索1位達成マーク（achieved へ遷移・Supabase永続化）
  */
 export async function markAsAchievedAction(keyword: string) {
     try {
-        const watchwords = readWatchwords();
+        const supabase = createAdminClient();
+        const watchwords = await getPersistedWatchwords(supabase);
         const item = watchwords.find((w) => w.keyword === keyword);
         if (!item) {
             return { success: false, message: `キーワード「${keyword}」が見つかりません。` };
@@ -607,15 +613,15 @@ export async function markAsAchievedAction(keyword: string) {
 
         item.status = 'achieved';
         item.current_rank = 1;
-        writeWatchwords(watchwords);
+        await savePersistedWatchwords(supabase, watchwords);
 
-        const logs = readImprovementLogs();
+        const logs = await getPersistedImprovementLogs(supabase);
         const targetLog = logs.find((l) => l.keyword === keyword && l.status === 'observing');
         if (targetLog) {
             targetLog.status = 'achieved';
             targetLog.current_rank = 1;
             targetLog.notes = '検索順位1位を達成しました！今後は定点観測を継続します。';
-            writeImprovementLogs(logs);
+            await savePersistedImprovementLogs(supabase, logs);
         }
 
         revalidatePath('/admin/geo-seo');
@@ -628,11 +634,12 @@ export async function markAsAchievedAction(keyword: string) {
 }
 
 /**
- * SEO Rank Watch: 7日間観察完了・ステータス更新
+ * SEO Rank Watch: 7日間観察完了・ステータス更新（Supabase永続化）
  */
 export async function completeObservingAction(keyword: string, notes: string, nextStatus: 'active' | 'achieved') {
     try {
-        const watchwords = readWatchwords();
+        const supabase = createAdminClient();
+        const watchwords = await getPersistedWatchwords(supabase);
         const item = watchwords.find((w) => w.keyword === keyword);
         if (!item) {
             return { success: false, message: `キーワード「${keyword}」が見つかりません。` };
@@ -642,14 +649,14 @@ export async function completeObservingAction(keyword: string, notes: string, ne
         if (nextStatus === 'achieved') {
             item.current_rank = 1;
         }
-        writeWatchwords(watchwords);
+        await savePersistedWatchwords(supabase, watchwords);
 
-        const logs = readImprovementLogs();
+        const logs = await getPersistedImprovementLogs(supabase);
         const targetLog = logs.find((l) => l.keyword === keyword && l.status === 'observing');
         if (targetLog) {
             targetLog.status = nextStatus;
             targetLog.notes = notes;
-            writeImprovementLogs(logs);
+            await savePersistedImprovementLogs(supabase, logs);
         }
 
         revalidatePath('/admin/geo-seo');
@@ -659,7 +666,6 @@ export async function completeObservingAction(keyword: string, notes: string, ne
         console.error('completeObservingAction error:', err);
         return { success: false, message: err.message || '完了処理に失敗しました。' };
     }
-
 }
 
 /**
