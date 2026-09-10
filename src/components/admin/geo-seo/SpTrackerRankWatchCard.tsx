@@ -35,10 +35,12 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
     const [isLogModalOpen, setIsLogModalOpen] = useState(false);
     const [isKitModalOpen, setIsKitModalOpen] = useState(false);
     const [activeKit, setActiveKit] = useState<SeoImprovementKit | null>(null);
+    const [kitActiveTab, setKitActiveTab] = useState<'content' | 'title' | 'jsonld' | 'audit'>('content');
     const [copiedField, setCopiedField] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     if (!state) return null;
+
 
     const { topContender, observingItem, stats, improvementLogs } = state;
 
@@ -60,8 +62,10 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
     const handleOpenKit = (keyword: string, targetPath: string, currentRank: number) => {
         const kit = generateSeoImprovementKit(keyword, targetPath, currentRank);
         setActiveKit(kit);
+        setKitActiveTab('content');
         setIsKitModalOpen(true);
     };
+
 
     // 改善アクション実施 -> observingへ
     const handleStartObservingWithKit = async (kit?: SeoImprovementKit | null) => {
@@ -390,175 +394,312 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
 
             </div>
 
-            {/* STUDIOコピペ用 完成形改善キット モーダル */}
+            {/* STUDIOコピペ用 完成形改善キット モーダル（UI/UX刷新版: タブ切り替え & スムーズスクロール） */}
             {isKitModalOpen && activeKit && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl max-w-3xl w-full p-6 md:p-8 text-zinc-100 space-y-6 shadow-2xl max-h-[90vh] flex flex-col">
-                        {/* モーダルヘッダー */}
-                        <div className="flex items-start justify-between border-b border-zinc-800 pb-4">
-                            <div className="space-y-1.5">
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold border ${
-                                        activeKit.pageType === 'studio_cms'
-                                            ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
-                                            : 'bg-amber-400/20 text-amber-300 border-amber-400/40'
-                                    }`}>
-                                        {activeKit.pageTypeLabel}
-                                    </span>
-                                    <span className="text-xs text-zinc-400 font-mono">
-                                        現在 {activeKit.currentRank}位 ➔ 目標 1位
-                                    </span>
-                                </div>
-                                <h3 className="text-xl font-black text-white">
-                                    「{activeKit.keyword}」1位獲得スプリント
-                                </h3>
-                                <p className="text-xs text-zinc-400">
-                                    対象ページ: <span className="font-mono text-indigo-300">{activeKit.targetPath}</span>
-                                </p>
-                            </div>
-                            <button
-                                onClick={() => setIsKitModalOpen(false)}
-                                className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
-                            >
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
-
-                        {/* 実測データ監査（Fact Audit）: なぜ現在2位なのか？ */}
-                        <div className="p-4 rounded-xl bg-zinc-800/80 border border-zinc-700/80 text-xs space-y-2">
-                            <div className="font-bold flex items-center gap-1.5 text-amber-300 text-[11px] font-mono uppercase tracking-wider">
-                                <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
-                                実測データ監査（現在2位の要因分析）:
-                            </div>
-                            <div className="text-zinc-300 space-y-1">
-                                <div><span className="text-zinc-500">現状のタイトル:</span> <span className="text-zinc-200 font-medium">「{activeKit.factAudit.existingTitle}」</span></div>
-                                <div><span className="text-zinc-500">既存コンテンツ:</span> <span className="text-zinc-300">{activeKit.factAudit.existingHeadingsSummary}</span></div>
-                                <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-200 leading-relaxed text-[11px] mt-1">
-                                    <strong>【データに基づく改善点】</strong> {activeKit.factAudit.missingGapReason}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* STUDIO反映手順ガイド */}
-                        <div className="p-4 rounded-xl bg-indigo-950/40 border border-indigo-500/30 text-xs text-indigo-200 space-y-1.5">
-                            <div className="font-bold flex items-center gap-1.5 text-indigo-300">
-                                <Sparkles className="w-4 h-4" />
-                                {activeKit.pageType === 'studio_cms' ? 'STUDIO CMSでの反映手順（約1分）' : 'STUDIOエディタでの反映手順（約1分）'}
-                            </div>
-                            <ol className="list-decimal list-inside space-y-0.5 text-zinc-300 pl-1">
-                                {activeKit.studioSteps.map((step, idx) => (
-                                    <li key={idx}>{step}</li>
-                                ))}
-                            </ol>
-                        </div>
-
-                        {/* コンテンツタブ / カード一覧 */}
-                        <div className="overflow-y-auto space-y-5 pr-2 flex-1 text-xs">
-                            {/* ① タイトル改善案（CMS記事設定用） */}
-                            <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-800/40 space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <div className="font-bold text-sm text-white flex items-center gap-2">
-                                        <Layers className="w-4 h-4 text-purple-400" />
-                                        ① {activeKit.pageType === 'studio_cms' ? 'CMS記事タイトル修正案（キーワード補正）' : '推奨ページタイトル'}
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl max-w-4xl w-full text-zinc-100 shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
+                        {/* モーダルヘッダー（固定） */}
+                        <div className="p-5 sm:p-6 border-b border-zinc-800 bg-zinc-900/90 backdrop-blur-md flex-shrink-0">
+                            <div className="flex items-start justify-between gap-4">
+                                <div className="space-y-1.5">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold border ${
+                                            activeKit.pageType === 'studio_cms'
+                                                ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
+                                                : 'bg-amber-400/20 text-amber-300 border-amber-400/40'
+                                        }`}>
+                                            {activeKit.pageTypeLabel}
+                                        </span>
+                                        <span className="text-xs text-zinc-400 font-mono">
+                                            現在 <strong className="text-white">{activeKit.currentRank}位</strong> ➔ 目標 <strong className="text-amber-300">1位</strong>
+                                        </span>
                                     </div>
-                                    <button
-                                        onClick={() => handleCopy(activeKit.proposedTitle, 'title', 'タイトル')}
-                                        className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold flex items-center gap-1.5 transition-all shadow-sm"
-                                    >
-                                        {copiedField === 'title' ? (
-                                            <>
-                                                <Check className="w-3.5 h-3.5" /> コピー完了
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Copy className="w-3.5 h-3.5" /> タイトルをコピー
-                                            </>
-                                        )}
-                                    </button>
+                                    <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                                        「{activeKit.keyword}」1位獲得改善キット
+                                    </h3>
+                                    <p className="text-xs text-zinc-400">
+                                        対象ページ: <a href={`https://swim-partners.com${activeKit.targetPath}`} target="_blank" rel="noreferrer" className="font-mono text-indigo-300 hover:underline inline-flex items-center gap-1">{activeKit.targetPath} <ExternalLink className="w-3 h-3" /></a>
+                                    </p>
                                 </div>
-                                <div className="p-3 rounded-lg bg-zinc-950 text-purple-200 font-sans text-xs border border-zinc-800 leading-relaxed">
-                                    {activeKit.proposedTitle}
-                                </div>
+                                <button
+                                    onClick={() => setIsKitModalOpen(false)}
+                                    className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+                                    title="閉じる"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
                             </div>
 
-                            {/* ② FAQテキストブロック（CMSリッチテキスト用） */}
-                            <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-800/40 space-y-3">
-                                <div className="flex items-center justify-between">
-                                    <div className="font-bold text-sm text-white flex items-center gap-2">
-                                        <FileText className="w-4 h-4 text-amber-400" />
-                                        ② {activeKit.pageType === 'studio_cms' ? 'CMSリッチテキスト追記用 よくある質問（FAQ）' : 'STUDIO本文追記用 よくある質問（FAQ）'}
+                            {/* タブナビゲーションバー（入れ子スクロールを排除し、目的のコンテンツに1発アクセス） */}
+                            <div className="flex items-center gap-2 mt-5 border-b border-zinc-800/80 overflow-x-auto pb-px">
+                                <button
+                                    onClick={() => setKitActiveTab('content')}
+                                    className={`px-4 py-2.5 text-xs font-bold rounded-t-xl transition-all flex items-center gap-2 border-b-2 whitespace-nowrap ${
+                                        kitActiveTab === 'content'
+                                            ? 'text-amber-300 border-amber-400 bg-zinc-800/60'
+                                            : 'text-zinc-400 border-transparent hover:text-zinc-200 hover:bg-zinc-800/30'
+                                    }`}
+                                >
+                                    <FileText className="w-4 h-4 text-amber-400" />
+                                    ① 本文・FAQ追記テキスト
+                                </button>
+
+                                <button
+                                    onClick={() => setKitActiveTab('title')}
+                                    className={`px-4 py-2.5 text-xs font-bold rounded-t-xl transition-all flex items-center gap-2 border-b-2 whitespace-nowrap ${
+                                        kitActiveTab === 'title'
+                                            ? 'text-purple-300 border-purple-400 bg-zinc-800/60'
+                                            : 'text-zinc-400 border-transparent hover:text-zinc-200 hover:bg-zinc-800/30'
+                                    }`}
+                                >
+                                    <Layers className="w-4 h-4 text-purple-400" />
+                                    ② タイトル・メタ設定
+                                </button>
+
+                                <button
+                                    onClick={() => setKitActiveTab('jsonld')}
+                                    className={`px-4 py-2.5 text-xs font-bold rounded-t-xl transition-all flex items-center gap-2 border-b-2 whitespace-nowrap ${
+                                        kitActiveTab === 'jsonld'
+                                            ? 'text-emerald-300 border-emerald-400 bg-zinc-800/60'
+                                            : 'text-zinc-400 border-transparent hover:text-zinc-200 hover:bg-zinc-800/30'
+                                    }`}
+                                >
+                                    <Code2 className="w-4 h-4 text-emerald-400" />
+                                    ③ JSON-LD 構造化データ
+                                </button>
+
+                                <button
+                                    onClick={() => setKitActiveTab('audit')}
+                                    className={`px-4 py-2.5 text-xs font-bold rounded-t-xl transition-all flex items-center gap-2 border-b-2 whitespace-nowrap ${
+                                        kitActiveTab === 'audit'
+                                            ? 'text-indigo-300 border-indigo-400 bg-zinc-800/60'
+                                            : 'text-zinc-400 border-transparent hover:text-zinc-200 hover:bg-zinc-800/30'
+                                    }`}
+                                >
+                                    <ShieldAlert className="w-4 h-4 text-indigo-400" />
+                                    ④ 現状データ監査 & 手順
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* モーダルコンテンツ本体（ここだけが滑らかにスクロール。内部に小さなスクロール枠は一切作らない） */}
+                        <div className="p-6 overflow-y-auto flex-1 space-y-6 text-sm">
+                            {/* ================= タブ1: 本文・FAQテキスト ================= */}
+                            {kitActiveTab === 'content' && (
+                                <div className="space-y-4 animate-in fade-in duration-150">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                                        <div>
+                                            <div className="font-bold text-amber-300 text-sm flex items-center gap-2">
+                                                <FileText className="w-4 h-4 text-amber-400" />
+                                                {activeKit.pageType === 'studio_cms' ? 'STUDIO CMS記事リッチテキスト用 追記テキスト' : 'STUDIOエディタ用 本文・FAQ追記テキスト'}
+                                            </div>
+                                            <div className="text-xs text-zinc-300 mt-1">
+                                                既存の記事末尾（チェックシート後）にそのまま貼り付けるだけで、検索意図を満たすFAQセクションが完成します。
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => handleCopy(activeKit.bodyText, 'body', '本文・FAQテキスト')}
+                                            className="px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-zinc-950 font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-[0_0_15px_rgba(245,158,11,0.25)] flex-shrink-0"
+                                        >
+                                            {copiedField === 'body' ? (
+                                                <>
+                                                    <Check className="w-4 h-4 text-zinc-950" /> コピー完了！
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Copy className="w-4 h-4 text-zinc-950" /> 本文・FAQをコピー
+                                                </>
+                                            )}
+                                        </button>
                                     </div>
-                                    <button
-                                        onClick={() => handleCopy(activeKit.bodyText, 'body', 'FAQ追記テキスト')}
-                                        className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-zinc-950 font-bold flex items-center gap-1.5 transition-all shadow-sm"
-                                    >
-                                        {copiedField === 'body' ? (
-                                            <>
-                                                <Check className="w-3.5 h-3.5" /> コピー完了
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Copy className="w-3.5 h-3.5" /> FAQテキストをコピー
-                                            </>
-                                        )}
-                                    </button>
-                                </div>
-                                <pre className="p-3 rounded-lg bg-zinc-950 text-zinc-300 font-sans text-xs whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto border border-zinc-800">
-                                    {activeKit.bodyText}
-                                </pre>
-                            </div>
 
-                            {/* ③ 構造化データ（JSON-LD） */}
-                            <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-800/40 space-y-3">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <div className="font-bold text-sm text-white flex items-center gap-2">
-                                            <Code2 className="w-4 h-4 text-emerald-400" />
-                                            ③ STUDIOカスタムコード用 JSON-LD構造化データ
+                                    {/* フル展開テキストエリア（入れ子スクロールなし、見やすく全文表示） */}
+                                    <div className="relative rounded-xl border border-zinc-800 bg-zinc-950 p-5 font-sans leading-relaxed text-zinc-200">
+                                        <div className="whitespace-pre-wrap text-sm select-text">
+                                            {activeKit.bodyText}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ================= タブ2: タイトル・メタ設定 ================= */}
+                            {kitActiveTab === 'title' && (
+                                <div className="space-y-4 animate-in fade-in duration-150">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl bg-purple-500/10 border border-purple-500/30">
+                                        <div>
+                                            <div className="font-bold text-purple-300 text-sm flex items-center gap-2">
+                                                <Layers className="w-4 h-4 text-purple-400" />
+                                                タイトルタグのキーワード補正（現在2位 ➔ 1位狙撃）
+                                            </div>
+                                            <div className="text-xs text-zinc-300 mt-1">
+                                                現在欠落している「進級の早い子」を含め、既存の「上達する子」の評価を落とさずに両取りする最適化案です。
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => handleCopy(activeKit.proposedTitle, 'title', 'タイトル')}
+                                            className="px-4 py-2.5 rounded-xl bg-purple-500 hover:bg-purple-400 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-sm flex-shrink-0"
+                                        >
+                                            {copiedField === 'title' ? (
+                                                <>
+                                                    <Check className="w-4 h-4" /> コピー完了！
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Copy className="w-4 h-4" /> タイトルをコピー
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+
+                                    {/* 比較テーブル */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-950/60 space-y-2">
+                                            <div className="text-xs font-mono font-bold text-zinc-400">【現状の実測タイトル】（2位）</div>
+                                            <div className="text-sm text-zinc-400 line-through">
+                                                {activeKit.factAudit.existingTitle}
+                                            </div>
+                                            <div className="text-[11px] text-red-400/90 pt-1">
+                                                ※ 「進級の 早い子」の重要単語がタイトルに含まれていません
+                                            </div>
+                                        </div>
+
+                                        <div className="p-4 rounded-xl border border-purple-500/30 bg-purple-950/20 space-y-2">
+                                            <div className="text-xs font-mono font-bold text-purple-300">【推奨タイトル（1位獲得案）】</div>
+                                            <div className="text-sm font-bold text-white">
+                                                {activeKit.proposedTitle}
+                                            </div>
+                                            <div className="text-[11px] text-emerald-400 pt-1">
+                                                ✓ 「進級の早い子」「上達する子」の両方で完全一致評価
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* ディスクリプション設定 */}
+                                    <div className="p-5 rounded-xl border border-zinc-800 bg-zinc-950 space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <div className="text-xs font-bold text-zinc-300 font-mono">
+                                                推奨メタディスクリプション (Meta Description)
+                                            </div>
+                                            <button
+                                                onClick={() => handleCopy(activeKit.proposedDescription, 'desc', 'ディスクリプション')}
+                                                className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold flex items-center gap-1.5 transition-colors border border-zinc-700"
+                                            >
+                                                {copiedField === 'desc' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                                                ディスクリプションをコピー
+                                            </button>
+                                        </div>
+                                        <p className="text-xs text-zinc-300 leading-relaxed">
+                                            {activeKit.proposedDescription}
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* ================= タブ3: JSON-LD 構造化データ ================= */}
+                            {kitActiveTab === 'jsonld' && (
+                                <div className="space-y-4 animate-in fade-in duration-150">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
+                                        <div>
+                                            <div className="font-bold text-emerald-300 text-sm flex items-center gap-2">
+                                                <Code2 className="w-4 h-4 text-emerald-400" />
+                                                STUDIOカスタムコード用 FAQPage構造化データ（JSON-LD）
+                                            </div>
+                                            <div className="text-xs text-zinc-300 mt-1">
+                                                Google検索結果でアコーディオン状のFAQスニペットを表示させ、クリック率と順位を押し上げます。
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => handleCopy(activeKit.jsonLdScript, 'jsonld', 'JSON-LD構造化データ')}
+                                            className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-[0_0_15px_rgba(16,185,129,0.25)] flex-shrink-0"
+                                        >
+                                            {copiedField === 'jsonld' ? (
+                                                <>
+                                                    <Check className="w-4 h-4 text-zinc-950" /> コピー完了！
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Copy className="w-4 h-4 text-zinc-950" /> JSON-LDをコピー
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+
+                                    {/* 技術的な設置方法の正確なガイダンス */}
+                                    <div className="p-4 rounded-xl bg-zinc-800/80 border border-zinc-700/80 text-xs space-y-1.5 leading-relaxed text-zinc-300">
+                                        <div className="font-bold text-zinc-200 flex items-center gap-1.5">
+                                            <Sparkles className="w-3.5 h-3.5 text-emerald-400" /> STUDIOでの埋め込み先:
+                                        </div>
+                                        <div>
+                                            STUDIOのデザインエディタ ➔ 対象ページ設定 ➔「カスタムコード」の <code className="text-emerald-300 bg-zinc-900 px-1.5 py-0.5 rounded font-mono">&lt;head&gt;内</code> または <code className="text-emerald-300 bg-zinc-900 px-1.5 py-0.5 rounded font-mono">&lt;body&gt;末尾</code> に貼り付けてください。
                                         </div>
                                         <div className="text-[11px] text-zinc-400">
-                                            ※ デザインエディタの「ページ設定 ➔ カスタムコード (&lt;head&gt;)」に貼り付け
+                                            ※ STUDIO CMS記事本文（リッチテキストエディタ内）に直接貼り付けてもエスケープされるため、必ずページ設定のカスタムコードをご利用ください。
                                         </div>
                                     </div>
-                                    <button
-                                        onClick={() => handleCopy(activeKit.jsonLdScript, 'jsonld', 'JSON-LD構造化データ')}
-                                        className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold flex items-center gap-1.5 transition-all shadow-sm"
-                                    >
-                                        {copiedField === 'jsonld' ? (
-                                            <>
-                                                <Check className="w-3.5 h-3.5" /> コピー完了
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Copy className="w-3.5 h-3.5" /> JSON-LDをコピー
-                                            </>
-                                        )}
-                                    </button>
-                                </div>
-                                <pre className="p-3 rounded-lg bg-zinc-950 text-emerald-300 font-mono text-[11px] whitespace-pre-wrap leading-relaxed max-h-36 overflow-y-auto border border-zinc-800">
-                                    {activeKit.jsonLdScript}
-                                </pre>
-                                {activeKit.technicalNotes && activeKit.technicalNotes.length > 0 && (
-                                    <div className="space-y-1 text-[11px] text-zinc-400 pt-1">
-                                        {activeKit.technicalNotes.map((note, nIdx) => (
-                                            <div key={nIdx}>{note}</div>
-                                        ))}
+
+                                    {/* コード表示エリア（入れ子スクロールなし、見やすく全文表示） */}
+                                    <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-5 font-mono text-xs leading-relaxed text-emerald-300 overflow-x-auto select-text">
+                                        <pre>{activeKit.jsonLdScript}</pre>
                                     </div>
-                                )}
-                            </div>
+                                </div>
+                            )}
+
+                            {/* ================= タブ4: 現状データ監査 & 手順 ================= */}
+                            {kitActiveTab === 'audit' && (
+                                <div className="space-y-4 animate-in fade-in duration-150">
+                                    {/* 実測データ監査 */}
+                                    <div className="p-5 rounded-xl bg-zinc-800/80 border border-zinc-700/80 space-y-3">
+                                        <div className="font-bold text-amber-300 text-sm flex items-center gap-2">
+                                            <ShieldAlert className="w-4 h-4 text-amber-400" />
+                                            実測データ監査（現在2位の要因分析レポート）
+                                        </div>
+                                        <div className="space-y-2 text-xs text-zinc-300">
+                                            <div className="p-3 rounded-lg bg-zinc-950 border border-zinc-800 space-y-1">
+                                                <div><span className="text-zinc-500">現状のタイトル:</span> <span className="text-zinc-200 font-medium">「{activeKit.factAudit.existingTitle}」</span></div>
+                                                <div><span className="text-zinc-500">既存コンテンツ:</span> <span className="text-zinc-300">{activeKit.factAudit.existingHeadingsSummary}</span></div>
+                                            </div>
+                                            <div className="p-3.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-200 leading-relaxed">
+                                                <strong>【データに基づく改善点】</strong> {activeKit.factAudit.missingGapReason}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* 反映手順ガイド */}
+                                    <div className="p-5 rounded-xl bg-indigo-950/40 border border-indigo-500/30 space-y-3 text-xs">
+                                        <div className="font-bold text-indigo-300 text-sm flex items-center gap-2">
+                                            <Sparkles className="w-4 h-4" />
+                                            {activeKit.pageType === 'studio_cms' ? 'STUDIO CMSでの反映ステップ（所要時間: 約1分）' : 'STUDIOエディタでの反映ステップ（所要時間: 約1分）'}
+                                        </div>
+                                        <ol className="list-decimal list-inside space-y-2 text-zinc-200 pl-1">
+                                            {activeKit.studioSteps.map((step, idx) => (
+                                                <li key={idx} className="leading-relaxed">{step}</li>
+                                            ))}
+                                        </ol>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
-                        {/* モーダルフッター */}
-                        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-zinc-800">
-                            <a
-                                href="https://studio.design"
-                                target="_blank"
-                                rel="noreferrer"
-                                className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium flex items-center justify-center gap-1.5 transition-colors"
-                            >
-                                STUDIOを開く
-                                <ExternalLink className="w-3.5 h-3.5" />
-                            </a>
+                        {/* モーダルフッター（固定） */}
+                        <div className="p-4 sm:p-6 border-t border-zinc-800 bg-zinc-900/90 backdrop-blur-md flex-shrink-0 flex flex-col sm:flex-row items-center justify-between gap-3">
+                            <div className="flex items-center gap-2 w-full sm:w-auto">
+                                <a
+                                    href="https://studio.design"
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+                                >
+                                    STUDIOを開く
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                </a>
+                                <button
+                                    onClick={() => handleCopy(`${activeKit.proposedTitle}\n\n${activeKit.bodyText}`, 'all', 'タイトルと本文一括')}
+                                    className="w-full sm:w-auto px-3.5 py-2.5 rounded-xl border border-zinc-700 hover:bg-zinc-800 text-zinc-300 text-xs font-medium flex items-center justify-center gap-1.5 transition-colors"
+                                >
+                                    {copiedField === 'all' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                                    タイトル＋本文を一括コピー
+                                </button>
+                            </div>
 
                             <div className="flex items-center gap-2 w-full sm:w-auto">
                                 <button
@@ -580,6 +721,7 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                     </div>
                 </div>
             )}
+
 
             {/* 改善履歴ログ（Improvement Log）モーダル */}
             {isLogModalOpen && (
