@@ -538,21 +538,41 @@ export default function EnrollmentForm({
 
                       {/* 金額・詳細（タイトルからしっかり間隔を空ける） */}
                       <div className="mt-3.5 space-y-2.5">
-                        <div className="flex justify-between items-baseline">
-                          <span className="text-xs sm:text-sm font-bold text-slate-700">
-                            {activePlan.isPackage
-                              ? '本日お支払い額 (税込)'
-                              : selectedParentPlan === 'single'
-                              ? 'システム管理料・年会費 (税込)'
-                              : 'クレジットカード登録 (本日決済なし)'}
-                          </span>
-                          <span className="text-2xl sm:text-3xl font-black text-blue-600">
-                            ¥{(activePlan.isPackage ? activePlan.price : selectedParentPlan === 'single' ? (activePlan.price || 3300) : 0).toLocaleString()}
-                          </span>
-                        </div>
+                        {selectedParentPlan === 'single' ? (
+                          <div className="space-y-1.5">
+                            <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
+                              <span className="text-xs sm:text-sm font-bold text-slate-700">
+                                システム管理料 (月換算)
+                              </span>
+                              <div className="text-right">
+                                <span className="text-xs font-bold text-blue-600 mr-1">実質</span>
+                                <span className="text-2xl sm:text-3xl font-black text-blue-600">
+                                  ¥275
+                                </span>
+                                <span className="text-xs font-bold text-slate-500 ml-1">/ 月 相当</span>
+                              </div>
+                            </div>
+                            <div className="flex justify-end">
+                              <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
+                                （ 年額一括 ¥3,300 税込 / 1年ごと自動更新 ）
+                              </span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex justify-between items-baseline">
+                            <span className="text-xs sm:text-sm font-bold text-slate-700">
+                              {activePlan.isPackage
+                                ? '本日お支払い額 (税込)'
+                                : 'クレジットカード登録 (本日決済なし)'}
+                            </span>
+                            <span className="text-2xl sm:text-3xl font-black text-blue-600">
+                              ¥{(activePlan.isPackage ? activePlan.price : 0).toLocaleString()}
+                            </span>
+                          </div>
+                        )}
                         {selectedParentPlan === 'single' ? (
                           <p className="text-[11px] text-slate-500 pt-2 border-t border-slate-100 leading-relaxed font-medium">
-                            ※単発受講のシステム管理料として年会費3,300円（税込）が本日即時決済されます（以降1年ごとに自動更新）。
+                            ※入会時に1年分（3,300円 税込）が一括即時決済されます（以降1年ごとの自動更新）。
                           </p>
                         ) : !activePlan.isPackage ? (
                           <p className="text-[10px] text-slate-500 pt-2 border-t border-slate-100 leading-relaxed">
