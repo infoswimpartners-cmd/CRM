@@ -19,7 +19,9 @@ import {
     SpTrackerDashboardData,
 } from '@/actions/sp-tracker-actions';
 import { syncMarketingAnalytics } from '@/actions/marketing';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, MessageSquare, Briefcase } from 'lucide-react';
+import { AiChiefMarketerJohnCard } from '@/components/admin/geo-seo/AiChiefMarketerJohnCard';
+import { JohnMarketingConsultDrawer } from '@/components/admin/geo-seo/JohnMarketingConsultDrawer';
 
 function SpTrackerContent() {
     const searchParams = useSearchParams();
@@ -28,6 +30,7 @@ function SpTrackerContent() {
     const [activeTab, setActiveTab] = useState<'seo' | 'geo' | 'citation_gap' | 'conversion' | 'analytics' | 'settings'>('seo');
     const [loading, setLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const [isFloatingConsultOpen, setIsFloatingConsultOpen] = useState(false);
 
     useEffect(() => {
         if (tabParam && ['seo', 'geo', 'citation_gap', 'conversion', 'analytics', 'settings'].includes(tabParam)) {
@@ -133,6 +136,12 @@ function SpTrackerContent() {
                 </div>
             </div>
 
+            {/* 0. 専属AIチーフマーケター「ジョン」常駐デスク（最重要戦略司令塔） */}
+            <AiChiefMarketerJohnCard
+                rankWatchState={data.rankWatchState}
+                spreadsheetData={data.spreadsheetAnalytics}
+            />
+
             {/* 1. 最上部: SEO Rank Watch（1位狙撃 ✕ 7日間検証サイクル）カード */}
             <SpTrackerRankWatchCard
                 state={data.rankWatchState}
@@ -227,6 +236,22 @@ function SpTrackerContent() {
                     />
                 )}
             </div>
+
+            {/* 画面右下フローティング: ジョンに相談するFABボタン */}
+            <button
+                onClick={() => setIsFloatingConsultOpen(true)}
+                className="fixed bottom-6 right-6 z-40 px-4 py-3.5 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 text-zinc-950 font-black text-xs shadow-[0_10px_30px_rgba(245,158,11,0.4)] flex items-center gap-2.5 hover:scale-105 active:scale-95 transition-all border border-amber-300"
+            >
+                <div className="w-2.5 h-2.5 rounded-full bg-emerald-950 animate-ping" />
+                <Briefcase className="w-4 h-4 text-zinc-950" />
+                <span>CMOジョンに相談</span>
+            </button>
+
+            {/* ジョンとのチャット相談ドロワー */}
+            <JohnMarketingConsultDrawer
+                isOpen={isFloatingConsultOpen}
+                onClose={() => setIsFloatingConsultOpen(false)}
+            />
         </div>
     );
 }
