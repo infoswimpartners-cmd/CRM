@@ -85,10 +85,12 @@ export async function processLessonReminders(options: ReminderProcessOptions = {
                 title,
                 location,
                 notes,
+                attendance_type,
                 reminder_sent_at,
                 students (
                     id,
                     full_name,
+                    second_student_name,
                     student_number,
                     contact_email,
                     line_user_id
@@ -218,6 +220,25 @@ export async function processLessonReminders(options: ReminderProcessOptions = {
             const timeStr = `${startJST.timeStr24}〜${endJST.timeStr24}`
             const coachName = coach?.full_name || '担当コーチ'
             const locationStr = schedule.location || 'ご指定のプール'
+            // 2名生徒の場合の表示名組み立て（コーチ通知用）
+            const secondStudentName = student.second_student_name?.trim()
+            let coachStudentDisplayNameWithHonorific = `${student.full_name} 様`
+            let coachStudentDisplayNamePlain = student.full_name
+
+            if (secondStudentName) {
+                if (schedule.attendance_type === 'student2') {
+                    coachStudentDisplayNameWithHonorific = `${secondStudentName} 様`
+                    coachStudentDisplayNamePlain = secondStudentName
+                } else if (schedule.attendance_type === 'student1') {
+                    coachStudentDisplayNameWithHonorific = `${student.full_name} 様`
+                    coachStudentDisplayNamePlain = student.full_name
+                } else {
+                    // 'both' または未指定（通常の2名レッスン）の場合
+                    coachStudentDisplayNameWithHonorific = `${student.full_name} 様・${secondStudentName} 様`
+                    coachStudentDisplayNamePlain = `${student.full_name}・${secondStudentName}`
+                }
+            }
+
             // スケジュールメモ内の「案件ID」等のシステム管理情報を通知文面から除外
             const cleanNotes = schedule.notes
                 ? schedule.notes
@@ -290,36 +311,43 @@ export async function processLessonReminders(options: ReminderProcessOptions = {
             const coachWebhookUrl = targetWebhookId ? webhookMap.get(targetWebhookId) : null
 
             if (coachWebhookUrl) {
-                // 前回レッスンの報告（前回の練習内容）を取得
+                // 前回レッスンの報告（前回の練習内容）を取得（lessonsテーブルより）
                 let previousLessonNote = '※前回の練習記録なし'
                 try {
                     const { data: prevLesson } = await supabase
-                        .from('lesson_schedules')
-                        .select('id, start_time, notes, lesson_reports(practice_menu, notes, student_feedback)')
+                        .from('lessons')
+                        .select('id, lesson_date, menu_description, coach_comment, feedback_next')
                         .eq('student_id', student.id)
-                        .lt('start_time', schedule.start_time)
-                        .order('start_time', { ascending: false })
+                        .lt('lesson_date', schedule.start_time)
+                        .order('lesson_date', { ascending: false })
                         .limit(1)
                         .maybeSingle()
 
                     if (prevLesson) {
-                        const prevJST = formatJST(prevLesson.start_time)
+                        const prevJST = formatJST(prevLesson.lesson_date)
                         const prevDateStr = prevJST.prevDateStr
-                        const reports = (prevLesson.lesson_reports as any)
-                        const report = Array.isArray(reports) ? reports[0] : reports
-                        const menu = report?.practice_menu ? `メニュー: ${report.practice_menu}` : ''
-                        const reportNotes = report?.notes ? `指導メモ: ${report.notes}` : ''
-                        const feedback = report?.student_feedback ? `生徒感想: ${report.student_feedback}` : ''
-                        const details = [menu, reportNotes, feedback].filter(Boolean).join(' / ')
+                        const parts: string[] = []
+                        if (prevLesson.menu_description && prevLesson.menu_description.trim()) {
+                            parts.push(`メニュー: ${prevLesson.menu_description.trim()}`)
+                        }
+                        if (prevLesson.coach_comment && prevLesson.coach_comment.trim()) {
+                            parts.push(`指導メモ: ${prevLesson.coach_comment.trim()}`)
+                        }
+                        if (prevLesson.feedback_next && prevLesson.feedback_next.trim()) {
+                            parts.push(`次回課題: ${prevLesson.feedback_next.trim()}`)
+                        }
+                        const details = parts.filter(Boolean).join(' / ')
                         previousLessonNote = `・前回の練習 (${prevDateStr}): ${details || '（特記事項なし）'}`
                     }
                 } catch (e) {
-                    console.error('[Cron Reminders] Failed to fetch previous lesson report:', e)
+                    console.error('[Cron Reminders] Failed to fetch previous lesson report from lessons:', e)
                 }
 
                 const coachMessage = coachBodyTmpl
-                    .replace(/{{name}}/g, student.full_name)
-                    .replace(/{{student_name}}/g, student.full_name)
+                    .replace(/{{name}}\s*様/g, coachStudentDisplayNameWithHonorific)
+                    .replace(/{{student_name}}\s*様/g, coachStudentDisplayNameWithHonorific)
+                    .replace(/{{name}}/g, coachStudentDisplayNamePlain)
+                    .replace(/{{student_name}}/g, coachStudentDisplayNamePlain)
                     .replace(/{{lesson_date}}/g, `${dateStr} ${timeStr}`)
                     .replace(/{{date}}/g, dateStr)
                     .replace(/{{time}}/g, timeStr)
