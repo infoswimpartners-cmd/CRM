@@ -390,7 +390,7 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                                                     ACTION 0{idx + 1}
                                                 </span>
                                                 <span className={`px-2 py-0.5 rounded-md font-bold border ${
-                                                    action.pageType === 'studio_cms'
+                                                    action.pageType === 'studio_cms_article'
                                                         ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
                                                         : 'bg-sky-500/20 text-sky-300 border-sky-500/40'
                                                 }`}>
@@ -564,7 +564,7 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                                 <div className="space-y-1.5">
                                     <div className="flex flex-wrap items-center gap-2">
                                         <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold border ${
-                                            activeKit.pageType === 'studio_cms'
+                                            activeKit.pageType === 'studio_cms_article'
                                                 ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
                                                 : 'bg-amber-400/20 text-amber-300 border-amber-400/40'
                                         }`}>
@@ -579,6 +579,9 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                                     </h3>
                                     <p className="text-xs text-zinc-400">
                                         対象ページ: <a href={`https://swim-partners.com${activeKit.targetPath}`} target="_blank" rel="noreferrer" className="font-mono text-indigo-300 hover:underline inline-flex items-center gap-1">{activeKit.targetPath} <ExternalLink className="w-3 h-3" /></a>
+                                        {activeKit.pageGoalSummary && (
+                                            <span className="ml-2 text-zinc-400">（目的: <strong className="text-zinc-200">{activeKit.pageGoalSummary}</strong>）</span>
+                                        )}
                                     </p>
                                 </div>
                                 <button
@@ -601,7 +604,7 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                                     }`}
                                 >
                                     <FileText className="w-4 h-4 text-amber-400" />
-                                    ① 本文・FAQ追記テキスト
+                                    {activeKit.pageType === 'studio_landing_page' ? '① LP構成・セクション改善案' : '① 記事本文・FAQ追記テキスト'}
                                 </button>
 
                                 <button
@@ -613,7 +616,7 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                                     }`}
                                 >
                                     <Layers className="w-4 h-4 text-purple-400" />
-                                    ② タイトル・メタ設定
+                                    {activeKit.pageType === 'studio_landing_page' ? '② LPタイトル・メタ設定' : '② 記事タイトル・メタ設定'}
                                 </button>
 
                                 <button
@@ -625,7 +628,7 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                                     }`}
                                 >
                                     <Code2 className="w-4 h-4 text-emerald-400" />
-                                    ③ JSON-LD 構造化データ
+                                    {activeKit.pageType === 'studio_landing_page' ? '③ 構造化データ（LocalBusiness）' : '③ 構造化データ（FAQPage）'}
                                 </button>
 
                                 <button
@@ -644,41 +647,123 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
 
                         {/* モーダルコンテンツ本体（ここだけが滑らかにスクロール。内部に小さなスクロール枠は一切作らない） */}
                         <div className="p-6 overflow-y-auto flex-1 space-y-6 text-sm">
-                            {/* ================= タブ1: 本文・FAQテキスト ================= */}
+                            {/* ================= タブ1: 本文・LP構成 ================= */}
                             {kitActiveTab === 'content' && (
                                 <div className="space-y-4 animate-in fade-in duration-150">
-                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30">
-                                        <div>
-                                            <div className="font-bold text-amber-300 text-sm flex items-center gap-2">
-                                                <FileText className="w-4 h-4 text-amber-400" />
-                                                {activeKit.pageType === 'studio_cms' ? 'STUDIO CMS記事リッチテキスト用 追記テキスト' : 'STUDIOエディタ用 本文・FAQ追記テキスト'}
+                                    {/* LP（ランディングページ）の場合：セクションごとに見やすくカード化 */}
+                                    {activeKit.pageType === 'studio_landing_page' && activeKit.lpBlocks && activeKit.lpBlocks.length > 0 ? (
+                                        <div className="space-y-4">
+                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                                                <div>
+                                                    <div className="font-bold text-amber-300 text-sm flex items-center gap-2">
+                                                        <Sparkles className="w-4 h-4 text-amber-400" />
+                                                        STUDIO通常デザイン編集用 LPセクション改善案（CVR・成約特化）
+                                                    </div>
+                                                    <div className="text-xs text-zinc-300 mt-1">
+                                                        ブログ記事のような長文流し込みではなく、LPの各構成要素（FV・強み・料金・CTA・FAQ）ごとに最適なテキストを提供しています。各枠右上のコピーボタンをご利用ください。
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={() => handleCopy(activeKit.bodyText, 'body', '全セクションテキスト')}
+                                                    className="px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-zinc-950 font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-[0_0_15px_rgba(245,158,11,0.25)] flex-shrink-0"
+                                                >
+                                                    {copiedField === 'body' ? (
+                                                        <>
+                                                            <Check className="w-4 h-4 text-zinc-950" /> 全文コピー完了！
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Copy className="w-4 h-4 text-zinc-950" /> 全セクションを一括コピー
+                                                        </>
+                                                    )}
+                                                </button>
                                             </div>
-                                            <div className="text-xs text-zinc-300 mt-1">
-                                                既存の記事末尾（チェックシート後）にそのまま貼り付けるだけで、検索意図を満たすFAQセクションが完成します。
-                                            </div>
-                                        </div>
-                                        <button
-                                            onClick={() => handleCopy(activeKit.bodyText, 'body', '本文・FAQテキスト')}
-                                            className="px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-zinc-950 font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-[0_0_15px_rgba(245,158,11,0.25)] flex-shrink-0"
-                                        >
-                                            {copiedField === 'body' ? (
-                                                <>
-                                                    <Check className="w-4 h-4 text-zinc-950" /> コピー完了！
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Copy className="w-4 h-4 text-zinc-950" /> 本文・FAQをコピー
-                                                </>
-                                            )}
-                                        </button>
-                                    </div>
 
-                                    {/* フル展開テキストエリア（入れ子スクロールなし、見やすく全文表示） */}
-                                    <div className="relative rounded-xl border border-zinc-800 bg-zinc-950 p-5 font-sans leading-relaxed text-zinc-200">
-                                        <div className="whitespace-pre-wrap text-sm select-text">
-                                            {activeKit.bodyText}
+                                            {/* 各セクションブロック */}
+                                            <div className="space-y-3">
+                                                {activeKit.lpBlocks.map((block, idx) => (
+                                                    <div key={idx} className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-3">
+                                                        <div className="flex items-start justify-between gap-2 border-b border-zinc-800/80 pb-2.5">
+                                                            <div>
+                                                                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-zinc-800 text-amber-300 border border-zinc-700 mr-2">
+                                                                    BLOCK {idx + 1}
+                                                                </span>
+                                                                <span className="font-bold text-zinc-100 text-sm">{block.sectionName}</span>
+                                                                <p className="text-[11px] text-zinc-400 mt-0.5">{block.description}</p>
+                                                            </div>
+                                                            <button
+                                                                onClick={() => handleCopy(
+                                                                    `${block.headline}\n${block.subheadline ? block.subheadline + '\n' : ''}${block.content}${block.ctaText ? '\n【ボタン】: ' + block.ctaText : ''}`,
+                                                                    `block_${idx}`,
+                                                                    block.sectionName
+                                                                )}
+                                                                className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold flex items-center gap-1.5 transition-colors border border-zinc-700 flex-shrink-0"
+                                                            >
+                                                                {copiedField === `block_${idx}` ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                                                                コピー
+                                                            </button>
+                                                        </div>
+
+                                                        <div className="space-y-2 text-xs">
+                                                            <div className="p-2.5 rounded-lg bg-zinc-900/90 border border-zinc-800">
+                                                                <div className="text-[10px] font-mono text-amber-400/90 font-bold mb-0.5">見出し (HeadLine)</div>
+                                                                <div className="text-zinc-100 font-bold text-sm leading-snug">{block.headline}</div>
+                                                                {block.subheadline && (
+                                                                    <div className="text-zinc-400 text-xs mt-1">{block.subheadline}</div>
+                                                                )}
+                                                            </div>
+
+                                                            <div className="p-3 rounded-lg bg-zinc-900/60 border border-zinc-800 text-zinc-300 whitespace-pre-wrap leading-relaxed">
+                                                                {block.content}
+                                                            </div>
+
+                                                            {block.ctaText && (
+                                                                <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 font-medium flex items-center justify-between">
+                                                                    <span>ボタン文字（CTA）: <strong>{block.ctaText}</strong></span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
                                         </div>
-                                    </div>
+                                    ) : (
+                                        /* CMS記事の場合：リッチテキスト用全文 */
+                                        <div className="space-y-4">
+                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl bg-purple-500/10 border border-purple-500/30">
+                                                <div>
+                                                    <div className="font-bold text-purple-300 text-sm flex items-center gap-2">
+                                                        <FileText className="w-4 h-4 text-purple-400" />
+                                                        STUDIO CMS記事リッチテキスト用 追記テキスト
+                                                    </div>
+                                                    <div className="text-xs text-zinc-300 mt-1">
+                                                        既存の記事末尾にそのまま貼り付けるだけで、検索意図を満たすH2/H3、FAQ、および体験レッスンLP誘導CTAが完成します。
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={() => handleCopy(activeKit.bodyText, 'body', '記事追記テキスト')}
+                                                    className="px-4 py-2.5 rounded-xl bg-purple-500 hover:bg-purple-400 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-[0_0_15px_rgba(168,85,247,0.25)] flex-shrink-0"
+                                                >
+                                                    {copiedField === 'body' ? (
+                                                        <>
+                                                            <Check className="w-4 h-4 text-white" /> コピー完了！
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Copy className="w-4 h-4 text-white" /> 記事テキストをコピー
+                                                        </>
+                                                    )}
+                                                </button>
+                                            </div>
+
+                                            {/* フル展開テキストエリア */}
+                                            <div className="relative rounded-xl border border-zinc-800 bg-zinc-950 p-5 font-sans leading-relaxed text-zinc-200">
+                                                <div className="whitespace-pre-wrap text-sm select-text">
+                                                    {activeKit.bodyText}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
@@ -762,10 +847,14 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                                         <div>
                                             <div className="font-bold text-emerald-300 text-sm flex items-center gap-2">
                                                 <Code2 className="w-4 h-4 text-emerald-400" />
-                                                STUDIOカスタムコード用 FAQPage構造化データ（JSON-LD）
+                                                {activeKit.pageType === 'studio_landing_page'
+                                                    ? 'STUDIOカスタムコード用 LocalBusiness / Service構造化データ（JSON-LD）'
+                                                    : 'STUDIOカスタムコード用 FAQPage構造化データ（JSON-LD）'}
                                             </div>
                                             <div className="text-xs text-zinc-300 mt-1">
-                                                Google検索結果でアコーディオン状のFAQスニペットを表示させ、クリック率と順位を押し上げます。
+                                                {activeKit.pageType === 'studio_landing_page'
+                                                    ? '地域名（エリア）と水泳指導サービスの実体・価格・対応公営プールをGoogle検索エンジンに直接認識させ、MEO・地域検索順位を底上げします。'
+                                                    : 'Google検索結果でアコーディオン状のFAQスニペットを表示させ、クリック率と順位を押し上げます。'}
                                             </div>
                                         </div>
                                         <button
@@ -793,7 +882,7 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                                             STUDIOのデザインエディタ ➔ 対象ページ設定 ➔「カスタムコード」の <code className="text-emerald-300 bg-zinc-900 px-1.5 py-0.5 rounded font-mono">&lt;head&gt;内</code> または <code className="text-emerald-300 bg-zinc-900 px-1.5 py-0.5 rounded font-mono">&lt;body&gt;末尾</code> に貼り付けてください。
                                         </div>
                                         <div className="text-[11px] text-zinc-400">
-                                            ※ STUDIO CMS記事本文（リッチテキストエディタ内）に直接貼り付けてもエスケープされるため、必ずページ設定のカスタムコードをご利用ください。
+                                            ※ STUDIOのページ設定にある「カスタムコード」に設置することで、デザインを一切崩さずに検索エンジンへセマンティック構造を伝達できます。
                                         </div>
                                     </div>
 
@@ -811,7 +900,7 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                                     <div className="p-5 rounded-xl bg-zinc-800/80 border border-zinc-700/80 space-y-3">
                                         <div className="font-bold text-amber-300 text-sm flex items-center gap-2">
                                             <ShieldAlert className="w-4 h-4 text-amber-400" />
-                                            実測データ監査（現在2位の要因分析レポート）
+                                            実測データ監査（現在{activeKit.currentRank}位の要因分析レポート）
                                         </div>
                                         <div className="space-y-2 text-xs text-zinc-300">
                                             <div className="p-3 rounded-lg bg-zinc-950 border border-zinc-800 space-y-1">
@@ -828,7 +917,7 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                                     <div className="p-5 rounded-xl bg-indigo-950/40 border border-indigo-500/30 space-y-3 text-xs">
                                         <div className="font-bold text-indigo-300 text-sm flex items-center gap-2">
                                             <Sparkles className="w-4 h-4" />
-                                            {activeKit.pageType === 'studio_cms' ? 'STUDIO CMSでの反映ステップ（所要時間: 約1分）' : 'STUDIOエディタでの反映ステップ（所要時間: 約1分）'}
+                                            {activeKit.pageType === 'studio_cms_article' ? 'STUDIO CMSでの反映ステップ（所要時間: 約1分）' : 'STUDIOデザインエディタでの反映ステップ（所要時間: 約2分）'}
                                         </div>
                                         <ol className="list-decimal list-inside space-y-2 text-zinc-200 pl-1">
                                             {activeKit.studioSteps.map((step, idx) => (

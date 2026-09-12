@@ -44,7 +44,7 @@ export interface SeoActionTask {
     targetPath: string;
     currentRank: number;
     priority: 'high' | 'medium';
-    pageType: 'studio_cms' | 'studio_static';
+    pageType: 'studio_landing_page' | 'studio_cms_article' | 'studio_cms' | 'studio_static';
     pageTypeLabel: string;
     actionTitle: string;
     actionDetail: string;
@@ -362,17 +362,17 @@ export async function getSeoRankWatchState(supabase?: any): Promise<SeoRankWatch
     for (const tLog of todayLogs) {
         if (topActions.length >= 3) break;
         const kwItem = watchwords.find((w) => w.keyword === tLog.keyword);
-        const isCms = isStudioCmsPath(tLog.target_path);
+        const kit = generateSeoImprovementKit(tLog.keyword, tLog.target_path, kwItem?.current_rank || tLog.current_rank);
         topActions.push({
             id: `task_${tLog.id}`,
             keyword: tLog.keyword,
             targetPath: tLog.target_path,
             currentRank: kwItem?.current_rank || tLog.current_rank,
             priority: kwItem?.priority || 'high',
-            pageType: isCms ? 'studio_cms' : 'studio_static',
-            pageTypeLabel: isCms ? 'STUDIO CMS記事' : 'STUDIO 通常ページ',
-            actionTitle: tLog.action_title,
-            actionDetail: tLog.action_detail,
+            pageType: kit.pageType,
+            pageTypeLabel: kit.pageTypeLabel,
+            actionTitle: tLog.action_title || kit.actionTitle,
+            actionDetail: tLog.action_detail || kit.actionDetail,
             status: 'executed_today',
             executedAt: tLog.implemented_at,
             nextAvailableDate: nextDateStr,
@@ -393,7 +393,6 @@ export async function getSeoRankWatchState(supabase?: any): Promise<SeoRankWatch
 
     for (const cand of candidateKeywords) {
         if (topActions.length >= 3) break;
-        const isCms = isStudioCmsPath(cand.target_path);
         const kit = generateSeoImprovementKit(cand.keyword, cand.target_path, cand.current_rank);
 
         topActions.push({
@@ -402,8 +401,8 @@ export async function getSeoRankWatchState(supabase?: any): Promise<SeoRankWatch
             targetPath: cand.target_path,
             currentRank: cand.current_rank,
             priority: cand.priority,
-            pageType: isCms ? 'studio_cms' : 'studio_static',
-            pageTypeLabel: isCms ? 'STUDIO CMS記事' : 'STUDIO 通常ページ',
+            pageType: kit.pageType,
+            pageTypeLabel: kit.pageTypeLabel,
             actionTitle: kit.actionTitle,
             actionDetail: kit.actionDetail,
             status: cand.status === 'observing' ? 'observing' : 'ready',

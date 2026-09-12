@@ -72,8 +72,10 @@ export const JOHN_SYSTEM_PROMPT = `
 4. **次の検証ポイント・KPI**（成否を測るための指標）
 `;
 
+import { getSeoPageType } from './seo-improvement-generator';
+
 /**
- * 実データに基づいたジョンのデイリーブリーフィングを生成
+ * 実データに基づいたジョンのデイリーブリーフィングを生成（LP vs CMS記事 厳密対応）
  */
 export function generateJohnDailyBriefing(
     rankWatchState?: SeoRankWatchState,
@@ -84,19 +86,39 @@ export function generateJohnDailyBriefing(
     const topContender = rankWatchState?.topContender;
 
     const targetKw = topAction?.keyword || topContender?.keyword || 'スイミング 進級の 早い子';
+    const targetPath = topAction?.targetPath || topContender?.target_path || '/zUHb45xV/swimming_tips_up';
     const currentRank = topAction?.currentRank || topContender?.current_rank || 2;
+    const isLp = getSeoPageType(targetPath) === 'studio_landing_page';
+
+    if (isLp) {
+        return {
+            title: `「${targetKw}」集客ランディングページ（LP）の成約率（CVR）改善と1位獲得戦略`,
+            targetFocus: `注力施策: 「${targetKw}」現在${currentRank}位 ➔ 1位狙撃（集客LP 通常デザイン最適化）`,
+            executiveSummary: `本日の最優先PL改善ポイントは、現在${currentRank}位につけている集客LP（${targetPath}）のファーストビュー訴求と成約導線の最適化です。長文記事ではなく、エリア固有の公営プール出張対応と体験予約への強いCTAを提示することで、広告費ゼロで成約率（CVR）を高め、LTV最大化を図ります。`,
+            analysisAndEvidence: `対象ページは集客用LPです。ブログ記事のように長文を貼り付けるのではなく、ファーストビュー（FV）のキャッチコピーに「${targetKw}」の完全一致を含め、料金プランのアンカリングと体験予約ボタンのマイクロコピーを改善することが最も即効性があります。`,
+            executionPlan: [
+                `【手順1】「TOP 3 ACTIONS」の「STUDIO改善キットを開く」から、LP専用の推奨キャッチコピーとCTA文面を確認。`,
+                `【手順2】STUDIOの「デザインエディタ」で対象ページ（${targetPath}）を開き、H1テキストボックスとCTAボタンの文面を更新（所要時間: 2分）。`,
+                `【手順3】ページ設定の「カスタムコード」にLocalBusiness構造化データを配置し、公開更新。`,
+                `【手順4】カードの「実行済みにする (7日間検証開始)」をクリックしてスプリントを開始。`,
+            ],
+            nextKpi: `主要KPI: 7日後の検索順位 1位到達（目標）、LPから体験予約フォームへの遷移率 CVR 3.5%超。`,
+            cmoInsight: `「LPに必要なのはブログのような長文ではなく、訪問者の『近くで受講できるか』『いくら掛かるのか』の疑問を即座に解消するFVと明朗会計の提示です。」`,
+            updatedAt: todayStr,
+        };
+    }
 
     return {
-        title: `「${targetKw}」の1位奪取と体験レッスンLTV最大化戦略`,
-        targetFocus: `注力施策: 「${targetKw}」現在${currentRank}位 ➔ 1位狙撃（STUDIO CMS最適化）`,
-        executiveSummary: `本日の最優先PL改善ポイントは、現在${currentRank}位につけている「${targetKw}」の検索1位奪取です。広告費ゼロ（オーガニック）で最も購買意欲の高い親御層（進級の悩み・即時性）を獲得できるため、獲得単価（CPA）を実質0円に抑えつつ、体験レッスン経由の月額継続LTV（約18〜24万円/年）を最大化できます。`,
-        analysisAndEvidence: `Search Console実測値およびSTUDIO CMSの現状監査から、競合上位記事に対して「具体的な進級基準FAQ」「つまずき解消のチェックシート」が不足しています。現在2位であるため、タイトルタグへの完全一致キーワード追加とFAQセクション（JSON-LD構造化データ含む）の追記を行うだけで、クリック率（CTR）は現状推定8%から1位奪取時の28〜32%へと約3.5倍に跳ね上がる確度の高いファクトがあります。`,
+        title: `「${targetKw}」CMS記事の1位奪取と体験レッスンLTV最大化戦略`,
+        targetFocus: `注力施策: 「${targetKw}」現在${currentRank}位 ➔ 1位狙撃（STUDIO CMS記事最適化）`,
+        executiveSummary: `本日の最優先PL改善ポイントは、現在${currentRank}位につけているノウハウ記事「${targetKw}」の検索1位奪取です。広告費ゼロ（オーガニック）で最も購買意欲の高い親御層（進級の悩み・即時性）を獲得できるため、獲得単価（CPA）を実質0円に抑えつつ、記事末尾の送客CTAから体験レッスンLTVを最大化できます。`,
+        analysisAndEvidence: `Search Console実測値およびSTUDIO CMSの現状監査から、競合上位記事に対して「具体的な進級基準FAQ」「つまずき解消のQ&A」が不足しています。タイトルタグへの完全一致語句追加と、記事末尾へのFAQ＋体験レッスンLP誘導バナーを追記することで、1位奪取と送客率向上が見込めます。`,
         executionPlan: [
-            `【手順1】「TOP 3 ACTIONS」の「STUDIO改善キットを開く」から、生成済みのタイトル修正案とFAQ本文テキストをコピー。`,
-            `【手順2】STUDIO CMS管理画面で該当記事（/zUHb45xV/swimming_tips_up）の末尾にFAQをペーストし、公開更新（所要時間: 90秒）。`,
-            `【手順3】更新後、カードの「実行済みにする (7日間検証開始)」をクリック。本日〜次回判定日まで再編集を控え、クローラーの評価定着を監視。`,
+            `【手順1】「TOP 3 ACTIONS」の「STUDIO改善キットを開く」から、生成済みのCMS記事タイトル案とFAQ追記テキストをコピー。`,
+            `【手順2】STUDIOダッシュボードの「CMS」から該当記事（${targetPath.split('/').pop()}）を開き、タイトルと本文末尾を更新（所要時間: 90秒）。`,
+            `【手順3】右上の「公開」をクリック後、カードの「実行済みにする (7日間検証開始)」をクリックしてスプリントを開始。`,
         ],
-        nextKpi: `主要KPI: 7日後の検索順位 1位到達（目標）、インプレッションCTR 25%超、月間体験レッスン申込数 +4件（年間見込みLTV +72万円）。`,
+        nextKpi: `主要KPI: 7日後の検索順位 1位到達（目標）、インプレッションCTR 25%超、記事経由の体験レッスン申込数 +4件/月。`,
         cmoInsight: `「アクセスを闇雲に増やすより、既に2位まで来ている確度の高いキーワードを1位にねじ込む方が、今週の売上インパクトは圧倒的です。まずは本日のアクション01を完了させましょう。」`,
         updatedAt: todayStr,
     };
