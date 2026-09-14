@@ -169,7 +169,7 @@ export default function SwimStepBookingPage() {
   const targetSlotCount = currentPlan.slotsCount;
   const remainingCount = targetSlotCount - selectedSlots.length;
 
-  // スロット選択トグル処理
+  // スロット選択トグル処理（アトミックな関数型更新で二重実行・競合を防止）
   const toggleSlot = (
     sessionNumber: number,
     date: string,
@@ -178,44 +178,54 @@ export default function SwimStepBookingPage() {
     timeRange: string,
     className: string
   ) => {
-    const isSelected = selectedSlots.some(
-      (s) => s.sessionNumber === sessionNumber && s.classType === classType
-    );
-
-    if (isSelected) {
-      // 選択解除
-      setSelectedSlots((prev) =>
-        prev.filter((s) => !(s.sessionNumber === sessionNumber && s.classType === classType))
+    setSelectedSlots((prev) => {
+      const isSelected = prev.some(
+        (s) => s.sessionNumber === sessionNumber && s.classType === classType
       );
-    } else {
-      // 追加
-      if (selectedSlots.length >= targetSlotCount) {
-        toast.warning(
-          `選択されたチケット（${currentPlan.name}）は最大${targetSlotCount}枠まで選択可能です。変更したい枠のチェックを外してから選択してください。`
+
+      if (isSelected) {
+        // 選択解除
+        return prev.filter(
+          (s) => !(s.sessionNumber === sessionNumber && s.classType === classType)
         );
-        return;
+      } else {
+        // 追加
+        if (prev.length >= targetSlotCount) {
+          try {
+            toast.warning(
+              `選択されたチケット（${currentPlan.name}）は最大${targetSlotCount}枠まで選択可能です。変更したい枠のチェックを外してから選択してください。`
+            );
+          } catch (e) {
+            console.warn(e);
+          }
+          return prev;
+        }
+
+        return [
+          ...prev,
+          {
+            sessionNumber,
+            date,
+            dateLabel,
+            classType,
+            className: `${className}（${timeRange}）`,
+            timeRange,
+          },
+        ];
       }
-      setSelectedSlots((prev) => [
-        ...prev,
-        {
-          sessionNumber,
-          date,
-          dateLabel,
-          classType,
-          className: `${className}（${timeRange}）`,
-          timeRange,
-        },
-      ]);
-    }
+    });
   };
 
   // プラン変更時に枠数が超過している場合は末尾から自動調整
   const handlePlanChange = (newPlan: 'single' | 'double' | 'full') => {
     setPlanType(newPlan);
-    const maxCount = SWIM_STEP_PLANS[newPlan].slotsCount;
-    if (selectedSlots.length > maxCount) {
-      setSelectedSlots((prev) => prev.slice(0, maxCount));
-    }
+    const maxCount = SWIM_STEP_PLANS[newPlan]?.slotsCount ?? 1;
+    setSelectedSlots((prev) => {
+      if (prev.length > maxCount) {
+        return prev.slice(0, maxCount);
+      }
+      return prev;
+    });
   };
 
   // フォーム送信＆Stripe決済画面へ遷移
@@ -604,27 +614,37 @@ export default function SwimStepBookingPage() {
                               slot.className
                             )
                           }
-                          className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              toggleSlot(
+                                opt.sessionNumber,
+                                opt.date,
+                                opt.dateLabel,
+                                slot.classType,
+                                slot.timeRange,
+                                slot.className
+                              );
+                            }
+                          }}
+                          className={`p-3 rounded-lg border-2 cursor-pointer transition-all select-none ${
                             isChecked
-                              ? 'border-blue-600 bg-blue-50 text-blue-900 shadow-sm'
+                              ? 'border-blue-600 bg-blue-50 text-blue-900 shadow-sm ring-1 ring-blue-600/20'
                               : 'border-slate-200 bg-white hover:border-slate-300 text-slate-700'
                           }`}
                         >
                           <div className="flex items-start gap-2.5">
-                            <Checkbox
-                              checked={isChecked}
-                              className="mt-0.5"
-                              onCheckedChange={() =>
-                                toggleSlot(
-                                  opt.sessionNumber,
-                                  opt.date,
-                                  opt.dateLabel,
-                                  slot.classType,
-                                  slot.timeRange,
-                                  slot.className
-                                )
-                              }
-                            />
+                            <div
+                              className={`h-4 w-4 shrink-0 rounded border flex items-center justify-center mt-0.5 transition-colors ${
+                                isChecked
+                                  ? 'bg-blue-600 border-blue-600 text-white'
+                                  : 'border-slate-300 bg-white'
+                              }`}
+                            >
+                              {isChecked && <CheckCircle2 className="w-3.5 h-3.5 fill-current" />}
+                            </div>
                             <div className="space-y-1">
                               <div className="flex items-center gap-2">
                                 <Badge variant="outline" className="text-[11px] font-bold bg-white">
