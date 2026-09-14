@@ -374,6 +374,24 @@ export async function submitLessonReport(values: FormValues) {
             // メール失敗しても処理を続行
         }
 
+        // 4.5 コーチ専用チャットスペースへの受付完了・控え通知
+        try {
+            const { notifyCoachLessonReportSubmitted } = await import('@/lib/coach-notifications')
+            await notifyCoachLessonReportSubmitted(supabaseAdmin, {
+                coachId: user.id,
+                studentName: data.student_name,
+                studentId: data.student_id,
+                lessonDate: data.lesson_date,
+                location: data.location,
+                lessonMasterId: data.lesson_master_id,
+                menuDescription: data.menu_description,
+                scheduleId: data.schedule_id,
+                attendanceType: data.attendance_type
+            })
+        } catch (coachChatError) {
+            console.error('Error sending coach report notification:', coachChatError)
+        }
+
         // 5. 体験レッスンの場合、生徒のステータスを更新
         if (data.student_id) {
             const { createAdminClient } = await import('@/lib/supabase/admin')
@@ -760,6 +778,24 @@ export async function submitPublicLessonReport(values: PublicFormValues) {
                 price: data.price.toLocaleString() + '円',
                 description: data.menu_description || '(なし)',
             })
+        }
+
+        // 5. コーチ専用チャットスペースへの受付完了・控え通知
+        try {
+            const { notifyCoachLessonReportSubmitted } = await import('@/lib/coach-notifications')
+            await notifyCoachLessonReportSubmitted(supabaseAdmin, {
+                coachId: data.coach_id,
+                studentName: data.student_name,
+                studentId: data.student_id,
+                lessonDate: data.lesson_date,
+                location: data.location,
+                lessonMasterId: data.lesson_master_id,
+                menuDescription: data.menu_description,
+                scheduleId: null,
+                attendanceType: 'both'
+            })
+        } catch (coachChatError) {
+            console.error('Error sending coach report notification in public report:', coachChatError)
         }
 
         return { success: true }
