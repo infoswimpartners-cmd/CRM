@@ -6,11 +6,13 @@ import React, { useState, useEffect } from 'react';
 import { 
   getSwimStepBookings, 
   updateSwimStepBooking, 
-  sendSwimStepLineMessage,
-  SWIM_STEP_SLOTS_DEF, 
+  sendSwimStepLineMessage 
+} from '@/actions/swim_step_admin';
+import { SWIM_STEP_SLOTS_DEF } from '@/types/swim_step';
+import type { 
   SwimStepAdminBooking, 
   SwimStepSummary 
-} from '@/actions/swim_step_admin';
+} from '@/types/swim_step';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';

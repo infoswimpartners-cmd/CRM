@@ -2,14 +2,11 @@
 
 import { stripe } from '@/lib/stripe';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { 
-  SWIM_STEP_PLANS, 
+import { SWIM_STEP_PLANS } from '@/types/swim_step';
+import type { 
   SwimStepSlotSelection, 
   SwimStepBookingPayload 
 } from '@/types/swim_step';
-
-export type { SwimStepSlotSelection, SwimStepBookingPayload };
-export { SWIM_STEP_PLANS };
 
 /**
  * スイムステップのStripe Checkout Session作成処理

@@ -5,10 +5,8 @@ export const dynamic = 'force-dynamic';
 import React, { useEffect, useState } from 'react';
 import liff from '@line/liff';
 import { createSwimStepCheckoutSession } from '@/actions/swim_step';
-import { 
-  SWIM_STEP_PLANS, 
-  SwimStepSlotSelection 
-} from '@/types/swim_step';
+import { SWIM_STEP_PLANS } from '@/types/swim_step';
+import type { SwimStepSlotSelection } from '@/types/swim_step';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
