@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Menu, X, LayoutDashboard, Users, Calendar, DollarSign, Settings, LogOut, History, PlusCircle, Mail, FileCheck, Megaphone, MessageCircle, CreditCard, BookOpen, Crown, Timer, User, UserPlus, Sparkles, Bell } from 'lucide-react'
+import { Menu, X, LayoutDashboard, Users, Calendar, DollarSign, Settings, LogOut, History, PlusCircle, Mail, FileCheck, Megaphone, MessageCircle, CreditCard, BookOpen, Crown, Timer, User, UserPlus, Sparkles, Bell, Waves } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { usePathname } from 'next/navigation'
 import Image from 'next/image'
@@ -135,6 +135,7 @@ export function MobileSidebar({ userProfile }: { userProfile: any }) {
                             <NavItem href="/admin/schedule" icon={Calendar} label="全体スケジュール" isActive={pathname?.startsWith('/admin/schedule')} />
                             <NavItem href="/customers" icon={Users} label="会員管理" isActive={pathname?.startsWith('/customers')} />
                             <NavItem href="/admin/trio" icon={Crown} label="TRIO管理" isActive={pathname?.startsWith('/admin/trio')} />
+                            <NavItem href="/admin/swim-step" icon={Waves} label="スイムステップ管理" isActive={pathname?.startsWith('/admin/swim-step')} />
                             <NavItem href="/admin/coaches" icon={User} label="コーチ管理" isActive={pathname?.startsWith('/admin/coaches')} />
                             <NavItem href="/admin/line-monitoring" icon={MessageCircle} label="LINE日程監視" isActive={pathname?.startsWith('/admin/line-monitoring')} />
 

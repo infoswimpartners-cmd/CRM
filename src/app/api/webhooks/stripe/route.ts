@@ -270,6 +270,129 @@ export async function POST(req: NextRequest) {
 
                         console.log(`[Stripe Webhook] Successfully added ${amount} TRIO tickets to Student ${studentId}. New Balance: ${newBalance}`);
                     }
+                } else if (type === 'swim_step') {
+                    // --- スイムステップ（城東小学校プール）事前決済完了処理 ---
+                    const {
+                        bookingId,
+                        lineUserId,
+                        parentName,
+                        parentKana,
+                        childName,
+                        childKana,
+                        childAge,
+                        phone,
+                        email,
+                        planType,
+                        planName,
+                        amount,
+                        selectedSlotsJson
+                    } = session.metadata || {};
+
+                    console.log(`[Stripe Webhook] Processing Swim Step Payment: Booking ID: ${bookingId}, Parent: ${parentName}, Child: ${childName}`);
+
+                    let selectedSlots: any[] = [];
+                    try {
+                        if (selectedSlotsJson) {
+                            selectedSlots = JSON.parse(selectedSlotsJson);
+                        }
+                    } catch (e) {
+                        console.error('[Stripe Webhook] Failed to parse selectedSlotsJson:', e);
+                    }
+
+                    // 1. DB (swim_step_bookings) のステータスを paid に更新または新規登録
+                    try {
+                        if (bookingId) {
+                            await supabaseAdmin
+                                .from('swim_step_bookings')
+                                .update({
+                                    payment_status: 'paid',
+                                    stripe_payment_intent_id: session.payment_intent as string || null,
+                                    stripe_session_id: session.id,
+                                    updated_at: new Date().toISOString()
+                                })
+                                .eq('id', bookingId);
+                        } else {
+                            // bookingIdがない場合のフォールバック作成
+                            await supabaseAdmin
+                                .from('swim_step_bookings')
+                                .insert({
+                                    line_user_id: lineUserId || null,
+                                    parent_name: parentName || '未登録',
+                                    parent_kana: parentKana || '',
+                                    phone: phone || '',
+                                    email: email || session.customer_details?.email || '',
+                                    child_name: childName || '未登録',
+                                    child_kana: childKana || '',
+                                    child_age: childAge || '',
+                                    plan_type: planType || 'single',
+                                    amount: parseInt(amount || '0', 10),
+                                    payment_status: 'paid',
+                                    stripe_session_id: session.id,
+                                    stripe_payment_intent_id: session.payment_intent as string || null,
+                                    selected_slots: selectedSlots,
+                                    status: 'confirmed'
+                                });
+                        }
+                    } catch (dbErr) {
+                        console.error('[Stripe Webhook] Swim Step DB Update Error:', dbErr);
+                    }
+
+                    // 2. 選択日程テキストの整形
+                    const slotsListText = selectedSlots.length > 0
+                        ? selectedSlots.map(s => `・${s.dateLabel || ''} ${s.className || ''}`).join('\n')
+                        : '・10月限定クラス';
+
+                    // 3. LINE公式アカウントへ予約完了メッセージをプッシュ送信
+                    const targetLineUserId = lineUserId || session.metadata?.line_user_id;
+                    if (targetLineUserId) {
+                        const lineMessage = `【予約完了】ご参加ありがとうございます！🎉
+
+スイムステップ（城東小学校プール）へのお申し込み・決済が完了いたしました。
+
+━━━━━━━━━━━━━━━━━━━
+■ ご予約内容
+・保護者様：${parentName || '保護者'} 様
+・お子様名：${childName || 'お子様'}（${childAge || ''}）
+・参加プラン：${planName || 'スイムステップチケット'}
+・ご参加日程：
+${slotsListText}
+━━━━━━━━━━━━━━━━━━━
+
+■ 会場アクセス
+城東小学校プール（受付はプール棟入口）
+※開始10分前までにお集まりください。
+
+■ 当日の持ち物
+・水着（指定なし）
+・水泳帽（スイムキャップ）
+・ゴーグル
+・バスタオル
+・飲み物（水分補給用）
+
+ご不明な点やお子様の体調不良等ございましたら、このLINEトーク画面よりお気軽にご連絡ください。
+当日お会いできるのをコーチ一同楽しみにしております！`;
+
+                        try {
+                            const lineSent = await lineService.pushMessage(targetLineUserId, lineMessage);
+                            console.log(`[Stripe Webhook] Swim Step LINE Push Sent: ${lineSent}`);
+                        } catch (lineErr) {
+                            console.error('[Stripe Webhook] Swim Step LINE Push Error:', lineErr);
+                        }
+                    }
+
+                    // 4. お礼メール送信
+                    const customerEmail = email || session.customer_details?.email;
+                    if (customerEmail) {
+                        try {
+                            await emailService.sendTriggerEmail('payment_success', customerEmail, {
+                                name: parentName || '保護者様',
+                                title: `スイムステップ（${planName || '10月限定クラス'}）`,
+                                amount: (session.amount_total || 0).toLocaleString() + '円'
+                            });
+                        } catch (mailErr) {
+                            console.error('[Stripe Webhook] Swim Step Email Send Error:', mailErr);
+                        }
+                    }
                 } else if (type === 'membership_enrollment') {
                     const studentId = session.metadata?.studentId
                     const lineUserId = line_user_id || session.metadata?.line_user_id

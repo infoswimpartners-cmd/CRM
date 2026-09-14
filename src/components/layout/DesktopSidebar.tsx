@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { LogOut, LayoutDashboard, Users, Calendar, DollarSign, Settings, User, History, PlusCircle, CreditCard, BookOpen, Mail, FileCheck, Megaphone, MessageCircle, Crown, Timer, UserPlus, Sparkles, Bell } from 'lucide-react'
+import { LogOut, LayoutDashboard, Users, Calendar, DollarSign, Settings, User, History, PlusCircle, CreditCard, BookOpen, Mail, FileCheck, Megaphone, MessageCircle, Crown, Timer, UserPlus, Sparkles, Bell, Waves } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 
 interface DesktopSidebarProps {
@@ -66,6 +66,7 @@ export function DesktopSidebar({ role }: DesktopSidebarProps) {
                         <NavItem href="/admin/schedule" icon={Calendar} label="全体スケジュール" isActive={pathname?.startsWith('/admin/schedule')} />
                         <NavItem href="/customers" icon={Users} label="会員管理" isActive={pathname?.startsWith('/customers')} />
                         <NavItem href="/admin/trio" icon={Crown} label="TRIO管理" isActive={pathname?.startsWith('/admin/trio')} />
+                        <NavItem href="/admin/swim-step" icon={Waves} label="スイムステップ管理" isActive={pathname?.startsWith('/admin/swim-step')} />
                         <NavItem href="/admin/coaches" icon={User} label="コーチ管理" isActive={pathname?.startsWith('/admin/coaches')} />
                         <NavItem href="/admin/line-monitoring" icon={MessageCircle} label="LINE日程監視" isActive={pathname?.startsWith('/admin/line-monitoring')} />
 
