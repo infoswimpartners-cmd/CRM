@@ -1,12 +1,14 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import React, { useEffect, useState } from 'react';
 import liff from '@line/liff';
+import { createSwimStepCheckoutSession } from '@/actions/swim_step';
 import { 
-  createSwimStepCheckoutSession, 
   SWIM_STEP_PLANS, 
   SwimStepSlotSelection 
-} from '@/actions/swim_step';
+} from '@/types/swim_step';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -165,7 +167,7 @@ export default function SwimStepBookingPage() {
     initLiff();
   }, []);
 
-  const currentPlan = SWIM_STEP_PLANS[planType];
+  const currentPlan = SWIM_STEP_PLANS[planType] || SWIM_STEP_PLANS.single;
   const targetSlotCount = currentPlan.slotsCount;
   const remainingCount = targetSlotCount - selectedSlots.length;
 
