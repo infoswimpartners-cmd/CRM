@@ -6,7 +6,8 @@ import React, { useState, useEffect } from 'react';
 import { 
   getSwimStepBookings, 
   updateSwimStepBooking, 
-  sendSwimStepLineMessage 
+  sendSwimStepLineMessage,
+  cancelSwimStepBookingAction 
 } from '@/actions/swim_step_admin';
 import { SWIM_STEP_SLOTS_DEF } from '@/types/swim_step';
 import type { 
@@ -17,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -92,6 +94,13 @@ export default function AdminSwimStepPage() {
   const [editAdminNotes, setEditAdminNotes] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
 
+  // キャンセル・返金モーダルステート
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+  const [issueStripeRefund, setIssueStripeRefund] = useState(true);
+  const [cancelReason, setCancelReason] = useState('');
+  const [sendCancelLine, setSendCancelLine] = useState(true);
+  const [isCancelling, setIsCancelling] = useState(false);
+
   // データ取得
   const fetchData = async () => {
     setLoading(true);
@@ -142,6 +151,46 @@ export default function AdminSwimStepPage() {
       toast.error('エラーが発生しました。');
     } finally {
       setIsUpdating(false);
+    }
+  };
+
+  // キャンセルモーダルオープン
+  const handleOpenCancelModal = (booking: SwimStepAdminBooking) => {
+    setSelectedBooking(booking);
+    setIssueStripeRefund(booking.payment_status === 'paid');
+    setSendCancelLine(Boolean(booking.line_user_id));
+    setCancelReason('');
+    setIsCancelModalOpen(true);
+  };
+
+  // キャンセル・返金実行
+  const handleExecuteCancel = async () => {
+    if (!selectedBooking) return;
+    setIsCancelling(true);
+    try {
+      const res = await cancelSwimStepBookingAction({
+        bookingId: selectedBooking.id,
+        issueStripeRefund,
+        cancelReason,
+        sendLineNotification: sendCancelLine,
+      });
+
+      if (res.success) {
+        if (res.refundId) {
+          toast.success(`キャンセルおよびStripe全額返金（${res.refundedAmount?.toLocaleString()}円）を完了しました。`);
+        } else {
+          toast.success('キャンセル処理を完了しました。');
+        }
+        setIsCancelModalOpen(false);
+        setIsDetailModalOpen(false);
+        fetchData();
+      } else {
+        toast.error(res.error || 'キャンセル処理に失敗しました。');
+      }
+    } catch (e: any) {
+      toast.error('通信エラーが発生しました。');
+    } finally {
+      setIsCancelling(false);
     }
   };
 
@@ -545,6 +594,20 @@ export default function AdminSwimStepPage() {
                               >
                                 <MessageCircle className="w-3.5 h-3.5 mr-1" /> LINE
                               </Button>
+                              {b.status !== 'cancelled' ? (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => handleOpenCancelModal(b)}
+                                  className="h-7 px-2 text-[11px] text-rose-600 hover:bg-rose-50 hover:text-rose-700"
+                                >
+                                  <XCircle className="w-3.5 h-3.5 mr-1" /> キャンセル
+                                </Button>
+                              ) : (
+                                <Badge variant="outline" className="text-[10px] text-rose-500 border-rose-200 bg-rose-50/50">
+                                  解約済
+                                </Badge>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>
@@ -882,22 +945,42 @@ export default function AdminSwimStepPage() {
             </div>
           )}
 
-          <DialogFooter className="pt-3 border-t border-slate-100">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsDetailModalOpen(false)}
-            >
-              閉じる
-            </Button>
-            <Button
-              size="sm"
-              onClick={handleSaveDetail}
-              disabled={isUpdating}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              {isUpdating ? '保存中...' : '変更を保存'}
-            </Button>
+          <DialogFooter className="pt-3 border-t border-slate-100 flex flex-row items-center justify-between">
+            <div>
+              {selectedBooking && selectedBooking.status !== 'cancelled' && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    if (selectedBooking) {
+                      handleOpenCancelModal(selectedBooking);
+                    }
+                  }}
+                  className="text-xs text-rose-600 hover:bg-rose-50 hover:text-rose-700 h-8"
+                >
+                  <XCircle className="w-3.5 h-3.5 mr-1" />
+                  この申込をキャンセル・返金
+                </Button>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsDetailModalOpen(false)}
+              >
+                閉じる
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleSaveDetail}
+                disabled={isUpdating}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                {isUpdating ? '保存中...' : '変更を保存'}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -952,6 +1035,131 @@ export default function AdminSwimStepPage() {
               ) : (
                 <span className="flex items-center gap-1">
                   <Send className="w-3.5 h-3.5" /> LINE送信
+                </span>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* キャンセル・返金確認モーダル */}
+      <Dialog open={isCancelModalOpen} onOpenChange={setIsCancelModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold flex items-center gap-2 text-rose-600">
+              <AlertCircle className="w-5 h-5 text-rose-600" />
+              お申し込みのキャンセル・返金処理
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              予約枠の解放、およびStripeでのカード返金とLINE通知を同時に実行します。
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedBooking && (
+            <div className="space-y-3.5 pt-2 text-xs">
+              {/* 対象者サマリー */}
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">保護者様:</span>
+                  <strong className="text-slate-800">{selectedBooking.parent_name} 様</strong>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">お子様名:</span>
+                  <strong className="text-slate-800">{selectedBooking.child_name} 様</strong>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">参加プラン:</span>
+                  <span className="text-slate-800 font-semibold">{getPlanBadge(selectedBooking.plan_type)}</span>
+                </div>
+                <div className="flex justify-between pt-1 border-t border-slate-200">
+                  <span className="text-slate-500">決済金額:</span>
+                  <strong className="text-blue-700 text-sm">{selectedBooking.amount.toLocaleString()}円</strong>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">現在の決済状況:</span>
+                  <span>{getPaymentBadge(selectedBooking.payment_status)}</span>
+                </div>
+              </div>
+
+              {/* Stripe返金チェックボックス */}
+              {selectedBooking.payment_status === 'paid' ? (
+                <div className="p-3 rounded-xl border border-rose-200 bg-rose-50/60 space-y-2">
+                  <div className="flex items-start gap-2.5">
+                    <Checkbox
+                      id="issueStripeRefund"
+                      checked={issueStripeRefund}
+                      onCheckedChange={(c) => setIssueStripeRefund(Boolean(c))}
+                      className="mt-0.5"
+                    />
+                    <div className="space-y-0.5">
+                      <Label htmlFor="issueStripeRefund" className="text-xs font-bold text-rose-900 cursor-pointer">
+                        Stripe経由で受講料（{selectedBooking.amount.toLocaleString()}円）を全額返金する
+                      </Label>
+                      <p className="text-[11px] text-rose-700 leading-relaxed">
+                        ※チェックを入れると、Stripe API経由でクレジットカードへ即時に全額返金リクエスト（Refund）が実行されます。
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-[11px] text-slate-500 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                  ※このお申し込みは「未決済」のため、Stripeの返金処理は不要です（予約枠のキャンセル・解放のみ実施）。
+                </div>
+              )}
+
+              {/* LINE通知チェックボックス */}
+              {selectedBooking.line_user_id && (
+                <div className="flex items-start gap-2.5 p-2.5 rounded-xl border border-slate-200 bg-slate-50">
+                  <Checkbox
+                    id="sendCancelLine"
+                    checked={sendCancelLine}
+                    onCheckedChange={(c) => setSendCancelLine(Boolean(c))}
+                    className="mt-0.5"
+                  />
+                  <Label htmlFor="sendCancelLine" className="text-xs text-slate-700 cursor-pointer">
+                    保護者様のLINEへ【キャンセル完了通知】を自動送信する
+                  </Label>
+                </div>
+              )}
+
+              {/* キャンセル理由 */}
+              <div className="space-y-1">
+                <Label className="text-xs font-bold text-slate-700">キャンセル理由・管理者メモ（任意）</Label>
+                <Input
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  placeholder="例：お客様都合（体調不良）、重複申込、テストキャンセル 等"
+                  className="text-xs bg-white"
+                />
+              </div>
+
+              <div className="p-2.5 bg-blue-50/60 rounded-lg border border-blue-200 text-[11px] text-blue-800">
+                💡 キャンセルを実行すると、選択されていた受講枠が即座に解放され、クラス別集計の空き枠数が回復します。
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="pt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsCancelModalOpen(false)}
+            >
+              戻る
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleExecuteCancel}
+              disabled={isCancelling}
+              className="bg-rose-600 hover:bg-rose-700 text-white gap-1.5"
+            >
+              {isCancelling ? (
+                <span className="flex items-center gap-1">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> 処理中...
+                </span>
+              ) : (
+                <span className="flex items-center gap-1">
+                  <XCircle className="w-3.5 h-3.5" /> キャンセル・返金を確定する
                 </span>
               )}
             </Button>
