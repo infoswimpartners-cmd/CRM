@@ -159,8 +159,11 @@ export default function SwimStepSuccessPage() {
               画面を閉じる
             </Button>
           )}
-          <p className="text-center text-xs text-slate-400">
-            ご不明な点やお困りごとはLINEトーク画面よりお気軽にご連絡ください。
+          <p className="text-center text-xs text-slate-500">
+            ※キャンセルや日程変更をご希望の場合は、前日正午までにLINE公式アカウントのトーク画面よりご連絡ください。
+          </p>
+          <p className="text-center text-[11px] text-slate-400">
+            その他ご不明な点やお困りごとも、LINEトーク画面よりお気軽にお問い合わせいただけます。
           </p>
         </div>
       </div>

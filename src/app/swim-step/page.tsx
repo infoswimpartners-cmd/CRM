@@ -710,6 +710,9 @@ export default function SwimStepBookingPage() {
                     <p className="text-xs text-slate-600 leading-relaxed">
                       「前日正午以降のキャンセルは100%のキャンセル料が発生することに同意します」
                     </p>
+                    <p className="text-[11px] text-amber-800 font-medium">
+                      ※キャンセルのご連絡は、LINE公式アカウントのトーク画面より前日正午までにお申し付けください。
+                    </p>
                   </div>
                 </div>
               </div>
