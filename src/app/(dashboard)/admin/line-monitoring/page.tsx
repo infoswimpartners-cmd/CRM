@@ -200,7 +200,7 @@ export default function LineMonitoringPage() {
     const [stepLeads, setStepLeads] = useState<any[]>([])
     const [isLoadingStepLeads, setIsLoadingStepLeads] = useState(false)
     const [isTriggeringStepReminder, setIsTriggeringStepReminder] = useState(false)
-    const [stepLeadFilter, setStepLeadFilter] = useState<'all' | 'friend_only' | 'applied' | 'trial_done' | 'active' | 'withdrawn'>('all')
+    const [stepLeadFilter, setStepLeadFilter] = useState<'all' | 'friend_only' | 'inquired' | 'applied' | 'trial_done' | 'active' | 'withdrawn'>('all')
 
     // 時間の自動計算（レッスン種別の分数に基づく）
     const calculateEndTime = (startStr: string, masterId: string, mastersList = lessonMasters) => {
@@ -1346,6 +1346,14 @@ export default function LineMonitoringPage() {
                             友だち追加のみ・配信中 ({stepLeads.filter(l => l.status === 'friend_only').length})
                         </Button>
                         <Button
+                            variant={stepLeadFilter === 'inquired' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setStepLeadFilter('inquired')}
+                            className={`rounded-xl text-xs h-8 ${stepLeadFilter === 'inquired' ? 'bg-sky-600 hover:bg-sky-500 text-white' : 'text-sky-700 border-sky-200 bg-sky-50/50'}`}
+                        >
+                            問い合わせ・相談中 ({stepLeads.filter(l => l.status === 'inquired').length})
+                        </Button>
+                        <Button
                             variant={stepLeadFilter === 'applied' ? 'default' : 'outline'}
                             size="sm"
                             onClick={() => setStepLeadFilter('applied')}
@@ -1445,6 +1453,9 @@ export default function LineMonitoringPage() {
                                                             <SelectContent>
                                                                 <SelectItem value="friend_only">
                                                                     <span className="text-amber-700 font-medium">LINE友だち追加のみ</span>
+                                                                </SelectItem>
+                                                                <SelectItem value="inquired">
+                                                                    <span className="text-sky-700 font-medium">問い合わせ・相談中</span>
                                                                 </SelectItem>
                                                                 <SelectItem value="applied">
                                                                     <span className="text-blue-700 font-medium">申し込み済み</span>

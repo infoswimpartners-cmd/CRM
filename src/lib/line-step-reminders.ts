@@ -8,7 +8,7 @@ const LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN || ''
 export interface StepLeadState {
     line_user_id: string
     display_name: string | null
-    status: 'friend_only' | 'applied' | 'contacted' | 'trial_done' | 'active' | 'withdrawn'
+    status: 'friend_only' | 'inquired' | 'applied' | 'trial_done' | 'active' | 'withdrawn'
     step_stage: number // 0: 未送信, 1: 24h送信済, 2: 72h送信済, 3: 120h送信済, -1: 停止
     followed_at: string
     next_send_at: string | null
@@ -188,18 +188,18 @@ export async function handleOfficialLineMessage(lineUserId: string, messageText:
 
     // もしステップ配信対象中であれば即座に停止
     if (state && (state.step_stage >= 0 || state.status === 'friend_only')) {
-        state.status = 'applied' // 相談中・申し込み済みへ
+        state.status = 'inquired' // 問い合わせ・相談中へ
         state.step_stage = -1    // 配信停止
         state.next_send_at = null
         await saveStepLeadState(state)
 
-        // studentsテーブルも「申し込み済み」に更新
+        // studentsテーブルも「問い合わせ・相談中」に更新
         await supabase
             .from('students')
-            .update({ status: 'applied' })
+            .update({ status: 'inquired' })
             .eq('line_user_id', lineUserId)
 
-        console.log(`[Official LINE Step] User message received from ${displayName || lineUserId}. Step reminder stopped!`)
+        console.log(`[Official LINE Step] User message received from ${displayName || lineUserId}. Status changed to inquired & step reminder stopped!`)
     }
 
     // 管理者専用 Google Chat スペースへ相談検知通知
@@ -211,14 +211,15 @@ export async function handleOfficialLineMessage(lineUserId: string, messageText:
         .limit(1)
         .maybeSingle()
 
-    if (defaultWebhook?.webhook_url) {
+    const webhookUrl = defaultWebhook?.webhook_url || process.env.GOOGLE_CHAT_WEBHOOK_URL
+    if (webhookUrl) {
         const chatMessage = `💬 *【事務局公式LINE チャット相談検知】*\n` +
                             `・顧客名: ${displayName || 'LINEユーザー'} 様\n` +
                             `・メッセージ: 「${messageText}」\n` +
                             `・ステータス: 自動ステップ配信を停止し、有人対応モードに切り替えました。\n` +
                             `・検知日時: ${new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}`
         try {
-            await sendGoogleChatMessage(defaultWebhook.webhook_url, chatMessage)
+            await sendGoogleChatMessage(webhookUrl, chatMessage)
         } catch (e) {
             console.error('[Official LINE Step] Failed to notify Google Chat:', e)
         }
