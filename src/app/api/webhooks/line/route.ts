@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { sendGoogleChatMessage } from '@/lib/google-chat'
+import { 
+    isOfficialBotDestination, 
+    handleOfficialLineFollow, 
+    handleOfficialLineUnfollow, 
+    handleOfficialLineMessage 
+} from '@/lib/line-step-reminders'
 
 const CHANNEL_SECRET = process.env.LINE_CHANNEL_SECRET || process.env.LINE_CLIENT_SECRET || ''
 const CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN || ''
@@ -163,12 +169,42 @@ export async function POST(req: NextRequest) {
             botName = '未紐付けボット'
         }
 
+        const isOfficialBot = isOfficialBotDestination(destination)
+
         for (const event of events) {
-            // テキストメッセージイベントのみを対象にする
+            const lineUserId = event.source?.userId
+
+            // A. 友だち追加イベント (follow)
+            if (event.type === 'follow' && lineUserId) {
+                console.log(`[LINE Webhook] Follow event received from user: ${lineUserId}, destination: ${destination}`)
+                if (isOfficialBot) {
+                    const activeAccessToken = coachAccessToken || CHANNEL_ACCESS_TOKEN
+                    const displayName = await getLineUserProfile(lineUserId, activeAccessToken)
+                    await handleOfficialLineFollow(lineUserId, displayName)
+                }
+                continue
+            }
+
+            // B. ブロック（友だち解除）イベント (unfollow)
+            if (event.type === 'unfollow' && lineUserId) {
+                console.log(`[LINE Webhook] Unfollow event received from user: ${lineUserId}`)
+                if (isOfficialBot) {
+                    await handleOfficialLineUnfollow(lineUserId)
+                }
+                continue
+            }
+
+            // C. テキストメッセージイベント
             if (event.type === 'message' && event.message && event.message.type === 'text') {
                 const messageText = event.message.text
-                const lineUserId = event.source.userId
                 const direction = event.source.type === 'user' ? 'customer_to_coach' : 'coach_to_customer'
+
+                // 事務局公式LINE宛てのメッセージの場合、ステップ配信を即時停止＆管理者通知
+                if (isOfficialBot && lineUserId && direction === 'customer_to_coach') {
+                    const activeAccessToken = coachAccessToken || CHANNEL_ACCESS_TOKEN
+                    const displayName = await getLineUserProfile(lineUserId, activeAccessToken)
+                    await handleOfficialLineMessage(lineUserId, messageText, displayName)
+                }
 
                 // 3. 日程調整に関するメッセージか判定
                 if (detectScheduleKeywords(messageText)) {

@@ -284,10 +284,10 @@ export async function updateStudentStatus(studentId: string, newStatus: string) 
     if (!user) return { success: false, error: 'Unauthorized' }
 
     try {
-        // 2. Fetch current student data (need stripe_sub_id)
+        // 2. Fetch current student data (need stripe_sub_id, line_user_id)
         const { data: student, error: fetchError } = await supabase
             .from('students')
-            .select('stripe_subscription_id')
+            .select('stripe_subscription_id, line_user_id')
             .eq('id', studentId)
             .single()
 
@@ -306,6 +306,16 @@ export async function updateStudentStatus(studentId: string, newStatus: string) 
             }
         }
 
+        // 4. ステータスが変更された場合、公式LINEステップ配信を連動して停止・状態更新
+        if (student.line_user_id && newStatus !== 'friend_only') {
+            try {
+                const { stopStepReminderForUser } = await import('@/lib/line-step-reminders')
+                await stopStepReminderForUser(student.line_user_id, newStatus)
+            } catch (stepErr) {
+                console.error('Failed to stop step reminder:', stepErr)
+            }
+        }
+
         const updatePayload: any = { status: newStatus }
 
         if (newStatus === 'withdrawn') {
@@ -321,6 +331,7 @@ export async function updateStudentStatus(studentId: string, newStatus: string) 
         if (updateError) throw updateError
 
         revalidatePath(`/customers/${studentId}`)
+        revalidatePath('/customers')
         return { success: true }
 
     } catch (error: any) {

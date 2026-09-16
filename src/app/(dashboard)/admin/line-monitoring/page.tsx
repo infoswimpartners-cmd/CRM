@@ -16,6 +16,9 @@ import {
     saveScheduleMonitoringWebhookAction,
     testScheduleMonitoringWebhookAction,
     verifyCoachLineTokenAction,
+    getOfficialLineStepLeadsAction,
+    updateStepLeadStatusAction,
+    triggerStepRemindersNowAction,
     LineMonitoringLog,
     LineBotConfig
 } from '@/actions/line-monitoring'
@@ -193,6 +196,12 @@ export default function LineMonitoringPage() {
     const [onlyAssignedCoachStudents, setOnlyAssignedCoachStudents] = useState(false)
     const [isTriggeringReminder, setIsTriggeringReminder] = useState(false)
 
+    // 事務局公式LINEステップ配信状態
+    const [stepLeads, setStepLeads] = useState<any[]>([])
+    const [isLoadingStepLeads, setIsLoadingStepLeads] = useState(false)
+    const [isTriggeringStepReminder, setIsTriggeringStepReminder] = useState(false)
+    const [stepLeadFilter, setStepLeadFilter] = useState<'all' | 'friend_only' | 'applied' | 'trial_done' | 'active' | 'withdrawn'>('all')
+
     // 時間の自動計算（レッスン種別の分数に基づく）
     const calculateEndTime = (startStr: string, masterId: string, mastersList = lessonMasters) => {
         if (!startStr) return ''
@@ -262,7 +271,61 @@ export default function LineMonitoringPage() {
         fetchConfigs()
         fetchChatWebhooks()
         fetchAdminWebhook()
+        fetchStepLeads()
     }, [])
+
+    // 事務局公式LINEステップ配信リード取得
+    const fetchStepLeads = async () => {
+        setIsLoadingStepLeads(true)
+        try {
+            const res = await getOfficialLineStepLeadsAction()
+            if (res.success && res.data) {
+                setStepLeads(res.data)
+            }
+        } catch (e: any) {
+            console.error('Failed to fetch step leads:', e)
+        } finally {
+            setIsLoadingStepLeads(false)
+        }
+    }
+
+    // ステップ配信ステータス更新
+    const handleUpdateStepLeadStatus = async (lineUserId: string, newStatus: string, stopDelivery: boolean = false) => {
+        try {
+            const res = await updateStepLeadStatusAction(lineUserId, newStatus, stopDelivery)
+            if (res.success) {
+                toast.success('ステータスを更新しました')
+                fetchStepLeads()
+            } else {
+                toast.error('更新に失敗しました: ' + res.error)
+            }
+        } catch (e: any) {
+            toast.error('エラーが発生しました: ' + e.message)
+        }
+    }
+
+    // ステップ配信手動即時実行（テストまたは本番）
+    const handleTriggerStepReminders = async (dryRun: boolean = false) => {
+        setIsTriggeringStepReminder(true)
+        try {
+            const res = await triggerStepRemindersNowAction(dryRun)
+            if (res.success) {
+                const count = 'processedCount' in res ? (res.processedCount || 0) : 0
+                if (dryRun) {
+                    toast.info(`【テスト確認】送信対象リード: ${count}件`)
+                } else {
+                    toast.success(`ステップ配信を実行しました（送信対象: ${count}件）`)
+                }
+                fetchStepLeads()
+            } else {
+                toast.error('ステップ配信の実行に失敗しました: ' + res.error)
+            }
+        } catch (e: any) {
+            toast.error('エラーが発生しました: ' + e.message)
+        } finally {
+            setIsTriggeringStepReminder(false)
+        }
+    }
 
     // Webhookリスト読み込み後のセレクトボックス自動同期
     useEffect(() => {
@@ -787,6 +850,15 @@ export default function LineMonitoringPage() {
                             <MessageSquare className="h-4 w-4 mr-2" />
                             日程調整ログ
                         </TabsTrigger>
+                        <TabsTrigger value="step-reminders" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                            <Send className="h-4 w-4 mr-2 text-indigo-600" />
+                            公式LINEステップ配信
+                            {stepLeads.filter(l => l.status === 'friend_only').length > 0 && (
+                                <span className="ml-1.5 px-1.5 py-0.2 bg-amber-500 text-white rounded-full text-[10px] font-bold">
+                                    {stepLeads.filter(l => l.status === 'friend_only').length}
+                                </span>
+                            )}
+                        </TabsTrigger>
                         <TabsTrigger value="settings" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
                             <Bot className="h-4 w-4 mr-2" />
                             ボット紐付け設定
@@ -1210,6 +1282,227 @@ export default function LineMonitoringPage() {
                             </CardContent>
                         </Card>
                     </div>
+                </TabsContent>
+
+                {/* タブ3: 事務局公式LINE 未申込ステップ配信 */}
+                <TabsContent value="step-reminders" className="space-y-6">
+                    {/* 上部説明 ＆ アクションバナー */}
+                    <div className="bg-gradient-to-r from-indigo-50/90 via-blue-50/70 to-indigo-50/90 border border-indigo-100 rounded-2xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                        <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-indigo-600 text-white text-xs font-bold">
+                                    <Send className="h-3 w-3" />
+                                    事務局公式LINE代表アカウント（@607ekntf）
+                                </span>
+                                <Badge variant="outline" className="bg-white text-slate-600 border-indigo-200 text-xs">
+                                    毎時Cron自動判定
+                                </Badge>
+                            </div>
+                            <h3 className="text-base font-bold text-slate-800">友だち追加未申込ユーザー向け 自動ステップ配信</h3>
+                            <p className="text-xs text-slate-600 max-w-2xl leading-relaxed">
+                                公式LINEを友だち追加したものの、申し込みがないリードに対し、24時間後（Step 1: 出張公営プール案内）、72時間後（Step 2: お悩み・上達安心感）、120時間後（Step 3: チャット直接相談）を順次自動配信します。<br />
+                                <span className="text-indigo-700 font-semibold">※体験申込フォーム送信時、またはチャットで返信があった瞬間にステップ配信は即座に自動停止します。</span>
+                            </p>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 self-end md:self-auto shrink-0">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleTriggerStepReminders(true)}
+                                disabled={isTriggeringStepReminder}
+                                className="bg-white border-indigo-200 text-indigo-700 hover:bg-indigo-50 rounded-xl text-xs h-9"
+                            >
+                                {isTriggeringStepReminder ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
+                                対象者テスト確認
+                            </Button>
+                            <Button
+                                size="sm"
+                                onClick={() => handleTriggerStepReminders(false)}
+                                disabled={isTriggeringStepReminder}
+                                className="bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm shadow-indigo-600/20 rounded-xl text-xs h-9"
+                            >
+                                {isTriggeringStepReminder ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Send className="h-3.5 w-3.5 mr-1.5" />}
+                                今すぐ配信を実行
+                            </Button>
+                        </div>
+                    </div>
+
+                    {/* ステータスフィルターボタン */}
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                            variant={stepLeadFilter === 'all' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setStepLeadFilter('all')}
+                            className="rounded-xl text-xs h-8"
+                        >
+                            すべて ({stepLeads.length})
+                        </Button>
+                        <Button
+                            variant={stepLeadFilter === 'friend_only' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setStepLeadFilter('friend_only')}
+                            className={`rounded-xl text-xs h-8 ${stepLeadFilter === 'friend_only' ? 'bg-amber-600 hover:bg-amber-500 text-white' : 'text-amber-700 border-amber-200 bg-amber-50/50'}`}
+                        >
+                            友だち追加のみ・配信中 ({stepLeads.filter(l => l.status === 'friend_only').length})
+                        </Button>
+                        <Button
+                            variant={stepLeadFilter === 'applied' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setStepLeadFilter('applied')}
+                            className={`rounded-xl text-xs h-8 ${stepLeadFilter === 'applied' ? 'bg-blue-600 hover:bg-blue-500 text-white' : 'text-blue-700 border-blue-200 bg-blue-50/50'}`}
+                        >
+                            申し込み済み ({stepLeads.filter(l => l.status === 'applied').length})
+                        </Button>
+                        <Button
+                            variant={stepLeadFilter === 'trial_done' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setStepLeadFilter('trial_done')}
+                            className={`rounded-xl text-xs h-8 ${stepLeadFilter === 'trial_done' ? 'bg-purple-600 hover:bg-purple-500 text-white' : 'text-purple-700 border-purple-200 bg-purple-50/50'}`}
+                        >
+                            体験済み ({stepLeads.filter(l => l.status === 'trial_done').length})
+                        </Button>
+                        <Button
+                            variant={stepLeadFilter === 'active' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setStepLeadFilter('active')}
+                            className={`rounded-xl text-xs h-8 ${stepLeadFilter === 'active' ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'text-emerald-700 border-emerald-200 bg-emerald-50/50'}`}
+                        >
+                            入会済み ({stepLeads.filter(l => l.status === 'active').length})
+                        </Button>
+                        <Button
+                            variant={stepLeadFilter === 'withdrawn' ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setStepLeadFilter('withdrawn')}
+                            className={`rounded-xl text-xs h-8 ${stepLeadFilter === 'withdrawn' ? 'bg-rose-600 hover:bg-rose-500 text-white' : 'text-rose-700 border-rose-200 bg-rose-50/50'}`}
+                        >
+                            退会済み ({stepLeads.filter(l => l.status === 'withdrawn').length})
+                        </Button>
+                    </div>
+
+                    {/* リード一覧テーブル */}
+                    <Card className="border-slate-100 shadow-sm rounded-2xl bg-white overflow-hidden">
+                        {isLoadingStepLeads ? (
+                            <div className="flex flex-col items-center justify-center p-12 space-y-4">
+                                <RefreshCw className="h-8 w-8 text-indigo-500 animate-spin" />
+                                <p className="text-slate-400 text-sm">ステップ配信データを読み込んでいます...</p>
+                            </div>
+                        ) : stepLeads.length === 0 ? (
+                            <div className="text-center p-12 space-y-3">
+                                <AlertCircle className="h-10 w-10 text-slate-300 mx-auto" />
+                                <h4 className="text-slate-500 text-base font-medium">登録されている公式LINE友だちはいません</h4>
+                                <p className="text-slate-400 text-xs">事務局公式LINEが友だち追加されると、自動的にここに表示されます。</p>
+                            </div>
+                        ) : (
+                            <Table>
+                                <TableHeader className="bg-slate-50/50">
+                                    <TableRow>
+                                        <TableHead>生徒名 / LINE表示名</TableHead>
+                                        <TableHead>ステータス（CRM）</TableHead>
+                                        <TableHead>ステップ配信進捗</TableHead>
+                                        <TableHead>次回配信予定</TableHead>
+                                        <TableHead>友だち追加日時</TableHead>
+                                        <TableHead className="w-[150px] text-right">配信操作</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {stepLeads
+                                        .filter(l => stepLeadFilter === 'all' || l.status === stepLeadFilter)
+                                        .map((lead: any) => {
+                                            const isStopped = lead.step_stage === -1 || lead.is_blocked
+                                            const stageLabels: Record<number, string> = {
+                                                0: '未送信（待機中）',
+                                                1: 'Step 1 送信済 (24h)',
+                                                2: 'Step 2 送信済 (72h)',
+                                                3: 'Step 3 送信済 (120h)'
+                                            }
+
+                                            return (
+                                                <TableRow key={lead.line_user_id} className="hover:bg-slate-50/50">
+                                                    <TableCell>
+                                                        <div className="flex flex-col">
+                                                            <div className="font-semibold text-slate-800 flex items-center gap-1.5">
+                                                                <User className="h-3.5 w-3.5 text-slate-400" />
+                                                                <span>{lead.full_name || lead.display_name || '公式LINE友だち'}</span>
+                                                                {lead.student_id && (
+                                                                    <Link href={`/customers/${lead.student_id}`} className="text-indigo-600 hover:text-indigo-500 ml-1">
+                                                                        <ExternalLink className="h-3 w-3" />
+                                                                    </Link>
+                                                                )}
+                                                            </div>
+                                                            <span className="font-mono text-[10px] text-slate-400 truncate max-w-[180px]">
+                                                                {lead.line_user_id}
+                                                            </span>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Select 
+                                                            value={lead.status || 'friend_only'} 
+                                                            onValueChange={(val) => handleUpdateStepLeadStatus(lead.line_user_id, val)}
+                                                        >
+                                                            <SelectTrigger className="h-7 text-xs rounded-full font-medium w-[140px]">
+                                                                <SelectValue />
+                                                            </SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="friend_only">
+                                                                    <span className="text-amber-700 font-medium">LINE友だち追加のみ</span>
+                                                                </SelectItem>
+                                                                <SelectItem value="applied">
+                                                                    <span className="text-blue-700 font-medium">申し込み済み</span>
+                                                                </SelectItem>
+                                                                <SelectItem value="trial_done">
+                                                                    <span className="text-purple-700 font-medium">体験済み</span>
+                                                                </SelectItem>
+                                                                <SelectItem value="active">
+                                                                    <span className="text-emerald-700 font-medium">入会済み</span>
+                                                                </SelectItem>
+                                                                <SelectItem value="withdrawn">
+                                                                    <span className="text-rose-700 font-medium">退会済み</span>
+                                                                </SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {isStopped ? (
+                                                            <Badge variant="outline" className="bg-slate-100 text-slate-500 border-slate-200 text-xs font-normal">
+                                                                {lead.is_blocked ? 'ブロック中' : '配信停止済'}
+                                                            </Badge>
+                                                        ) : (
+                                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-xs font-medium border border-indigo-100">
+                                                                <Send className="h-3 w-3" />
+                                                                {stageLabels[lead.step_stage] || `Stage ${lead.step_stage}`}
+                                                            </span>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell className="text-xs text-slate-500">
+                                                        {lead.next_send_at && !isStopped ? (
+                                                            <span className="flex items-center gap-1 text-indigo-600 font-medium font-mono">
+                                                                <Clock className="h-3 w-3" />
+                                                                {new Date(lead.next_send_at).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-slate-400">―</span>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell className="text-xs text-slate-500 font-mono">
+                                                        {lead.followed_at ? new Date(lead.followed_at).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '―'}
+                                                    </TableCell>
+                                                    <TableCell className="text-right">
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => handleUpdateStepLeadStatus(lead.line_user_id, lead.status, !isStopped)}
+                                                            className={`text-xs rounded-xl h-7 px-2.5 ${isStopped ? 'text-indigo-600 border-indigo-200 hover:bg-indigo-50' : 'text-slate-500 hover:text-red-600 hover:border-red-200'}`}
+                                                        >
+                                                            {isStopped ? '配信を再開' : '配信を停止'}
+                                                        </Button>
+                                                    </TableCell>
+                                                </TableRow>
+                                            )
+                                        })}
+                                </TableBody>
+                            </Table>
+                        )}
+                    </Card>
                 </TabsContent>
             </Tabs>
 

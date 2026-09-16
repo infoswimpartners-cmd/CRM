@@ -677,4 +677,136 @@ export async function verifyCoachGChatWebhookAction(webhookUrl: string, coachNam
     }
 }
 
+/**
+ * 事務局公式LINEのステップ配信リード一覧を取得します（管理者のみ）
+ */
+export async function getOfficialLineStepLeadsAction() {
+    const { isAuthorized } = await verifyAdminRole()
+    if (!isAuthorized) {
+        return { success: false, error: 'Unauthorized', data: [] }
+    }
+
+    const supabase = await createClient()
+
+    try {
+        // app_configs から line_step:* を全件取得
+        const { data: configs } = await supabase
+            .from('app_configs')
+            .select('key, value, updated_at')
+            .like('key', 'line_step:%')
+
+        // students から status: friend_only の生徒も取得してマージ
+        const { data: students } = await supabase
+            .from('students')
+            .select('id, full_name, line_user_id, status, created_at')
+            .not('line_user_id', 'is', null)
+
+        const studentMap = new Map((students || []).map(s => [s.line_user_id, s]))
+
+        const leads: any[] = []
+
+        for (const cfg of configs || []) {
+            try {
+                const parsed = JSON.parse(cfg.value)
+                const student = studentMap.get(parsed.line_user_id)
+                leads.push({
+                    ...parsed,
+                    student_id: student?.id || null,
+                    full_name: student?.full_name || parsed.display_name || '公式LINE友だち',
+                    current_student_status: student?.status || parsed.status
+                })
+            } catch {}
+        }
+
+        // configs にないが students で friend_only なユーザーも補完
+        for (const s of students || []) {
+            if (s.status === 'friend_only' && s.line_user_id && !leads.some(l => l.line_user_id === s.line_user_id)) {
+                leads.push({
+                    line_user_id: s.line_user_id,
+                    display_name: s.full_name,
+                    full_name: s.full_name,
+                    student_id: s.id,
+                    status: 'friend_only',
+                    step_stage: 0,
+                    followed_at: s.created_at,
+                    next_send_at: null,
+                    last_sent_at: null,
+                    is_blocked: false,
+                    current_student_status: 'friend_only'
+                })
+            }
+        }
+
+        // 新しい順にソート
+        leads.sort((a, b) => new Date(b.followed_at || 0).getTime() - new Date(a.followed_at || 0).getTime())
+
+        return { success: true, data: leads }
+    } catch (e: any) {
+        console.error('getOfficialLineStepLeadsAction Error:', e)
+        return { success: false, error: e.message, data: [] }
+    }
+}
+
+/**
+ * 事務局公式LINEステップ配信のステータスまたは配信停止を手動更新します（管理者のみ）
+ */
+export async function updateStepLeadStatusAction(lineUserId: string, newStatus: string, stopDelivery: boolean = false) {
+    const { isAuthorized } = await verifyAdminRole()
+    if (!isAuthorized) {
+        return { success: false, error: 'Unauthorized' }
+    }
+
+    try {
+        const { getStepLeadState, saveStepLeadState } = await import('@/lib/line-step-reminders')
+        const state = await getStepLeadState(lineUserId)
+
+        if (state) {
+            state.status = newStatus as any
+            if (stopDelivery || newStatus !== 'friend_only') {
+                state.step_stage = -1
+                state.next_send_at = null
+            } else if (newStatus === 'friend_only' && state.step_stage === -1) {
+                // 再開
+                state.step_stage = 0
+                state.next_send_at = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+            }
+            await saveStepLeadState(state)
+        }
+
+        // students テーブルも更新
+        const supabase = await createClient()
+        await supabase
+            .from('students')
+            .update({ status: newStatus })
+            .eq('line_user_id', lineUserId)
+
+        revalidatePath('/admin/line-monitoring')
+        revalidatePath('/customers')
+        return { success: true }
+    } catch (e: any) {
+        console.error('updateStepLeadStatusAction Error:', e)
+        return { success: false, error: e.message }
+    }
+}
+
+/**
+ * ステップ配信を手動即時実行（テストまたは手動トリガー）
+ */
+export async function triggerStepRemindersNowAction(dryRun: boolean = false) {
+    const { isAuthorized } = await verifyAdminRole()
+    if (!isAuthorized) {
+        return { success: false, error: 'Unauthorized' }
+    }
+
+    try {
+        const { processLineStepReminders } = await import('@/lib/line-step-reminders')
+        const result = await processLineStepReminders({ dryRun })
+        revalidatePath('/admin/line-monitoring')
+        return { success: true, ...result }
+    } catch (e: any) {
+        console.error('triggerStepRemindersNowAction Error:', e)
+        return { success: false, error: e.message }
+    }
+}
+
 
