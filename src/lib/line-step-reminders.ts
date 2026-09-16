@@ -202,22 +202,48 @@ export async function handleOfficialLineMessage(lineUserId: string, messageText:
         console.log(`[Official LINE Step] User message received from ${displayName || lineUserId}. Status changed to inquired & step reminder stopped!`)
     }
 
-    // 管理者専用 Google Chat スペースへ相談検知通知
-    const { data: defaultWebhook } = await supabase
-        .from('google_chat_webhooks')
-        .select('webhook_url')
-        .ilike('space_name', '%日程調整%')
-        .eq('active', true)
-        .limit(1)
+    // 管理者専用「公式ラインチャットグループ」へ相談検知通知
+    let webhookUrl: string | null = null
+
+    // 1. 管理者設定（email_triggers: line_schedule_detected）を第一優先で参照
+    const { data: adminTrigger } = await supabase
+        .from('email_triggers')
+        .select('google_chat_webhook_url, google_chat_enabled')
+        .eq('id', 'line_schedule_detected')
         .maybeSingle()
 
-    const webhookUrl = defaultWebhook?.webhook_url || process.env.GOOGLE_CHAT_WEBHOOK_URL
+    if (adminTrigger && adminTrigger.google_chat_enabled !== false && adminTrigger.google_chat_webhook_url) {
+        webhookUrl = adminTrigger.google_chat_webhook_url
+    }
+
+    // 2. 未設定の場合、google_chat_webhooksの「公式ラインチャットグループ」をフォールバック検索
+    if (!webhookUrl) {
+        const { data: defaultWebhook } = await supabase
+            .from('google_chat_webhooks')
+            .select('webhook_url')
+            .or('space_name.ilike.%公式ライン%,space_name.ilike.%日程調整%')
+            .eq('active', true)
+            .limit(1)
+            .maybeSingle()
+
+        if (defaultWebhook?.webhook_url) {
+            webhookUrl = defaultWebhook.webhook_url
+        }
+    }
+
+    // 3. 環境変数を最終フォールバック
+    if (!webhookUrl) {
+        webhookUrl = process.env.GOOGLE_CHAT_WEBHOOK_URL || null
+    }
+
     if (webhookUrl) {
-        const chatMessage = `💬 *【事務局公式LINE チャット相談検知】*\n` +
-                            `・顧客名: ${displayName || 'LINEユーザー'} 様\n` +
-                            `・メッセージ: 「${messageText}」\n` +
-                            `・ステータス: 自動ステップ配信を停止し、有人対応モードに切り替えました。\n` +
-                            `・検知日時: ${new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}`
+        const chatMessage = `💬 *【公式ラインチャットグループ通知】見込み客からメッセージを受信しました*\n` +
+                            `・顧客名: ${displayName || '公式LINEユーザー'} 様\n` +
+                            `・LINE ID: \`${lineUserId}\`\n` +
+                            `・受信内容:\n「${messageText}」\n` +
+                            `・対応状況: 自動ステップ配信を停止し、ステータスを「問い合わせ・相談中」に更新しました。\n` +
+                            `・検知日時: ${new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}\n` +
+                            `※LINE公式アカウント管理画面にて有人チャット対応をお願いします。`
         try {
             await sendGoogleChatMessage(webhookUrl, chatMessage)
         } catch (e) {

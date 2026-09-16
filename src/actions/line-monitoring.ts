@@ -537,8 +537,8 @@ export async function saveScheduleMonitoringWebhookAction(data: { webhook_url: s
         .from('email_triggers')
         .upsert({
             id: 'line_schedule_detected',
-            name: 'LINE公式アカウント 日程調整メッセージ検知（管理者通知）',
-            description: '生徒とコーチの間で日程調整が行われた際に、管理者専用のGoogle Chatスペースへ自動通知します。',
+            name: '公式ラインチャットグループ（チャット相談＆日程調整検知）',
+            description: '公式LINEでの顧客からのチャット相談や、生徒・コーチ間の日程調整が検知された際に、管理者専用の公式ラインチャットグループへ自動通知します。',
             google_chat_webhook_url: data.webhook_url.trim() || null,
             google_chat_enabled: data.enabled,
             updated_at: new Date().toISOString()
@@ -554,7 +554,7 @@ export async function saveScheduleMonitoringWebhookAction(data: { webhook_url: s
 }
 
 /**
- * 管理者用 LINE日程調整検知 Google Chat Webhookのテスト送信を行います
+ * 管理者用 公式ラインチャットグループ Google Chat Webhookのテスト送信を行います
  */
 export async function testScheduleMonitoringWebhookAction(webhookUrl: string) {
     const { isAuthorized } = await verifyAdminRole()
@@ -568,13 +568,13 @@ export async function testScheduleMonitoringWebhookAction(webhookUrl: string) {
 
     try {
         const { sendGoogleChatMessage } = await import('@/lib/google-chat')
-        const testMessage = `💬 *【テスト送信: LINE日程調整検知通知】*\n` +
-                            `・*対象アカウント*: テスト公式LINE\n` +
-                            `・*担当コーチ*: テストコーチ\n` +
+        const testMessage = `💬 *【テスト送信: 公式ラインチャットグループ通知】*\n` +
+                            `・*対象アカウント*: スイムパートナーズ公式LINE\n` +
+                            `・*担当コーチ/事務局*: 事務局管理者\n` +
                             `・*顧客名*: テスト太郎 様\n` +
-                            `・*メッセージ*: 「8月28日 10:00〜でレッスンをお願いできますか？」\n` +
+                            `・*受信内容*: 「体験レッスンの場所について相談したいのですが、空きはありますか？」\n` +
                             `・*送信日時*: ${new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}\n` +
-                            `※このメッセージはLINE日程調整検知の専用Webhook設定テストです。`
+                            `※このメッセージは公式ラインチャットグループ通知のWebhook疎通テストです。`
 
         const success = await sendGoogleChatMessage(webhookUrl.trim(), testMessage)
         if (!success) {

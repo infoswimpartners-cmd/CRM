@@ -758,16 +758,16 @@ export default function LineMonitoringPage() {
                 <div className="absolute bottom-0 left-0 -ml-20 -mb-20 h-80 w-80 rounded-full bg-blue-500/10 blur-3xl"></div>
             </div>
 
-            {/* 管理者用 Google Chat 通知先設定（日程調整検知 集約用） */}
+            {/* 管理者用 Google Chat 通知先設定（公式ラインチャットグループ） */}
             <Card className="border-slate-200 shadow-sm bg-white overflow-hidden">
                 <CardHeader className="p-4 bg-slate-50/50 border-b border-slate-100 flex flex-row items-center justify-between space-y-0">
                     <div>
                         <CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-2">
                             <ShieldCheck className="h-4 w-4 text-indigo-600" />
-                            管理者用 Google Chat 通知先設定（日程調整検知）
+                            管理者用 Google Chat 通知先設定（公式ラインチャットグループ）
                         </CardTitle>
                         <CardDescription className="text-xs text-slate-500 mt-0.5">
-                            各コーチの公式LINEで日程調整が検知された際、この管理者専用スペースへ自動通知が集約されます。（各コーチでの設定は不要です）
+                            見込み客からの公式LINEチャット相談や、各コーチのLINEでの日程調整が検知された際、この公式ラインチャットグループへ自動通知が集約されます。
                         </CardDescription>
                     </div>
                     <div className="flex items-center gap-2">
