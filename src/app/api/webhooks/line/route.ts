@@ -89,16 +89,17 @@ export async function POST(req: NextRequest) {
         // 管理者特権Supabaseクライアント作成
         const supabase = createAdminClient()
 
-        // 2. ボットID (destination) または ベーシックID (@...) に紐づくコーチを特定
+        // 2. ボットID (destination) または 各コーチのトークンから担当コーチを特定
         let coachId: string | null = null
         let botName = 'LINEボット'
         let gchatWebhookId: string | null = null
+        let coachAccessToken: string | null = null
 
         if (destination) {
-            // まずは bot_id が destination (U...) と完全一致するものを検索
+            // まずは bot_id が destination (U...) と完全一致するものを高速検索
             const { data: botConfig } = await supabase
                 .from('line_bot_configs')
-                .select('id, coach_id, bot_name, bot_id, gchat_webhook_id')
+                .select('id, coach_id, bot_name, bot_id, gchat_webhook_id, channel_access_token')
                 .eq('bot_id', destination)
                 .maybeSingle()
             
@@ -106,59 +107,57 @@ export async function POST(req: NextRequest) {
                 coachId = botConfig.coach_id
                 botName = botConfig.bot_name
                 gchatWebhookId = botConfig.gchat_webhook_id || null
+                coachAccessToken = botConfig.channel_access_token || null
             } else {
-                // destination で一致しない場合、ベーシックID (@...) 等で登録されている設定がないか柔軟に照合
-                let basicId: string | null = null
-                if (CHANNEL_ACCESS_TOKEN) {
-                    try {
-                        const botInfoRes = await fetch('https://api.line.me/v2/bot/info', {
-                            headers: { 'Authorization': `Bearer ${CHANNEL_ACCESS_TOKEN}` }
-                        })
-                        if (botInfoRes.ok) {
-                            const botInfo = await botInfoRes.json()
-                            basicId = botInfo.basicId ? (botInfo.basicId.startsWith('@') ? botInfo.basicId : `@${botInfo.basicId}`) : null
-                        }
-                    } catch (e) {
-                        console.error('[LINE Webhook] Failed to fetch bot info from LINE API:', e)
-                    }
-                }
-
-                // 登録されている全 line_bot_configs を取得して柔軟マッチング
+                // destination で直接一致しない場合（ベーシックID @... で登録されている等）、
+                // 登録されている全コーチのアクセストークンを用いてボット情報を照合
                 const { data: allConfigs } = await supabase
                     .from('line_bot_configs')
-                    .select('id, coach_id, bot_name, bot_id, gchat_webhook_id')
+                    .select('id, coach_id, bot_name, bot_id, gchat_webhook_id, channel_access_token')
 
                 if (allConfigs && allConfigs.length > 0) {
-                    const cleanDest = destination.trim().toLowerCase()
-                    const cleanBasic = basicId ? basicId.trim().toLowerCase() : ''
-                    const cleanBasicNoAt = cleanBasic.replace(/^@/, '')
+                    let matchedConfig: any = null
 
-                    const matched = allConfigs.find(c => {
-                        const cleanConfigId = c.bot_id.trim().toLowerCase()
-                        const cleanConfigIdNoAt = cleanConfigId.replace(/^@/, '')
-                        
-                        return cleanConfigId === cleanDest || 
-                               (cleanBasic && (cleanConfigId === cleanBasic || cleanConfigId === cleanBasicNoAt || cleanConfigIdNoAt === cleanBasicNoAt))
-                    })
+                    for (const config of allConfigs) {
+                        if (!config.channel_access_token) continue
 
-                    if (matched) {
-                        coachId = matched.coach_id
-                        botName = matched.bot_name
-                        gchatWebhookId = matched.gchat_webhook_id || null
+                        try {
+                            const botInfoRes = await fetch('https://api.line.me/v2/bot/info', {
+                                headers: { 'Authorization': `Bearer ${config.channel_access_token}` }
+                            })
+                            if (botInfoRes.ok) {
+                                const botInfo = await botInfoRes.json()
+                                // ボット固有ID (userId: U...) または ベーシックID で照合
+                                if (botInfo.userId === destination || 
+                                    (botInfo.basicId && (botInfo.basicId === destination || `@${botInfo.basicId}` === destination))) {
+                                    matchedConfig = config
+                                    coachAccessToken = config.channel_access_token
+                                    break
+                                }
+                            }
+                        } catch (e) {
+                            console.error(`[LINE Webhook] Failed to fetch bot info for "${config.bot_name}":`, e)
+                        }
+                    }
+
+                    if (matchedConfig) {
+                        coachId = matchedConfig.coach_id
+                        botName = matchedConfig.bot_name
+                        gchatWebhookId = matchedConfig.gchat_webhook_id || null
 
                         // 次回以降のアクセス高速化のため、bot_id を destination (U...) で自動更新（学習）
                         await supabase
                             .from('line_bot_configs')
                             .update({ bot_id: destination })
-                            .eq('id', matched.id)
+                            .eq('id', matchedConfig.id)
                         
-                        console.log(`[LINE Webhook] Successfully matched and updated bot_id for "${matched.bot_name}" to destination: ${destination}`)
+                        console.log(`[LINE Webhook] Successfully matched and updated bot_id for "${matchedConfig.bot_name}" to destination: ${destination}`)
                     }
                 }
             }
         }
 
-        // コーチが特定できない場合は、未紐付けボットとして安全に処理（管理者に誤認されるのを防ぐ）
+        // コーチが特定できない場合は警告を出力
         if (!coachId) {
             console.warn(`[LINE Webhook] No coach configured for bot_id (destination): ${destination}`)
             botName = '未紐付けボット'
@@ -175,68 +174,73 @@ export async function POST(req: NextRequest) {
                 if (detectScheduleKeywords(messageText)) {
                     console.log(`[LINE Webhook] Schedule keyword detected: "${messageText}"`)
 
-                    // 4. 送信ユーザーのプロフィール情報を取得
-                    const displayName = await getLineUserProfile(lineUserId, CHANNEL_ACCESS_TOKEN) || 'LINEユーザー'
+                    // 4. 送信ユーザーのプロフィール情報を取得（担当コーチのトークンを優先使用）
+                    const activeAccessToken = coachAccessToken || CHANNEL_ACCESS_TOKEN
+                    const displayName = await getLineUserProfile(lineUserId, activeAccessToken) || 'LINEユーザー'
 
                      // 5. 自動マージ（重複フィルタリング）処理
-                     // 同じ顧客 (line_user_id) ＆ 同じコーチ (coachId) で、直近24時間以内の未確認 (unread) ログを検索
-                     const oneDayAgo = new Date()
-                     oneDayAgo.setDate(oneDayAgo.getDate() - 1)
-
-                     const { data: existingUnreadLog, error: searchError } = await supabase
-                         .from('line_monitoring_logs')
-                         .select('id, message_text')
-                         .eq('line_user_id', lineUserId)
-                         .eq('coach_id', coachId)
-                         .eq('status', 'unread')
-                         .gte('detected_at', oneDayAgo.toISOString())
-                         .maybeSingle()
-
+                     // coachIdが特定できている場合のみDBログに保存
                      let isMerged = false
 
-                     if (searchError) {
-                         console.error('[LINE Webhook] Failed to search existing unread log:', searchError)
-                     }
+                     if (coachId) {
+                         const oneDayAgo = new Date()
+                         oneDayAgo.setDate(oneDayAgo.getDate() - 1)
 
-                     if (existingUnreadLog) {
-                         // 既存の未読ログがある場合、改行でメッセージを追記して更新
-                         const separator = direction === 'customer_to_coach' ? '\n(顧客): ' : '\n(コーチ): '
-                         const updatedMessage = `${existingUnreadLog.message_text}${separator}${messageText}`
-                         
-                         const { error: updateError } = await supabase
+                         const { data: existingUnreadLog, error: searchError } = await supabase
                              .from('line_monitoring_logs')
-                             .update({
-                                 message_text: updatedMessage,
-                                 detected_at: new Date().toISOString() // 最終検知日時を更新
-                             })
-                             .eq('id', existingUnreadLog.id)
+                             .select('id, message_text')
+                             .eq('line_user_id', lineUserId)
+                             .eq('coach_id', coachId)
+                             .eq('status', 'unread')
+                             .gte('detected_at', oneDayAgo.toISOString())
+                             .maybeSingle()
 
-                         if (updateError) {
-                             console.error('[LINE Webhook] Failed to update/merge log:', updateError)
-                         } else {
-                             isMerged = true
-                             console.log(`[LINE Webhook] Successfully merged message into existing log ID: ${existingUnreadLog.id}`)
+                         if (searchError) {
+                             console.error('[LINE Webhook] Failed to search existing unread log:', searchError)
                          }
-                     }
 
-                     // 既存ログがなければ新規挿入
-                     if (!isMerged) {
-                         const prefix = direction === 'customer_to_coach' ? '(顧客): ' : '(コーチ): '
-                         const { error: insertError } = await supabase
-                             .from('line_monitoring_logs')
-                             .insert({
-                                 coach_id: coachId,
-                                 line_user_id: lineUserId,
-                                 line_display_name: displayName,
-                                 message_text: `${prefix}${messageText}`,
-                                 direction: direction,
-                                 status: 'unread',
-                                 detected_at: new Date().toISOString()
-                             })
+                         if (existingUnreadLog) {
+                             // 既存の未読ログがある場合、改行でメッセージを追記して更新
+                             const separator = direction === 'customer_to_coach' ? '\n(顧客): ' : '\n(コーチ): '
+                             const updatedMessage = `${existingUnreadLog.message_text}${separator}${messageText}`
+                             
+                             const { error: updateError } = await supabase
+                                 .from('line_monitoring_logs')
+                                 .update({
+                                     message_text: updatedMessage,
+                                     detected_at: new Date().toISOString() // 最終検知日時を更新
+                                 })
+                                 .eq('id', existingUnreadLog.id)
 
-                         if (insertError) {
-                             console.error('[LINE Webhook] Failed to insert log to DB:', insertError)
+                             if (updateError) {
+                                 console.error('[LINE Webhook] Failed to update/merge log:', updateError)
+                             } else {
+                                 isMerged = true
+                                 console.log(`[LINE Webhook] Successfully merged message into existing log ID: ${existingUnreadLog.id}`)
+                             }
                          }
+
+                         // 既存ログがなければ新規挿入
+                         if (!isMerged) {
+                             const prefix = direction === 'customer_to_coach' ? '(顧客): ' : '(コーチ): '
+                             const { error: insertError } = await supabase
+                                 .from('line_monitoring_logs')
+                                 .insert({
+                                     coach_id: coachId,
+                                     line_user_id: lineUserId,
+                                     line_display_name: displayName,
+                                     message_text: `${prefix}${messageText}`,
+                                     direction: direction,
+                                     status: 'unread',
+                                     detected_at: new Date().toISOString()
+                                 })
+
+                             if (insertError) {
+                                 console.error('[LINE Webhook] Failed to insert log to DB:', insertError)
+                             }
+                         }
+                     } else {
+                         console.warn(`[LINE Webhook] Skip log insertion: coachId is null for destination ${destination}`)
                      }
 
                     // 6. 古いログの自動削除 (3ヶ月以上前) の自己クリーンアップ

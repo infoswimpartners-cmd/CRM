@@ -206,14 +206,32 @@ export async function saveLineBotConfigAction(data: {
     }
 
     const supabase = await createClient()
-    const cleanBotId = data.bot_id.trim()
+    let cleanBotId = data.bot_id.trim()
     const cleanBotName = data.bot_name.trim()
     let gchatWebhookId = data.gchat_webhook_id || null
     const channelAccessToken = data.channel_access_token?.trim() || null
     const customWebhookUrl = data.custom_webhook_url?.trim() || null
     const customSpaceName = data.custom_space_name?.trim() || null
 
-    // 0. 直接 Webhook URL が入力されている場合の処理
+    // 0-1. アクセストークンが存在する場合、LINE APIから正規のボット固有ID (destination: U...) を自動解決
+    if (channelAccessToken) {
+        try {
+            const botInfoRes = await fetch('https://api.line.me/v2/bot/info', {
+                headers: { Authorization: `Bearer ${channelAccessToken}` },
+                cache: 'no-store'
+            })
+            if (botInfoRes.ok) {
+                const botInfo = await botInfoRes.json()
+                if (botInfo.userId) {
+                    cleanBotId = botInfo.userId
+                }
+            }
+        } catch (e) {
+            console.error('saveLineBotConfigAction: Failed to fetch bot userId from LINE:', e)
+        }
+    }
+
+    // 0-2. 直接 Webhook URL が入力されている場合の処理
     if (customWebhookUrl) {
         if (!customWebhookUrl.startsWith('https://chat.googleapis.com/')) {
             return { success: false, error: 'Google Chatの有効なWebhook URLを入力してください (https://chat.googleapis.com/...)' }
