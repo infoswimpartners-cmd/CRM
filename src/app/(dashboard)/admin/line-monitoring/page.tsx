@@ -1604,6 +1604,22 @@ export default function LineMonitoringPage() {
                                                         ※ <code className="text-indigo-600 bg-indigo-50 px-1 py-0.5 rounded">{'{name}'}</code> はLINE登録時の表示名（または「お客様」）に、
                                                         <code className="text-indigo-600 bg-indigo-50 px-1 py-0.5 rounded">{'{trial_url}'}</code> は体験レッスン申込ページのURLに自動置換されます。
                                                     </p>
+
+                                                    {/* 置換プレビュー表示 */}
+                                                    <div className="mt-3 pt-3 border-t border-slate-200 space-y-1.5">
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-[11px] font-bold text-slate-600 flex items-center gap-1">
+                                                                <MessageSquare className="h-3 w-3 text-indigo-500" />
+                                                                送信プレビュー（変数置換後イメージ: テスト太郎 様）:
+                                                            </span>
+                                                            <span className="text-[10px] text-slate-400">※実際の送信時は顧客ごとのLINE表示名が自動置換されます</span>
+                                                        </div>
+                                                        <div className="p-3 bg-white rounded-xl border border-slate-200 text-xs text-slate-700 whitespace-pre-wrap font-sans leading-relaxed shadow-inner">
+                                                            {(stepTemplates[activeTemplateTab].body || '')
+                                                                .replace(/[{｛]{1,2}\s*name\s*[}｝]{1,2}/gi, 'テスト太郎')
+                                                                .replace(/[{｛]{1,2}\s*trial_url\s*[}｝]{1,2}/gi, 'https://manager.swim-partners.com/trial')}
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
                                         )}

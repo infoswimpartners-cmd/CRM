@@ -442,8 +442,8 @@ export async function processLineStepReminders(options: { dryRun?: boolean } = {
 
         const renderTemplate = (tmpl: StepMessageTemplate) => {
             return tmpl.body
-                .replace(/{name}/g, name)
-                .replace(/{trial_url}/g, trialFormUrl)
+                .replace(/[{｛]{1,2}\s*name\s*[}｝]{1,2}/gi, name)
+                .replace(/[{｛]{1,2}\s*trial_url\s*[}｝]{1,2}/gi, trialFormUrl)
         }
 
         // Stage 0 -> Step 1 (24時間後)
