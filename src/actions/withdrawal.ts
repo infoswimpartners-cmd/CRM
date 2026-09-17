@@ -185,21 +185,27 @@ export async function submitWithdrawal(data: SubmitWithdrawalInput) {
       }
     }
 
-    // 6. 既存の外部Webhook（Make）への送信（後方互換性）
+    // 6. 退会専用の外部Webhook（Make）への送信
     const externalWebhookUrl = process.env.MAKE_WITHDRAWAL_WEBHOOK_URL;
-    if (externalWebhookUrl) {
+    const trialWebhookUrl = process.env.NEXT_PUBLIC_MAKE_WEBHOOK_URL;
+
+    // 体験申し込み用Webhookと同じURLが指定されている場合は誤送信・シナリオ誤作動を防ぐためスキップ
+    if (externalWebhookUrl && externalWebhookUrl !== trialWebhookUrl) {
       try {
         await fetch(externalWebhookUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             ...surveyPayload,
+            event_type: 'withdrawal',
             agreed_timestamp: now.toISOString(),
           }),
         });
       } catch (makeErr) {
         console.error('[Withdrawal] Make webhook error:', makeErr);
       }
+    } else if (externalWebhookUrl && externalWebhookUrl === trialWebhookUrl) {
+      console.warn('[Withdrawal] MAKE_WITHDRAWAL_WEBHOOK_URL is identical to NEXT_PUBLIC_MAKE_WEBHOOK_URL (trial booking). Skipped to prevent webhook collision.');
     }
 
     return { 
