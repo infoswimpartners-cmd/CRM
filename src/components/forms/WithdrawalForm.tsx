@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { submitWithdrawal, getStudentNameByLineId } from '@/actions/withdrawal';
-import { Loader2, CheckCircle2, AlertCircle, Info, ArrowLeft } from 'lucide-react';
+import { Loader2, CheckCircle2, AlertCircle, Info, ArrowLeft, Star, Calendar, X } from 'lucide-react';
 import Link from 'next/link';
 import liff from '@line/liff';
 
@@ -30,6 +30,11 @@ export default function WithdrawalForm({ initialLineUserId = '', studentName = '
   const [isAutoDetected, setIsAutoDetected] = useState(!!(paramLineUserId || initialLineUserId));
   
   const [reason, setReason] = useState('');
+  const [satisfactionScore, setSatisfactionScore] = useState<number>(0);
+  const [hoveredStar, setHoveredStar] = useState<number>(0);
+  const [feedbackComment, setFeedbackComment] = useState('');
+  const [isInLiffClient, setIsInLiffClient] = useState(false);
+
   const [agreed, setAgreed] = useState({
     deadline: false,
     noRefund: false,
@@ -40,6 +45,14 @@ export default function WithdrawalForm({ initialLineUserId = '', studentName = '
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [isRedirecting, setIsRedirecting] = useState(false);
+
+  // 退会予定日（10日締め切りルールに基づく自動算出）
+  const today = new Date();
+  const isAfter10th = today.getDate() > 10;
+  const withdrawalMonth = isAfter10th
+    ? new Date(today.getFullYear(), today.getMonth() + 2, 0)
+    : new Date(today.getFullYear(), today.getMonth() + 1, 0);
+  const withdrawalDateStr = `${withdrawalMonth.getFullYear()}年${withdrawalMonth.getMonth() + 1}月末日`;
 
   // クエリパラメータやPropsが変化した際の自動同期
   useEffect(() => {
@@ -73,6 +86,9 @@ export default function WithdrawalForm({ initialLineUserId = '', studentName = '
           }
 
           const isLineBrowser = /Line/i.test(navigator.userAgent);
+          if (liff.isInClient()) {
+            setIsInLiffClient(true);
+          }
 
           // 2. LINEアプリ内（LIFFアプリ内およびLINE内ブラウザ）の場合
           if (liff.isInClient() || isLineBrowser) {
@@ -134,6 +150,9 @@ export default function WithdrawalForm({ initialLineUserId = '', studentName = '
       const res = await submitWithdrawal({
         line_user_id: lineUserId.trim(),
         withdrawal_reason: reason,
+        satisfaction_score: satisfactionScore || undefined,
+        feedback_comment: feedbackComment || undefined,
+        student_name: studentNameState || undefined,
       });
 
       if (res.success) {
@@ -179,10 +198,26 @@ export default function WithdrawalForm({ initialLineUserId = '', studentName = '
             手続き完了の通知メール、またはLINEメッセージをご確認ください。
           </p>
           
-          <div className="mt-8 pt-6 border-t border-slate-100">
+          <div className="mt-8 pt-6 border-t border-slate-100 space-y-4">
             <p className="text-xs text-slate-400">これまでの受講、誠にありがとうございました。</p>
             {studentNameState && (
-              <p className="text-xs font-semibold text-slate-500 mt-2">受講生: {studentNameState} 様</p>
+              <p className="text-xs font-semibold text-slate-600">受講生: {studentNameState} 様</p>
+            )}
+
+            {isInLiffClient && (
+              <button
+                type="button"
+                onClick={() => {
+                  try {
+                    liff.closeWindow();
+                  } catch (e) {
+                    console.error('Failed to close LIFF window:', e);
+                  }
+                }}
+                className="w-full py-3 px-4 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition-colors shadow-sm"
+              >
+                LINEに戻る（画面を閉じる）
+              </button>
             )}
           </div>
         </div>
@@ -346,10 +381,87 @@ export default function WithdrawalForm({ initialLineUserId = '', studentName = '
           )}
         </div>
 
+        {/* STEP 2: サービス向上アンケート（データ収集） */}
+        <div className="space-y-4 border-t border-slate-100 pt-6">
+          <div>
+            <label className="block text-sm font-black text-slate-700 tracking-tight">
+              ② サービス向上アンケート（任意）
+            </label>
+            <p className="text-xs text-slate-400 mt-1 leading-normal">
+              今後のレッスン品質やサービス改善のため、率直なご意見をお聞かせいただけますと幸いです。
+            </p>
+          </div>
+
+          {/* 満足度5段階スター */}
+          <div className="bg-slate-50/70 p-4 rounded-2xl border border-slate-100 space-y-2">
+            <span className="text-xs font-bold text-slate-600 block">これまでのレッスンの総合満足度</span>
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              {[1, 2, 3, 4, 5].map((star) => {
+                const active = (hoveredStar || satisfactionScore) >= star;
+                return (
+                  <button
+                    key={star}
+                    type="button"
+                    onClick={() => setSatisfactionScore(star)}
+                    onMouseEnter={() => setHoveredStar(star)}
+                    onMouseLeave={() => setHoveredStar(0)}
+                    className="p-1 text-slate-300 hover:scale-110 transition-transform focus:outline-none"
+                    aria-label={`満足度 ${star}`}
+                  >
+                    <Star
+                      className={`h-7 w-7 transition-colors ${
+                        active
+                          ? 'text-amber-400 fill-amber-400'
+                          : 'text-slate-200'
+                      }`}
+                    />
+                  </button>
+                );
+              })}
+              <span className="text-xs font-bold text-slate-500 ml-2">
+                {satisfactionScore === 5 && '大変満足'}
+                {satisfactionScore === 4 && '満足'}
+                {satisfactionScore === 3 && '普通'}
+                {satisfactionScore === 2 && 'やや不満'}
+                {satisfactionScore === 1 && '不満'}
+              </span>
+            </div>
+          </div>
+
+          {/* 自由記述テキストエリア */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold text-slate-600">
+              改善へのご意見・ご要望・メッセージ（任意）
+            </label>
+            <textarea
+              value={feedbackComment}
+              onChange={(e) => setFeedbackComment(e.target.value)}
+              rows={3}
+              placeholder="「〇〇コーチの指導は分かりやすかった」「予約の取りやすさを改善してほしい」「また機会があれば利用したい」など"
+              className="w-full p-3.5 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-800/20 focus:border-slate-800 transition-all resize-none"
+            />
+          </div>
+        </div>
+
+        {/* 退会適用時期のご案内 */}
+        <div className="bg-amber-50/70 border border-amber-200/60 rounded-2xl p-4 flex items-start gap-3">
+          <Calendar className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div className="text-xs text-amber-900 space-y-1">
+            <p className="font-bold flex items-center gap-1.5">
+              退会適用予定日: <span className="underline decoration-amber-500 underline-offset-2 font-mono">{withdrawalDateStr}</span>
+            </p>
+            <p className="text-amber-800/80 leading-relaxed text-[11px]">
+              {isAfter10th
+                ? '本日（11日以降）のお手続きのため、翌月末での退会適用となります。'
+                : '本日（10日まで）のお手続きのため、当月末での退会適用となります。'}
+            </p>
+          </div>
+        </div>
+
         {/* STEP 3: 鉄壁のルール同意（共通必須項目） */}
         <div className="space-y-3.5 border-t border-slate-100 pt-6">
           <label className="block text-sm font-black text-slate-700 tracking-tight">
-            ② 退会規約への同意
+            ③ 退会規約への同意
           </label>
           <p className="text-xs text-slate-400 leading-normal">手続きを完了するには、すべての項目への同意が必要です。</p>
           
