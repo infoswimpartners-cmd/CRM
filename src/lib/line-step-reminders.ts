@@ -390,7 +390,8 @@ export async function processLineStepReminders(options: { dryRun?: boolean } = {
     const { dryRun = false } = options
     const supabase = createAdminClient()
     const appUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://manager.swim-partners.com'
-    const trialFormUrl = `${appUrl}/trial`
+    const trialLiffId = process.env.NEXT_PUBLIC_TRIAL_LIFF_ID || process.env.NEXT_PUBLIC_LIFF_ID || '2009159689-dWjvcfS7'
+    const trialFormUrl = trialLiffId ? `https://liff.line.me/${trialLiffId}` : `${appUrl}/trial`
 
     // 全ての line_step:* 設定を取得
     const { data: configs } = await supabase

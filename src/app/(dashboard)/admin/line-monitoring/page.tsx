@@ -1602,7 +1602,7 @@ export default function LineMonitoringPage() {
                                                     />
                                                     <p className="text-[11px] text-slate-400 leading-tight">
                                                         ※ <code className="text-indigo-600 bg-indigo-50 px-1 py-0.5 rounded">{'{name}'}</code> はLINE登録時の表示名（または「お客様」）に、
-                                                        <code className="text-indigo-600 bg-indigo-50 px-1 py-0.5 rounded">{'{trial_url}'}</code> は体験レッスン申込ページのURLに自動置換されます。
+                                                        <code className="text-indigo-600 bg-indigo-50 px-1 py-0.5 rounded">{'{trial_url}'}</code> は体験レッスン申込用のLIFF URL（LINEアプリ内即時起動URL）に自動置換されます。
                                                     </p>
 
                                                     {/* 置換プレビュー表示 */}
@@ -1617,7 +1617,7 @@ export default function LineMonitoringPage() {
                                                         <div className="p-3 bg-white rounded-xl border border-slate-200 text-xs text-slate-700 whitespace-pre-wrap font-sans leading-relaxed shadow-inner">
                                                             {(stepTemplates[activeTemplateTab].body || '')
                                                                 .replace(/[{｛]{1,2}\s*name\s*[}｝]{1,2}/gi, 'テスト太郎')
-                                                                .replace(/[{｛]{1,2}\s*trial_url\s*[}｝]{1,2}/gi, 'https://manager.swim-partners.com/trial')}
+                                                                .replace(/[{｛]{1,2}\s*trial_url\s*[}｝]{1,2}/gi, `https://liff.line.me/${process.env.NEXT_PUBLIC_TRIAL_LIFF_ID || '2009159689-dWjvcfS7'}`)}
                                                         </div>
                                                     </div>
                                                 </div>
