@@ -17,6 +17,123 @@ export interface StepLeadState {
     notes?: string
 }
 
+export interface StepMessageTemplate {
+    title: string
+    delay_hours: number
+    body: string
+    is_active: boolean
+}
+
+export interface StepTemplatesConfig {
+    step1: StepMessageTemplate
+    step2: StepMessageTemplate
+    step3: StepMessageTemplate
+}
+
+export const DEFAULT_STEP_TEMPLATES: StepTemplatesConfig = {
+    step1: {
+        title: '翌日 (24時間後): 出張プール案内・柔軟な利便性',
+        delay_hours: 24,
+        is_active: true,
+        body: `{name} 様、昨日はSwim Partners公式LINEへのご登録ありがとうございます！事務局です😊
+
+「個人レッスンって、どこで練習するの？」と気になっている方も多いのではないでしょうか？
+
+当スクールでは、ご自宅近くの公営プールや区民プールへインストラクターが出張いたします！🏊‍♂️
+わざわざ遠くのスイミングスクールまで送迎する必要がなく、平日の夕方や土日祝日など、ご都合の良い日時で柔軟にレッスンが可能です✨
+
+まずは一度、お近くのプールで体験してみませんか？
+▼体験レッスンの詳細・空き状況はこちら
+{trial_url}`
+    },
+    step2: {
+        title: '3日後 (72時間後): お悩み解消・マンツーマンの安心感',
+        delay_hours: 72,
+        is_active: true,
+        body: `こんにちは！Swim Partners事務局です✨
+
+お子様の水泳について、こんなお悩みはありませんか？
+・スイミングスクールの進級テストで何度も落ちてしまっている…
+・水に顔をつけるのが怖くて泣いてしまう…
+・集団レッスンだと待ち時間が多くて泳ぐ量が少ない…
+
+集団スクールでは一人ひとりのペースに合わせるのが難しいですが、マンツーマン個人指導なら大丈夫です。
+お子様の表情や苦手なポイントに1対1でじっくり寄り添い、「できた！」という自信と笑顔を引き出します😊
+
+お子様専属のコーチと一緒に、最初の一歩を踏み出してみませんか？
+▼体験レッスンのお申し込みはこちら
+{trial_url}`
+    },
+    step3: {
+        title: '5日後 (120時間後): 気軽なチャット返信ルート案内',
+        delay_hours: 120,
+        is_active: true,
+        body: `Swim Partners事務局です！
+
+「申し込みフォームを入力するのが少し面倒だな…」
+「近くにどんなプールやコーチがいるか相談してから決めたい」
+という方へ💡
+
+フォームを開かなくても、このLINEチャットにそのまま以下の3点を返信いただくだけで、事務局が最適なコーチ・日程をお探しいたします！
+
+-----------------------------
+① ご希望のエリア（例: ○○区、最寄りのプールなど）:
+② お子様の学年・現在のお悩み（例: 小1、水慣れから希望など）:
+③ 希望の曜日や時間帯（例: 土日の午前中など）:
+-----------------------------
+
+メッセージをいただきましたら、事務局スタッフより折り返しご案内メッセージをお送りいたします。
+ご質問だけでも大歓迎ですので、ぜひお気軽にこのチャットへご返信くださいね😊`
+    }
+}
+
+/**
+ * データベース（app_configs）からステップ配信テンプレートを取得
+ */
+export async function getStepMessageTemplates(): Promise<StepTemplatesConfig> {
+    const supabase = createAdminClient()
+    try {
+        const { data } = await supabase
+            .from('app_configs')
+            .select('value')
+            .eq('key', 'line_step_templates')
+            .maybeSingle()
+
+        if (data?.value) {
+            const parsed = JSON.parse(data.value)
+            return {
+                step1: { ...DEFAULT_STEP_TEMPLATES.step1, ...parsed.step1 },
+                step2: { ...DEFAULT_STEP_TEMPLATES.step2, ...parsed.step2 },
+                step3: { ...DEFAULT_STEP_TEMPLATES.step3, ...parsed.step3 }
+            }
+        }
+    } catch (e) {
+        console.error('[Official LINE Step] Failed to load templates config:', e)
+    }
+    return DEFAULT_STEP_TEMPLATES
+}
+
+/**
+ * ステップ配信テンプレートをデータベース（app_configs）に保存
+ */
+export async function saveStepMessageTemplates(templates: StepTemplatesConfig): Promise<boolean> {
+    const supabase = createAdminClient()
+    try {
+        const { error } = await supabase
+            .from('app_configs')
+            .upsert({
+                key: 'line_step_templates',
+                value: JSON.stringify(templates),
+                description: '公式LINEステップ配信メッセージテンプレート設定',
+                updated_at: new Date().toISOString()
+            })
+        return !error
+    } catch (e) {
+        console.error('[Official LINE Step] Failed to save templates config:', e)
+        return false
+    }
+}
+
 /**
  * 事務局公式LINE宛てのメッセージをプッシュ送信するヘルパー
  */
@@ -285,6 +402,8 @@ export async function processLineStepReminders(options: { dryRun?: boolean } = {
     const nowIso = now.toISOString()
     const results: any[] = []
 
+    const templates = await getStepMessageTemplates()
+
     for (const cfg of configs || []) {
         let state: StepLeadState
         try {
@@ -321,51 +440,50 @@ export async function processLineStepReminders(options: { dryRun?: boolean } = {
 
         const followedDate = new Date(state.followed_at)
 
+        const renderTemplate = (tmpl: StepMessageTemplate) => {
+            return tmpl.body
+                .replace(/{name}/g, name)
+                .replace(/{trial_url}/g, trialFormUrl)
+        }
+
         // Stage 0 -> Step 1 (24時間後)
         if (state.step_stage === 0) {
-            messageText = `${name} 様、昨日はSwim Partners公式LINEへのご登録ありがとうございます！事務局です😊\n\n` +
-                          `「個人レッスンって、どこで練習するの？」と気になっている方も多いのではないでしょうか？\n\n` +
-                          `当スクールでは、ご自宅近くの公営プールや区民プールへインストラクターが出張いたします！🏊‍♂️\n` +
-                          `わざわざ遠くのスイミングスクールまで送迎する必要がなく、平日の夕方や土日祝日など、ご都合の良い日時で柔軟にレッスンが可能です✨\n\n` +
-                          `まずは一度、お近くのプールで体験してみませんか？\n` +
-                          `▼体験レッスンの詳細・空き状況はこちら\n` +
-                          `${trialFormUrl}`
-
-            // 次回は登録から72時間後
-            nextSendAt = new Date(followedDate.getTime() + 72 * 60 * 60 * 1000).toISOString()
+            if (!templates.step1.is_active) {
+                // スキップしてStep 2へ
+                state.step_stage = 1
+                const delayH = templates.step2.delay_hours || 72
+                state.next_send_at = new Date(followedDate.getTime() + delayH * 60 * 60 * 1000).toISOString()
+                await saveStepLeadState(state)
+                continue
+            }
+            messageText = renderTemplate(templates.step1)
+            const nextDelayH = templates.step2.delay_hours || 72
+            nextSendAt = new Date(followedDate.getTime() + nextDelayH * 60 * 60 * 1000).toISOString()
         } 
         // Stage 1 -> Step 2 (72時間後)
         else if (state.step_stage === 1) {
-            messageText = `こんにちは！Swim Partners事務局です✨\n\n` +
-                          `お子様の水泳について、こんなお悩みはありませんか？\n` +
-                          `・スイミングスクールの進級テストで何度も落ちてしまっている…\n` +
-                          `・水に顔をつけるのが怖くて泣いてしまう…\n` +
-                          `・集団レッスンだと待ち時間が多くて泳ぐ量が少ない…\n\n` +
-                          `集団スクールでは一人ひとりのペースに合わせるのが難しいですが、マンツーマン個人指導なら大丈夫です。\n` +
-                          `お子様の表情や苦手なポイントに1対1でじっくり寄り添い、「できた！」という自信と笑顔を引き出します😊\n\n` +
-                          `お子様専属のコーチと一緒に、最初の一歩を踏み出してみませんか？\n` +
-                          `▼体験レッスンのお申し込みはこちら\n` +
-                          `${trialFormUrl}`
-
-            // 次回は登録から120時間後
-            nextSendAt = new Date(followedDate.getTime() + 120 * 60 * 60 * 1000).toISOString()
+            if (!templates.step2.is_active) {
+                // スキップしてStep 3へ
+                state.step_stage = 2
+                const delayH = templates.step3.delay_hours || 120
+                state.next_send_at = new Date(followedDate.getTime() + delayH * 60 * 60 * 1000).toISOString()
+                await saveStepLeadState(state)
+                continue
+            }
+            messageText = renderTemplate(templates.step2)
+            const nextDelayH = templates.step3.delay_hours || 120
+            nextSendAt = new Date(followedDate.getTime() + nextDelayH * 60 * 60 * 1000).toISOString()
         }
         // Stage 2 -> Step 3 (120時間後)
         else if (state.step_stage === 2) {
-            messageText = `Swim Partners事務局です！\n\n` +
-                          `「申し込みフォームを入力するのが少し面倒だな…」\n` +
-                          `「近くにどんなプールやコーチがいるか相談してから決めたい」\n` +
-                          `という方へ💡\n\n` +
-                          `フォームを開かなくても、このLINEチャットにそのまま以下の3点を返信いただくだけで、事務局が最適なコーチ・日程をお探しいたします！\n\n` +
-                          `-----------------------------\n` +
-                          `① ご希望のエリア（例: ○○区、最寄りのプールなど）:\n` +
-                          `② お子様の学年・現在のお悩み（例: 小1、水慣れから希望など）:\n` +
-                          `③ 希望の曜日や時間帯（例: 土日の午前中など）:\n` +
-                          `-----------------------------\n\n` +
-                          `メッセージをいただきましたら、事務局スタッフより折り返しご案内メッセージをお送りいたします。\n` +
-                          `ご質問だけでも大歓迎ですので、ぜひお気軽にこのチャットへご返信くださいね😊`
-
-            // Step 3 完了
+            if (!templates.step3.is_active) {
+                // Step 3 完了
+                state.step_stage = 3
+                state.next_send_at = null
+                await saveStepLeadState(state)
+                continue
+            }
+            messageText = renderTemplate(templates.step3)
             nextStage = 3
             nextSendAt = null
         }

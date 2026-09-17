@@ -809,4 +809,47 @@ export async function triggerStepRemindersNowAction(dryRun: boolean = false) {
     }
 }
 
+/**
+ * ステップ配信のメッセージテンプレート設定を取得（管理者のみ）
+ */
+export async function getStepTemplatesAction() {
+    const { isAuthorized } = await verifyAdminRole()
+    if (!isAuthorized) {
+        return { success: false, error: 'Unauthorized', data: null }
+    }
+
+    try {
+        const { getStepMessageTemplates, DEFAULT_STEP_TEMPLATES } = await import('@/lib/line-step-reminders')
+        const templates = await getStepMessageTemplates()
+        return { success: true, data: templates, defaultTemplates: DEFAULT_STEP_TEMPLATES }
+    } catch (e: any) {
+        console.error('getStepTemplatesAction Error:', e)
+        return { success: false, error: e.message, data: null }
+    }
+}
+
+/**
+ * ステップ配信のメッセージテンプレート設定を保存（管理者のみ）
+ */
+export async function saveStepTemplatesAction(templates: any) {
+    const { isAuthorized } = await verifyAdminRole()
+    if (!isAuthorized) {
+        return { success: false, error: 'Unauthorized' }
+    }
+
+    try {
+        const { saveStepMessageTemplates } = await import('@/lib/line-step-reminders')
+        const success = await saveStepMessageTemplates(templates)
+        if (!success) {
+            return { success: false, error: 'テンプレートの保存に失敗しました' }
+        }
+        revalidatePath('/admin/line-monitoring')
+        return { success: true }
+    } catch (e: any) {
+        console.error('saveStepTemplatesAction Error:', e)
+        return { success: false, error: e.message }
+    }
+}
+
+
 

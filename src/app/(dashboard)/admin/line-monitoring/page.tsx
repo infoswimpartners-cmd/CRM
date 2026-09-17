@@ -19,6 +19,8 @@ import {
     getOfficialLineStepLeadsAction,
     updateStepLeadStatusAction,
     triggerStepRemindersNowAction,
+    getStepTemplatesAction,
+    saveStepTemplatesAction,
     LineMonitoringLog,
     LineBotConfig
 } from '@/actions/line-monitoring'
@@ -28,6 +30,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -202,6 +205,18 @@ export default function LineMonitoringPage() {
     const [isTriggeringStepReminder, setIsTriggeringStepReminder] = useState(false)
     const [stepLeadFilter, setStepLeadFilter] = useState<'all' | 'friend_only' | 'inquired' | 'applied' | 'trial_done' | 'active' | 'withdrawn'>('all')
 
+    // 事務局公式LINEステップ配信メッセージテンプレート設定
+    const [stepTemplates, setStepTemplates] = useState<{
+        step1: { title: string; delay_hours: number; body: string; is_active: boolean };
+        step2: { title: string; delay_hours: number; body: string; is_active: boolean };
+        step3: { title: string; delay_hours: number; body: string; is_active: boolean };
+    } | null>(null)
+    const [defaultTemplates, setDefaultTemplates] = useState<any>(null)
+    const [isLoadingTemplates, setIsLoadingTemplates] = useState(false)
+    const [isSavingTemplates, setIsSavingTemplates] = useState(false)
+    const [isTemplateEditorOpen, setIsTemplateEditorOpen] = useState(false)
+    const [activeTemplateTab, setActiveTemplateTab] = useState<'step1' | 'step2' | 'step3'>('step1')
+
     // 時間の自動計算（レッスン種別の分数に基づく）
     const calculateEndTime = (startStr: string, masterId: string, mastersList = lessonMasters) => {
         if (!startStr) return ''
@@ -272,6 +287,7 @@ export default function LineMonitoringPage() {
         fetchChatWebhooks()
         fetchAdminWebhook()
         fetchStepLeads()
+        fetchTemplates()
     }, [])
 
     // 事務局公式LINEステップ配信リード取得
@@ -288,6 +304,67 @@ export default function LineMonitoringPage() {
             setIsLoadingStepLeads(false)
         }
     }
+
+    // ステップ配信メッセージテンプレート取得
+    const fetchTemplates = async () => {
+        setIsLoadingTemplates(true)
+        try {
+            const res = await getStepTemplatesAction()
+            if (res.success && res.data) {
+                setStepTemplates(res.data)
+                if (res.defaultTemplates) {
+                    setDefaultTemplates(res.defaultTemplates)
+                }
+            }
+        } catch (e: any) {
+            console.error('Failed to fetch step templates:', e)
+        } finally {
+            setIsLoadingTemplates(false)
+        }
+    }
+
+    // ステップ配信メッセージテンプレート保存
+    const handleSaveTemplates = async () => {
+        if (!stepTemplates) return
+        setIsSavingTemplates(true)
+        try {
+            const res = await saveStepTemplatesAction(stepTemplates)
+            if (res.success) {
+                toast.success('ステップ配信テンプレート設定を保存しました')
+            } else {
+                toast.error('保存に失敗しました: ' + res.error)
+            }
+        } catch (e: any) {
+            toast.error('エラーが発生しました: ' + e.message)
+        } finally {
+            setIsSavingTemplates(false)
+        }
+    }
+
+    // 初期設定テンプレートへリセット
+    const handleResetTemplates = () => {
+        if (defaultTemplates) {
+            if (confirm('テンプレートを初期設定の内容に戻しますか？\n（※「設定を保存」ボタンを押すまで確定されません）')) {
+                setStepTemplates(JSON.parse(JSON.stringify(defaultTemplates)))
+                toast.info('初期テンプレートを反映しました。「設定を保存」を押して確定してください')
+            }
+        }
+    }
+
+    // 変数タグの挿入
+    const handleInsertVariable = (stepKey: 'step1' | 'step2' | 'step3', variable: string) => {
+        if (!stepTemplates) return
+        const current = stepTemplates[stepKey].body || ''
+        setStepTemplates({
+            ...stepTemplates,
+            [stepKey]: {
+                ...stepTemplates[stepKey],
+                body: current + (current.endsWith('\n') || current === '' ? '' : '\n') + variable
+            }
+        })
+        toast.info(`${variable} を挿入しました`)
+    }
+
 
     // ステップ配信ステータス更新
     const handleUpdateStepLeadStatus = async (lineUserId: string, newStatus: string, stopDelivery: boolean = false) => {
@@ -1326,6 +1403,215 @@ export default function LineMonitoringPage() {
                             </Button>
                         </div>
                     </div>
+
+                    {/* 配信メッセージ文面エディタ */}
+                    <Card className="border-indigo-100 shadow-sm overflow-hidden bg-white">
+                        <CardHeader className="bg-slate-50/80 pb-3 border-b border-slate-100">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <div className="space-y-0.5">
+                                    <div className="flex items-center gap-2">
+                                        <MessageSquare className="h-4 w-4 text-indigo-600" />
+                                        <CardTitle className="text-sm font-bold text-slate-800">ステップ配信メッセージ文面設定</CardTitle>
+                                        <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 text-[10px]">
+                                            自由編集・即時反映
+                                        </Badge>
+                                    </div>
+                                    <CardDescription className="text-xs text-slate-500">
+                                        友だち追加後の経過時間（24h / 72h / 120h）ごとに送信されるLINEメッセージ文面や配信間隔を管理画面から編集できます。
+                                    </CardDescription>
+                                </div>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setIsTemplateEditorOpen(!isTemplateEditorOpen)}
+                                    className="text-xs h-8 border-indigo-200 text-indigo-700 hover:bg-indigo-50 shrink-0 self-start sm:self-auto"
+                                >
+                                    {isTemplateEditorOpen ? 'エディタを閉じる' : 'メッセージ文面を編集する'}
+                                </Button>
+                            </div>
+                        </CardHeader>
+                        {isTemplateEditorOpen && (
+                            <CardContent className="p-5 space-y-4">
+                                {isLoadingTemplates ? (
+                                    <div className="flex items-center justify-center py-8 text-slate-400 text-xs">
+                                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                        テンプレートを読み込み中...
+                                    </div>
+                                ) : !stepTemplates ? (
+                                    <div className="text-center py-6 text-slate-500 text-xs">
+                                        テンプレートの読み込みに失敗しました。
+                                        <Button variant="link" size="sm" onClick={fetchTemplates} className="text-xs text-indigo-600">
+                                            再試行
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <>
+                                        {/* Step1 / Step2 / Step3 切り替えサブタブ ＆ 保存ボタン */}
+                                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                {(['step1', 'step2', 'step3'] as const).map((key, idx) => {
+                                                    const stepNum = idx + 1
+                                                    const hours = stepTemplates[key].delay_hours
+                                                    const isActive = stepTemplates[key].is_active
+                                                    const isSelected = activeTemplateTab === key
+                                                    return (
+                                                        <button
+                                                            key={key}
+                                                            type="button"
+                                                            onClick={() => setActiveTemplateTab(key)}
+                                                            className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 border ${
+                                                                isSelected 
+                                                                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' 
+                                                                    : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                                                            }`}
+                                                        >
+                                                            <span>Step {stepNum} ({hours}h後)</span>
+                                                            <span className={`w-2 h-2 rounded-full ${isActive ? (isSelected ? 'bg-emerald-300' : 'bg-emerald-500') : 'bg-slate-300'}`} />
+                                                        </button>
+                                                    )
+                                                })}
+                                            </div>
+                                            <div className="flex items-center gap-2 self-end sm:self-auto">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={handleResetTemplates}
+                                                    className="text-xs h-8 text-slate-500 hover:text-slate-700"
+                                                >
+                                                    初期設定に戻す
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    onClick={handleSaveTemplates}
+                                                    disabled={isSavingTemplates}
+                                                    className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs h-8 shadow-sm rounded-xl px-4"
+                                                >
+                                                    {isSavingTemplates ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Save className="h-3.5 w-3.5 mr-1.5" />}
+                                                    設定を保存
+                                                </Button>
+                                            </div>
+                                        </div>
+
+                                        {/* 選択中ステップの編集フォーム */}
+                                        {stepTemplates[activeTemplateTab] && (
+                                            <div className="space-y-4 bg-slate-50/70 p-4 rounded-xl border border-slate-200">
+                                                <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+                                                    <div className="md:col-span-6 space-y-1">
+                                                        <Label className="text-xs font-bold text-slate-700">ステップ管理タイトル</Label>
+                                                        <Input
+                                                            value={stepTemplates[activeTemplateTab].title}
+                                                            onChange={(e) => {
+                                                                setStepTemplates({
+                                                                    ...stepTemplates,
+                                                                    [activeTemplateTab]: {
+                                                                        ...stepTemplates[activeTemplateTab],
+                                                                        title: e.target.value
+                                                                    }
+                                                                })
+                                                            }}
+                                                            placeholder="配信ステップの管理用タイトル"
+                                                            className="text-xs h-9 bg-white"
+                                                        />
+                                                    </div>
+                                                    <div className="md:col-span-3 space-y-1">
+                                                        <Label className="text-xs font-bold text-slate-700">配信間隔（友だち追加から）</Label>
+                                                        <div className="flex items-center gap-2">
+                                                            <Input
+                                                                type="number"
+                                                                value={stepTemplates[activeTemplateTab].delay_hours}
+                                                                onChange={(e) => {
+                                                                    setStepTemplates({
+                                                                        ...stepTemplates,
+                                                                        [activeTemplateTab]: {
+                                                                            ...stepTemplates[activeTemplateTab],
+                                                                            delay_hours: parseInt(e.target.value) || 0
+                                                                        }
+                                                                    })
+                                                                }}
+                                                                className="text-xs h-9 bg-white w-24"
+                                                            />
+                                                            <span className="text-xs text-slate-600 font-medium">時間後</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="md:col-span-3 space-y-1 flex flex-col justify-end">
+                                                        <Label className="text-xs font-bold text-slate-700 mb-2">配信ステータス</Label>
+                                                        <div className="flex items-center gap-2">
+                                                            <Switch
+                                                                checked={stepTemplates[activeTemplateTab].is_active}
+                                                                onCheckedChange={(checked) => {
+                                                                    setStepTemplates({
+                                                                        ...stepTemplates,
+                                                                        [activeTemplateTab]: {
+                                                                            ...stepTemplates[activeTemplateTab],
+                                                                            is_active: checked
+                                                                        }
+                                                                    })
+                                                                }}
+                                                                id={`active-${activeTemplateTab}`}
+                                                            />
+                                                            <Label htmlFor={`active-${activeTemplateTab}`} className="text-xs text-slate-700 cursor-pointer font-medium">
+                                                                {stepTemplates[activeTemplateTab].is_active ? (
+                                                                    <span className="text-emerald-600 font-bold">配信中（有効）</span>
+                                                                ) : (
+                                                                    <span className="text-slate-400 font-medium">スキップ（停止中）</span>
+                                                                )}
+                                                            </Label>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="space-y-1.5 pt-2">
+                                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                                        <Label className="text-xs font-bold text-slate-700">メッセージ本文（LINE送信内容）</Label>
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="text-[11px] text-slate-500 mr-1">差し込み変数:</span>
+                                                            <Button
+                                                                type="button"
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() => handleInsertVariable(activeTemplateTab, '{name}')}
+                                                                className="h-6 text-[11px] px-2.5 bg-white hover:bg-indigo-50 hover:text-indigo-600 border-slate-300 rounded-lg"
+                                                            >
+                                                                + {'{name}'}（顧客名）
+                                                            </Button>
+                                                            <Button
+                                                                type="button"
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() => handleInsertVariable(activeTemplateTab, '{trial_url}')}
+                                                                className="h-6 text-[11px] px-2.5 bg-white hover:bg-indigo-50 hover:text-indigo-600 border-slate-300 rounded-lg"
+                                                            >
+                                                                + {'{trial_url}'}（体験申込URL）
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                    <Textarea
+                                                        rows={9}
+                                                        value={stepTemplates[activeTemplateTab].body}
+                                                        onChange={(e) => {
+                                                            setStepTemplates({
+                                                                ...stepTemplates,
+                                                                [activeTemplateTab]: {
+                                                                    ...stepTemplates[activeTemplateTab],
+                                                                    body: e.target.value
+                                                                }
+                                                            })
+                                                        }}
+                                                        className="text-xs font-mono bg-white resize-y leading-relaxed border-slate-200"
+                                                        placeholder="LINEで送信するメッセージ本文を入力してください..."
+                                                    />
+                                                    <p className="text-[11px] text-slate-400 leading-tight">
+                                                        ※ <code className="text-indigo-600 bg-indigo-50 px-1 py-0.5 rounded">{'{name}'}</code> はLINE登録時の表示名（または「お客様」）に、
+                                                        <code className="text-indigo-600 bg-indigo-50 px-1 py-0.5 rounded">{'{trial_url}'}</code> は体験レッスン申込ページのURLに自動置換されます。
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </CardContent>
+                        )}
+                    </Card>
 
                     {/* ステータスフィルターボタン */}
                     <div className="flex flex-wrap items-center gap-2">
