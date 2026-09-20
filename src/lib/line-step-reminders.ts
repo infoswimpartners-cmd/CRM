@@ -280,6 +280,58 @@ export async function handleOfficialLineFollow(lineUserId: string, displayName?:
             .update({ status: 'friend_only' })
             .eq('id', existingStudent.id)
     }
+
+    // 管理者専用「公式ラインチャットグループ」へ友だち追加通知
+    let webhookUrl: string | null = null
+
+    // 1. 管理者設定（email_triggers: line_schedule_detected）を第一優先で参照
+    const { data: adminTrigger } = await supabase
+        .from('email_triggers')
+        .select('google_chat_webhook_url, google_chat_enabled')
+        .eq('id', 'line_schedule_detected')
+        .maybeSingle()
+
+    if (adminTrigger && adminTrigger.google_chat_enabled !== false && adminTrigger.google_chat_webhook_url) {
+        webhookUrl = adminTrigger.google_chat_webhook_url
+    }
+
+    // 2. 未設定の場合、google_chat_webhooksの「公式ラインチャットグループ」をフォールバック検索
+    if (!webhookUrl) {
+        const { data: defaultWebhook } = await supabase
+            .from('google_chat_webhooks')
+            .select('webhook_url')
+            .or('space_name.ilike.%公式ライン%,space_name.ilike.%日程調整%')
+            .eq('active', true)
+            .limit(1)
+            .maybeSingle()
+
+        if (defaultWebhook?.webhook_url) {
+            webhookUrl = defaultWebhook.webhook_url
+        }
+    }
+
+    // 3. 環境変数を最終フォールバック
+    if (!webhookUrl) {
+        webhookUrl = process.env.GOOGLE_CHAT_WEBHOOK_URL || null
+    }
+
+    if (webhookUrl) {
+        const chatMessage = `🤝 *【公式LINE 友だち追加通知】新しい友だちが追加されました*\n` +
+                            `・お名前 / LINE表示名: ${displayName || '公式LINEユーザー'} 様\n` +
+                            `・LINE ID: \`${lineUserId}\`\n` +
+                            `・追加日時: ${new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}\n` +
+                            `・ステータス: LINE友だち追加のみ（未申込）\n` +
+                            `・ステップ配信: 24時間後にStep 1（出張プール案内）を自動配信予定\n` +
+                            `\n` +
+                            `▼ 管理画面で確認:\n` +
+                            `https://manager.swim-partners.com/admin/line-monitoring`
+        try {
+            await sendGoogleChatMessage(webhookUrl, chatMessage)
+            console.log(`[Official LINE Step] Follow notification sent to Google Chat for ${displayName || lineUserId}`)
+        } catch (e) {
+            console.error('[Official LINE Step] Failed to notify Google Chat on follow:', e)
+        }
+    }
 }
 
 /**
