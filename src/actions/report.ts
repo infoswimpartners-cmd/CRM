@@ -411,7 +411,7 @@ export async function submitLessonReport(values: FormValues) {
                     .eq('id', data.student_id)
                     .single()
 
-                if (student?.status === 'trial_confirmed') {
+                if (student && student.status !== 'trial_done' && student.status !== 'active') {
                     await supabaseAdmin
                         .from('students')
                         .update({ status: 'trial_done' })
@@ -731,7 +731,7 @@ export async function submitPublicLessonReport(values: PublicFormValues) {
                     .eq('id', data.student_id)
                     .single()
 
-                if (student?.status === 'trial_confirmed') {
+                if (student && student.status !== 'trial_done' && student.status !== 'active') {
                     await supabaseAdmin
                         .from('students')
                         .update({ status: 'trial_done' })
@@ -1009,7 +1009,7 @@ export async function submitAdminProxyReport(values: AdminProxyValues) {
                 .eq('id', data.student_id)
                 .single()
 
-            if (student?.status === 'trial_confirmed') {
+            if (student && student.status !== 'trial_done' && student.status !== 'active') {
                 await supabaseAdmin
                     .from('students')
                     .update({ status: 'trial_done' })
