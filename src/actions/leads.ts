@@ -116,10 +116,16 @@ async function createTrialScheduleForLead(params: {
         const durationMinutes = Math.round((new Date(end).getTime() - new Date(start).getTime()) / (60 * 1000))
         const is90Min = durationMinutes >= 80 || params.confirmedDate.includes('90分') || (params.leadNotes || '').includes('90分')
 
-        // 料金の計算（基本6,000円、2名同時または90分の場合は9,000円）
+        // お友達紹介キャンペーンの判定（notesに「【ご紹介者様】」が含まれるか判定）
+        const isReferral = !!(params.leadNotes && params.leadNotes.includes('【ご紹介者様】'))
+
+        // 料金の計算（基本6,000円、お友達紹介の場合は特別価格3,500円、2名同時または90分の場合は9,000円）
         const baseUnitPrice = trialMaster?.unit_price || 6000
         let lessonPrice = baseUnitPrice
-        if (params.hasSecondStudent || is90Min) {
+        if (isReferral) {
+            // お友達紹介キャンペーン特別価格: 3,500円（2名同時の場合は7,000円）
+            lessonPrice = params.hasSecondStudent ? 7000 : 3500
+        } else if (params.hasSecondStudent || is90Min) {
             lessonPrice = trialMaster?.pair_unit_price || 9000
         }
 

@@ -9,6 +9,10 @@ export async function POST(req: Request) {
     const payload = await req.json();
     const supabase = createAdminClient();
 
+    const referrer = (payload.referrerName || "").trim();
+    const referrerNote = referrer ? `【ご紹介者様】${referrer} 様（お友達紹介キャンペーン対象: 特別価格3,500円）` : "";
+    const combinedNotes = [referrerNote, payload.notes].filter(Boolean).join("\n\n") || null;
+
     // 1. Supabaseの leads テーブルに直接保存（/admin/leads で即座に確認可能に）
     try {
       const { data: newLead, error: leadError } = await supabase
@@ -31,7 +35,7 @@ export async function POST(req: Request) {
           available_times: payload.availableTimes || null,
           skill_level: payload.skillLevel || null,
           frequency: payload.frequency || null,
-          notes: payload.notes || null,
+          notes: combinedNotes,
           line_user_id: payload.userId || null,
           status: '新規',
           created_at: new Date().toISOString()
@@ -143,6 +147,7 @@ export async function POST(req: Request) {
         const gchatMessage = 
           `🏊‍♂️ *【体験レッスンお申し込みを受信しました】*\n` +
           `・氏名: *${payload.name || '未入力'}* 様（${payload.kana || ''}）\n` +
+          (referrer ? `・🎁 *ご紹介者様*: *${referrer}* 様（*お友達紹介特別価格 3,500円適用*）\n` : '') +
           `・希望エリア/最寄駅: ${payload.station || '未指定'}\n` +
           `・第1希望: ${payload.datetime1 || '未指定'}\n` +
           `・第2希望: ${payload.datetime2 || '未指定'}\n` +

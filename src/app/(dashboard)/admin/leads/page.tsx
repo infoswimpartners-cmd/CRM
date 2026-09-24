@@ -2223,8 +2223,13 @@ export default function AdminLeadsPage() {
                                             <TableRow key={lead.id} className="hover:bg-gray-50/30 border-b border-gray-100 last:border-b-0">
                                                 <TableCell className="align-middle whitespace-normal">
                                                     <div className="flex flex-col gap-0.5 w-[164px] min-w-[164px]">
-                                                        <div className="flex items-center gap-1.5">
+                                                        <div className="flex items-center gap-1.5 flex-wrap">
                                                             <span className="font-semibold text-xs text-gray-950">{lead.name}</span>
+                                                            {lead.notes?.includes('【ご紹介者様】') && (
+                                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-300 shadow-2xs" title={lead.notes.split('\n')[0]}>
+                                                                    🎁 紹介
+                                                                </span>
+                                                            )}
                                                             <Button
                                                                 type="button"
                                                                 variant="ghost"

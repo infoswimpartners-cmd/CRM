@@ -36,6 +36,7 @@ export default function BookingForm() {
     skillLevel: "",
     frequency: "",
     notes: "",
+    referrerName: "",
     agreed: false
   });
   
@@ -189,10 +190,45 @@ export default function BookingForm() {
 
   return (
     <div style={{ padding: "20px", maxWidth: "500px", margin: "0 auto", fontFamily: "sans-serif", backgroundColor: "#f9f9f9" }}>
-      <h2 style={{ textAlign: "center", color: "#333", marginBottom: "30px" }}>体験レッスンお申し込み</h2>
+      <h2 style={{ textAlign: "center", color: "#333", marginBottom: "20px" }}>体験レッスンお申し込み</h2>
       
+      {/* お友達紹介キャンペーン価格の明記バナー */}
+      <div style={{ 
+        backgroundColor: "#FEF3C7", 
+        border: "1.5px solid #F59E0B", 
+        borderRadius: "8px", 
+        padding: "14px 16px", 
+        marginBottom: "20px" 
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", fontWeight: "bold", color: "#92400E", fontSize: "14px", marginBottom: "4px" }}>
+          <span>🎁</span>
+          <span>お友達紹介キャンペーン実施中！</span>
+        </div>
+        <p style={{ margin: 0, fontSize: "13px", color: "#B45309", lineHeight: "1.5" }}>
+          ※お友達紹介の場合は、<strong>初回体験が特別価格3,500円（通常6,000円）</strong>となります。<br />
+          ご紹介でお申し込みの方は、下記の「ご紹介者様のお名前」欄にご記入ください。
+        </p>
+      </div>
+
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
         
+        <div style={sectionTitleStyle}>ご紹介者様（任意）</div>
+        
+        <label style={labelStyle}>
+          ご紹介者様のお名前（お友達紹介キャンペーン）:
+          <input 
+            type="text" 
+            name="referrerName" 
+            value={formData.referrerName} 
+            onChange={handleChange} 
+            placeholder="例：山田 太郎 様（ご紹介者がいる場合のみ）" 
+            style={inputStyle} 
+          />
+          <span style={{ fontSize: "12px", color: "#B45309", marginTop: "4px", fontWeight: "normal" }}>
+            ※ご紹介者様のお名前を入力いただくと、初回体験が特別価格3,500円（通常6,000円）となります。
+          </span>
+        </label>
+
         <div style={sectionTitleStyle}>基本情報（1人目）</div>
         
         <label style={labelStyle}>
