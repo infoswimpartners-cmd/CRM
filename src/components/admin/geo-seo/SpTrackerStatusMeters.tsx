@@ -60,13 +60,13 @@ export function SpTrackerStatusMeters({
     ];
 
     return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             {meters.map((meter, idx) => {
                 const Icon = meter.icon;
                 return (
                     <div
                         key={idx}
-                        className="bg-white rounded-2xl border border-zinc-200/80 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:border-zinc-300 transition-all flex flex-col justify-between"
+                        className="bg-white rounded-2xl border border-zinc-200/80 p-4 sm:p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:border-zinc-300 transition-all flex flex-col justify-between"
                     >
                         <div>
                             <div className="flex items-center justify-between">

@@ -107,11 +107,11 @@ function SpTrackerContent() {
     };
 
     return (
-        <div className="min-h-screen bg-[#fafafa] text-zinc-900 p-6 md:p-12 space-y-10">
+        <div className="min-h-screen bg-[#fafafa] text-zinc-900 p-3.5 sm:p-6 md:p-10 space-y-6 sm:space-y-8 max-w-7xl mx-auto">
             {/* ページタイトル (SP-Tracker ヘッダー) */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-zinc-200/80 pb-6 gap-4">
-                <div>
-                    <div className="flex items-center gap-2 mb-1">
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between border-b border-zinc-200/80 pb-5 gap-4">
+                <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
                         <span className="text-[11px] font-mono font-bold tracking-widest text-zinc-400 uppercase">
                             SP-TRACKER v1.0.0
                         </span>
@@ -119,16 +119,16 @@ function SpTrackerContent() {
                             SEO ✕ GEO INTEGRATED ENGINE
                         </span>
                     </div>
-                    <h1 className="text-3xl md:text-4xl lg:text-5xl font-black tracking-tight text-zinc-900">
+                    <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-zinc-900 leading-tight">
                         スイムパートナーズ専用 SEO・GEO統合管理
                     </h1>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-shrink-0">
                     <button
                         onClick={handleRefreshAll}
                         disabled={isRefreshing}
-                        className="px-4 py-2.5 rounded-xl border border-zinc-900 text-xs font-semibold bg-zinc-900 text-white hover:bg-zinc-800 transition-all shadow-sm flex items-center gap-2 disabled:opacity-50"
+                        className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-zinc-900 text-xs font-semibold bg-zinc-900 text-white hover:bg-zinc-800 transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
                     >
                         <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
                         {isRefreshing ? '同期中...' : '最新データを取得'}
@@ -163,30 +163,32 @@ function SpTrackerContent() {
             />
 
             {/* 4. 詳細ビュー タブ切り替え */}
-            <div className="flex items-center gap-1.5 p-1 bg-zinc-200/60 rounded-xl max-w-fit overflow-x-auto">
-                {[
-                    { id: 'seo', label: 'SEO推移（エリア・セグメント）' },
-                    { id: 'conversion', label: 'CV・顧客分析（スプレッドシート連携）' },
-                    { id: 'geo', label: 'GEO分析（AI回答原文 & SOV）' },
-                    { id: 'citation_gap', label: '引用元ギャップリスト' },
-                    { id: 'analytics', label: 'GA4 / Search Console' },
-                    { id: 'settings', label: '設定（KW・プロンプト・Webhook）' },
-                ].map((tab) => {
-                    const isActive = activeTab === tab.id;
-                    return (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id as any)}
-                            className={`px-4 py-2 rounded-lg text-xs font-semibold tracking-wide transition-all duration-150 whitespace-nowrap ${
-                                isActive
-                                    ? 'bg-white text-zinc-900 shadow-[0_2px_8px_rgba(0,0,0,0.06)] font-bold'
-                                    : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/50'
-                            }`}
-                        >
-                            {tab.label}
-                        </button>
-                    );
-                })}
+            <div className="w-full overflow-x-auto no-scrollbar pb-1">
+                <div className="flex items-center gap-1.5 p-1 bg-zinc-200/60 rounded-xl min-w-max">
+                    {[
+                        { id: 'seo', label: 'SEO推移（エリア・セグメント）' },
+                        { id: 'conversion', label: 'CV・顧客分析（スプレッドシート連携）' },
+                        { id: 'geo', label: 'GEO分析（AI回答原文 & SOV）' },
+                        { id: 'citation_gap', label: '引用元ギャップリスト' },
+                        { id: 'analytics', label: 'GA4 / Search Console' },
+                        { id: 'settings', label: '設定（KW・プロンプト・Webhook）' },
+                    ].map((tab) => {
+                        const isActive = activeTab === tab.id;
+                        return (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id as any)}
+                                className={`px-3.5 sm:px-4 py-2 rounded-lg text-xs font-semibold tracking-wide transition-all duration-150 whitespace-nowrap ${
+                                    isActive
+                                        ? 'bg-white text-zinc-900 shadow-[0_2px_8px_rgba(0,0,0,0.06)] font-bold'
+                                        : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/50'
+                                }`}
+                            >
+                                {tab.label}
+                            </button>
+                        );
+                    })}
+                </div>
             </div>
 
             {/* 5. タブコンテンツ表示 */}
@@ -240,10 +242,10 @@ function SpTrackerContent() {
             {/* 画面右下フローティング: ジョンに相談するFABボタン */}
             <button
                 onClick={() => setIsFloatingConsultOpen(true)}
-                className="fixed bottom-6 right-6 z-40 px-4 py-3.5 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 text-zinc-950 font-black text-xs shadow-[0_10px_30px_rgba(245,158,11,0.4)] flex items-center gap-2.5 hover:scale-105 active:scale-95 transition-all border border-amber-300"
+                className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-40 px-3.5 sm:px-4 py-2.5 sm:py-3.5 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 text-zinc-950 font-black text-xs shadow-[0_10px_30px_rgba(245,158,11,0.4)] flex items-center gap-2 sm:gap-2.5 hover:scale-105 active:scale-95 transition-all border border-amber-300"
             >
-                <div className="w-2.5 h-2.5 rounded-full bg-emerald-950 animate-ping" />
-                <Briefcase className="w-4 h-4 text-zinc-950" />
+                <div className="w-2 sm:w-2.5 h-2 sm:h-2.5 rounded-full bg-emerald-950 animate-ping" />
+                <Briefcase className="w-3.5 sm:w-4 h-3.5 sm:h-4 text-zinc-950" />
                 <span>CMOジョンに相談</span>
             </button>
 

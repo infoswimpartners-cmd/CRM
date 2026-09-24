@@ -133,7 +133,7 @@ export function SpTrackerSeoView({ keywords, searchConsoleData, rankWatchState, 
 
             {/* 2. Search Console 実データ連動パフォーマンスサマリー */}
             {searchConsoleData && (
-                <div className="bg-white rounded-2xl border border-zinc-200/80 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] space-y-4">
+                <div className="bg-white rounded-2xl border border-zinc-200/80 p-4 sm:p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] space-y-4">
                     <div className="flex items-center justify-between">
                         <div className="text-xs font-mono font-bold tracking-widest text-zinc-400 uppercase">
                             SEARCH CONSOLE PERFORMANCE (過去28日間)
@@ -143,45 +143,45 @@ export function SpTrackerSeoView({ keywords, searchConsoleData, rankWatchState, 
                         </span>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                        <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-200/60">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                        <div className="p-3 sm:p-4 rounded-xl bg-zinc-50 border border-zinc-200/60">
                             <div className="text-xs text-zinc-500">合計クリック数</div>
-                            <div className="text-2xl font-black text-zinc-900 mt-1">{searchConsoleData.clicks?.toLocaleString()} 回</div>
+                            <div className="text-xl sm:text-2xl font-black text-zinc-900 mt-1">{searchConsoleData.clicks?.toLocaleString()} 回</div>
                         </div>
-                        <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-200/60">
+                        <div className="p-3 sm:p-4 rounded-xl bg-zinc-50 border border-zinc-200/60">
                             <div className="text-xs text-zinc-500">合計表示回数 (Imp)</div>
-                            <div className="text-2xl font-black text-zinc-900 mt-1">{searchConsoleData.impressions?.toLocaleString()} 回</div>
+                            <div className="text-xl sm:text-2xl font-black text-zinc-900 mt-1">{searchConsoleData.impressions?.toLocaleString()} 回</div>
                         </div>
-                        <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-200/60">
+                        <div className="p-3 sm:p-4 rounded-xl bg-zinc-50 border border-zinc-200/60">
                             <div className="text-xs text-zinc-500">平均クリック率 (CTR)</div>
-                            <div className="text-2xl font-black text-zinc-900 mt-1">{searchConsoleData.ctr}</div>
+                            <div className="text-xl sm:text-2xl font-black text-zinc-900 mt-1">{searchConsoleData.ctr}</div>
                         </div>
-                        <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-200/60">
+                        <div className="p-3 sm:p-4 rounded-xl bg-zinc-50 border border-zinc-200/60">
                             <div className="text-xs text-zinc-500">平均掲載順位</div>
-                            <div className="text-2xl font-black text-zinc-900 mt-1">{searchConsoleData.averagePosition} 位</div>
+                            <div className="text-xl sm:text-2xl font-black text-zinc-900 mt-1">{searchConsoleData.averagePosition} 位</div>
                         </div>
                     </div>
                 </div>
             )}
 
             {/* 3. キーワード順位推移テーブル */}
-            <div className="bg-white rounded-2xl border border-zinc-200/80 p-6 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] space-y-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-zinc-100 gap-4">
+            <div className="bg-white rounded-2xl border border-zinc-200/80 p-4 sm:p-6 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] space-y-6">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between pb-4 border-b border-zinc-100 gap-4">
                     <div>
                         <div className="text-[11px] font-mono font-bold tracking-widest text-zinc-400 uppercase mb-1">
                             SEO RANKING TRACKING
                         </div>
-                        <h3 className="text-2xl font-extrabold tracking-tight text-zinc-900">
+                        <h3 className="text-xl sm:text-2xl font-extrabold tracking-tight text-zinc-900">
                             エリア別 ✕ セグメント別 検索順位推移
                         </h3>
                     </div>
 
-                    {/* フィルタ & GSC同期ボタン */}
-                    <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
+                    {/* フィルタ & GSC同期ボタン（スマホ時は2列、PC時はインライン） */}
+                    <div className="w-full lg:w-auto grid grid-cols-2 sm:flex sm:flex-wrap sm:items-center gap-2 text-xs font-mono">
                         <select
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value)}
-                            className="px-3 py-1.5 rounded-lg border border-indigo-200 bg-indigo-50/50 text-indigo-900 font-bold focus:outline-none"
+                            className="px-3 py-2 rounded-lg border border-indigo-200 bg-indigo-50/50 text-indigo-900 font-bold focus:outline-none"
                         >
                             <option value="all">全ステータス</option>
                             <option value="achieved">👑 1位達成</option>
@@ -192,7 +192,7 @@ export function SpTrackerSeoView({ keywords, searchConsoleData, rankWatchState, 
                         <select
                             value={areaFilter}
                             onChange={(e) => setAreaFilter(e.target.value)}
-                            className="px-3 py-1.5 rounded-lg border border-zinc-200 bg-zinc-50 text-zinc-700 focus:outline-none"
+                            className="px-3 py-2 rounded-lg border border-zinc-200 bg-zinc-50 text-zinc-700 focus:outline-none"
                         >
                             <option value="all">全エリア</option>
                             <option value="tokyo_23">東京23区</option>
@@ -203,7 +203,7 @@ export function SpTrackerSeoView({ keywords, searchConsoleData, rankWatchState, 
                         <select
                             value={targetFilter}
                             onChange={(e) => setTargetFilter(e.target.value)}
-                            className="px-3 py-1.5 rounded-lg border border-zinc-200 bg-zinc-50 text-zinc-700 focus:outline-none"
+                            className="px-3 py-2 rounded-lg border border-zinc-200 bg-zinc-50 text-zinc-700 focus:outline-none"
                         >
                             <option value="all">全セグメント</option>
                             <option value="adult">大人</option>
@@ -215,7 +215,7 @@ export function SpTrackerSeoView({ keywords, searchConsoleData, rankWatchState, 
                         <button
                             onClick={handleSyncRanks}
                             disabled={isSyncing}
-                            className="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white font-semibold flex items-center gap-1.5 transition-all disabled:opacity-50"
+                            className="col-span-2 sm:col-auto px-4 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white font-semibold flex items-center justify-center gap-1.5 transition-all disabled:opacity-50"
                             title="Google Search Consoleの最新順位を取得して履歴に追記"
                         >
                             <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} />
@@ -224,10 +224,10 @@ export function SpTrackerSeoView({ keywords, searchConsoleData, rankWatchState, 
                     </div>
                 </div>
 
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
+                <div className="overflow-x-auto no-scrollbar">
+                    <table className="w-full min-w-[760px] text-left border-collapse">
                         <thead>
-                            <tr className="border-b border-zinc-200 text-[11px] font-mono font-bold text-zinc-400 uppercase">
+                            <tr className="border-b border-zinc-200 text-[11px] font-mono font-bold text-zinc-400 uppercase whitespace-nowrap">
                                 <th className="pb-3 px-3">キーワード</th>
                                 <th className="pb-3 px-3 text-center">Rank Watch</th>
                                 <th className="pb-3 px-3">エリア軸</th>

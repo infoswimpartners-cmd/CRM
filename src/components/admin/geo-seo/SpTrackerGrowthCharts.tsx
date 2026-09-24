@@ -192,11 +192,11 @@ export function SpTrackerGrowthCharts({ dailyPerformance, keywords }: SpTrackerG
     }
 
     return (
-        <div className="bg-white rounded-2xl border border-zinc-200/80 p-6 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] space-y-6">
+        <div className="bg-white rounded-2xl border border-zinc-200/80 p-4 sm:p-6 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] space-y-6">
             {/* ヘッダー部: タイトル & 成長バッジ & 切り替えタブ */}
             <div className="flex flex-col lg:flex-row lg:items-center justify-between pb-4 border-b border-zinc-100 gap-4">
                 <div>
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
                         <span className="text-[11px] font-mono font-bold tracking-widest text-zinc-400 uppercase">
                             GROWTH ANALYTICS & TRENDS
                         </span>
@@ -204,48 +204,50 @@ export function SpTrackerGrowthCharts({ dailyPerformance, keywords }: SpTrackerG
                             <TrendingUp className="w-3 h-3" /> 前期比 +{clickGrowthPercent}% 成長
                         </span>
                     </div>
-                    <h3 className="text-2xl font-black tracking-tight text-zinc-900 flex items-center gap-2">
+                    <h3 className="text-xl sm:text-2xl font-black tracking-tight text-zinc-900 flex items-center gap-2">
                         SEO検索露出・順位成長トレンド
                     </h3>
                 </div>
 
-                {/* タブ切り替え */}
-                <div className="flex items-center gap-1 p-1 bg-zinc-100 rounded-xl">
-                    <button
-                        onClick={() => setActiveChartTab('exposure')}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                            activeChartTab === 'exposure'
-                                ? 'bg-white text-zinc-900 shadow-sm'
-                                : 'text-zinc-600 hover:text-zinc-900'
-                        }`}
-                    >
-                        📈 検索露出（Clicks ✕ Imp）
-                    </button>
-                    <button
-                        onClick={() => setActiveChartTab('ranks')}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                            activeChartTab === 'ranks'
-                                ? 'bg-white text-zinc-900 shadow-sm'
-                                : 'text-zinc-600 hover:text-zinc-900'
-                        }`}
-                    >
-                        🎯 主要KW 順位推移
-                    </button>
-                    <button
-                        onClick={() => setActiveChartTab('segments')}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                            activeChartTab === 'segments'
-                                ? 'bg-white text-zinc-900 shadow-sm'
-                                : 'text-zinc-600 hover:text-zinc-900'
-                        }`}
-                    >
-                        📊 セグメント別比率
-                    </button>
+                {/* タブ切り替え（スマホで崩れず横スクロール可能に） */}
+                <div className="w-full lg:w-auto overflow-x-auto no-scrollbar pb-0.5">
+                    <div className="flex items-center gap-1 p-1 bg-zinc-100 rounded-xl min-w-max">
+                        <button
+                            onClick={() => setActiveChartTab('exposure')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+                                activeChartTab === 'exposure'
+                                    ? 'bg-white text-zinc-900 shadow-sm'
+                                    : 'text-zinc-600 hover:text-zinc-900'
+                            }`}
+                        >
+                            📈 検索露出（Clicks ✕ Imp）
+                        </button>
+                        <button
+                            onClick={() => setActiveChartTab('ranks')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+                                activeChartTab === 'ranks'
+                                    ? 'bg-white text-zinc-900 shadow-sm'
+                                    : 'text-zinc-600 hover:text-zinc-900'
+                            }`}
+                        >
+                            🎯 主要KW 順位推移
+                        </button>
+                        <button
+                            onClick={() => setActiveChartTab('segments')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+                                activeChartTab === 'segments'
+                                    ? 'bg-white text-zinc-900 shadow-sm'
+                                    : 'text-zinc-600 hover:text-zinc-900'
+                            }`}
+                        >
+                            📊 セグメント別比率
+                        </button>
+                    </div>
                 </div>
             </div>
 
             {/* 3つの成長指標KPIカード */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                 <div className="p-4 rounded-xl bg-gradient-to-br from-indigo-50/50 to-white border border-indigo-100">
                     <div className="flex items-center justify-between text-xs text-zinc-500 mb-1">
                         <span>直近クリック成長率</span>
@@ -296,10 +298,10 @@ export function SpTrackerGrowthCharts({ dailyPerformance, keywords }: SpTrackerG
             </div>
 
             {/* グラフ描画エリア */}
-            <div className="h-80 w-full pt-2">
+            <div className="h-72 sm:h-80 w-full pt-2">
                 {activeChartTab === 'exposure' && (
                     <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={chartData} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
+                        <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                             <defs>
                                 <linearGradient id="clicksGrad" x1="0" y1="0" x2="0" y2="1">
                                     <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.4} />
@@ -385,7 +387,7 @@ export function SpTrackerGrowthCharts({ dailyPerformance, keywords }: SpTrackerG
                 {activeChartTab === 'ranks' && (
                     <ResponsiveContainer width="100%" height="100%">
                         {/* Y軸反転（1位が一番上） */}
-                        <LineChart data={keywordRankTrends} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
+                        <LineChart data={keywordRankTrends} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                             <XAxis
                                 dataKey="period"
@@ -461,16 +463,16 @@ export function SpTrackerGrowthCharts({ dailyPerformance, keywords }: SpTrackerG
 
                 {activeChartTab === 'segments' && (
                     <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={segmentData} layout="vertical" margin={{ top: 10, right: 20, left: 40, bottom: 0 }}>
+                        <BarChart data={segmentData} layout="vertical" margin={{ top: 10, right: 10, left: -5, bottom: 0 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                             <XAxis type="number" stroke="#94a3b8" fontSize={11} tickLine={false} unit="回" />
                             <YAxis
                                 dataKey="segment"
                                 type="category"
                                 stroke="#475569"
-                                fontSize={11}
+                                fontSize={10}
                                 tickLine={false}
-                                width={120}
+                                width={88}
                             />
                             <Tooltip
                                 contentStyle={{

@@ -42,25 +42,25 @@ export function SpTrackerHeroActions({ actions, onResolveToggle }: SpTrackerHero
     const badge = getPriorityBadge(primaryAction.priority);
 
     return (
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-zinc-900 via-zinc-900 to-zinc-950 text-white p-8 md:p-10 border border-zinc-800/80 shadow-[0_20px_50px_rgba(0,0,0,0.3)] transition-all duration-300">
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-zinc-900 via-zinc-900 to-zinc-950 text-white p-4 sm:p-7 md:p-10 border border-zinc-800/80 shadow-[0_20px_50px_rgba(0,0,0,0.3)] transition-all duration-300">
             {/* 上品な発光グラデーション (Linear風アンビエント) */}
             <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none" />
             <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-red-500/5 rounded-full blur-[100px] pointer-events-none" />
 
             <div className="relative z-10 space-y-6">
                 {/* ステータスバッジ */}
-                <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800/80 pb-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800/80 pb-4">
                     <div className="flex items-center gap-2">
-                        <span className="relative flex h-2 w-2">
+                        <span className="relative flex h-2 w-2 flex-shrink-0">
                             <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${badge.dot}`}></span>
                             <span className={`relative inline-flex rounded-full h-2 w-2 ${badge.dot}`}></span>
                         </span>
                         <span className="text-[11px] font-mono font-bold tracking-widest text-zinc-400 uppercase">
-                            TODAY'S & WEEKLY PRIORITY ACTION — 今週・今日やるべき最優先アクション
+                            TODAY'S & WEEKLY PRIORITY ACTION
                         </span>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                         <span className={`px-2.5 py-1 rounded-md text-[11px] font-mono font-bold border ${badge.color}`}>
                             {badge.label}
                         </span>
@@ -71,13 +71,13 @@ export function SpTrackerHeroActions({ actions, onResolveToggle }: SpTrackerHero
                 </div>
 
                 {/* メインアクションコンテンツ */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-center">
                     <div className="lg:col-span-8 space-y-4">
-                        <h2 className="text-2xl md:text-3xl lg:text-4xl font-black tracking-tight text-white leading-tight">
+                        <h2 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-white leading-tight">
                             {primaryAction.title}
                         </h2>
 
-                        <p className="text-sm text-zinc-300 leading-relaxed font-normal">
+                        <p className="text-xs sm:text-sm text-zinc-300 leading-relaxed font-normal">
                             {primaryAction.issue_description}
                         </p>
 

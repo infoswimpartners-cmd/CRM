@@ -252,16 +252,16 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
     };
 
     return (
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-zinc-900 via-zinc-900 to-zinc-950 text-white p-8 md:p-10 border border-zinc-800/80 shadow-[0_20px_50px_rgba(0,0,0,0.3)] transition-all">
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-zinc-900 via-zinc-900 to-zinc-950 text-white p-4 sm:p-7 md:p-10 border border-zinc-800/80 shadow-[0_20px_50px_rgba(0,0,0,0.3)] transition-all">
             {/* アンビエント発光 */}
             <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-amber-500/10 rounded-full blur-[130px] pointer-events-none" />
             <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none" />
 
-            <div className="relative z-10 space-y-8">
+            <div className="relative z-10 space-y-6 sm:space-y-8">
                 {/* ヘッダー: ツール名 & サイクルサマリー */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-800 pb-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-5">
                     <div className="space-y-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-400/10 text-amber-300 border border-amber-400/30 flex items-center gap-1.5">
                                 <Target className="w-3 h-3" /> SEO RANK WATCH ENGINE
                             </span>
@@ -269,24 +269,24 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                                 1位狙撃 ✕ 7日間検証サイクル
                             </span>
                         </div>
-                        <h2 className="text-2xl md:text-3xl font-black tracking-tight text-white">
+                        <h2 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-white">
                             検索順位1位 獲得自律スプリント
                         </h2>
                     </div>
 
                     {/* 3つのステータス統計バッジ & 履歴ボタン */}
-                    <div className="flex flex-wrap items-center gap-3">
-                        <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-zinc-800/80 border border-zinc-700/80 text-xs font-mono">
+                    <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-zinc-800/80 border border-zinc-700/80 text-xs font-mono">
                             <span className="text-amber-400 flex items-center gap-1 font-bold">
-                                <Trophy className="w-3.5 h-3.5" /> 1位達成: {stats.achievedCount}件
+                                <Trophy className="w-3.5 h-3.5" /> 1位: {stats.achievedCount}
                             </span>
                             <span className="text-zinc-500">|</span>
                             <span className="text-indigo-300 flex items-center gap-1 font-bold">
-                                <Hourglass className="w-3.5 h-3.5" /> 観察中: {stats.observingCount}件
+                                <Hourglass className="w-3.5 h-3.5" /> 観察: {stats.observingCount}
                             </span>
                             <span className="text-zinc-500">|</span>
                             <span className="text-zinc-400 font-medium">
-                                候補: {stats.activeCount}件
+                                候補: {stats.activeCount}
                             </span>
                         </div>
 
@@ -295,7 +295,7 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                             className="px-3.5 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm"
                         >
                             <History className="w-3.5 h-3.5 text-zinc-400" />
-                            改善施策ログ ({improvementLogs.length})
+                            改善ログ ({improvementLogs.length})
                         </button>
                     </div>
                 </div>
@@ -328,12 +328,12 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
 
                         return (
                             <div className="p-3.5 rounded-xl bg-zinc-800/40 border border-zinc-700/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                                <div className="flex items-center gap-3">
+                                <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
                                     <div className="flex items-center gap-1.5 text-xs font-mono font-bold text-zinc-200">
                                         <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                                         本日の改善進捗: <span className="text-emerald-400 text-sm">{completedActionsCount}</span> / {totalCount} 件完了
                                     </div>
-                                    <div className="w-28 sm:w-44 bg-zinc-700/60 h-2.5 rounded-full overflow-hidden">
+                                    <div className="flex-1 sm:w-44 bg-zinc-700/60 h-2.5 rounded-full overflow-hidden min-w-[100px]">
                                         <div
                                             className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-500"
                                             style={{ width: `${percent}%` }}
@@ -440,23 +440,23 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                                             )}
                                         </div>
 
-                                        {/* 右側アクションボタン群 */}
-                                        <div className="flex flex-wrap lg:flex-col items-center lg:items-end justify-end gap-2.5 flex-shrink-0">
+                                        {/* 右側アクションボタン群（スマホ時は押しやすい全幅、PC時は右寄せ） */}
+                                        <div className="w-full lg:w-auto flex flex-col sm:flex-row lg:flex-col items-stretch sm:items-center lg:items-end justify-end gap-2 sm:gap-2.5 flex-shrink-0 pt-2 lg:pt-0">
                                             <button
                                                 onClick={() => handleOpenKit(action.keyword, action.targetPath, action.currentRank)}
-                                                className="px-4 py-2.5 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/40 text-xs font-bold flex items-center gap-2 transition-all shadow-sm"
+                                                className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/40 text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-sm"
                                             >
                                                 <FileText className="w-4 h-4 text-indigo-400" />
                                                 STUDIO改善キットを開く
                                             </button>
 
                                             {isExecutedToday ? (
-                                                <div className="px-4 py-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center gap-1.5 shadow-sm">
+                                                <div className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm">
                                                     <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                                                     本日反映済み (効果測定中)
                                                 </div>
                                             ) : isObserving ? (
-                                                <div className="px-4 py-2.5 rounded-xl bg-indigo-500/15 border border-indigo-500/40 text-indigo-300 text-xs font-bold flex items-center gap-1.5 shadow-sm">
+                                                <div className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-indigo-500/15 border border-indigo-500/40 text-indigo-300 text-xs font-bold flex items-center justify-center gap-1.5 shadow-sm">
                                                     <Hourglass className="w-4 h-4 text-indigo-400" />
                                                     7日間検証中
                                                 </div>
@@ -464,14 +464,14 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                                                 <button
                                                     onClick={() => handleStartObservingWithKit(generateSeoImprovementKit(action.keyword, action.targetPath, action.currentRank))}
                                                     disabled={isSubmitting}
-                                                    className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-zinc-950 text-xs font-bold transition-all shadow-[0_0_15px_rgba(245,158,11,0.25)] flex items-center gap-1.5 disabled:opacity-50"
+                                                    className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-zinc-950 text-xs font-bold transition-all shadow-[0_0_15px_rgba(245,158,11,0.25)] flex items-center justify-center gap-1.5 disabled:opacity-50"
                                                 >
                                                     <CheckCircle2 className="w-3.5 h-3.5 text-zinc-950" />
                                                     実行済みにする (7日間検証開始)
                                                 </button>
                                             )}
 
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex items-center justify-end gap-2">
                                                 <a
                                                     href="https://studio.design"
                                                     target="_blank"
@@ -556,14 +556,14 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
 
             {/* STUDIOコピペ用 完成形改善キット モーダル（UI/UX刷新版: タブ切り替え & スムーズスクロール） */}
             {isKitModalOpen && activeKit && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl max-w-4xl w-full text-zinc-100 shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl max-w-4xl w-full text-zinc-100 shadow-2xl max-h-[92vh] sm:max-h-[90vh] flex flex-col overflow-hidden">
                         {/* モーダルヘッダー（固定） */}
-                        <div className="p-5 sm:p-6 border-b border-zinc-800 bg-zinc-900/90 backdrop-blur-md flex-shrink-0">
-                            <div className="flex items-start justify-between gap-4">
-                                <div className="space-y-1.5">
+                        <div className="p-4 sm:p-6 border-b border-zinc-800 bg-zinc-900/90 backdrop-blur-md flex-shrink-0">
+                            <div className="flex items-start justify-between gap-3 sm:gap-4">
+                                <div className="space-y-1 sm:space-y-1.5">
                                     <div className="flex flex-wrap items-center gap-2">
-                                        <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold border ${
+                                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-mono font-bold border ${
                                             activeKit.pageType === 'studio_cms_article'
                                                 ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
                                                 : 'bg-amber-400/20 text-amber-300 border-amber-400/40'
@@ -574,19 +574,19 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                                             現在 <strong className="text-white">{activeKit.currentRank}位</strong> ➔ 目標 <strong className="text-amber-300">1位</strong>
                                         </span>
                                     </div>
-                                    <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                                    <h3 className="text-lg sm:text-2xl font-black text-white tracking-tight leading-tight">
                                         「{activeKit.keyword}」1位獲得改善キット
                                     </h3>
-                                    <p className="text-xs text-zinc-400">
+                                    <p className="text-xs text-zinc-400 break-all">
                                         対象ページ: <a href={`https://swim-partners.com${activeKit.targetPath}`} target="_blank" rel="noreferrer" className="font-mono text-indigo-300 hover:underline inline-flex items-center gap-1">{activeKit.targetPath} <ExternalLink className="w-3 h-3" /></a>
                                         {activeKit.pageGoalSummary && (
-                                            <span className="ml-2 text-zinc-400">（目的: <strong className="text-zinc-200">{activeKit.pageGoalSummary}</strong>）</span>
+                                            <span className="ml-1 sm:ml-2 text-zinc-400 inline-block">（目的: <strong className="text-zinc-200">{activeKit.pageGoalSummary}</strong>）</span>
                                         )}
                                     </p>
                                 </div>
                                 <button
                                     onClick={() => setIsKitModalOpen(false)}
-                                    className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+                                    className="p-1.5 sm:p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors flex-shrink-0"
                                     title="閉じる"
                                 >
                                     <X className="w-5 h-5" />
@@ -594,59 +594,59 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                             </div>
 
                             {/* タブナビゲーションバー（入れ子スクロールを排除し、目的のコンテンツに1発アクセス） */}
-                            <div className="flex items-center gap-2 mt-5 border-b border-zinc-800/80 overflow-x-auto pb-px">
+                            <div className="flex items-center gap-1.5 sm:gap-2 mt-4 sm:mt-5 border-b border-zinc-800/80 overflow-x-auto no-scrollbar pb-px">
                                 <button
                                     onClick={() => setKitActiveTab('content')}
-                                    className={`px-4 py-2.5 text-xs font-bold rounded-t-xl transition-all flex items-center gap-2 border-b-2 whitespace-nowrap ${
+                                    className={`px-3 sm:px-4 py-2 sm:py-2.5 text-xs font-bold rounded-t-xl transition-all flex items-center gap-1.5 sm:gap-2 border-b-2 whitespace-nowrap ${
                                         kitActiveTab === 'content'
                                             ? 'text-amber-300 border-amber-400 bg-zinc-800/60'
                                             : 'text-zinc-400 border-transparent hover:text-zinc-200 hover:bg-zinc-800/30'
                                     }`}
                                 >
-                                    <FileText className="w-4 h-4 text-amber-400" />
-                                    {activeKit.pageType === 'studio_landing_page' ? '① LP構成・セクション改善案' : '① 記事本文・FAQ追記テキスト'}
+                                    <FileText className="w-3.5 sm:w-4 h-3.5 sm:h-4 text-amber-400" />
+                                    {activeKit.pageType === 'studio_landing_page' ? '① LP構成案' : '① 記事本文案'}
                                 </button>
 
                                 <button
                                     onClick={() => setKitActiveTab('title')}
-                                    className={`px-4 py-2.5 text-xs font-bold rounded-t-xl transition-all flex items-center gap-2 border-b-2 whitespace-nowrap ${
+                                    className={`px-3 sm:px-4 py-2 sm:py-2.5 text-xs font-bold rounded-t-xl transition-all flex items-center gap-1.5 sm:gap-2 border-b-2 whitespace-nowrap ${
                                         kitActiveTab === 'title'
                                             ? 'text-purple-300 border-purple-400 bg-zinc-800/60'
                                             : 'text-zinc-400 border-transparent hover:text-zinc-200 hover:bg-zinc-800/30'
                                     }`}
                                 >
-                                    <Layers className="w-4 h-4 text-purple-400" />
-                                    {activeKit.pageType === 'studio_landing_page' ? '② LPタイトル・メタ設定' : '② 記事タイトル・メタ設定'}
+                                    <Layers className="w-3.5 sm:w-4 h-3.5 sm:h-4 text-purple-400" />
+                                    ② タイトル・メタ設定
                                 </button>
 
                                 <button
                                     onClick={() => setKitActiveTab('jsonld')}
-                                    className={`px-4 py-2.5 text-xs font-bold rounded-t-xl transition-all flex items-center gap-2 border-b-2 whitespace-nowrap ${
+                                    className={`px-3 sm:px-4 py-2 sm:py-2.5 text-xs font-bold rounded-t-xl transition-all flex items-center gap-1.5 sm:gap-2 border-b-2 whitespace-nowrap ${
                                         kitActiveTab === 'jsonld'
                                             ? 'text-emerald-300 border-emerald-400 bg-zinc-800/60'
                                             : 'text-zinc-400 border-transparent hover:text-zinc-200 hover:bg-zinc-800/30'
                                     }`}
                                 >
-                                    <Code2 className="w-4 h-4 text-emerald-400" />
-                                    {activeKit.pageType === 'studio_landing_page' ? '③ 構造化データ（LocalBusiness）' : '③ 構造化データ（FAQPage）'}
+                                    <Code2 className="w-3.5 sm:w-4 h-3.5 sm:h-4 text-emerald-400" />
+                                    ③ 構造化データ
                                 </button>
 
                                 <button
                                     onClick={() => setKitActiveTab('audit')}
-                                    className={`px-4 py-2.5 text-xs font-bold rounded-t-xl transition-all flex items-center gap-2 border-b-2 whitespace-nowrap ${
+                                    className={`px-3 sm:px-4 py-2 sm:py-2.5 text-xs font-bold rounded-t-xl transition-all flex items-center gap-1.5 sm:gap-2 border-b-2 whitespace-nowrap ${
                                         kitActiveTab === 'audit'
                                             ? 'text-indigo-300 border-indigo-400 bg-zinc-800/60'
                                             : 'text-zinc-400 border-transparent hover:text-zinc-200 hover:bg-zinc-800/30'
                                     }`}
                                 >
-                                    <ShieldAlert className="w-4 h-4 text-indigo-400" />
-                                    ④ 現状データ監査 & 手順
+                                    <ShieldAlert className="w-3.5 sm:w-4 h-3.5 sm:h-4 text-indigo-400" />
+                                    ④ 監査・手順
                                 </button>
                             </div>
                         </div>
 
-                        {/* モーダルコンテンツ本体（ここだけが滑らかにスクロール。内部に小さなスクロール枠は一切作らない） */}
-                        <div className="p-6 overflow-y-auto flex-1 space-y-6 text-sm">
+                        {/* モーダルコンテンツ本体（ここだけが滑らかにスクロール） */}
+                        <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-5 sm:space-y-6 text-sm">
                             {/* ================= タブ1: 本文・LP構成 ================= */}
                             {kitActiveTab === 'content' && (
                                 <div className="space-y-4 animate-in fade-in duration-150">
