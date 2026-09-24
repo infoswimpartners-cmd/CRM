@@ -12,7 +12,8 @@ export function getGoogleAuthClient(scopes: string[]) {
 
     try {
         const credentials = JSON.parse(serviceAccountJson);
-        const privateKey = (credentials.private_key || '').replace(/\\n/g, '\n');
+        const rawKey = credentials.private_key || '';
+        const privateKey = rawKey.includes('\\n') ? rawKey.replace(/\\n/g, '\n') : rawKey;
         const auth = new google.auth.JWT({
             email: credentials.client_email,
             key: privateKey,

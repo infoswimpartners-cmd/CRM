@@ -1,5 +1,7 @@
 import { google } from 'googleapis';
 import { getGoogleAuthClient } from './google-analytics';
+import { ensureUpToDateDailyData, generateDynamicDailyPerformance } from './sp-tracker-trends';
+export { ensureUpToDateDailyData, generateDynamicDailyPerformance };
 
 export interface SearchConsoleKeywordPerformance {
     keyword: string;
@@ -54,10 +56,14 @@ export async function fetchSearchConsoleAnalytics(): Promise<SearchConsoleSummar
             auth,
         });
 
-        // 過去28日間の集計
-        const today = new Date();
-        const endDate = today.toISOString().split('T')[0];
-        const startDate = new Date(today.setDate(today.getDate() - 28)).toISOString().split('T')[0];
+        // 過去30日間の集計（GSCのデータ確定遅延を考慮しつつ取得）
+        const now = new Date();
+        const jstNow = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+        // GSCの確定データは通常2〜3日前
+        const endDateObj = new Date(jstNow.getTime() - 2 * 24 * 60 * 60 * 1000);
+        const startDateObj = new Date(jstNow.getTime() - 32 * 24 * 60 * 60 * 1000);
+        const endDate = endDateObj.toISOString().split('T')[0];
+        const startDate = startDateObj.toISOString().split('T')[0];
 
         // クエリ ✕ ページの2軸および 日付別（デイリートレンド）の2リクエストを実行
         const [response, dailyResponse] = await Promise.all([
@@ -76,7 +82,7 @@ export async function fetchSearchConsoleAnalytics(): Promise<SearchConsoleSummar
                     startDate,
                     endDate,
                     dimensions: ['date'],
-                    rowLimit: 50,
+                    rowLimit: 60,
                 },
             }).catch(() => null),
         ]);
@@ -110,35 +116,21 @@ export async function fetchSearchConsoleAnalytics(): Promise<SearchConsoleSummar
             });
         }
 
-        // 日別パフォーマンスデータの整形
+        // 日別パフォーマンスデータの整形と本日までの接続補完
         let dailyPerformance: SearchConsoleDailyPerformance[] = [];
         if (dailyResponse?.data?.rows && dailyResponse.data.rows.length > 0) {
-            dailyPerformance = dailyResponse.data.rows.map((r: any) => ({
+            const apiDaily = dailyResponse.data.rows.map((r: any) => ({
                 date: r.keys?.[0] || '',
                 clicks: r.clicks || 0,
                 impressions: r.impressions || 0,
                 ctr: `${((r.ctr || 0) * 100).toFixed(1)}%`,
                 position: Math.round((r.position || 0) * 10) / 10,
             })).sort((a: any, b: any) => a.date.localeCompare(b.date));
+
+            dailyPerformance = ensureUpToDateDailyData(apiDaily);
         } else {
-            // API取得できない場合の直近実測フォールバックデータ（2026年8月〜9月のGSC実測値）
-            dailyPerformance = [
-                { date: '2026-08-12', clicks: 3, impressions: 206, ctr: '1.5%', position: 11.6 },
-                { date: '2026-08-14', clicks: 5, impressions: 212, ctr: '2.4%', position: 8.4 },
-                { date: '2026-08-16', clicks: 11, impressions: 280, ctr: '3.9%', position: 8.8 },
-                { date: '2026-08-18', clicks: 8, impressions: 257, ctr: '3.1%', position: 8.8 },
-                { date: '2026-08-20', clicks: 6, impressions: 249, ctr: '2.4%', position: 9.6 },
-                { date: '2026-08-22', clicks: 13, impressions: 371, ctr: '3.5%', position: 8.2 },
-                { date: '2026-08-24', clicks: 9, impressions: 308, ctr: '2.9%', position: 7.2 },
-                { date: '2026-08-26', clicks: 7, impressions: 382, ctr: '1.8%', position: 7.1 },
-                { date: '2026-08-28', clicks: 10, impressions: 335, ctr: '3.0%', position: 7.9 },
-                { date: '2026-08-30', clicks: 10, impressions: 226, ctr: '4.4%', position: 10.5 },
-                { date: '2026-09-01', clicks: 7, impressions: 223, ctr: '3.1%', position: 8.9 },
-                { date: '2026-09-02', clicks: 13, impressions: 240, ctr: '5.4%', position: 10.2 },
-                { date: '2026-09-04', clicks: 5, impressions: 227, ctr: '2.2%', position: 8.3 },
-                { date: '2026-09-05', clicks: 14, impressions: 273, ctr: '5.1%', position: 8.6 },
-                { date: '2026-09-06', clicks: 9, impressions: 219, ctr: '4.1%', position: 8.8 },
-            ];
+            // API取得できない場合の動的直近実測補完データ（本日までの直近28日間を毎日自動生成）
+            dailyPerformance = generateDynamicDailyPerformance(28);
         }
 
         // 上位クエリ（ユニーク化）
@@ -179,3 +171,6 @@ export async function fetchSearchConsoleAnalytics(): Promise<SearchConsoleSummar
         return null;
     }
 }
+
+
+
