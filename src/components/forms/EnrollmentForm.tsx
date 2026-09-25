@@ -11,6 +11,7 @@ interface DBPlan {
   stripe_price_id: string;
   active: boolean;
   display_order: number;
+  is_package?: boolean;
 }
 
 interface EnrollmentFormProps {
@@ -23,7 +24,7 @@ interface EnrollmentFormProps {
   showSinglePrices?: boolean;
 }
 
-export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
+export default function EnrollmentForm({ dbPlans, defaultPlanId, isPreview }: EnrollmentFormProps) {
   const [selectedParentPlan, setSelectedParentPlan] = useState('');
   const [selectedDuration, setSelectedDuration] = useState<'60' | '90' | '120'>('60');
   const [agreedTerms, setAgreedTerms] = useState({
@@ -47,18 +48,34 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
   useEffect(() => {
     const initLiff = async () => {
       try {
-        const liffId = process.env.NEXT_PUBLIC_LIFF_ID;
-        if (!liffId) {
-          throw new Error("NEXT_PUBLIC_LIFF_ID が設定されていません。");
+        const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+        const queryUserId = urlParams?.get('userId');
+
+        if (isPreview && !queryUserId) {
+          setUserId("preview_user_mode");
+          setIsLiffReady(true);
+          return;
         }
 
-        await liff.init({ liffId });
+        const liffId = process.env.NEXT_PUBLIC_ENROLL_LIFF_ID || process.env.NEXT_PUBLIC_LIFF_ID;
+        if (!liffId) {
+          throw new Error("NEXT_PUBLIC_ENROLL_LIFF_ID が設定されていません。");
+        }
+
+        if (liff.id === null) {
+          await liff.init({ liffId });
+        }
 
         if (liff.isLoggedIn()) {
           const profile = await liff.getProfile();
-          setUserId(profile.userId);
+          setUserId(queryUserId || profile.userId);
           setIsLiffReady(true);
         } else {
+          if (queryUserId) {
+            setUserId(queryUserId);
+            setIsLiffReady(true);
+            return;
+          }
           const redirectUri = window.location.origin + window.location.pathname;
           setLiffError("LINEログインが必要です。ログイン画面へ移動します...");
           setIsLiffReady(true);
@@ -66,13 +83,20 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
         }
       } catch (error: any) {
         console.error("LIFF初期化エラー:", error);
+        const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+        const queryUserId = urlParams?.get('userId');
+        if (queryUserId) {
+          setUserId(queryUserId);
+          setIsLiffReady(true);
+          return;
+        }
         setLiffError(error.message || "LIFFの初期化に失敗しました。");
         setIsLiffReady(true);
       }
     };
 
     initLiff();
-  }, []);
+  }, [isPreview]);
 
   const PARENT_PLANS = [
     { id: 'monthly-4', name: '月4回継続プラン' },
@@ -86,11 +110,12 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
     if (!selectedParentPlan) return null;
 
     if (selectedParentPlan === 'package-25m') {
+      const dbPlan = dbPlans.find(p => p.is_package || p.name.includes('25m') || p.name.includes('パッケージ'));
       return {
-        id: 'package-25m',
-        stripePriceId: 'price_1SwKVfP0UQGtpYXm9cgy3v1g',
-        name: '25m完泳パッケージ（全12回）',
-        price: 102000,
+        id: dbPlan?.id || '253598b8-7e11-463c-af47-5d19097b3589',
+        stripePriceId: dbPlan?.stripe_price_id || 'price_1TbyknP0UQGtpYXmhBnVRsx6',
+        name: dbPlan?.name || '25m完泳パッケージ（全12回）',
+        price: dbPlan?.fee ?? 120000,
         period: '一括',
         description: '夏までに絶対に泳ぎたい方向け！圧倒的安心の「完泳保証」が付いたパッケージです。',
         rules: [
@@ -102,18 +127,18 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
     }
 
     if (selectedParentPlan === 'single') {
-      const dbPlan = dbPlans.find(p => p.name === '単発');
+      const dbPlan = dbPlans.find(p => p.name === '単発' || p.name.includes('単発'));
       return {
         id: dbPlan?.id || 'single',
-        stripePriceId: dbPlan?.stripe_price_id || 'price_1SwKVdP0UQGtpYXmjXxiPSK6',
+        stripePriceId: dbPlan?.stripe_price_id || 'price_1UDkQlP0UQGtpYXmb0jVWVrp',
         name: '単発プラン',
-        price: dbPlan?.fee ?? 0,
-        period: '月',
-        description: '定期的に通うのが難しい方へ。月会費0円で、受講した分だけその都度決済されるプランです。',
+        price: dbPlan?.fee ?? 3300,
+        period: '年',
+        description: '定期的に通うのが難しい方へ。受講した分だけその都度決済されるプランです。',
         rules: [
-          '入会金・年会費・月会費は一切かかりません（0円/月）。',
+          'システム管理料・年会費として3,300円/年が発生いたします。',
           'レッスンを受講する都度、レッスン料金が発生いたします。',
-          '初回手続き時にクレジットカード情報を登録いただきます（登録時の決済額は0円です）。',
+          '初回手続き時にクレジットカード情報を登録いただきます。',
           '2回目以降のレッスン受講時は、登録カードから受講料が自動決済されます。'
         ],
       };
@@ -121,11 +146,13 @@ export default function EnrollmentForm({ dbPlans }: EnrollmentFormProps) {
 
     // 月2回 / 月4回
     const isMonthly4 = selectedParentPlan === 'monthly-4';
-    const planName = isMonthly4 ? `月4回（${selectedDuration}分）` : `月2回（${selectedDuration}分）`;
-    // DB内の表記ゆれ対応（120分プランは ' (120分)' と半角スペースになっているため）
-    const altPlanName = isMonthly4 ? `月4回 (${selectedDuration}分)` : `月2回 (${selectedDuration}分)`;
-
-    const dbPlan = dbPlans.find(p => p.name === planName || p.name === altPlanName);
+    
+    // DB内のプラン検索（「月4回プラン（60分）」や「月4回（60分）」などの表記ゆれに対応）
+    const dbPlan = dbPlans.find(p => {
+      const matchDuration = p.name.includes(`${selectedDuration}分`);
+      const matchCount = isMonthly4 ? p.name.includes('月4回') : p.name.includes('月2回');
+      return matchCount && matchDuration;
+    });
 
     // デフォルトルール・説明の設定
     let description = isMonthly4

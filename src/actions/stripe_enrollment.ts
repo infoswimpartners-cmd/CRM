@@ -23,6 +23,13 @@ const PRICE_ID_MAP: Record<string, string> = {
     'price_1TbyknP0UQGtpYXmhBnVRsx6': 'price_1Tc4e6P0UQGtpYXmufqAYO2o',
     // 単発プラン（年会費・システム管理料）- テスト環境用マッピング
     'price_1UDkQlP0UQGtpYXmb0jVWVrp': 'price_1UDkQmP0UQGtpYXmMYM0n7FE',
+    // 最新の入会用月謝プラン（Live -> Test）
+    'price_1Tqo1hP0UQGtpYXm0H7gRS6m': 'price_1TSX3TP0UQGtpYXmAfC6TLIO', // 月2回 60分
+    'price_1Tqo1iP0UQGtpYXmSxp1dfJO': 'price_1TSX3TP0UQGtpYXmAfC6TLIO', // 月4回 60分
+    'price_1Tqo1kP0UQGtpYXmgau2am7q': 'price_1TSX3TP0UQGtpYXmAfC6TLIO', // 月2回 90分
+    'price_1Tqo1mP0UQGtpYXmfXtyTJge': 'price_1TSX3TP0UQGtpYXmAfC6TLIO', // 月4回 90分
+    'price_1Tqo1nP0UQGtpYXmNypRPLFL': 'price_1TSX3TP0UQGtpYXmAfC6TLIO', // 月2回 120分
+    'price_1Tqo1pP0UQGtpYXmNpyiuhGW': 'price_1TSX3TP0UQGtpYXmAfC6TLIO', // 月4回 120分
 }
 
 /**
