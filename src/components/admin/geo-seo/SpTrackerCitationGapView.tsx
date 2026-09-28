@@ -38,7 +38,7 @@ ${gap.name} 編集部・ご担当者様
                 <div className="text-[11px] font-mono font-bold tracking-widest text-zinc-400 uppercase mb-1">
                     CITATION GAP ANALYSIS & OUTREACH
                 </div>
-                <h3 className="text-2xl font-extrabold tracking-tight text-zinc-900">
+                <h3 className="text-2xl font-extrabold tracking-tight text-slate-900">
                     AI引用元ギャップリスト（競合掲載・自社未掲載メディア）
                 </h3>
                 <p className="text-xs text-zinc-500 mt-1">
@@ -61,7 +61,7 @@ ${gap.name} 編集部・ご担当者様
                         {citationGaps.map((gap, idx) => (
                             <tr key={idx} className="hover:bg-zinc-50/80 transition-colors">
                                 <td className="py-4 px-3 space-y-1">
-                                    <div className="font-bold text-zinc-900 flex items-center gap-1.5">
+                                    <div className="font-bold text-slate-900 flex items-center gap-1.5">
                                         <Globe className="w-3.5 h-3.5 text-zinc-400" />
                                         {gap.name}
                                     </div>
@@ -108,7 +108,7 @@ ${gap.name} 編集部・ご担当者様
                                     {!gap.is_swim_partners_listed ? (
                                         <button
                                             onClick={() => handleCopyOutreachTemplate(gap)}
-                                            className="px-3.5 py-1.5 rounded-lg border border-zinc-900 bg-zinc-900 text-white hover:bg-zinc-800 text-xs font-semibold transition-all inline-flex items-center gap-1.5 shadow-sm"
+                                            className="px-3.5 py-1.5 rounded-lg border border-indigo-600 bg-indigo-600 text-white hover:bg-indigo-700 text-xs font-semibold transition-all inline-flex items-center gap-1.5 shadow-sm"
                                         >
                                             <Mail className="w-3.5 h-3.5" /> 掲載依頼文をコピー
                                         </button>

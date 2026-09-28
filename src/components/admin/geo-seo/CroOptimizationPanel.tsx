@@ -31,7 +31,7 @@ export function CroOptimizationPanel() {
                     <div className="text-[11px] font-mono font-bold tracking-widest text-zinc-400 uppercase mb-1">
                         CONVERSION RATE OPTIMIZATION (CRO)
                     </div>
-                    <h3 className="text-2xl font-extrabold tracking-tight text-zinc-900">
+                    <h3 className="text-2xl font-extrabold tracking-tight text-slate-900">
                         成約（申込率）指標 ＆ パフォーマンス
                     </h3>
                 </div>
@@ -40,7 +40,7 @@ export function CroOptimizationPanel() {
                     {conversionStats.map((stat, idx) => (
                         <div key={idx} className="p-5 rounded-xl bg-zinc-50/60 border border-zinc-200/60 hover:border-zinc-300 transition-all">
                             <div className="text-xs font-semibold text-zinc-500">{stat.title}</div>
-                            <div className="mt-2 text-3xl font-black tracking-tight text-zinc-900">{stat.value}</div>
+                            <div className="mt-2 text-3xl font-black tracking-tight text-slate-900">{stat.value}</div>
                             <div className="text-xs font-mono text-emerald-600 mt-1">{stat.rate}</div>
                         </div>
                     ))}
@@ -52,7 +52,7 @@ export function CroOptimizationPanel() {
                     <div className="text-[11px] font-mono font-bold tracking-widest text-zinc-400 uppercase mb-1">
                         CRO ACTION PLAN
                     </div>
-                    <h3 className="text-2xl font-extrabold tracking-tight text-zinc-900">
+                    <h3 className="text-2xl font-extrabold tracking-tight text-slate-900">
                         申込率・CVRアップ改善策
                     </h3>
                 </div>
@@ -65,14 +65,14 @@ export function CroOptimizationPanel() {
                         >
                             <div className="space-y-2">
                                 <div className="flex items-center gap-2 text-xs font-mono">
-                                    <span className="bg-zinc-900 text-white px-2 py-0.5 rounded-md text-[10px] font-bold uppercase">
+                                    <span className="bg-indigo-600 text-white px-2 py-0.5 rounded-md text-[10px] font-bold uppercase">
                                         {action.category}
                                     </span>
                                     <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-md text-[10px] font-bold">
                                         {action.impact}
                                     </span>
                                 </div>
-                                <h4 className="font-bold text-zinc-900 text-lg tracking-tight">{action.title}</h4>
+                                <h4 className="font-bold text-slate-900 text-lg tracking-tight">{action.title}</h4>
                                 <p className="text-xs text-zinc-500 leading-relaxed max-w-3xl">{action.desc}</p>
                             </div>
                         </div>

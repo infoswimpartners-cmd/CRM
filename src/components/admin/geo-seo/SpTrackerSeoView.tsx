@@ -146,19 +146,19 @@ export function SpTrackerSeoView({ keywords, searchConsoleData, rankWatchState, 
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
                         <div className="p-3 sm:p-4 rounded-xl bg-zinc-50 border border-zinc-200/60">
                             <div className="text-xs text-zinc-500">合計クリック数</div>
-                            <div className="text-xl sm:text-2xl font-black text-zinc-900 mt-1">{searchConsoleData.clicks?.toLocaleString()} 回</div>
+                            <div className="text-xl sm:text-2xl font-black text-slate-900 mt-1">{searchConsoleData.clicks?.toLocaleString()} 回</div>
                         </div>
                         <div className="p-3 sm:p-4 rounded-xl bg-zinc-50 border border-zinc-200/60">
                             <div className="text-xs text-zinc-500">合計表示回数 (Imp)</div>
-                            <div className="text-xl sm:text-2xl font-black text-zinc-900 mt-1">{searchConsoleData.impressions?.toLocaleString()} 回</div>
+                            <div className="text-xl sm:text-2xl font-black text-slate-900 mt-1">{searchConsoleData.impressions?.toLocaleString()} 回</div>
                         </div>
                         <div className="p-3 sm:p-4 rounded-xl bg-zinc-50 border border-zinc-200/60">
                             <div className="text-xs text-zinc-500">平均クリック率 (CTR)</div>
-                            <div className="text-xl sm:text-2xl font-black text-zinc-900 mt-1">{searchConsoleData.ctr}</div>
+                            <div className="text-xl sm:text-2xl font-black text-slate-900 mt-1">{searchConsoleData.ctr}</div>
                         </div>
                         <div className="p-3 sm:p-4 rounded-xl bg-zinc-50 border border-zinc-200/60">
                             <div className="text-xs text-zinc-500">平均掲載順位</div>
-                            <div className="text-xl sm:text-2xl font-black text-zinc-900 mt-1">{searchConsoleData.averagePosition} 位</div>
+                            <div className="text-xl sm:text-2xl font-black text-slate-900 mt-1">{searchConsoleData.averagePosition} 位</div>
                         </div>
                     </div>
                 </div>
@@ -171,17 +171,17 @@ export function SpTrackerSeoView({ keywords, searchConsoleData, rankWatchState, 
                         <div className="text-[11px] font-mono font-bold tracking-widest text-zinc-400 uppercase mb-1">
                             SEO RANKING TRACKING
                         </div>
-                        <h3 className="text-xl sm:text-2xl font-extrabold tracking-tight text-zinc-900">
+                        <h3 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">
                             エリア別 ✕ セグメント別 検索順位推移
                         </h3>
                     </div>
 
-                    {/* フィルタ & GSC同期ボタン（スマホ時は2列、PC時はインライン） */}
+                    {/* フィルタ & GSC同期ボタン（スマホ時は押しやすいグリッド、PC時はインライン） */}
                     <div className="w-full lg:w-auto grid grid-cols-2 sm:flex sm:flex-wrap sm:items-center gap-2 text-xs font-mono">
                         <select
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value)}
-                            className="px-3 py-2 rounded-lg border border-indigo-200 bg-indigo-50/50 text-indigo-900 font-bold focus:outline-none"
+                            className="px-3 py-2.5 rounded-xl border border-indigo-200 bg-indigo-50/60 text-indigo-950 font-bold focus:outline-none shadow-xs text-xs"
                         >
                             <option value="all">全ステータス</option>
                             <option value="achieved">👑 1位達成</option>
@@ -192,7 +192,7 @@ export function SpTrackerSeoView({ keywords, searchConsoleData, rankWatchState, 
                         <select
                             value={areaFilter}
                             onChange={(e) => setAreaFilter(e.target.value)}
-                            className="px-3 py-2 rounded-lg border border-zinc-200 bg-zinc-50 text-zinc-700 focus:outline-none"
+                            className="px-3 py-2.5 rounded-xl border border-zinc-200 bg-zinc-50 text-zinc-800 font-medium focus:outline-none shadow-xs text-xs"
                         >
                             <option value="all">全エリア</option>
                             <option value="tokyo_23">東京23区</option>
@@ -203,7 +203,7 @@ export function SpTrackerSeoView({ keywords, searchConsoleData, rankWatchState, 
                         <select
                             value={targetFilter}
                             onChange={(e) => setTargetFilter(e.target.value)}
-                            className="px-3 py-2 rounded-lg border border-zinc-200 bg-zinc-50 text-zinc-700 focus:outline-none"
+                            className="px-3 py-2.5 rounded-xl border border-zinc-200 bg-zinc-50 text-zinc-800 font-medium focus:outline-none shadow-xs text-xs"
                         >
                             <option value="all">全セグメント</option>
                             <option value="adult">大人</option>
@@ -215,16 +215,21 @@ export function SpTrackerSeoView({ keywords, searchConsoleData, rankWatchState, 
                         <button
                             onClick={handleSyncRanks}
                             disabled={isSyncing}
-                            className="col-span-2 sm:col-auto px-4 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white font-semibold flex items-center justify-center gap-1.5 transition-all disabled:opacity-50"
+                            className="col-span-2 sm:col-auto px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold flex items-center justify-center gap-1.5 transition-all disabled:opacity-50 shadow-xs text-xs"
                             title="Google Search Consoleの最新順位を取得して履歴に追記"
                         >
-                            <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} />
+                            <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
                             {isSyncing ? '同期中...' : 'GSC順位計測'}
                         </button>
                     </div>
                 </div>
 
-                <div className="overflow-x-auto no-scrollbar">
+                {/* モバイル用スクロール案内 */}
+                <div className="block lg:hidden text-[11px] font-mono text-zinc-400 bg-zinc-50 px-3 py-1.5 rounded-lg border border-zinc-200/80 text-center">
+                    👈 左右にスワイプして全列を確認できます 👉
+                </div>
+
+                <div className="overflow-x-auto no-scrollbar -mx-4 sm:mx-0 px-4 sm:px-0">
                     <table className="w-full min-w-[760px] text-left border-collapse">
                         <thead>
                             <tr className="border-b border-zinc-200 text-[11px] font-mono font-bold text-zinc-400 uppercase whitespace-nowrap">
@@ -243,7 +248,7 @@ export function SpTrackerSeoView({ keywords, searchConsoleData, rankWatchState, 
                                 const gscPerf: any = gscPerformanceMap.get(kw.keyword);
                                 return (
                                     <tr key={kw.id} className="hover:bg-zinc-50/80 transition-colors">
-                                        <td className="py-4 px-3 font-bold text-zinc-900">
+                                        <td className="py-4 px-3 font-bold text-slate-900">
                                             {kw.keyword}
                                         </td>
                                         <td className="py-4 px-3 text-center">

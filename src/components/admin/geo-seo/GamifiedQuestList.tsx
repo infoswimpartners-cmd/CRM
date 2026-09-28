@@ -40,13 +40,13 @@ export function GamifiedQuestList({ quests, onToggleQuest }: GamifiedQuestListPr
                     <div className="text-[11px] font-mono font-bold tracking-widest text-zinc-400 uppercase mb-1">
                         ACTIONABLE ROADMAP & QUESTS
                     </div>
-                    <h3 className="text-2xl font-extrabold tracking-tight text-zinc-900">
+                    <h3 className="text-2xl font-extrabold tracking-tight text-slate-900">
                         マーケティング改善タスク一覧
                     </h3>
                 </div>
 
                 <div className="text-xs font-mono text-zinc-500 bg-zinc-50 px-3 py-1.5 rounded-lg border border-zinc-200/80">
-                    STATUS: <strong className="text-zinc-900">{completedCount} / {quests.length} COMPLETED</strong>
+                    STATUS: <strong className="text-slate-900">{completedCount} / {quests.length} COMPLETED</strong>
                 </div>
             </div>
 
@@ -66,7 +66,7 @@ export function GamifiedQuestList({ quests, onToggleQuest }: GamifiedQuestListPr
                             <div className="flex items-start gap-4">
                                 <button
                                     type="button"
-                                    className="mt-0.5 text-zinc-300 group-hover:text-zinc-900 transition-colors focus:outline-none flex-shrink-0"
+                                    className="mt-0.5 text-zinc-300 group-hover:text-slate-900 transition-colors focus:outline-none flex-shrink-0"
                                 >
                                     {quest.isCompleted ? (
                                         <CheckCircle2 className="w-5 h-5 text-emerald-600 fill-emerald-50" />
@@ -85,7 +85,7 @@ export function GamifiedQuestList({ quests, onToggleQuest }: GamifiedQuestListPr
                                         </span>
                                     </div>
 
-                                    <h4 className={`text-base font-bold tracking-tight ${quest.isCompleted ? 'line-through text-zinc-400' : 'text-zinc-900'}`}>
+                                    <h4 className={`text-base font-bold tracking-tight ${quest.isCompleted ? 'line-through text-zinc-400' : 'text-slate-900'}`}>
                                         {quest.title}
                                     </h4>
 
@@ -97,7 +97,7 @@ export function GamifiedQuestList({ quests, onToggleQuest }: GamifiedQuestListPr
 
                             <div className="flex items-center justify-between md:justify-end gap-4 border-t md:border-t-0 pt-3 md:pt-0 border-zinc-100">
                                 <div className="text-right font-mono text-xs">
-                                    <div className="font-bold text-zinc-900">+{quest.xpReward} XP</div>
+                                    <div className="font-bold text-slate-900">+{quest.xpReward} XP</div>
                                     <div className="text-[10px] text-zinc-400">Score +{quest.scoreReward}pt</div>
                                 </div>
 
@@ -105,7 +105,7 @@ export function GamifiedQuestList({ quests, onToggleQuest }: GamifiedQuestListPr
                                     type="button"
                                     className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all duration-150 ${quest.isCompleted
                                             ? 'bg-zinc-100 text-zinc-400 border border-zinc-200'
-                                            : 'bg-zinc-900 hover:bg-zinc-800 text-white shadow-sm'
+                                            : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm'
                                         }`}
                                 >
                                     {quest.isCompleted ? '完了済み' : '完了にする'}

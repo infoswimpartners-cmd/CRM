@@ -45,7 +45,7 @@ LINE友だち追加してくれた保護者様へ、体験レッスンの申込�
                     <div className="text-[11px] font-mono font-bold tracking-widest text-zinc-400 uppercase mb-1">
                         AI PROMPT GENERATOR
                     </div>
-                    <h3 className="text-2xl font-extrabold tracking-tight text-zinc-900">
+                    <h3 className="text-2xl font-extrabold tracking-tight text-slate-900">
                         GEO ✕ マーケティング AIプロンプト作成
                     </h3>
                 </div>
@@ -61,7 +61,7 @@ LINE友だち追加してくれた保護者様へ、体験レッスンの申込�
                             key={tab.id}
                             onClick={() => setPromptType(tab.id as any)}
                             className={`px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold transition-all duration-150 ${promptType === tab.id
-                                    ? 'bg-zinc-900 text-white shadow-sm'
+                                    ? 'bg-indigo-600 text-white shadow-sm'
                                     : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
                                 }`}
                         >
@@ -76,13 +76,13 @@ LINE友だち追加してくれた保護者様へ、体験レッスンの申込�
                     readOnly
                     rows={8}
                     value={currentPrompt}
-                    className="w-full p-4 rounded-xl bg-zinc-900 text-zinc-100 text-xs font-mono border border-zinc-900 leading-relaxed resize-none focus:outline-none"
+                    className="w-full p-4 rounded-xl bg-zinc-50 text-slate-800 text-xs font-mono border border-zinc-200 leading-relaxed resize-none focus:outline-none focus:ring-1 focus:ring-indigo-500"
                 />
                 <button
                     onClick={handleCopy}
-                    className="absolute top-3 right-3 px-3.5 py-1.5 rounded-lg border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-mono font-semibold flex items-center gap-1.5 transition-all"
+                    className="absolute top-3 right-3 px-3.5 py-1.5 rounded-lg border border-zinc-200 bg-white hover:bg-zinc-50 text-slate-700 text-xs font-mono font-semibold flex items-center gap-1.5 transition-all shadow-xs"
                 >
-                    {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
                     {isCopied ? 'コピー完了' : 'プロンプトをコピー'}
                 </button>
             </div>

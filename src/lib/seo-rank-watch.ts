@@ -394,6 +394,7 @@ export async function getSeoRankWatchState(supabase?: any): Promise<SeoRankWatch
     for (const cand of candidateKeywords) {
         if (topActions.length >= 3) break;
         const kit = generateSeoImprovementKit(cand.keyword, cand.target_path, cand.current_rank);
+        const isAlreadyDone = cand.status === 'observing' || kit.isAlreadyOptimized || kit.optimizationStatus === 'optimized_in_production';
 
         topActions.push({
             id: `task_cand_${cand.id}`,
@@ -405,7 +406,7 @@ export async function getSeoRankWatchState(supabase?: any): Promise<SeoRankWatch
             pageTypeLabel: kit.pageTypeLabel,
             actionTitle: kit.actionTitle,
             actionDetail: kit.actionDetail,
-            status: cand.status === 'observing' ? 'observing' : 'ready',
+            status: isAlreadyDone ? 'observing' : 'ready',
         });
     }
 

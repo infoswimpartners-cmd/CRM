@@ -43,7 +43,7 @@ export function GeoAuditPanel() {
                     <div className="text-[11px] font-mono font-bold tracking-widest text-zinc-400 uppercase mb-1">
                         GEO ENGINE DIAGNOSTICS
                     </div>
-                    <h3 className="text-2xl font-extrabold tracking-tight text-zinc-900">
+                    <h3 className="text-2xl font-extrabold tracking-tight text-slate-900">
                         生成AIエンジン別 引用適応スコア
                     </h3>
                 </div>
@@ -53,18 +53,18 @@ export function GeoAuditPanel() {
                         <div key={idx} className="p-5 rounded-xl bg-zinc-50/60 border border-zinc-200/60 hover:border-zinc-300 transition-all flex flex-col justify-between">
                             <div>
                                 <div className="flex items-center justify-between">
-                                    <span className="font-bold text-zinc-900 text-sm">{engine.name}</span>
+                                    <span className="font-bold text-slate-900 text-sm">{engine.name}</span>
                                     <span className={`text-[10px] font-mono px-2 py-0.5 rounded-md font-bold border ${engine.style}`}>
                                         {engine.status}
                                     </span>
                                 </div>
                                 <div className="mt-4 flex items-baseline justify-between">
-                                    <span className="text-3xl font-black text-zinc-900">{engine.score}</span>
+                                    <span className="text-3xl font-black text-slate-900">{engine.score}</span>
                                     <span className="text-xs text-zinc-400 font-mono">/ 100点</span>
                                 </div>
                             </div>
                             <div className="w-full bg-zinc-200/80 rounded-full h-1.5 mt-3 overflow-hidden">
-                                <div className="bg-zinc-900 h-full rounded-full" style={{ width: `${engine.score}%` }} />
+                                <div className="bg-indigo-600 h-full rounded-full" style={{ width: `${engine.score}%` }} />
                             </div>
                         </div>
                     ))}
@@ -77,7 +77,7 @@ export function GeoAuditPanel() {
                     <div className="text-[11px] font-mono font-bold tracking-widest text-zinc-400 uppercase mb-1">
                         RECOMMENDED GEO ACTIONS
                     </div>
-                    <h3 className="text-2xl font-extrabold tracking-tight text-zinc-900">
+                    <h3 className="text-2xl font-extrabold tracking-tight text-slate-900">
                         生成AI検索（GEO）最適化プラン
                     </h3>
                 </div>
@@ -90,18 +90,18 @@ export function GeoAuditPanel() {
                         >
                             <div className="space-y-2">
                                 <div className="flex items-center gap-2 text-xs font-mono">
-                                    <span className="bg-zinc-900 text-white px-2 py-0.5 rounded-md text-[10px] font-bold uppercase">
+                                    <span className="bg-indigo-600 text-white px-2 py-0.5 rounded-md text-[10px] font-bold uppercase">
                                         {rec.category}
                                     </span>
                                     <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-md text-[10px] font-bold">
                                         {rec.impact}
                                     </span>
                                 </div>
-                                <h4 className="font-bold text-zinc-900 text-lg tracking-tight">{rec.title}</h4>
+                                <h4 className="font-bold text-slate-900 text-lg tracking-tight">{rec.title}</h4>
                                 <p className="text-xs text-zinc-500 leading-relaxed max-w-3xl">{rec.description}</p>
                             </div>
 
-                            <button className="flex-shrink-0 px-4 py-2.5 rounded-xl border border-zinc-900 text-xs font-semibold bg-white text-zinc-900 hover:bg-zinc-900 hover:text-white transition-all duration-150 flex items-center gap-2">
+                            <button className="flex-shrink-0 px-4 py-2.5 rounded-xl border border-indigo-600 text-xs font-semibold bg-white text-slate-900 hover:bg-indigo-600 hover:text-white transition-all duration-150 flex items-center gap-2">
                                 {rec.actionText} <ArrowRight className="w-3.5 h-3.5" />
                             </button>
                         </div>

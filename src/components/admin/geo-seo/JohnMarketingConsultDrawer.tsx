@@ -6,10 +6,6 @@ import {
     Send,
     Bot,
     Sparkles,
-    TrendingUp,
-    Target,
-    DollarSign,
-    Users,
     Copy,
     Check,
     Briefcase,
@@ -112,26 +108,26 @@ export function JohnMarketingConsultDrawer({
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="w-full max-w-2xl bg-zinc-950 border-l border-zinc-800 text-zinc-100 flex flex-col h-full shadow-2xl animate-in slide-in-from-right duration-300">
+        <div className="fixed inset-0 z-50 flex justify-end bg-slate-800/40 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="w-full max-w-2xl bg-white border-l border-zinc-200 text-slate-900 flex flex-col h-full shadow-2xl animate-in slide-in-from-right duration-300">
                 {/* ヘッダー */}
-                <div className="p-5 sm:p-6 border-b border-zinc-800 bg-zinc-900/90 flex items-center justify-between gap-4">
+                <div className="p-4 sm:p-6 border-b border-zinc-200 bg-slate-50/90 flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-300 p-0.5 shadow-[0_0_15px_rgba(245,158,11,0.3)]">
-                            <div className="w-full h-full bg-zinc-950 rounded-[14px] flex items-center justify-center">
-                                <Briefcase className="w-5 h-5 text-amber-400" />
+                        <div className="w-10 sm:w-11 h-10 sm:h-11 rounded-2xl bg-gradient-to-tr from-amber-500 to-amber-300 p-0.5 shadow-sm">
+                            <div className="w-full h-full bg-white rounded-[14px] flex items-center justify-center">
+                                <Briefcase className="w-5 h-5 text-amber-600" />
                             </div>
                         </div>
                         <div>
                             <div className="flex items-center gap-2">
-                                <h2 className="text-base font-black text-white tracking-tight">
+                                <h2 className="text-base font-black text-slate-900 tracking-tight">
                                     AIチーフマーケター ジョン (John)
                                 </h2>
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-400/20 text-amber-300 border border-amber-400/30">
-                                    CMO
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-50 text-amber-800 border border-amber-300">
+                                    専属CMO
                                 </span>
                             </div>
-                            <p className="text-xs text-zinc-400 mt-0.5">
+                            <p className="text-xs text-zinc-500 mt-0.5">
                                 PL・LTV最大化 ✕ データドリブン戦略伴走パートナー
                             </p>
                         </div>
@@ -139,7 +135,7 @@ export function JohnMarketingConsultDrawer({
 
                     <button
                         onClick={onClose}
-                        className="p-2 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+                        className="p-2 rounded-xl text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors"
                         title="閉じる"
                     >
                         <X className="w-5 h-5" />
@@ -147,11 +143,11 @@ export function JohnMarketingConsultDrawer({
                 </div>
 
                 {/* メッセージエリア */}
-                <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 text-sm">
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 text-sm bg-[#fafafa]">
                     {/* プリセット質問タグ群 */}
                     <div className="space-y-2">
-                        <div className="text-[11px] font-mono text-zinc-400 flex items-center gap-1.5">
-                            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                        <div className="text-[11px] font-mono text-zinc-500 flex items-center gap-1.5 font-bold">
+                            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
                             ジョンへのクイック戦略相談:
                         </div>
                         <div className="flex flex-wrap gap-2">
@@ -160,7 +156,7 @@ export function JohnMarketingConsultDrawer({
                                     key={idx}
                                     onClick={() => handleSend(pq.text)}
                                     disabled={isLoading}
-                                    className="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-xs font-medium border border-zinc-800 hover:border-amber-500/40 transition-all text-left disabled:opacity-50"
+                                    className="px-3 py-1.5 rounded-lg bg-white hover:bg-zinc-50 text-zinc-700 text-xs font-medium border border-zinc-200 hover:border-amber-300 transition-all text-left shadow-xs disabled:opacity-50"
                                 >
                                     {pq.label}
                                 </button>
@@ -168,7 +164,7 @@ export function JohnMarketingConsultDrawer({
                         </div>
                     </div>
 
-                    <div className="border-t border-zinc-800/80 pt-4 space-y-6">
+                    <div className="border-t border-zinc-200/80 pt-4 space-y-5">
                         {messages.map((msg) => {
                             const isJohn = msg.sender === 'john';
 
@@ -178,18 +174,18 @@ export function JohnMarketingConsultDrawer({
                                     className={`flex gap-3 ${isJohn ? 'items-start' : 'items-start flex-row-reverse'}`}
                                 >
                                     {isJohn ? (
-                                        <div className="w-8 h-8 rounded-xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center flex-shrink-0 text-amber-300 mt-1">
+                                        <div className="w-8 h-8 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center flex-shrink-0 text-amber-700 mt-1 shadow-xs">
                                             <Bot className="w-4 h-4" />
                                         </div>
                                     ) : (
-                                        <div className="w-8 h-8 rounded-xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center flex-shrink-0 text-indigo-300 mt-1 font-bold text-xs">
+                                        <div className="w-8 h-8 rounded-xl bg-indigo-600 border border-indigo-100 flex items-center justify-center flex-shrink-0 text-white mt-1 font-bold text-xs shadow-xs">
                                             YOU
                                         </div>
                                     )}
 
-                                    <div className={`max-w-[85%] space-y-2 ${isJohn ? 'text-zinc-200' : 'text-white'}`}>
+                                    <div className={`max-w-[85%] space-y-1.5 ${isJohn ? 'text-zinc-800' : 'text-slate-900'}`}>
                                         <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-500">
-                                            <span>{isJohn ? 'ジョン (CMO)' : 'あなた'}</span>
+                                            <span className="font-bold">{isJohn ? 'ジョン (CMO)' : 'あなた'}</span>
                                             <span>•</span>
                                             <span>{msg.timestamp}</span>
                                         </div>
@@ -197,8 +193,8 @@ export function JohnMarketingConsultDrawer({
                                         <div
                                             className={`p-4 rounded-2xl text-xs sm:text-sm leading-relaxed whitespace-pre-wrap ${
                                                 isJohn
-                                                    ? 'bg-zinc-900 border border-zinc-800 shadow-md select-text'
-                                                    : 'bg-indigo-600 text-white rounded-tr-none'
+                                                    ? 'bg-white border border-zinc-200 shadow-xs select-text'
+                                                    : 'bg-indigo-600 text-white rounded-tr-none shadow-xs'
                                             }`}
                                         >
                                             {msg.text}
@@ -208,11 +204,11 @@ export function JohnMarketingConsultDrawer({
                                             <div className="flex items-center gap-2 pt-1">
                                                 <button
                                                     onClick={() => handleCopy(msg.text, msg.id)}
-                                                    className="px-2.5 py-1 rounded-md bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 text-[11px] font-mono flex items-center gap-1 border border-zinc-800 transition-colors"
+                                                    className="px-2.5 py-1 rounded-md bg-white hover:bg-zinc-100 text-zinc-600 hover:text-slate-900 text-[11px] font-mono flex items-center gap-1 border border-zinc-200 transition-colors shadow-xs"
                                                 >
                                                     {copiedId === msg.id ? (
                                                         <>
-                                                            <Check className="w-3 h-3 text-emerald-400" /> コピー済
+                                                            <Check className="w-3 h-3 text-emerald-600" /> コピー済
                                                         </>
                                                     ) : (
                                                         <>
@@ -229,11 +225,11 @@ export function JohnMarketingConsultDrawer({
 
                         {isLoading && (
                             <div className="flex items-start gap-3">
-                                <div className="w-8 h-8 rounded-xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-center flex-shrink-0 text-amber-300 mt-1">
+                                <div className="w-8 h-8 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center flex-shrink-0 text-amber-700 mt-1 shadow-xs">
                                     <Bot className="w-4 h-4 animate-spin" />
                                 </div>
-                                <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl text-xs text-zinc-400 flex items-center gap-2">
-                                    <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                                <div className="bg-white border border-zinc-200 p-4 rounded-2xl text-xs text-zinc-600 flex items-center gap-2 shadow-xs">
+                                    <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
                                     ジョンが損益構造・ファネル・実データを分析して戦略を立案中...
                                 </div>
                             </div>
@@ -244,7 +240,7 @@ export function JohnMarketingConsultDrawer({
                 </div>
 
                 {/* 入力フォーム */}
-                <div className="p-4 border-t border-zinc-800 bg-zinc-900/90">
+                <div className="p-3.5 sm:p-4 border-t border-zinc-200 bg-white">
                     <form
                         onSubmit={(e) => {
                             e.preventDefault();
@@ -258,18 +254,18 @@ export function JohnMarketingConsultDrawer({
                             onChange={(e) => setInputText(e.target.value)}
                             placeholder="ジョンに相談する（例: 体験からの成約率を改善したい、広告文の修正案...）"
                             disabled={isLoading}
-                            className="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-xs sm:text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400 transition-colors disabled:opacity-50"
+                            className="flex-1 bg-zinc-50 border border-zinc-200 rounded-xl px-3.5 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm text-slate-900 placeholder-zinc-400 focus:outline-none focus:border-amber-500 transition-colors disabled:opacity-50"
                         />
                         <button
                             type="submit"
                             disabled={!inputText.trim() || isLoading}
-                            className="px-5 py-3 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-zinc-950 font-bold text-xs flex items-center gap-1.5 transition-all shadow-[0_0_15px_rgba(245,158,11,0.2)] disabled:opacity-50 flex-shrink-0"
+                            className="px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm disabled:opacity-50 flex-shrink-0"
                         >
                             <Send className="w-3.5 h-3.5" />
                             送信
                         </button>
                     </form>
-                    <div className="text-[10px] text-zinc-500 mt-2 text-center">
+                    <div className="text-[10px] text-zinc-400 mt-2 text-center">
                         ※ ジョンは「PL・LTVファースト」「ボトルネック分解」「現場実行レベル」「プロとしての直言」の思考原則で回答します。
                     </div>
                 </div>

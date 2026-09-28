@@ -204,7 +204,7 @@ export function SpTrackerGrowthCharts({ dailyPerformance, keywords }: SpTrackerG
                             <TrendingUp className="w-3 h-3" /> 前期比 +{clickGrowthPercent}% 成長
                         </span>
                     </div>
-                    <h3 className="text-xl sm:text-2xl font-black tracking-tight text-zinc-900 flex items-center gap-2">
+                    <h3 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 flex items-center gap-2">
                         SEO検索露出・順位成長トレンド
                     </h3>
                 </div>
@@ -216,8 +216,8 @@ export function SpTrackerGrowthCharts({ dailyPerformance, keywords }: SpTrackerG
                             onClick={() => setActiveChartTab('exposure')}
                             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
                                 activeChartTab === 'exposure'
-                                    ? 'bg-white text-zinc-900 shadow-sm'
-                                    : 'text-zinc-600 hover:text-zinc-900'
+                                    ? 'bg-white text-slate-900 shadow-sm'
+                                    : 'text-zinc-600 hover:text-slate-900'
                             }`}
                         >
                             📈 検索露出（Clicks ✕ Imp）
@@ -226,8 +226,8 @@ export function SpTrackerGrowthCharts({ dailyPerformance, keywords }: SpTrackerG
                             onClick={() => setActiveChartTab('ranks')}
                             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
                                 activeChartTab === 'ranks'
-                                    ? 'bg-white text-zinc-900 shadow-sm'
-                                    : 'text-zinc-600 hover:text-zinc-900'
+                                    ? 'bg-white text-slate-900 shadow-sm'
+                                    : 'text-zinc-600 hover:text-slate-900'
                             }`}
                         >
                             🎯 主要KW 順位推移
@@ -236,8 +236,8 @@ export function SpTrackerGrowthCharts({ dailyPerformance, keywords }: SpTrackerG
                             onClick={() => setActiveChartTab('segments')}
                             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
                                 activeChartTab === 'segments'
-                                    ? 'bg-white text-zinc-900 shadow-sm'
-                                    : 'text-zinc-600 hover:text-zinc-900'
+                                    ? 'bg-white text-slate-900 shadow-sm'
+                                    : 'text-zinc-600 hover:text-slate-900'
                             }`}
                         >
                             📊 セグメント別比率
@@ -340,12 +340,12 @@ export function SpTrackerGrowthCharts({ dailyPerformance, keywords }: SpTrackerG
                             />
                             <Tooltip
                                 contentStyle={{
-                                    backgroundColor: '#0f172a',
+                                    backgroundColor: '#ffffff',
                                     borderRadius: '12px',
-                                    border: 'none',
-                                    color: '#fff',
+                                    border: '1px solid #e2e8f0',
+                                    color: '#0f172a',
                                     fontSize: '12px',
-                                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3)',
+                                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.08)',
                                 }}
                                 formatter={(value: any, name: any) => {
                                     if (name === 'clicks') return [`${value} 回`, 'クリック数 (Clicks)'];
@@ -406,12 +406,12 @@ export function SpTrackerGrowthCharts({ dailyPerformance, keywords }: SpTrackerG
                             />
                             <Tooltip
                                 contentStyle={{
-                                    backgroundColor: '#0f172a',
+                                    backgroundColor: '#ffffff',
                                     borderRadius: '12px',
-                                    border: 'none',
-                                    color: '#fff',
+                                    border: '1px solid #e2e8f0',
+                                    color: '#0f172a',
                                     fontSize: '12px',
-                                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3)',
+                                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.08)',
                                 }}
                                 formatter={(value: any, name: any) => [`${value} 位`, name]}
                             />
@@ -476,12 +476,12 @@ export function SpTrackerGrowthCharts({ dailyPerformance, keywords }: SpTrackerG
                             />
                             <Tooltip
                                 contentStyle={{
-                                    backgroundColor: '#0f172a',
+                                    backgroundColor: '#ffffff',
                                     borderRadius: '12px',
-                                    border: 'none',
-                                    color: '#fff',
+                                    border: '1px solid #e2e8f0',
+                                    color: '#0f172a',
                                     fontSize: '12px',
-                                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3)',
+                                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.08)',
                                 }}
                                 formatter={(val: any, name: any) => [
                                     `${val} 回`,

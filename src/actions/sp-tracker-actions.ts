@@ -34,6 +34,8 @@ import {
     getSpreadsheetAnalyticsAction,
 } from '@/actions/spreadsheet-analytics-actions';
 import { SpreadsheetAnalyticsData } from '@/lib/spreadsheet-types';
+import { getLivePageAudit, LivePageAuditResult } from '@/lib/page-audit';
+import { generateSeoImprovementKit, SeoImprovementKit } from '@/lib/seo-improvement-generator';
 
 export interface SpTrackerDashboardData {
     statusMeters: {
@@ -712,6 +714,45 @@ export async function syncGscRanksAction() {
     } catch (err: any) {
         console.error('syncGscRanksAction error:', err);
         return { success: false, message: err.message || '順位同期中にエラーが発生しました。' };
+    }
+}
+
+/**
+ * 対象ページの最新HTMLをリアルタイム取得・分析するServer Action
+ * （キャッシュをバイパスして公開Webサイトの最新状態を取得）
+ */
+export async function fetchLivePageAuditAction(
+    targetPath: string,
+    keyword: string,
+    forceRefresh = true
+): Promise<{ success: boolean; data?: LivePageAuditResult; message?: string }> {
+    try {
+        const audit = await getLivePageAudit(targetPath, keyword, forceRefresh);
+        return { success: true, data: audit };
+    } catch (err: any) {
+        console.error('fetchLivePageAuditAction error:', err);
+        return { success: false, message: err.message || 'ページ情報の取得に失敗しました。' };
+    }
+}
+
+/**
+ * 最新の実測ページ情報を取り込んだSEO改善キットを取得するServer Action
+ */
+export async function fetchSeoImprovementKitAction(
+    keyword: string,
+    targetPath: string,
+    currentRank = 2,
+    forceRefresh = false
+): Promise<{ success: boolean; data?: SeoImprovementKit; message?: string }> {
+    try {
+        const audit = await getLivePageAudit(targetPath, keyword, forceRefresh);
+        const kit = generateSeoImprovementKit(keyword, targetPath, currentRank, audit);
+        return { success: true, data: kit };
+    } catch (err: any) {
+        console.error('fetchSeoImprovementKitAction error:', err);
+        // フォールバック生成
+        const fallbackKit = generateSeoImprovementKit(keyword, targetPath, currentRank);
+        return { success: true, data: fallbackKit };
     }
 }
 

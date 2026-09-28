@@ -52,14 +52,14 @@ export function ScoreOverviewCard({
                             {badge.label}
                         </span>
                     </div>
-                    <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight text-zinc-900">
+                    <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight text-slate-900">
                         マーケティング健康度 ＆ 分析指標
                     </h2>
                 </div>
 
                 {/* メイン数値 */}
                 <div className="flex items-baseline gap-3">
-                    <div className="text-6xl md:text-7xl font-black tracking-tighter text-zinc-900 leading-none">
+                    <div className="text-6xl md:text-7xl font-black tracking-tighter text-slate-900 leading-none">
                         {totalScore}
                     </div>
                     <div className="text-sm font-semibold text-zinc-400 font-mono">
@@ -75,17 +75,17 @@ export function ScoreOverviewCard({
                         key={idx}
                         className="p-5 rounded-xl bg-zinc-50/60 border border-zinc-200/60 flex flex-col justify-between hover:border-zinc-300 transition-all group"
                     >
-                        <span className="text-xs font-semibold text-zinc-500 group-hover:text-zinc-900 transition-colors">
+                        <span className="text-xs font-semibold text-zinc-500 group-hover:text-slate-900 transition-colors">
                             {cat.name}
                         </span>
 
                         <div className="mt-4">
-                            <div className="text-2xl font-extrabold tracking-tight text-zinc-900">
+                            <div className="text-2xl font-extrabold tracking-tight text-slate-900">
                                 {cat.score}<span className="text-xs font-normal text-zinc-400">/100</span>
                             </div>
                             <div className="w-full bg-zinc-200/80 rounded-full h-1.5 mt-2.5 overflow-hidden">
                                 <div
-                                    className="bg-zinc-900 h-full rounded-full transition-all duration-500"
+                                    className="bg-indigo-600 h-full rounded-full transition-all duration-500"
                                     style={{ width: `${cat.score}%` }}
                                 />
                             </div>
@@ -102,7 +102,7 @@ export function ScoreOverviewCard({
                     </div>
                     <div>
                         <span className="text-zinc-400 text-[10px] uppercase font-bold block">LEVEL STATUS</span>
-                        <span className="font-bold text-zinc-900 text-sm">
+                        <span className="font-bold text-slate-900 text-sm">
                             Lv.{level} <span className="text-zinc-500 font-normal text-xs">({levelTitle})</span>
                         </span>
                     </div>

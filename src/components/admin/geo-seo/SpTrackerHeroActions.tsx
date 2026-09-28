@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { ActionRecommendationItem } from '@/lib/sp-tracker-seed';
-import { ArrowRight, CheckCircle2, AlertTriangle, Sparkles, Compass } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 
 interface SpTrackerHeroActionsProps {
@@ -19,20 +19,20 @@ export function SpTrackerHeroActions({ actions, onResolveToggle }: SpTrackerHero
             case 'high':
                 return {
                     label: '最優先（至急対応）',
-                    color: 'bg-red-500/10 text-red-400 border-red-500/30',
-                    dot: 'bg-red-500',
+                    color: 'bg-rose-50 text-rose-700 border-rose-200',
+                    dot: 'bg-rose-500',
                 };
             case 'medium':
                 return {
                     label: '改善チャンス（推奨）',
-                    color: 'bg-amber-500/10 text-amber-300 border-amber-500/30',
-                    dot: 'bg-amber-400',
+                    color: 'bg-amber-50 text-amber-800 border-amber-300',
+                    dot: 'bg-amber-500',
                 };
             default:
                 return {
                     label: '維持・良好',
-                    color: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30',
-                    dot: 'bg-emerald-400',
+                    color: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                    dot: 'bg-emerald-500',
                 };
         }
     };
@@ -42,20 +42,20 @@ export function SpTrackerHeroActions({ actions, onResolveToggle }: SpTrackerHero
     const badge = getPriorityBadge(primaryAction.priority);
 
     return (
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-b from-zinc-900 via-zinc-900 to-zinc-950 text-white p-4 sm:p-7 md:p-10 border border-zinc-800/80 shadow-[0_20px_50px_rgba(0,0,0,0.3)] transition-all duration-300">
-            {/* 上品な発光グラデーション (Linear風アンビエント) */}
-            <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-500/10 rounded-full blur-[120px] pointer-events-none" />
-            <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-red-500/5 rounded-full blur-[100px] pointer-events-none" />
+        <div className="relative overflow-hidden rounded-2xl bg-white text-slate-900 p-4 sm:p-7 md:p-8 border border-indigo-100 shadow-[0_8px_30px_rgba(99,102,241,0.06)] transition-all duration-300">
+            {/* 上品な発光アンビエント */}
+            <div className="absolute top-0 right-0 w-[450px] h-[450px] bg-indigo-500/5 rounded-full blur-[100px] pointer-events-none" />
+            <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-rose-500/5 rounded-full blur-[90px] pointer-events-none" />
 
             <div className="relative z-10 space-y-6">
                 {/* ステータスバッジ */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800/80 pb-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-100 pb-4">
                     <div className="flex items-center gap-2">
                         <span className="relative flex h-2 w-2 flex-shrink-0">
                             <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${badge.dot}`}></span>
                             <span className={`relative inline-flex rounded-full h-2 w-2 ${badge.dot}`}></span>
                         </span>
-                        <span className="text-[11px] font-mono font-bold tracking-widest text-zinc-400 uppercase">
+                        <span className="text-[11px] font-mono font-bold tracking-widest text-zinc-500 uppercase">
                             TODAY'S & WEEKLY PRIORITY ACTION
                         </span>
                     </div>
@@ -64,7 +64,7 @@ export function SpTrackerHeroActions({ actions, onResolveToggle }: SpTrackerHero
                         <span className={`px-2.5 py-1 rounded-md text-[11px] font-mono font-bold border ${badge.color}`}>
                             {badge.label}
                         </span>
-                        <span className="px-2.5 py-1 rounded-md text-[11px] font-mono font-bold bg-zinc-800 text-zinc-300 border border-zinc-700">
+                        <span className="px-2.5 py-1 rounded-md text-[11px] font-mono font-bold bg-zinc-100 text-zinc-700 border border-zinc-200">
                             {primaryAction.category.toUpperCase()}
                         </span>
                     </div>
@@ -73,19 +73,19 @@ export function SpTrackerHeroActions({ actions, onResolveToggle }: SpTrackerHero
                 {/* メインアクションコンテンツ */}
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-center">
                     <div className="lg:col-span-8 space-y-4">
-                        <h2 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-white leading-tight">
+                        <h2 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-slate-900 leading-tight">
                             {primaryAction.title}
                         </h2>
 
-                        <p className="text-xs sm:text-sm text-zinc-300 leading-relaxed font-normal">
+                        <p className="text-xs sm:text-sm text-zinc-600 leading-relaxed font-normal">
                             {primaryAction.issue_description}
                         </p>
 
-                        <div className="p-4 rounded-xl bg-zinc-800/60 border border-zinc-700/60 text-xs text-zinc-200 font-sans space-y-1.5 backdrop-blur-sm">
-                            <div className="text-zinc-400 font-mono text-[11px] font-bold tracking-wider uppercase flex items-center gap-1.5">
-                                <Sparkles className="w-3.5 h-3.5 text-indigo-400" /> 具体的な作業指示（DIRECTIVE）:
+                        <div className="p-4 rounded-xl bg-indigo-50/60 border border-indigo-100 text-xs text-zinc-800 font-sans space-y-1.5 shadow-xs">
+                            <div className="text-indigo-900 font-mono text-[11px] font-bold tracking-wider uppercase flex items-center gap-1.5">
+                                <Sparkles className="w-3.5 h-3.5 text-indigo-600" /> 具体的な作業指示（DIRECTIVE）:
                             </div>
-                            <div className="text-zinc-100 font-medium leading-relaxed">
+                            <div className="text-slate-900 font-medium leading-relaxed">
                                 {primaryAction.action_directive}
                             </div>
                         </div>
@@ -94,19 +94,19 @@ export function SpTrackerHeroActions({ actions, onResolveToggle }: SpTrackerHero
                     <div className="lg:col-span-4 flex flex-col justify-center gap-3 h-full">
                         <button
                             onClick={() => onResolveToggle(primaryAction.id, primaryAction.is_resolved)}
-                            className={`w-full py-4 px-6 rounded-xl font-sans font-bold text-sm tracking-wide transition-all duration-200 shadow-lg flex items-center justify-center gap-2.5 ${
+                            className={`w-full py-3.5 sm:py-4 px-6 rounded-xl font-sans font-bold text-xs sm:text-sm tracking-wide transition-all duration-200 shadow-sm flex items-center justify-center gap-2.5 ${
                                 primaryAction.is_resolved
-                                    ? 'bg-zinc-800 hover:bg-zinc-700 text-emerald-400 border border-emerald-500/30'
-                                    : 'bg-white hover:bg-zinc-100 text-zinc-950 shadow-[0_0_30px_rgba(255,255,255,0.2)] hover:shadow-[0_0_40px_rgba(255,255,255,0.3)] active:scale-[0.99]'
+                                    ? 'bg-zinc-100 hover:bg-zinc-200 text-emerald-700 border border-emerald-300'
+                                    : 'bg-indigo-600 hover:bg-indigo-700 text-white active:scale-[0.99]'
                             }`}
                         >
                             {primaryAction.is_resolved ? (
                                 <>
-                                    <CheckCircle2 className="w-4 h-4 text-emerald-400" /> 対応完了（未完了に戻す）
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-600" /> 対応完了（未完了に戻す）
                                 </>
                             ) : (
                                 <>
-                                    この指示を完了済みにする <CheckCircle2 className="w-4 h-4 text-zinc-950" />
+                                    この指示を完了済みにする <CheckCircle2 className="w-4 h-4 text-white" />
                                 </>
                             )}
                         </button>
@@ -114,7 +114,7 @@ export function SpTrackerHeroActions({ actions, onResolveToggle }: SpTrackerHero
                         {primaryAction.action_link && (
                             <Link
                                 href={primaryAction.action_link}
-                                className="w-full py-2.5 px-4 rounded-xl text-xs font-mono font-semibold text-center text-zinc-400 hover:text-white bg-zinc-800/40 hover:bg-zinc-800 border border-zinc-700/50 transition-all flex items-center justify-center gap-1.5"
+                                className="w-full py-2.5 px-4 rounded-xl text-xs font-mono font-semibold text-center text-zinc-600 hover:text-slate-900 bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 transition-all flex items-center justify-center gap-1.5"
                             >
                                 対象の詳細ビューへジャンプ <ArrowRight className="w-3.5 h-3.5" />
                             </Link>
@@ -124,7 +124,7 @@ export function SpTrackerHeroActions({ actions, onResolveToggle }: SpTrackerHero
 
                 {/* 他のアクション一覧（未完了のもの） */}
                 {actions.length > 1 && (
-                    <div className="pt-4 border-t border-zinc-800/60 grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="pt-4 border-t border-zinc-100 grid grid-cols-1 md:grid-cols-2 gap-3">
                         {actions.slice(1, 3).map((act) => {
                             const b = getPriorityBadge(act.priority);
                             return (
@@ -133,21 +133,21 @@ export function SpTrackerHeroActions({ actions, onResolveToggle }: SpTrackerHero
                                     onClick={() => onResolveToggle(act.id, act.is_resolved)}
                                     className={`p-4 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
                                         act.is_resolved
-                                            ? 'bg-zinc-900/40 border-zinc-800 opacity-50'
-                                            : 'bg-zinc-800/30 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800/50'
+                                            ? 'bg-zinc-50/50 border-zinc-200 opacity-60'
+                                            : 'bg-zinc-50/80 border-zinc-200 hover:border-zinc-300 hover:bg-white'
                                     }`}
                                 >
                                     <div className="space-y-1 overflow-hidden">
                                         <div className="flex items-center gap-2">
                                             <span className={`w-1.5 h-1.5 rounded-full ${b.dot}`} />
-                                            <span className="text-[10px] font-mono text-zinc-400 uppercase">{act.category}</span>
-                                            {act.is_resolved && <span className="text-[10px] text-emerald-400 font-bold">DONE</span>}
+                                            <span className="text-[10px] font-mono text-zinc-500 uppercase">{act.category}</span>
+                                            {act.is_resolved && <span className="text-[10px] text-emerald-700 font-bold">DONE</span>}
                                         </div>
-                                        <div className={`text-xs font-bold truncate ${act.is_resolved ? 'line-through text-zinc-500' : 'text-zinc-200'}`}>
+                                        <div className={`text-xs font-bold truncate ${act.is_resolved ? 'line-through text-zinc-400' : 'text-zinc-800'}`}>
                                             {act.title}
                                         </div>
                                     </div>
-                                    <span className="text-xs text-zinc-400 font-mono flex-shrink-0">
+                                    <span className="text-xs text-zinc-500 font-mono flex-shrink-0">
                                         {act.is_resolved ? '解除' : '完了'}
                                     </span>
                                 </div>

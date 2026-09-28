@@ -44,7 +44,7 @@ export function SnsContentPlanner() {
                 <div className="text-[11px] font-mono font-bold tracking-widest text-zinc-400 uppercase mb-1">
                     SHORT VIDEO CONTENT PLANNER
                 </div>
-                <h3 className="text-2xl font-extrabold tracking-tight text-zinc-900">
+                <h3 className="text-2xl font-extrabold tracking-tight text-slate-900">
                     SNS & 短尺動画コンテンツ企画AI
                 </h3>
             </div>
@@ -57,7 +57,7 @@ export function SnsContentPlanner() {
                     >
                         <div className="space-y-3">
                             <div className="flex items-center justify-between">
-                                <span className="bg-zinc-900 text-white text-[10px] font-mono font-bold px-2 py-0.5 rounded-md uppercase">
+                                <span className="bg-indigo-600 text-white text-[10px] font-mono font-bold px-2 py-0.5 rounded-md uppercase">
                                     {idea.platform}
                                 </span>
                                 <span className="text-[10px] font-mono font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200 flex items-center gap-1">
@@ -65,9 +65,9 @@ export function SnsContentPlanner() {
                                 </span>
                             </div>
 
-                            <h4 className="font-bold text-zinc-900 text-base leading-snug tracking-tight">{idea.title}</h4>
+                            <h4 className="font-bold text-slate-900 text-base leading-snug tracking-tight">{idea.title}</h4>
 
-                            <div className="p-3 rounded-lg bg-zinc-900 text-white font-mono text-xs space-y-1">
+                            <div className="p-3 rounded-lg bg-indigo-600 text-white font-mono text-xs space-y-1">
                                 <div className="text-indigo-300 font-bold">フック（冒頭3秒）:</div>
                                 <p className="italic text-zinc-200">「{idea.hook}」</p>
                             </div>
@@ -79,7 +79,7 @@ export function SnsContentPlanner() {
 
                         <button
                             onClick={() => handleCopy(`${idea.title}\n\nフック: ${idea.hook}\n\n構成:\n${idea.script}`, idx)}
-                            className="w-full py-2.5 rounded-xl border border-zinc-900 text-xs font-semibold bg-white text-zinc-900 hover:bg-zinc-900 hover:text-white transition-all duration-150 flex items-center justify-center gap-2"
+                            className="w-full py-2.5 rounded-xl border border-indigo-600 text-xs font-semibold bg-white text-slate-900 hover:bg-indigo-600 hover:text-white transition-all duration-150 flex items-center justify-center gap-2"
                         >
                             {copiedIdx === idx ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
                             {copiedIdx === idx ? 'コピー完了' : '構成案・フックをコピー'}

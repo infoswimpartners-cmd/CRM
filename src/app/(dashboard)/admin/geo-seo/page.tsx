@@ -16,6 +16,7 @@ import { DEFAULT_SPREADSHEET_ANALYTICS } from '@/lib/spreadsheet-types';
 import {
     getSpTrackerDashboard,
     toggleActionRecommendationResolved,
+    fetchLivePageAuditAction,
     SpTrackerDashboardData,
 } from '@/actions/sp-tracker-actions';
 import { syncMarketingAnalytics } from '@/actions/marketing';
@@ -99,15 +100,23 @@ function SpTrackerContent() {
         setIsRefreshing(true);
         try {
             await syncMarketingAnalytics();
+            // 主要ページの最新HTMLを強制再取得（キャッシュバイパス）して最新化
+            await Promise.allSettled([
+                fetchLivePageAuditAction('/zUHb45xV/swimming_tips_up', 'スイミング 進級の 早い子', true),
+                fetchLivePageAuditAction('/personal_swim/chiba', '水泳個人レッスン 千葉', true),
+                fetchLivePageAuditAction('/personal_swim/meguro', 'スイミング マンツーマン 目黒', true),
+            ]);
             await loadDashboard();
-            toast.success('最新のSEO/GEOデータを同期しました');
+            toast.success('最新のSEO/GEOデータおよびWebページ情報を再取得・同期しました');
         } catch (err) {
             toast.error('同期に失敗しました');
+        } finally {
+            setIsRefreshing(false);
         }
     };
 
     return (
-        <div className="min-h-screen bg-[#fafafa] text-zinc-900 p-3.5 sm:p-6 md:p-10 space-y-6 sm:space-y-8 max-w-7xl mx-auto">
+        <div className="min-h-screen bg-[#fafafa] text-slate-900 p-3.5 sm:p-6 md:p-10 space-y-6 sm:space-y-8 max-w-7xl mx-auto">
             {/* ページタイトル (SP-Tracker ヘッダー) */}
             <div className="flex flex-col sm:flex-row sm:items-end justify-between border-b border-zinc-200/80 pb-5 gap-4">
                 <div className="space-y-1">
@@ -119,7 +128,7 @@ function SpTrackerContent() {
                             SEO ✕ GEO INTEGRATED ENGINE
                         </span>
                     </div>
-                    <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-zinc-900 leading-tight">
+                    <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-slate-900 leading-tight">
                         スイムパートナーズ専用 SEO・GEO統合管理
                     </h1>
                 </div>
@@ -128,7 +137,7 @@ function SpTrackerContent() {
                     <button
                         onClick={handleRefreshAll}
                         disabled={isRefreshing}
-                        className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-zinc-900 text-xs font-semibold bg-zinc-900 text-white hover:bg-zinc-800 transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
+                        className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-indigo-600 text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700 transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
                     >
                         <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
                         {isRefreshing ? '同期中...' : '最新データを取得'}
@@ -180,8 +189,8 @@ function SpTrackerContent() {
                                 onClick={() => setActiveTab(tab.id as any)}
                                 className={`px-3.5 sm:px-4 py-2 rounded-lg text-xs font-semibold tracking-wide transition-all duration-150 whitespace-nowrap ${
                                     isActive
-                                        ? 'bg-white text-zinc-900 shadow-[0_2px_8px_rgba(0,0,0,0.06)] font-bold'
-                                        : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/50'
+                                        ? 'bg-white text-slate-900 shadow-[0_2px_8px_rgba(0,0,0,0.06)] font-bold'
+                                        : 'text-zinc-600 hover:text-slate-900 hover:bg-zinc-100/50'
                                 }`}
                             >
                                 {tab.label}

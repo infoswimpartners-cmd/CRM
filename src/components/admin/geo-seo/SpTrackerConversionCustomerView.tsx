@@ -119,7 +119,7 @@ export function SpTrackerConversionCustomerView({
                         </div>
                         <div>
                             <div className="flex items-center gap-2">
-                                <h3 className="text-lg font-black text-zinc-900">CRM ✕ スプレッドシート常時連携</h3>
+                                <h3 className="text-lg font-black text-slate-900">CRM ✕ スプレッドシート常時連携</h3>
                                 <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
                                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                                     CRM実データ常時連動中
@@ -146,7 +146,7 @@ export function SpTrackerConversionCustomerView({
                         <button
                             onClick={handleSync}
                             disabled={isSyncing}
-                            className="px-3 py-1.5 rounded-lg bg-zinc-900 text-white text-xs font-semibold hover:bg-zinc-800 transition-all flex items-center gap-1.5 disabled:opacity-50"
+                            className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 transition-all flex items-center gap-1.5 disabled:opacity-50"
                         >
                             <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
                             {isSyncing ? '同期中...' : '再同期'}
@@ -166,7 +166,7 @@ export function SpTrackerConversionCustomerView({
                                 value={inputUrl}
                                 onChange={(e) => setInputUrl(e.target.value)}
                                 placeholder="https://docs.google.com/spreadsheets/d/XXXXXXXXX/edit..."
-                                className="flex-1 px-3 py-2 text-xs rounded-lg border border-zinc-300 bg-white text-zinc-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                className="flex-1 px-3 py-2 text-xs rounded-lg border border-zinc-300 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                             />
                             <div className="flex gap-2">
                                 <button
@@ -226,7 +226,7 @@ export function SpTrackerConversionCustomerView({
                             <Target className="w-3.5 h-3.5" />
                         </span>
                     </div>
-                    <div className="text-3xl font-black text-zinc-900 mt-1">{totalConversions.inquiries} 件</div>
+                    <div className="text-3xl font-black text-slate-900 mt-1">{totalConversions.inquiries} 件</div>
                     <p className="text-[11px] text-zinc-400 mt-1">SEO/GEO・広告・SNS合算</p>
                 </div>
 
@@ -277,7 +277,7 @@ export function SpTrackerConversionCustomerView({
                         <div className="text-[11px] font-mono font-bold tracking-widest text-zinc-400 uppercase mb-1">
                             CHANNEL ATTRIBUTION & CONVERSION
                         </div>
-                        <h3 className="text-2xl font-extrabold tracking-tight text-zinc-900">
+                        <h3 className="text-2xl font-extrabold tracking-tight text-slate-900">
                             流入経路別 コンバージョン獲得実績
                         </h3>
                     </div>
@@ -301,14 +301,14 @@ export function SpTrackerConversionCustomerView({
                         <tbody className="divide-y divide-zinc-100 text-sm">
                             {channelPerformances.map((c) => (
                                 <tr key={c.channel} className="hover:bg-zinc-50/80 transition-colors">
-                                    <td className="py-4 px-3 font-bold text-zinc-900 flex items-center gap-2">
+                                    <td className="py-4 px-3 font-bold text-slate-900 flex items-center gap-2">
                                         <span className="w-2 h-2 rounded-full bg-indigo-600" />
                                         {c.label}
                                     </td>
                                     <td className="py-4 px-3 text-right font-mono text-zinc-600">
                                         {c.sessions.toLocaleString()}
                                     </td>
-                                    <td className="py-4 px-3 text-right font-mono font-bold text-zinc-900">
+                                    <td className="py-4 px-3 text-right font-mono font-bold text-slate-900">
                                         {c.inquiries}
                                     </td>
                                     <td className="py-4 px-3 text-right font-mono font-bold text-emerald-600">
@@ -340,7 +340,7 @@ export function SpTrackerConversionCustomerView({
                         <div className="text-[11px] font-mono font-bold tracking-widest text-zinc-400 uppercase mb-1">
                             MONTHLY CONVERSION TREND
                         </div>
-                        <h3 className="text-2xl font-extrabold tracking-tight text-zinc-900">
+                        <h3 className="text-2xl font-extrabold tracking-tight text-slate-900">
                             月別コンバージョン獲得推移
                         </h3>
                     </div>
@@ -388,7 +388,7 @@ export function SpTrackerConversionCustomerView({
                         <div className="text-[11px] font-mono font-bold tracking-widest text-zinc-400 uppercase mb-1">
                             CUSTOMER SEGMENTS & LTV
                         </div>
-                        <h3 className="text-2xl font-extrabold tracking-tight text-zinc-900">
+                        <h3 className="text-2xl font-extrabold tracking-tight text-slate-900">
                             受講者セグメント別分析
                         </h3>
                     </div>
@@ -397,7 +397,7 @@ export function SpTrackerConversionCustomerView({
                         {segmentAnalyses.map((s) => (
                             <div key={s.segment} className="p-4 rounded-xl bg-zinc-50 border border-zinc-200/60 space-y-3">
                                 <div className="flex items-center justify-between">
-                                    <span className="font-bold text-zinc-900 text-sm">{s.label}</span>
+                                    <span className="font-bold text-slate-900 text-sm">{s.label}</span>
                                     <span className="px-2 py-0.5 rounded text-xs font-mono font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
                                         シェア {s.sharePercent}%
                                     </span>
@@ -405,7 +405,7 @@ export function SpTrackerConversionCustomerView({
                                 <div className="grid grid-cols-3 gap-2 text-center pt-2 border-t border-zinc-200/50">
                                     <div>
                                         <div className="text-[10px] text-zinc-500">受講者数</div>
-                                        <div className="text-base font-black text-zinc-900 mt-0.5">{s.customerCount} 名</div>
+                                        <div className="text-base font-black text-slate-900 mt-0.5">{s.customerCount} 名</div>
                                     </div>
                                     <div>
                                         <div className="text-[10px] text-zinc-500">平均継続</div>
@@ -427,7 +427,7 @@ export function SpTrackerConversionCustomerView({
                         <div className="text-[11px] font-mono font-bold tracking-widest text-zinc-400 uppercase mb-1">
                             GEOGRAPHIC DISTRIBUTION
                         </div>
-                        <h3 className="text-xl font-extrabold tracking-tight text-zinc-900 flex items-center gap-2">
+                        <h3 className="text-xl font-extrabold tracking-tight text-slate-900 flex items-center gap-2">
                             <MapPin className="w-4 h-4 text-rose-500" /> エリア別顧客分布
                         </h3>
                     </div>
@@ -456,7 +456,7 @@ export function SpTrackerConversionCustomerView({
                             {demographics.ageGroups.map((g) => (
                                 <div key={g.group} className="flex items-center justify-between text-[11px]">
                                     <span className="text-zinc-600">{g.group}</span>
-                                    <span className="font-mono font-bold text-zinc-900">{g.count}名 ({g.share}%)</span>
+                                    <span className="font-mono font-bold text-slate-900">{g.count}名 ({g.share}%)</span>
                                 </div>
                             ))}
                         </div>

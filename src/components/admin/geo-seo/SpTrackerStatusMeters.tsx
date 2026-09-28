@@ -60,30 +60,30 @@ export function SpTrackerStatusMeters({
     ];
 
     return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
             {meters.map((meter, idx) => {
                 const Icon = meter.icon;
                 return (
                     <div
                         key={idx}
-                        className="bg-white rounded-2xl border border-zinc-200/80 p-4 sm:p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:border-zinc-300 transition-all flex flex-col justify-between"
+                        className="bg-white rounded-2xl border border-zinc-200/80 p-3.5 sm:p-5 md:p-6 shadow-[0_8px_30px_rgb(0,0,0,0.03)] hover:border-zinc-300 transition-all flex flex-col justify-between"
                     >
                         <div>
-                            <div className="flex items-center justify-between">
-                                <div className="p-2.5 rounded-xl bg-zinc-100 text-zinc-800">
-                                    <Icon className="w-4 h-4" />
+                            <div className="flex items-center justify-between gap-1">
+                                <div className="p-2 sm:p-2.5 rounded-xl bg-zinc-100 text-zinc-800 flex-shrink-0">
+                                    <Icon className="w-3.5 sm:w-4 h-3.5 sm:h-4" />
                                 </div>
-                                <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md border ${meter.badgeStyle}`}>
+                                <span className={`text-[9px] sm:text-[10px] font-mono font-bold px-1.5 sm:px-2 py-0.5 rounded-md border ${meter.badgeStyle} truncate`}>
                                     {meter.badge}
                                 </span>
                             </div>
 
-                            <div className="mt-4">
-                                <div className="text-xs font-semibold text-zinc-500">{meter.label}</div>
-                                <div className="text-3xl font-black tracking-tight text-zinc-900 mt-0.5">
+                            <div className="mt-3 sm:mt-4">
+                                <div className="text-[11px] sm:text-xs font-semibold text-zinc-500 truncate">{meter.label}</div>
+                                <div className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-slate-900 mt-0.5">
                                     {meter.value}
                                 </div>
-                                <div className="text-[11px] font-mono text-zinc-400 mt-0.5">
+                                <div className="text-[10px] sm:text-[11px] font-mono text-zinc-400 mt-0.5 truncate">
                                     {meter.sublabel}
                                 </div>
                             </div>

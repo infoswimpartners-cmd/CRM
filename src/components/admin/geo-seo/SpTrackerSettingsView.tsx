@@ -159,7 +159,7 @@ export function SpTrackerSettingsView({
                         <div className="text-[11px] font-mono font-bold tracking-widest text-zinc-400 uppercase mb-1">
                             AUTOMATED WEEKLY PUSH NOTIFICATIONS
                         </div>
-                        <h3 className="text-2xl font-extrabold tracking-tight text-zinc-900">
+                        <h3 className="text-2xl font-extrabold tracking-tight text-slate-900">
                             Google Chat（毎週月曜 8:30 JST）週次配信設定
                         </h3>
                         <p className="text-xs text-zinc-500 mt-1">
@@ -189,7 +189,7 @@ export function SpTrackerSettingsView({
                                 value={webhookUrlInput}
                                 onChange={(e) => setWebhookUrlInput(e.target.value)}
                                 placeholder="https://chat.googleapis.com/v1/spaces/.../messages?key=...&token=..."
-                                className="flex-1 px-4 py-2.5 rounded-xl border border-zinc-200 bg-zinc-50 text-xs font-mono focus:outline-none focus:border-zinc-900"
+                                className="flex-1 px-4 py-2.5 rounded-xl border border-zinc-200 bg-zinc-50 text-xs font-mono focus:outline-none focus:border-indigo-600"
                             />
                             <button
                                 onClick={handleSaveWebhook}
@@ -202,7 +202,7 @@ export function SpTrackerSettingsView({
                             <button
                                 onClick={handleTestWebhook}
                                 disabled={isTestingWebhook || !webhookUrlInput}
-                                className="px-5 py-2.5 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 text-xs font-semibold transition-all inline-flex items-center justify-center gap-2 disabled:opacity-50 flex-shrink-0"
+                                className="px-5 py-2.5 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 text-xs font-semibold transition-all inline-flex items-center justify-center gap-2 disabled:opacity-50 flex-shrink-0"
                             >
                                 <Send className={`w-3.5 h-3.5 ${isTestingWebhook ? 'animate-spin' : ''}`} />
                                 {isTestingWebhook ? '送信中...' : '今すぐテスト配信'}
@@ -221,7 +221,7 @@ export function SpTrackerSettingsView({
                     <div className="text-[11px] font-mono font-bold tracking-widest text-zinc-400 uppercase mb-1">
                         KEYWORD REGISTRATION
                     </div>
-                    <h3 className="text-2xl font-extrabold tracking-tight text-zinc-900">
+                    <h3 className="text-2xl font-extrabold tracking-tight text-slate-900">
                         追跡SEOキーワードの追加
                     </h3>
                 </div>
@@ -234,7 +234,7 @@ export function SpTrackerSettingsView({
                             value={newKeyword}
                             onChange={(e) => setNewKeyword(e.target.value)}
                             placeholder="例: 出張 水泳 目黒区"
-                            className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 bg-zinc-50 text-xs focus:outline-none focus:border-zinc-900"
+                            className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 bg-zinc-50 text-xs focus:outline-none focus:border-indigo-600"
                         />
                     </div>
                     <div className="sm:col-span-3">
@@ -242,7 +242,7 @@ export function SpTrackerSettingsView({
                         <select
                             value={newArea}
                             onChange={(e) => setNewArea(e.target.value)}
-                            className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 bg-zinc-50 text-xs focus:outline-none focus:border-zinc-900"
+                            className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 bg-zinc-50 text-xs focus:outline-none focus:border-indigo-600"
                         >
                             <option value="tokyo_23">東京23区</option>
                             <option value="kanagawa">神奈川</option>
@@ -254,7 +254,7 @@ export function SpTrackerSettingsView({
                         <select
                             value={newTarget}
                             onChange={(e) => setNewTarget(e.target.value)}
-                            className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 bg-zinc-50 text-xs focus:outline-none focus:border-zinc-900"
+                            className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 bg-zinc-50 text-xs focus:outline-none focus:border-indigo-600"
                         >
                             <option value="adult">大人・泳ぎ直し</option>
                             <option value="junior">子供・ジュニア</option>
@@ -266,7 +266,7 @@ export function SpTrackerSettingsView({
                         <button
                             type="submit"
                             disabled={isSubmittingKw || !newKeyword.trim()}
-                            className="px-5 py-2.5 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 text-xs font-semibold transition-all inline-flex items-center gap-1.5 disabled:opacity-50"
+                            className="px-5 py-2.5 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 text-xs font-semibold transition-all inline-flex items-center gap-1.5 disabled:opacity-50"
                         >
                             <Plus className="w-4 h-4" /> キーワードを登録
                         </button>
@@ -277,7 +277,7 @@ export function SpTrackerSettingsView({
                 <div className="pt-6 border-t border-zinc-100 space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <div>
-                            <h4 className="text-sm font-bold text-zinc-900 flex items-center gap-2">
+                            <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                                 <span>現在追跡中のキーワード一覧</span>
                                 <span className="px-2 py-0.5 rounded-full text-xs font-mono font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
                                     {keywords.length} 件
@@ -296,7 +296,7 @@ export function SpTrackerSettingsView({
                                 className="p-3.5 rounded-xl border border-zinc-200/80 bg-zinc-50/60 hover:bg-white hover:border-zinc-300 transition-all flex items-center justify-between gap-3 shadow-[0_2px_8px_rgba(0,0,0,0.02)]"
                             >
                                 <div className="space-y-1.5 min-w-0 flex-1">
-                                    <div className="font-bold text-xs text-zinc-900 truncate">
+                                    <div className="font-bold text-xs text-slate-900 truncate">
                                         {kw.keyword}
                                     </div>
                                     <div className="flex items-center gap-1.5 text-[10px] font-mono">
@@ -330,7 +330,7 @@ export function SpTrackerSettingsView({
                     <div className="text-[11px] font-mono font-bold tracking-widest text-zinc-400 uppercase mb-1">
                         GEO PROMPT REGISTRATION
                     </div>
-                    <h3 className="text-2xl font-extrabold tracking-tight text-zinc-900">
+                    <h3 className="text-2xl font-extrabold tracking-tight text-slate-900">
                         定点観測GEOプロンプト（想定質問）の追加
                     </h3>
                 </div>
@@ -343,7 +343,7 @@ export function SpTrackerSettingsView({
                             value={newPrompt}
                             onChange={(e) => setNewPrompt(e.target.value)}
                             placeholder="例: 世田谷区で子供がマンツーマンで泳げる水泳個人レッスンを探しています"
-                            className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 bg-zinc-50 text-xs focus:outline-none focus:border-zinc-900"
+                            className="w-full px-4 py-2.5 rounded-xl border border-zinc-200 bg-zinc-50 text-xs focus:outline-none focus:border-indigo-600"
                         />
                     </div>
                     <div className="sm:col-span-3">
@@ -351,7 +351,7 @@ export function SpTrackerSettingsView({
                         <select
                             value={newIntent}
                             onChange={(e) => setNewIntent(e.target.value)}
-                            className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 bg-zinc-50 text-xs focus:outline-none focus:border-zinc-900"
+                            className="w-full px-3 py-2.5 rounded-xl border border-zinc-200 bg-zinc-50 text-xs focus:outline-none focus:border-indigo-600"
                         >
                             <option value="adult">大人</option>
                             <option value="junior">子供</option>
@@ -364,7 +364,7 @@ export function SpTrackerSettingsView({
                         <button
                             type="submit"
                             disabled={isSubmittingPrompt || !newPrompt.trim()}
-                            className="px-5 py-2.5 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 text-xs font-semibold transition-all inline-flex items-center gap-1.5 disabled:opacity-50"
+                            className="px-5 py-2.5 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 text-xs font-semibold transition-all inline-flex items-center gap-1.5 disabled:opacity-50"
                         >
                             <Plus className="w-4 h-4" /> プロンプトを登録
                         </button>

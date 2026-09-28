@@ -24,7 +24,7 @@ export function SeoMeoAuditPanel() {
                     <div className="text-[11px] font-mono font-bold tracking-widest text-zinc-400 uppercase mb-1">
                         SEARCH ENGINE & AI OVERVIEWS
                     </div>
-                    <h3 className="text-2xl font-extrabold tracking-tight text-zinc-900">
+                    <h3 className="text-2xl font-extrabold tracking-tight text-slate-900">
                         SEO ✕ AIO (検索エンジン) 診断
                     </h3>
                 </div>
@@ -38,7 +38,7 @@ export function SeoMeoAuditPanel() {
                                     {item.status}
                                 </span>
                             </div>
-                            <div className="mt-3 text-2xl font-black text-zinc-900 tracking-tight">{item.score}</div>
+                            <div className="mt-3 text-2xl font-black text-slate-900 tracking-tight">{item.score}</div>
                         </div>
                     ))}
                 </div>
@@ -50,7 +50,7 @@ export function SeoMeoAuditPanel() {
                         <div className="text-[11px] font-mono font-bold tracking-widest text-zinc-400 uppercase mb-1">
                             MAP ENGINE OPTIMIZATION
                         </div>
-                        <h3 className="text-2xl font-extrabold tracking-tight text-zinc-900">
+                        <h3 className="text-2xl font-extrabold tracking-tight text-slate-900">
                             MEO (Googleマップ) 診断指標
                         </h3>
                     </div>
@@ -68,7 +68,7 @@ export function SeoMeoAuditPanel() {
                     {meoMetrics.map((metric, idx) => (
                         <div key={idx} className="p-5 rounded-xl bg-zinc-50/60 border border-zinc-200/60 hover:border-zinc-300 transition-all">
                             <div className="text-xs font-semibold text-zinc-500">{metric.name}</div>
-                            <div className="mt-2 text-xl font-bold tracking-tight text-zinc-900">{metric.score}</div>
+                            <div className="mt-2 text-xl font-bold tracking-tight text-slate-900">{metric.score}</div>
                         </div>
                     ))}
                 </div>

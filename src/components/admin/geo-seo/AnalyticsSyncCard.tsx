@@ -81,7 +81,7 @@ export function AnalyticsSyncCard({
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-6 border-b border-zinc-100 gap-4">
                     <div>
                         <div className="flex flex-wrap items-center gap-2 mb-1">
-                            <h3 className="font-extrabold text-zinc-900 text-xl tracking-tight">
+                            <h3 className="font-extrabold text-slate-900 text-xl tracking-tight">
                                 GA4 & Search Console データ連携
                             </h3>
                             {isConfigured ? (
@@ -111,7 +111,7 @@ export function AnalyticsSyncCard({
                         <button
                             onClick={handleSync}
                             disabled={isSyncing}
-                            className="px-4 py-2 rounded-xl border border-zinc-900 text-xs font-semibold bg-zinc-900 text-white hover:bg-zinc-800 transition-all shadow-sm flex items-center gap-2 disabled:opacity-50"
+                            className="px-4 py-2 rounded-xl border border-indigo-600 text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700 transition-all shadow-sm flex items-center gap-2 disabled:opacity-50"
                         >
                             <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
                             {isSyncing ? '同期中...' : '再同期する'}
@@ -140,7 +140,7 @@ export function AnalyticsSyncCard({
                             </div>
 
                             <div className="mt-4">
-                                <div className="text-2xl font-extrabold tracking-tight text-zinc-900 flex items-center justify-between">
+                                <div className="text-2xl font-extrabold tracking-tight text-slate-900 flex items-center justify-between">
                                     {source.count}
                                     <ArrowUpRight className="w-4 h-4 text-zinc-400" />
                                 </div>
@@ -161,19 +161,19 @@ export function AnalyticsSyncCard({
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                             <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-200/60">
                                 <div className="text-xs text-zinc-500 font-medium">合計クリック数</div>
-                                <div className="text-2xl font-black text-zinc-900 mt-1">{searchConsoleData.clicks.toLocaleString()} 回</div>
+                                <div className="text-2xl font-black text-slate-900 mt-1">{searchConsoleData.clicks.toLocaleString()} 回</div>
                             </div>
                             <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-200/60">
                                 <div className="text-xs text-zinc-500 font-medium">合計表示回数</div>
-                                <div className="text-2xl font-black text-zinc-900 mt-1">{searchConsoleData.impressions.toLocaleString()} 回</div>
+                                <div className="text-2xl font-black text-slate-900 mt-1">{searchConsoleData.impressions.toLocaleString()} 回</div>
                             </div>
                             <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-200/60">
                                 <div className="text-xs text-zinc-500 font-medium">平均CTR</div>
-                                <div className="text-2xl font-black text-zinc-900 mt-1">{searchConsoleData.ctr}</div>
+                                <div className="text-2xl font-black text-slate-900 mt-1">{searchConsoleData.ctr}</div>
                             </div>
                             <div className="p-4 rounded-xl bg-zinc-50 border border-zinc-200/60">
                                 <div className="text-xs text-zinc-500 font-medium">平均掲載順位</div>
-                                <div className="text-2xl font-black text-zinc-900 mt-1">{searchConsoleData.averagePosition} 位</div>
+                                <div className="text-2xl font-black text-slate-900 mt-1">{searchConsoleData.averagePosition} 位</div>
                             </div>
                         </div>
                     </div>
@@ -182,12 +182,12 @@ export function AnalyticsSyncCard({
 
             {/* API接続設定・手順案内モーダル */}
             {showGuideModal && (
-                <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+                <div className="fixed inset-0 z-50 bg-slate-800/40 backdrop-blur-sm flex items-center justify-center p-4">
                     <div className="bg-white rounded-2xl max-w-2xl w-full p-6 md:p-8 shadow-2xl border border-zinc-200 space-y-6 max-h-[90vh] overflow-y-auto">
                         <div className="flex items-center justify-between border-b border-zinc-100 pb-4">
                             <div className="flex items-center gap-2">
                                 <ShieldCheck className="w-5 h-5 text-indigo-600" />
-                                <h3 className="text-lg font-bold text-zinc-900">Google Cloud API 接続設定ガイド</h3>
+                                <h3 className="text-lg font-bold text-slate-900">Google Cloud API 接続設定ガイド</h3>
                             </div>
                             <button
                                 onClick={() => setShowGuideModal(false)}
@@ -204,27 +204,27 @@ export function AnalyticsSyncCard({
                             </div>
 
                             <div className="space-y-3">
-                                <h4 className="font-bold text-zinc-900 text-sm">接続手順（3ステップ）:</h4>
+                                <h4 className="font-bold text-slate-900 text-sm">接続手順（3ステップ）:</h4>
 
                                 <div className="p-3.5 rounded-lg border border-zinc-200 bg-zinc-50 space-y-1">
-                                    <strong className="text-zinc-900 font-bold block">1. Google Cloud ConsoleでAPIを有効化</strong>
+                                    <strong className="text-slate-900 font-bold block">1. Google Cloud ConsoleでAPIを有効化</strong>
                                     <p>「Google Analytics Data API」および「Google Search Console API」を検索して有効にします。</p>
                                 </div>
 
                                 <div className="p-3.5 rounded-lg border border-zinc-200 bg-zinc-50 space-y-1">
-                                    <strong className="text-zinc-900 font-bold block">2. サービスアカウントの作成 &amp; 鍵の発行</strong>
+                                    <strong className="text-slate-900 font-bold block">2. サービスアカウントの作成 &amp; 鍵の発行</strong>
                                     <p>「IAMと管理 → サービスアカウント」から作成し、キー（JSON）をダウンロードします。このJSONの中身を環境変数に設定します。</p>
                                 </div>
 
                                 <div className="p-3.5 rounded-lg border border-zinc-200 bg-zinc-50 space-y-1">
-                                    <strong className="text-zinc-900 font-bold block">3. GA4 / Search Consoleへ閲覧者追加</strong>
+                                    <strong className="text-slate-900 font-bold block">3. GA4 / Search Consoleへ閲覧者追加</strong>
                                     <p>GA4の「プロパティのアクセス管理」とSearch Consoleの「設定 → ユーザーと権限」で、サービスアカウントのメールアドレスを「閲覧者」として追加します。</p>
                                 </div>
                             </div>
 
                             <div className="space-y-2 pt-2">
-                                <h4 className="font-bold text-zinc-900 text-sm">設定する環境変数（.env.local）:</h4>
-                                <pre className="p-4 rounded-xl bg-zinc-900 text-zinc-100 font-mono text-[11px] overflow-x-auto whitespace-pre leading-relaxed">
+                                <h4 className="font-bold text-slate-900 text-sm">設定する環境変数（.env.local）:</h4>
+                                <pre className="p-4 rounded-xl bg-slate-900 text-emerald-400 font-mono text-[11px] overflow-x-auto whitespace-pre leading-relaxed border border-slate-800 shadow-inner">
 {`# 1. GA4プロパティID (9桁の数字)
 GA4_PROPERTY_ID="123456789"
 
@@ -240,7 +240,7 @@ GOOGLE_SERVICE_ACCOUNT_KEY='{"type": "service_account", "client_email": "...", "
                         <div className="flex justify-end pt-4 border-t border-zinc-100">
                             <button
                                 onClick={() => setShowGuideModal(false)}
-                                className="px-5 py-2.5 rounded-xl bg-zinc-900 text-white text-xs font-semibold hover:bg-zinc-800 transition-all"
+                                className="px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-700 transition-all"
                             >
                                 閉じる
                             </button>

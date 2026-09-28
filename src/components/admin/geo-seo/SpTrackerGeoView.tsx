@@ -32,7 +32,7 @@ export function SpTrackerGeoView({ prompts }: SpTrackerGeoViewProps) {
                     <div className="text-[11px] font-mono font-bold tracking-widest text-zinc-400 uppercase mb-1">
                         GEO AI MONITORING & SOV
                     </div>
-                    <h3 className="text-2xl font-extrabold tracking-tight text-zinc-900">
+                    <h3 className="text-2xl font-extrabold tracking-tight text-slate-900">
                         生成AI想定質問 定点観測 ＆ 回答原文分析
                     </h3>
                     <p className="text-xs text-zinc-500 mt-1">
@@ -48,7 +48,7 @@ export function SpTrackerGeoView({ prompts }: SpTrackerGeoViewProps) {
                             onClick={() => setSelectedPromptId(p.id)}
                             className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all duration-150 text-left ${
                                 selectedPromptId === p.id
-                                    ? 'bg-zinc-900 text-white shadow-sm'
+                                    ? 'bg-indigo-600 text-white shadow-sm'
                                     : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
                             }`}
                         >
@@ -65,7 +65,7 @@ export function SpTrackerGeoView({ prompts }: SpTrackerGeoViewProps) {
                                 <span className="text-[10px] font-mono text-zinc-400 uppercase font-bold">
                                     MONITORED PROMPT (想定質問)
                                 </span>
-                                <h4 className="text-base font-bold text-zinc-900">
+                                <h4 className="text-base font-bold text-slate-900">
                                     「{activePrompt.prompt_text}」
                                 </h4>
                             </div>
