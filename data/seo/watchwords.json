@@ -79,7 +79,7 @@
   {
     "id": 8,
     "keyword": "水泳 個人レッスン 東京",
-    "target_path": "/personal_swim",
+    "target_path": "/",
     "priority": "high",
     "status": "active",
     "target_rank": 1,
@@ -90,7 +90,7 @@
   {
     "id": 9,
     "keyword": "水泳 マンツーマン 横浜",
-    "target_path": "/personal_swim",
+    "target_path": "/",
     "priority": "high",
     "status": "active",
     "target_rank": 1,
@@ -167,7 +167,7 @@
   {
     "id": 16,
     "keyword": "トライアスロン スイム レッスン 東京",
-    "target_path": "/personal_swim",
+    "target_path": "/",
     "priority": "medium",
     "status": "active",
     "target_rank": 1,

@@ -90,7 +90,7 @@ export async function getSpTrackerDashboard(): Promise<SpTrackerDashboardData> {
                         target_category: k.target_category || 'adult',
                         current_rank: k.current_rank || 12,
                         previous_rank: (k.current_rank || 12) + 1,
-                        target_url: k.target_url || 'https://swim-partners.com/personal_swim',
+                        target_url: k.target_url || 'https://swim-partners.com/',
                     });
                     existingKwTexts.add(k.keyword);
                 }
@@ -397,7 +397,7 @@ export async function addKeywordAction(keyword: string, area_category: string, t
             area_category,
             target_category,
             current_rank: 12,
-            target_url: 'https://swim-partners.com/personal_swim',
+            target_url: 'https://swim-partners.com/',
         };
         currentList.push(newEntry);
         await savePersistedCustomKeywords(supabase, currentList);

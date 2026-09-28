@@ -20,16 +20,24 @@ export interface LivePageAuditResult {
     auditSummary: string;
     fetchedAt: string;
     source: 'live_network' | 'fallback_cache';
+    httpStatus?: number;
+    isDeletedPage?: boolean;
+    suggestedAlternativePath?: string;
 }
 
 // インメモリキャッシュ（短時間保持しつつ、強制リフレッシュもサポート）
 const auditCache = new Map<string, { result: LivePageAuditResult; cachedAt: number }>();
 const CACHE_TTL_MS = 60 * 1000; // 1分間
 
+interface LiveFetchResult {
+    html: string;
+    status: number;
+}
+
 /**
- * 外部ネットワークからHTMLを確実に取得（fetch優先、curlフォールバック、キャッシュ完全バイパス）
+ * 外部ネットワークからHTMLおよびHTTPステータスを確実に取得（fetch優先、curlフォールバック、キャッシュ完全バイパス）
  */
-async function fetchHtmlLive(url: string): Promise<string> {
+async function fetchHtmlLive(url: string): Promise<LiveFetchResult> {
     const separator = url.includes('?') ? '&' : '?';
     const bypassUrl = `${url}${separator}_t=${Date.now()}`;
 
@@ -49,22 +57,22 @@ async function fetchHtmlLive(url: string): Promise<string> {
         });
         clearTimeout(timeoutId);
 
-        if (res.ok) {
-            const text = await res.text();
-            if (text && text.length > 50) {
-                return text;
-            }
-        }
+        const text = await res.text();
+        return {
+            html: text || '',
+            status: res.status,
+        };
     } catch (fetchErr) {
         console.warn(`[page-audit] fetch failed for ${bypassUrl}, falling back to curl:`, fetchErr);
     }
 
     // 2. curl によるフォールバック
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
         execFile(
             'curl',
             [
                 '-sL',
+                '-w', '\n%{http_code}',
                 '--max-time', '8',
                 '-H', 'Cache-Control: no-cache, no-store, must-revalidate',
                 '-H', 'Pragma: no-cache',
@@ -73,8 +81,14 @@ async function fetchHtmlLive(url: string): Promise<string> {
             ],
             { maxBuffer: 10 * 1024 * 1024 },
             (err, stdout) => {
-                if (err) return reject(err);
-                resolve(stdout || '');
+                if (err || !stdout) {
+                    return resolve({ html: '', status: 500 });
+                }
+                const parts = stdout.trim().split('\n');
+                const lastLine = parts[parts.length - 1];
+                const statusCode = parseInt(lastLine, 10) || (parts.length > 1 ? 200 : 0);
+                const html = parts.slice(0, -1).join('\n');
+                resolve({ html, status: statusCode });
             }
         );
     });
@@ -286,14 +300,46 @@ export async function getLivePageAudit(
     const fullUrl = `https://swim-partners.com${targetPath}`;
 
     try {
-        const html = await fetchHtmlLive(fullUrl);
+        const { html, status } = await fetchHtmlLive(fullUrl);
+
+        // 404（削除済みページ）の厳密な判定と除外対応
+        if (status === 404) {
+            const deletedResult: LivePageAuditResult = {
+                targetPath,
+                targetUrl: fullUrl,
+                liveTitle: '（削除済みページ・404）',
+                liveDescription: 'このページは既に削除されているか存在しません。',
+                h1: '',
+                h2List: [],
+                hasLdJson: false,
+                ldJsonTypes: [],
+                detectedPageType: 'studio_landing_page',
+                pageTypeLabel: '集客ランディングページ（LP・通常デザイン）',
+                isOptimizedForKeyword: false,
+                optimizationStatus: 'needs_optimization',
+                statusBadgeLabel: '🗑️ 削除済みページ (404)',
+                matchedImprovements: [],
+                missingImprovements: ['対象URLは削除されています。既存の主力ページ（/）の改善、または新規LPの作成を行ってください。'],
+                auditSummary: `対象ページ「${targetPath}」は現在HTTP 404（削除済み）となっています。キーワード「${keyword}」の検索順位・流入を獲得するため、既存の集客ページ（トップページ / など）の改善を行うか、新規集客ページの作成を推奨します。`,
+                fetchedAt: getJstFormattedTime(),
+                source: 'live_network',
+                httpStatus: 404,
+                isDeletedPage: true,
+                suggestedAlternativePath: '/',
+            };
+            auditCache.set(cacheKey, { result: deletedResult, cachedAt: now });
+            return deletedResult;
+        }
+
         if (html && html.length > 50) {
             const auditResult = parseHtmlAudit(html, targetPath, keyword);
+            auditResult.httpStatus = status || 200;
+            auditResult.isDeletedPage = false;
             auditCache.set(cacheKey, { result: auditResult, cachedAt: now });
             return auditResult;
         }
     } catch (err) {
-        console.warn(`[getLivePageAudit] Curl failed for ${fullUrl}:`, err);
+        console.warn(`[getLivePageAudit] Fetch failed for ${fullUrl}:`, err);
     }
 
     // フェッチ失敗時のフォールバック（既知のフォールバック値ではなく、エラー状態を返す）
@@ -318,5 +364,7 @@ export async function getLivePageAudit(
         auditSummary: 'ページのHTML取得に失敗したため、改善状況を判定できませんでした。',
         fetchedAt: getJstFormattedTime(),
         source: 'fallback_cache',
+        httpStatus: 500,
+        isDeletedPage: false,
     };
 }

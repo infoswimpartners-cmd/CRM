@@ -105,6 +105,7 @@ function SpTrackerContent() {
                 fetchLivePageAuditAction('/zUHb45xV/swimming_tips_up', 'スイミング 進級の 早い子', true),
                 fetchLivePageAuditAction('/personal_swim/chiba', '水泳個人レッスン 千葉', true),
                 fetchLivePageAuditAction('/personal_swim/meguro', 'スイミング マンツーマン 目黒', true),
+                fetchLivePageAuditAction('/', '水泳 個人レッスン 東京', true),
             ]);
             await loadDashboard();
             toast.success('最新のSEO/GEOデータおよびWebページ情報を再取得・同期しました');

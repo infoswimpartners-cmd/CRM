@@ -245,19 +245,31 @@ ${lpBlocks[4].ctaText}
 }
 </script>`;
 
+        const isDeleted = liveAudit?.isDeletedPage || targetPath === '/personal_swim';
+
         return {
             keyword,
             targetPath,
             currentRank,
             pageType,
-            pageTypeLabel: '集客ランディングページ（LP・通常デザイン）',
-            pageGoalSummary: '体験レッスン予約の成約率（CVR）最大化 ✕ 地域検索での1位獲得',
-            actionTitle: `「${keyword}」LPのファーストビュー訴求と地域ブロック最適化`,
-            actionDetail: `対象ページは集客用LPです。記事のような長文追記ではなく、ファーストビューのキャッチコピー、対応公営プール一覧、および体験予約CTAの配置を改善して成約率を高めます。`,
+            pageTypeLabel: isDeleted ? '集客LP（削除済み・新規作成または既存改善推奨）' : '集客ランディングページ（LP・通常デザイン）',
+            pageGoalSummary: isDeleted
+                ? '旧URL削除に伴う受け皿ページの配備（新規LP作成またはトップページ既存改善） ✕ 1位奪取'
+                : '体験レッスン予約の成約率（CVR）最大化 ✕ 地域検索での1位獲得',
+            actionTitle: isDeleted
+                ? `【新規LP作成または既存改善】「${keyword}」の集客ページ構築`
+                : `「${keyword}」LPのファーストビュー訴求と地域ブロック最適化`,
+            actionDetail: isDeleted
+                ? `旧ページ（${targetPath}）は削除済み（404）となっています。キーワード「${cleanKw}」の検索順位と流入を逃さないよう、既存の集客ページ（トップページ / など）を強化するか、STUDIOで新規LPを作成してください。`
+                : `対象ページは集客用LPです。記事のような長文追記ではなく、ファーストビューのキャッチコピー、対応公営プール一覧、および体験予約CTAの配置を改善して成約率を高めます。`,
             factAudit: {
                 existingTitle,
-                existingHeadingsSummary: '料金・サービス概要が中心の固定レイアウト（地域性や成約オファーの訴求が不足）',
-                missingGapReason: `競合の上位LPと比較して、「${cleanKw}」の完全一致キーワードがFVに含まれておらず、具体的な対応公営プールや体験予約への強いCTA誘導が不足しているため、2位〜上位に留まっています。`,
+                existingHeadingsSummary: isDeleted
+                    ? '対象ページは404削除済みのため、コンテンツが存在しません'
+                    : '料金・サービス概要が中心の固定レイアウト（地域性や成約オファーの訴求が不足）',
+                missingGapReason: isDeleted
+                    ? `旧URL（${targetPath}）が削除されているため、検索エンジンの評価を受け止める正規ページ（既存のトップページ / または新規LP）の配備が最優先課題です。`
+                    : `競合の上位LPと比較して、「${cleanKw}」の完全一致キーワードがFVに含まれておらず、具体的な対応公営プールや体験予約への強いCTA誘導が不足しているため、2位〜上位に留まっています。`,
             },
             proposedTitle,
             proposedDescription,
@@ -265,22 +277,35 @@ ${lpBlocks[4].ctaText}
             bodyText,
             faqItems,
             jsonLdScript,
-            studioSteps: [
-                '1. STUDIOにログインし、対象プロジェクトの「デザインエディタ」を開きます。',
-                '2. ページ一覧から「' + targetPath + '」のキャンバスを開きます。',
-                '3. 【ファーストビュー更新】H1テキストボックスを選択し、推奨キャッチコピー「' + lpBlocks[0].headline + '」に変更します。',
-                '4. 【CTAボタン更新】体験予約ボタンのマイクロコピーを「' + lpBlocks[0].ctaText + '」に変更し、リンク先を予約フォームに設定します。',
-                '5. 【地域・プール一覧の配置】必要に応じてテキストブロックを追加し、対応公営プールや選ばれる理由を配置します。',
-                '6. 【ページ設定】右上のページ設定 ➔「タイトル / メタディスクリプション」を更新し、カスタムコードにJSON-LDを配置して「公開」します。',
-            ],
-            technicalNotes: [
-                '※ このページは「ランディングページ（LP）」です。CMS記事のリッチテキストエディタではなく、STUDIOのデザインエディタから各ビジュアル要素を編集してください。',
-                '※ ブログ記事のような長文テキストを一括で流し込むとデザインが崩れるため、各セクション（FV、強み、料金、CTA）のテキストボックスに個別に適用してください。',
-                '※ 構造化データ（JSON-LD）は、ページ設定の「カスタムコード (<head>内)」に設置することでLocalBusinessとしてGoogleに認識されます。',
-            ],
+            studioSteps: isDeleted
+                ? [
+                    '1. STUDIOにログインし、対象プロジェクトを開きます。',
+                    '2. 【方針A: 既存ページの改善】トップページ（/）のキャンバスを開き、推奨キャッチコピー「' + lpBlocks[0].headline + '」や地域プールブロックを追加して公開します。',
+                    '3. 【方針B: 新規LPの作成】新規ページを作成（パス例: /personal_swim/tokyo または通常LP）し、以下のファーストビュー・選ばれる理由・料金ブロックを流し込みます。',
+                    '4. 【ページ設定】ページ設定から推奨タイトル「' + proposedTitle + '」とメタディスクリプションを設定し、カスタムコードにJSON-LDを設置します。',
+                    '5. STUDIO本番公開後、SP-Trackerの「実行済みにする」を押して7日間検証スプリントを開始します。',
+                ]
+                : [
+                    '1. STUDIOにログインし、対象プロジェクトの「デザインエディタ」を開きます。',
+                    '2. ページ一覧から「' + targetPath + '」のキャンバスを開きます。',
+                    '3. 【ファーストビュー更新】H1テキストボックスを選択し、推奨キャッチコピー「' + lpBlocks[0].headline + '」に変更します。',
+                    '4. 【CTAボタン更新】体験予約ボタンのマイクロコピーを「' + lpBlocks[0].ctaText + '」に変更し、リンク先を予約フォームに設定します。',
+                    '5. 【地域・プール一覧の配置】必要に応じてテキストブロックを追加し、対応公営プールや選ばれる理由を配置します。',
+                    '6. 【ページ設定】右上のページ設定 ➔「タイトル / メタディスクリプション」を更新し、カスタムコードにJSON-LDを配置して「公開」します。',
+                ],
+            technicalNotes: isDeleted
+                ? [
+                    '※ 対象ページは現在HTTP 404（削除済み）です。システム監査では「削除済みページ」として正しく検知・管理されています。',
+                    '※ キーワード「' + cleanKw + '」のSEO流入は貴重なため、既存トップページへの統合か、新規LPの立ち上げをご選択ください。どちらの場合も下記の推奨構成案がそのまま活用できます。',
+                ]
+                : [
+                    '※ このページは「ランディングページ（LP）」です。CMS記事のリッチテキストエディタではなく、STUDIOのデザインエディタから各ビジュアル要素を編集してください。',
+                    '※ ブログ記事のような長文テキストを一括で流し込むとデザインが崩れるため、各セクション（FV、強み、料金、CTA）のテキストボックスに個別に適用してください。',
+                    '※ 構造化データ（JSON-LD）は、ページ設定の「カスタムコード (<head>内)」に設置することでLocalBusinessとしてGoogleに認識されます。',
+                ],
             liveAudit,
-            isAlreadyOptimized: isOptimized,
-            optimizationStatus: liveAudit?.optimizationStatus || (isOptimized ? 'optimized_in_production' : 'needs_optimization'),
+            isAlreadyOptimized: isDeleted ? false : isOptimized,
+            optimizationStatus: isDeleted ? 'needs_optimization' : (liveAudit?.optimizationStatus || (isOptimized ? 'optimized_in_production' : 'needs_optimization')),
         };
     }
 

@@ -54,15 +54,15 @@ export const SEED_KEYWORDS: KeywordItem[] = [
     { id: 5, keyword: '水泳個人レッスン 千葉', area_category: 'chiba', target_category: 'adult', current_rank: 4, previous_rank: 4, target_url: 'https://swim-partners.com/personal_swim/chiba', competitor_top_url: '' },
     { id: 6, keyword: 'スイミング マンツーマン 目黒', area_category: 'tokyo_23', target_category: 'junior', current_rank: 2, previous_rank: 2, target_url: 'https://swim-partners.com/personal_swim/meguro', competitor_top_url: '' },
     { id: 7, keyword: 'スイミング マンツーマン 子供', area_category: 'tokyo_23', target_category: 'junior', current_rank: 2, previous_rank: 3, target_url: 'https://swim-partners.com/personal_swim/meguro', competitor_top_url: '' },
-    { id: 8, keyword: '水泳 個人レッスン 東京', area_category: 'tokyo_23', target_category: 'adult', current_rank: 4, previous_rank: 5, target_url: 'https://swim-partners.com/personal_swim', competitor_top_url: '' },
-    { id: 9, keyword: '水泳 マンツーマン 横浜', area_category: 'kanagawa', target_category: 'adult', current_rank: 6, previous_rank: 7, target_url: 'https://swim-partners.com/personal_swim', competitor_top_url: '' },
+    { id: 8, keyword: '水泳 個人レッスン 東京', area_category: 'tokyo_23', target_category: 'adult', current_rank: 4, previous_rank: 5, target_url: 'https://swim-partners.com/', competitor_top_url: '' },
+    { id: 9, keyword: '水泳 マンツーマン 横浜', area_category: 'kanagawa', target_category: 'adult', current_rank: 6, previous_rank: 7, target_url: 'https://swim-partners.com/', competitor_top_url: '' },
     { id: 10, keyword: '50代 水泳 初心者', area_category: 'tokyo_23', target_category: 'adult', current_rank: 9, previous_rank: 11, target_url: 'https://swim-partners.com/zUHb45xV/adult-private-swimming', competitor_top_url: '' },
     { id: 11, keyword: '40代 水泳', area_category: 'tokyo_23', target_category: 'adult', current_rank: 8, previous_rank: 10, target_url: 'https://swim-partners.com/zUHb45xV/adult-private-swimming', competitor_top_url: '' },
     { id: 12, keyword: '水泳 始めたい 大人', area_category: 'tokyo_23', target_category: 'adult', current_rank: 8, previous_rank: 9, target_url: 'https://swim-partners.com/zUHb45xV/adult-private-swimming', competitor_top_url: '' },
     { id: 13, keyword: '水泳 恐怖症 大人 個人レッスン', area_category: 'tokyo_23', target_category: 'phobia', current_rank: 7, previous_rank: 8, target_url: 'https://swim-partners.com/zUHb45xV/adult-private-swimming', competitor_top_url: '' },
     { id: 14, keyword: '大人 カナヅチ 克服 レッスン 東京', area_category: 'tokyo_23', target_category: 'phobia', current_rank: 6, previous_rank: 7, target_url: 'https://swim-partners.com/zUHb45xV/adult-private-swimming', competitor_top_url: '' },
     { id: 15, keyword: 'スイミングスクール 大人 安い', area_category: 'tokyo_23', target_category: 'adult', current_rank: 6, previous_rank: 8, target_url: 'https://swim-partners.com/zUHb45xV/yhCGMmjW', competitor_top_url: '' },
-    { id: 16, keyword: 'トライアスロン スイム レッスン 東京', area_category: 'tokyo_23', target_category: 'triathlon', current_rank: 12, previous_rank: 14, target_url: 'https://swim-partners.com/personal_swim', competitor_top_url: '' },
+    { id: 16, keyword: 'トライアスロン スイム レッスン 東京', area_category: 'tokyo_23', target_category: 'triathlon', current_rank: 12, previous_rank: 14, target_url: 'https://swim-partners.com/', competitor_top_url: '' },
 ];
 
 export const SEED_GEO_PROMPTS: GeoPromptItem[] = [
@@ -78,7 +78,7 @@ export const SEED_GEO_PROMPTS: GeoPromptItem[] = [
                 sentiment: 'positive',
                 full_response: '東京で大人の初心者におすすめの水泳個人レッスンとしては、「スイムパートナーズ」が特に高評価を得ています。完全マンツーマンで都内の公営プール（東京体育館プールや港区スポーツセンター等）への出張指導に対応しており、水恐怖症克服や大人の息継ぎ習得に定評があります。その他、コナミスポーツクラブやティップネスなどの大手フィットネスのプライベート枠もあります。',
                 cited_sources: [
-                    { title: 'スイムパートナーズ 個人レッスン公式', url: 'https://swim-partners.com/personal_swim', domain: 'swim-partners.com' },
+                    { title: 'スイムパートナーズ 個人レッスン公式', url: 'https://swim-partners.com/', domain: 'swim-partners.com' },
                     { title: 'エキテン 首都圏水泳教室・個人指導ランキング', url: 'https://www.ekiten.jp/cat_sports_swim/', domain: 'ekiten.jp' },
                 ]
             },
@@ -117,7 +117,7 @@ export const SEED_GEO_PROMPTS: GeoPromptItem[] = [
                 sentiment: 'positive',
                 full_response: '横浜エリアで水嫌いのお子様には、出張型個別レッスンの「スイムパートナーズ」がおすすめです。インストラクターがマンツーマンで寄り添い、横浜国際プールや各区スポーツセンターなどで指導を行っており、短期間で顔つけや潜りができるようになったという保護者の口コミが多く見られます。',
                 cited_sources: [
-                    { title: 'スイムパートナーズ 個人レッスン案内', url: 'https://swim-partners.com/personal_swim', domain: 'swim-partners.com' },
+                    { title: 'スイムパートナーズ 個人レッスン案内', url: 'https://swim-partners.com/', domain: 'swim-partners.com' },
                     { title: 'コドモブースター 子供の水泳教室比較', url: 'https://kodomo-booster.com/categories/swimming', domain: 'kodomo-booster.com' },
                 ]
             },

@@ -393,19 +393,35 @@ export async function getSeoRankWatchState(supabase?: any): Promise<SeoRankWatch
 
     for (const cand of candidateKeywords) {
         if (topActions.length >= 3) break;
-        const kit = generateSeoImprovementKit(cand.keyword, cand.target_path, cand.current_rank);
+
+        const isDeletedTarget = cand.target_path === '/personal_swim';
+        // 404削除済みページの場合は、存在しているトップページ（/）の改善または新規LP作成の提案に切り替え
+        const effectivePath = isDeletedTarget ? '/' : cand.target_path;
+        const kit = generateSeoImprovementKit(cand.keyword, effectivePath, cand.current_rank);
         const isAlreadyDone = cand.status === 'observing' || kit.isAlreadyOptimized || kit.optimizationStatus === 'optimized_in_production';
+
+        const actionTitle = isDeletedTarget
+            ? `【新規LP作成または既存改善】「${cand.keyword}」の集客ページ構築`
+            : kit.actionTitle;
+
+        const actionDetail = isDeletedTarget
+            ? `旧LP（${cand.target_path}）は404削除済みです。キーワード「${cand.keyword}」の検索順位を活かすため、既存のトップページ（/）を改修するか、STUDIOで新規LPを作成してください。`
+            : kit.actionDetail;
+
+        const pageTypeLabel = isDeletedTarget
+            ? '集客LP（旧ページ削除済 ➔ 既存改善・新規作成）'
+            : kit.pageTypeLabel;
 
         topActions.push({
             id: `task_cand_${cand.id}`,
             keyword: cand.keyword,
-            targetPath: cand.target_path,
+            targetPath: isDeletedTarget ? '/（または新規LP）' : cand.target_path,
             currentRank: cand.current_rank,
             priority: cand.priority,
             pageType: kit.pageType,
-            pageTypeLabel: kit.pageTypeLabel,
-            actionTitle: kit.actionTitle,
-            actionDetail: kit.actionDetail,
+            pageTypeLabel,
+            actionTitle,
+            actionDetail,
             status: isAlreadyDone ? 'observing' : 'ready',
         });
     }
