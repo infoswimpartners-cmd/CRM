@@ -24,6 +24,7 @@ import {
     RefreshCw,
     Globe,
     AlertCircle,
+    PlusCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { SeoRankWatchState, ImprovementLogEntry, SeoActionTask } from '@/lib/seo-rank-watch';
@@ -168,6 +169,37 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
         } finally {
             setIsAnalyzingLivePage(false);
         }
+    };
+
+    // 表示されていない未着手の待機中タスク候補プール
+    const displayedKeywords = new Set(localActions.map((a) => a.keyword));
+    const observingKeywords = new Set((state.observingItems || []).map((o) => o.keyword));
+    const availableCandidates = (state.candidatePool || []).filter(
+        (c) => !displayedKeywords.has(c.keyword) && !observingKeywords.has(c.keyword)
+    );
+
+    // ボタンを押して新たな改善タスクを1件追加表示
+    const handleAddNewTask = () => {
+        if (availableCandidates.length === 0) {
+            toast.info('現在すべてのアクティブな改善候補キーワードが表示されています');
+            return;
+        }
+        const nextTask = availableCandidates[0];
+        setLocalActions((prev) => [...prev, nextTask]);
+        toast.success(`新たな改善タスク「${nextTask.keyword}」を追加表示しました`);
+    };
+
+    // 特定タスクを別の候補キーワードに入れ替え（スキップ）
+    const handleSwapTask = (targetKeyword: string) => {
+        if (availableCandidates.length === 0) {
+            toast.info('入れ替え可能な別の待機中キーワードがありません');
+            return;
+        }
+        const nextTask = availableCandidates[0];
+        setLocalActions((prev) =>
+            prev.map((a) => (a.keyword === targetKeyword ? nextTask : a))
+        );
+        toast.success(`「${targetKeyword}」を「${nextTask.keyword}」の改善タスクに入れ替えました`);
     };
 
     // 改善アクション実施 -> observingへ (Optimistic UI + LocalStorage + 即座に完了モーダル表示)
@@ -337,7 +369,16 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                                 検索順位1位を獲得するために、本日実施すべき3つの具体的タスクです。公開ページの最新情報を自動検知します。
                             </p>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <button
+                                onClick={handleAddNewTask}
+                                disabled={availableCandidates.length === 0}
+                                className="px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs disabled:opacity-50"
+                                title="待機中の改善候補から次のタスクを画面に追加"
+                            >
+                                <PlusCircle className="w-3.5 h-3.5 text-indigo-600" />
+                                新たなタスクを表示 ({availableCandidates.length}件待機)
+                            </button>
                             <span className="text-[11px] font-mono text-zinc-500 bg-zinc-100 px-2.5 py-1 rounded-lg border border-zinc-200">
                                 サイクル: 毎日自動補充
                             </span>
@@ -377,7 +418,7 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                         );
                     })()}
 
-                    {/* アクションリスト (3件) */}
+                    {/* アクションリスト */}
                     <div className="grid grid-cols-1 gap-3 sm:gap-4">
                         {(localActions.length > 0 ? localActions : (state.topActions && state.topActions.length > 0 ? state.topActions : (
                             topContender ? [{
@@ -435,6 +476,16 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                                                         <Hourglass className="w-3.5 h-3.5 text-indigo-600" />
                                                         7日間検証中（効果測定）
                                                     </span>
+                                                )}
+                                                {!isExecutedToday && !isObserving && availableCandidates.length > 0 && (
+                                                    <button
+                                                        onClick={() => handleSwapTask(action.keyword)}
+                                                        title="このタスクを別の未着手キーワードに入れ替える"
+                                                        className="ml-auto px-2 py-0.5 rounded-md bg-zinc-100 hover:bg-zinc-200 text-zinc-600 border border-zinc-200 text-[11px] font-medium flex items-center gap-1 transition-all"
+                                                    >
+                                                        <RefreshCw className="w-3 h-3 text-zinc-500" />
+                                                        別のタスクに入れ替え
+                                                    </button>
                                                 )}
                                             </div>
 
@@ -521,6 +572,27 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                                 </div>
                             );
                         })}
+                    </div>
+
+                    {/* 新たなタスクを追加表示するボタンバー */}
+                    <div className="pt-1 flex flex-col sm:flex-row items-center justify-between gap-3 p-4 rounded-xl bg-gradient-to-r from-indigo-50/80 via-blue-50/60 to-indigo-50/80 border border-indigo-100 shadow-xs">
+                        <div className="space-y-0.5 text-center sm:text-left">
+                            <div className="text-xs font-bold text-indigo-950 flex items-center justify-center sm:justify-start gap-1.5">
+                                <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                                対策タスクをさらに進める
+                            </div>
+                            <p className="text-[11px] text-zinc-600">
+                                ボタンを押すと、未着手の監視キーワードから次の改善キット付きタスクが即座に追加表示されます（待機中: <strong className="text-indigo-700 font-bold">{availableCandidates.length}件</strong>）。
+                            </p>
+                        </div>
+                        <button
+                            onClick={handleAddNewTask}
+                            disabled={availableCandidates.length === 0}
+                            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 flex-shrink-0"
+                        >
+                            <PlusCircle className="w-4 h-4" />
+                            新たなタスクを表示する
+                        </button>
                     </div>
                 </div>
 

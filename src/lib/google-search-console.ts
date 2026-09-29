@@ -1,5 +1,6 @@
 import { google } from 'googleapis';
-import { getGoogleAuthClient } from './google-analytics';
+import { getGoogleAuthClient, getGoogleAuthClientAsync } from './google-analytics';
+import { getGoogleCredentials } from './google-credentials';
 import { ensureUpToDateDailyData, generateDynamicDailyPerformance } from './sp-tracker-trends';
 export { ensureUpToDateDailyData, generateDynamicDailyPerformance };
 
@@ -40,13 +41,16 @@ export interface SearchConsoleSummary {
  * Google Search Consoleから過去28日間の検索パフォーマンスを取得（実クエリ＋実URL）
  */
 export async function fetchSearchConsoleAnalytics(): Promise<SearchConsoleSummary | null> {
-    const siteUrl = process.env.SEARCH_CONSOLE_SITE_URL;
+    const creds = await getGoogleCredentials();
+    const siteUrl = creds.siteUrl || process.env.SEARCH_CONSOLE_SITE_URL;
     if (!siteUrl) {
+        console.warn('SEARCH_CONSOLE_SITE_URL is not configured in env or Supabase');
         return null;
     }
 
-    const auth = getGoogleAuthClient(['https://www.googleapis.com/auth/webmasters.readonly']);
+    const auth = await getGoogleAuthClientAsync(['https://www.googleapis.com/auth/webmasters.readonly']);
     if (!auth) {
+        console.warn('Google service account auth failed or not configured');
         return null;
     }
 

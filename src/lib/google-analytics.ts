@@ -1,10 +1,12 @@
 import { google } from 'googleapis';
 
+import { getGoogleCredentials } from './google-credentials';
+
 /**
- * Google サービスアカウント認証クライアントを取得
+ * Google サービスアカウント認証クライアントを取得（同期版: 環境変数またはキャッシュ）
  */
-export function getGoogleAuthClient(scopes: string[]) {
-    const serviceAccountJson = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+export function getGoogleAuthClient(scopes: string[], explicitKey?: string) {
+    const serviceAccountJson = explicitKey || process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
 
     if (!serviceAccountJson) {
         return null;
@@ -24,6 +26,14 @@ export function getGoogleAuthClient(scopes: string[]) {
         console.error('Failed to parse GOOGLE_SERVICE_ACCOUNT_KEY:', err);
         return null;
     }
+}
+
+/**
+ * Google サービスアカウント認証クライアントを非同期取得（Supabaseフォールバック対応）
+ */
+export async function getGoogleAuthClientAsync(scopes: string[]) {
+    const creds = await getGoogleCredentials();
+    return getGoogleAuthClient(scopes, creds.serviceAccountKey);
 }
 
 export interface GA4TrafficSummary {
@@ -46,12 +56,13 @@ export interface GA4TrafficSummary {
  * GA4から過去30日間のセッションと流入チャネル（特にAI参照）を取得
  */
 export async function fetchGA4Analytics(): Promise<GA4TrafficSummary | null> {
-    const propertyId = process.env.GA4_PROPERTY_ID;
+    const creds = await getGoogleCredentials();
+    const propertyId = creds.ga4Id || process.env.GA4_PROPERTY_ID;
     if (!propertyId) {
         return null;
     }
 
-    const auth = getGoogleAuthClient(['https://www.googleapis.com/auth/analytics.readonly']);
+    const auth = await getGoogleAuthClientAsync(['https://www.googleapis.com/auth/analytics.readonly']);
     if (!auth) {
         return null;
     }

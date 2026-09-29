@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getGoogleCredentials } from '@/lib/google-credentials';
 import {
     KeywordItem,
     GeoPromptItem,
@@ -255,6 +256,8 @@ export async function getSpTrackerDashboard(): Promise<SpTrackerDashboardData> {
             appendRankHistory(historyToAppend);
         }
 
+        const googleCreds = await getGoogleCredentials();
+
         return {
             statusMeters: {
                 seoTopRate,
@@ -273,8 +276,8 @@ export async function getSpTrackerDashboard(): Promise<SpTrackerDashboardData> {
             config: {
                 googleChatWebhookConfigured: Boolean(googleChatWebhookUrl),
                 googleChatWebhookUrl: googleChatWebhookUrl || undefined,
-                ga4Configured: Boolean(process.env.GA4_PROPERTY_ID),
-                searchConsoleConfigured: Boolean(process.env.SEARCH_CONSOLE_SITE_URL),
+                ga4Configured: Boolean(googleCreds.ga4Id && googleCreds.serviceAccountKey),
+                searchConsoleConfigured: Boolean(googleCreds.siteUrl && googleCreds.serviceAccountKey),
             },
         };
     } catch (error) {
@@ -671,17 +674,21 @@ export async function completeObservingAction(keyword: string, notes: string, ne
 }
 
 /**
- * Google Search Consoleの最新順位を取得してrank-history.jsonに追記同期
+ * Google Search Consoleの最新順位を取得してSupabaseおよび履歴に追記同期
  */
 export async function syncGscRanksAction() {
     try {
+        const supabase = createAdminClient();
         const scData = await fetchSearchConsoleAnalytics();
         if (!scData || !scData.keywordPages) {
-            return { success: false, message: 'Search Consoleデータを取得できませんでした。' };
+            return {
+                success: false,
+                message: 'Google Search Consoleデータを取得できませんでした。Google連携認証情報（サービスアカウントキーおよびサイトURL）をご確認ください。',
+            };
         }
 
-        const watchwords = readWatchwords();
-        const todayStr = new Date().toISOString().split('T')[0];
+        const watchwords = await getPersistedWatchwords(supabase);
+        const todayStr = getJstDateString();
         const entries = [];
 
         for (const item of watchwords) {
@@ -707,10 +714,19 @@ export async function syncGscRanksAction() {
 
         if (entries.length > 0) {
             appendRankHistory(entries);
-            writeWatchwords(watchwords);
+            await savePersistedWatchwords(supabase, watchwords);
         }
 
-        return { success: true, message: `${entries.length}件のSearch Console順位実績を追記同期しました。` };
+        try {
+            revalidatePath('/admin/geo-seo');
+        } catch {
+            // Next.jsリクエストコンテキスト外の実行時は無視
+        }
+
+        return {
+            success: true,
+            message: `${entries.length}件のSearch Console順位実績（最新実測値）を同期・反映しました。`,
+        };
     } catch (err: any) {
         console.error('syncGscRanksAction error:', err);
         return { success: false, message: err.message || '順位同期中にエラーが発生しました。' };

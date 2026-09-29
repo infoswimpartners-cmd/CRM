@@ -59,6 +59,7 @@ export interface SeoRankWatchState {
     improvementLogs: ImprovementLogEntry[];
     topContender: WatchwordItem | null;
     topActions: SeoActionTask[]; // 常に提示される3つのアクションリスト
+    candidatePool: SeoActionTask[]; // ボタン押下で追加補充できる未着手候補タスク全プール
     observingItem: (WatchwordItem & { remainingDays: number; log: ImprovementLogEntry }) | null;
     observingItems: (WatchwordItem & { remainingDays: number; log: ImprovementLogEntry })[]; // 7日間観察中の全アイテムリスト
     stats: {
@@ -393,9 +394,9 @@ export async function getSeoRankWatchState(supabase?: any): Promise<SeoRankWatch
             return (a.current_rank || 100) - (b.current_rank || 100);
         });
 
-    for (const cand of candidateKeywords) {
-        if (topActions.length >= 3) break;
+    const candidatePool: SeoActionTask[] = [];
 
+    for (const cand of candidateKeywords) {
         const isDeletedTarget = cand.target_path === '/personal_swim';
         // 404削除済みページの場合は、存在しているトップページ（/）の改善または新規LP作成の提案に切り替え
         const effectivePath = isDeletedTarget ? '/' : cand.target_path;
@@ -413,7 +414,7 @@ export async function getSeoRankWatchState(supabase?: any): Promise<SeoRankWatch
             ? '集客LP（旧ページ削除済 ➔ 既存改善・新規作成）'
             : kit.pageTypeLabel;
 
-        topActions.push({
+        const taskItem: SeoActionTask = {
             id: `task_cand_${cand.id}`,
             keyword: cand.keyword,
             targetPath: isDeletedTarget ? '/（または新規LP）' : cand.target_path,
@@ -424,7 +425,14 @@ export async function getSeoRankWatchState(supabase?: any): Promise<SeoRankWatch
             actionTitle,
             actionDetail,
             status: 'ready',
-        });
+        };
+
+        candidatePool.push(taskItem);
+
+        // 初期表示用（TOP 3 ACTIONS）の未充填枠に補充
+        if (topActions.length < 3) {
+            topActions.push(taskItem);
+        }
     }
 
     // 4. 統計集計
@@ -441,6 +449,7 @@ export async function getSeoRankWatchState(supabase?: any): Promise<SeoRankWatch
         improvementLogs,
         topContender,
         topActions,
+        candidatePool,
         observingItem,
         observingItems,
         stats,
