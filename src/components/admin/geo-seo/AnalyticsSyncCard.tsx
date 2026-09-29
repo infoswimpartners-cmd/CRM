@@ -63,7 +63,7 @@ export function AnalyticsSyncCard({
             isAi: false,
         },
         {
-            name: 'SNS・その他 (Instagram/LINE)',
+            name: 'SNS・公式LINE・その他',
             share: ga4Data.channelBreakdown.sns.share,
             count: `${ga4Data.channelBreakdown.sns.count.toLocaleString()} 回`,
             isAi: false,
@@ -72,7 +72,7 @@ export function AnalyticsSyncCard({
         { name: 'AI引用 (Perplexity/ChatGPT)', share: '32%', count: '1,420 回', isAi: true },
         { name: 'Google自然検索 (SEO)', share: '45%', count: '1,980 回', isAi: false },
         { name: 'Googleマップ (MEO)', share: '15%', count: '660 回', isAi: false },
-        { name: 'SNS・その他 (Instagram/LINE)', share: '8%', count: '350 回', isAi: false },
+        { name: 'SNS・公式LINE・その他', share: '8%', count: '350 回', isAi: false },
     ]
 
     return (
