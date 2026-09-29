@@ -456,7 +456,9 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                                                     ACTION 0{idx + 1}
                                                 </span>
                                                 <span className={`px-2 py-0.5 rounded-md font-bold text-[11px] border ${
-                                                    action.pageType === 'studio_cms_article'
+                                                    action.actionTitle.includes('新規') || action.pageTypeLabel.includes('新規')
+                                                        ? 'bg-amber-100 text-amber-900 border-amber-300 font-extrabold'
+                                                        : action.pageType === 'studio_cms_article'
                                                         ? 'bg-purple-50 text-purple-700 border-purple-200'
                                                         : 'bg-sky-50 text-sky-700 border-sky-200'
                                                 }`}>
@@ -730,6 +732,34 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                                     <X className="w-5 h-5" />
                                 </button>
                             </div>
+
+                            {/* 対象ページが存在しない（404・未作成）場合の新規作成ガイダンス */}
+                            {activeKit.isNewPageRecommended && (
+                                <div className="mt-3.5 p-3 sm:p-4 rounded-xl bg-amber-50/90 border border-amber-300 text-amber-950 text-xs flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs">
+                                    <div className="space-y-1 flex-1">
+                                        <div className="font-bold flex items-center gap-1.5 text-amber-950 text-xs sm:text-sm">
+                                            <Sparkles className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                                            【新規ページ作成を推奨】対象の専用ページがまだありません（または削除済み）
+                                        </div>
+                                        <p className="text-[11px] sm:text-xs text-amber-800 leading-relaxed">
+                                            検索キーワード「<strong>{activeKit.keyword}</strong>」の受け皿ページが存在しないため、トップページに統合するより<strong>「STUDIOで専用LPを新規作成する」</strong>方が、検索順位（Google1位評価）も体験予約成約率（CVR）も最も高くなります。以下の構成案をそのまま使って新規ページを作成してください。
+                                        </p>
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-2 flex-shrink-0 pt-2 md:pt-0">
+                                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-amber-300 text-amber-950 font-mono text-xs font-bold shadow-xs">
+                                            <span>推奨パス:</span>
+                                            <span className="text-indigo-600">{activeKit.suggestedSlug || '/personal_swim'}</span>
+                                        </div>
+                                        <button
+                                            onClick={() => handleCopy(activeKit.suggestedSlug || '', 'suggested_slug', '推奨URLパス')}
+                                            className="px-3 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-500 text-zinc-950 text-xs font-bold transition-all shadow-xs flex items-center gap-1"
+                                        >
+                                            {copiedField === 'suggested_slug' ? <Check className="w-3.5 h-3.5 text-emerald-800" /> : <Copy className="w-3.5 h-3.5" />}
+                                            {copiedField === 'suggested_slug' ? 'コピー完了' : 'パスをコピー'}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* タブナビゲーションバー（入れ子スクロールを排除し、目的のコンテンツに1発アクセス） */}
                             <div className="flex items-center gap-1 sm:gap-2 mt-4 sm:mt-5 border-b border-zinc-200 overflow-x-auto no-scrollbar pb-px">

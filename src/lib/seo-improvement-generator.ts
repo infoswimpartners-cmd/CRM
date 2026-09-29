@@ -63,6 +63,10 @@ export interface SeoImprovementKit {
     jsonLdScript: string;
     studioSteps: string[];
     technicalNotes: string[];
+
+    // 新規ページ作成ガイダンス
+    isNewPageRecommended?: boolean;
+    suggestedSlug?: string;
 }
 
 /**
@@ -246,29 +250,43 @@ ${lpBlocks[4].ctaText}
 </script>`;
 
         const isDeleted = liveAudit?.isDeletedPage || targetPath === '/personal_swim';
+        // 404削除済み、または未作成（トップページ / で個別キーワード対策をしようとしている場合）は新規作成を推奨
+        const isNewPageRecommended = isDeleted || (targetPath === '/' && (cleanKw.includes('50代') || cleanKw.includes('40代') || cleanKw.includes('東京') || cleanKw.includes('初心者')));
+
+        // 推奨URLスラッグの決定
+        let suggestedSlug = '/personal_swim';
+        if (cleanKw.includes('東京')) suggestedSlug = '/personal_swim/tokyo';
+        else if (cleanKw.includes('目黒')) suggestedSlug = '/personal_swim/meguro';
+        else if (cleanKw.includes('千葉')) suggestedSlug = '/personal_swim/chiba';
+        else if (cleanKw.includes('横浜') || cleanKw.includes('神奈川')) suggestedSlug = '/personal_swim/yokohama';
+        else if (cleanKw.includes('50代')) suggestedSlug = '/personal_swim/50s';
+        else if (cleanKw.includes('40代')) suggestedSlug = '/personal_swim/40s';
+        else if (targetPath.startsWith('/personal_swim/')) suggestedSlug = targetPath;
 
         return {
             keyword,
             targetPath,
             currentRank,
             pageType,
-            pageTypeLabel: isDeleted ? '集客LP（削除済み・新規作成または既存改善推奨）' : '集客ランディングページ（LP・通常デザイン）',
-            pageGoalSummary: isDeleted
-                ? '旧URL削除に伴う受け皿ページの配備（新規LP作成またはトップページ既存改善） ✕ 1位奪取'
+            pageTypeLabel: isNewPageRecommended
+                ? '🆕 新規集客LP作成推奨（専用ページ未配備・404）'
+                : '集客ランディングページ（LP・通常デザイン）',
+            pageGoalSummary: isNewPageRecommended
+                ? `「${cleanKw}」専用の集客LPを新規開設し、検索意図に100%合致させて1位奪取＆体験予約成約率を最大化`
                 : '体験レッスン予約の成約率（CVR）最大化 ✕ 地域検索での1位獲得',
-            actionTitle: isDeleted
-                ? `【新規LP作成または既存改善】「${keyword}」の集客ページ構築`
+            actionTitle: isNewPageRecommended
+                ? `【新規ページ作成】「${keyword}」専用の集客LPをSTUDIOで作成`
                 : `「${keyword}」LPのファーストビュー訴求と地域ブロック最適化`,
-            actionDetail: isDeleted
-                ? `旧ページ（${targetPath}）は削除済み（404）となっています。キーワード「${cleanKw}」の検索順位と流入を逃さないよう、既存の集客ページ（トップページ / など）を強化するか、STUDIOで新規LPを作成してください。`
+            actionDetail: isNewPageRecommended
+                ? `対象キーワード「${cleanKw}」に対する専用の受け皿ページが存在しない（または旧URLが削除済み）状態です。トップページに統合するより「専用の新規LP（推奨パス: ${suggestedSlug}）」をSTUDIOで新規作成する方が、検索順位（SEO評価）も成約率も圧倒的に高くなります。以下の構成案を元に新規作成してください。`
                 : `対象ページは集客用LPです。記事のような長文追記ではなく、ファーストビューのキャッチコピー、対応公営プール一覧、および体験予約CTAの配置を改善して成約率を高めます。`,
             factAudit: {
                 existingTitle,
-                existingHeadingsSummary: isDeleted
-                    ? '対象ページは404削除済みのため、コンテンツが存在しません'
+                existingHeadingsSummary: isNewPageRecommended
+                    ? `対象の専用ページ（${suggestedSlug}）がまだ公開されていないため、検索エンジンの受け皿が存在しません`
                     : '料金・サービス概要が中心の固定レイアウト（地域性や成約オファーの訴求が不足）',
-                missingGapReason: isDeleted
-                    ? `旧URL（${targetPath}）が削除されているため、検索エンジンの評価を受け止める正規ページ（既存のトップページ / または新規LP）の配備が最優先課題です。`
+                missingGapReason: isNewPageRecommended
+                    ? `検索キーワード「${cleanKw}」に特化した専用LPが存在しないため、汎用ページで受けてしまい順位が停滞しています。「${suggestedSlug}」として新規ページを作成し、検索意図を満たすことで最短で1位を獲得できます。`
                     : `競合の上位LPと比較して、「${cleanKw}」の完全一致キーワードがFVに含まれておらず、具体的な対応公営プールや体験予約への強いCTA誘導が不足しているため、2位〜上位に留まっています。`,
             },
             proposedTitle,
@@ -277,13 +295,14 @@ ${lpBlocks[4].ctaText}
             bodyText,
             faqItems,
             jsonLdScript,
-            studioSteps: isDeleted
+            studioSteps: isNewPageRecommended
                 ? [
-                    '1. STUDIOにログインし、対象プロジェクトを開きます。',
-                    '2. 【方針A: 既存ページの改善】トップページ（/）のキャンバスを開き、推奨キャッチコピー「' + lpBlocks[0].headline + '」や地域プールブロックを追加して公開します。',
-                    '3. 【方針B: 新規LPの作成】新規ページを作成（パス例: /personal_swim/tokyo または通常LP）し、以下のファーストビュー・選ばれる理由・料金ブロックを流し込みます。',
-                    '4. 【ページ設定】ページ設定から推奨タイトル「' + proposedTitle + '」とメタディスクリプションを設定し、カスタムコードにJSON-LDを設置します。',
-                    '5. STUDIO本番公開後、SP-Trackerの「実行済みにする」を押して7日間検証スプリントを開始します。',
+                    '【ステップ1: 新規ページの作成】STUDIOプロジェクトを開き、左メニューの「ページ」➔「＋ ページを追加」をクリックします。',
+                    '【ステップ2: URLパスの設定】ページ設定の「パス」に推奨スラッグ「' + suggestedSlug + '」を入力します。',
+                    '【ステップ3: コンテンツの配置】テンプレートまたは既存LPを複製し、以下のファーストビュー（H1キャッチコピー）・3つの選ばれる理由・料金ブロックを流し込みます。',
+                    '【ステップ4: SEO設定】右上のページ設定 ➔「タイトル」に「' + proposedTitle + '」、「メタディスクリプション」に「' + proposedDescription + '」を入力します。',
+                    '【ステップ5: 構造化データ】カスタムコード (<head>内) に下記のJSON-LDスクリプトを貼り付けます。',
+                    '【ステップ6: 公開と検証開始】右上の「公開」ボタンを押してWeb上に公開後、SP-Trackerの「実行済みにする」を押して7日間の効果測定を開始します。',
                 ]
                 : [
                     '1. STUDIOにログインし、対象プロジェクトの「デザインエディタ」を開きます。',
@@ -293,10 +312,10 @@ ${lpBlocks[4].ctaText}
                     '5. 【地域・プール一覧の配置】必要に応じてテキストブロックを追加し、対応公営プールや選ばれる理由を配置します。',
                     '6. 【ページ設定】右上のページ設定 ➔「タイトル / メタディスクリプション」を更新し、カスタムコードにJSON-LDを配置して「公開」します。',
                 ],
-            technicalNotes: isDeleted
+            technicalNotes: isNewPageRecommended
                 ? [
-                    '※ 対象ページは現在HTTP 404（削除済み）です。システム監査では「削除済みページ」として正しく検知・管理されています。',
-                    '※ キーワード「' + cleanKw + '」のSEO流入は貴重なため、既存トップページへの統合か、新規LPの立ち上げをご選択ください。どちらの場合も下記の推奨構成案がそのまま活用できます。',
+                    '💡 【新規作成がベストな理由】: 検索ユーザーは「' + cleanKw + '」という明確な課題を持って検索しています。トップページよりも、その悩みに特化した専用LPを作成する方がGoogle評価（1位獲得率）も体験予約成約率（CVR）も飛躍的に向上します。',
+                    '※ STUDIOでは既存のLP（通常ページ）を「複製」してスラッグを「' + suggestedSlug + '」に変更し、テキストを差し替えるだけで最短10分で新規LPを立ち上げ可能です。',
                 ]
                 : [
                     '※ このページは「ランディングページ（LP）」です。CMS記事のリッチテキストエディタではなく、STUDIOのデザインエディタから各ビジュアル要素を編集してください。',
@@ -304,8 +323,10 @@ ${lpBlocks[4].ctaText}
                     '※ 構造化データ（JSON-LD）は、ページ設定の「カスタムコード (<head>内)」に設置することでLocalBusinessとしてGoogleに認識されます。',
                 ],
             liveAudit,
-            isAlreadyOptimized: isDeleted ? false : isOptimized,
-            optimizationStatus: isDeleted ? 'needs_optimization' : (liveAudit?.optimizationStatus || (isOptimized ? 'optimized_in_production' : 'needs_optimization')),
+            isAlreadyOptimized: isNewPageRecommended ? false : isOptimized,
+            optimizationStatus: isNewPageRecommended ? 'needs_optimization' : (liveAudit?.optimizationStatus || (isOptimized ? 'optimized_in_production' : 'needs_optimization')),
+            isNewPageRecommended,
+            suggestedSlug,
         };
     }
 
