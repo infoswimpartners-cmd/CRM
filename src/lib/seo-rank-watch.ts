@@ -60,6 +60,7 @@ export interface SeoRankWatchState {
     topContender: WatchwordItem | null;
     topActions: SeoActionTask[]; // 常に提示される3つのアクションリスト
     observingItem: (WatchwordItem & { remainingDays: number; log: ImprovementLogEntry }) | null;
+    observingItems: (WatchwordItem & { remainingDays: number; log: ImprovementLogEntry })[]; // 7日間観察中の全アイテムリスト
     stats: {
         achievedCount: number;
         observingCount: number;
@@ -311,22 +312,22 @@ export async function getSeoRankWatchState(supabase?: any): Promise<SeoRankWatch
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // 1. 観察中 (observing) のアイテムを特定
-    let observingItem: SeoRankWatchState['observingItem'] = null;
-    const observingKw = watchwords.find((w) => w.status === 'observing');
-    if (observingKw) {
-        const log = improvementLogs.find((l) => l.keyword === observingKw.keyword && l.status === 'observing') ||
-                    improvementLogs.find((l) => l.keyword === observingKw.keyword) || {
-                        id: 'temp',
-                        keyword: observingKw.keyword,
-                        target_path: observingKw.target_path,
+    // 1. 観察中 (observing) の全アイテムを特定
+    const observingItems: (WatchwordItem & { remainingDays: number; log: ImprovementLogEntry })[] = [];
+    const observingKwList = watchwords.filter((w) => w.status === 'observing');
+    for (const obKw of observingKwList) {
+        const log = improvementLogs.find((l) => l.keyword === obKw.keyword && l.status === 'observing') ||
+                    improvementLogs.find((l) => l.keyword === obKw.keyword) || {
+                        id: `temp_${obKw.id}`,
+                        keyword: obKw.keyword,
+                        target_path: obKw.target_path,
                         action_title: '本質的なコンテンツ・FAQ改善',
                         action_detail: '検索ニーズに合わせた訴求と構造化データの追加',
                         implemented_at: todayStr,
                         review_date: getJstDateString(new Date(Date.now() + 7 * 86400000)),
                         status: 'observing' as const,
-                        rank_before: observingKw.current_rank + 1,
-                        current_rank: observingKw.current_rank,
+                        rank_before: obKw.current_rank + 1,
+                        current_rank: obKw.current_rank,
                         notes: '7日間効果測定中',
                     };
 
@@ -335,12 +336,13 @@ export async function getSeoRankWatchState(supabase?: any): Promise<SeoRankWatch
         const diffDays = Math.ceil((reviewDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
         const remainingDays = Math.max(0, diffDays);
 
-        observingItem = {
-            ...observingKw,
+        observingItems.push({
+            ...obKw,
             remainingDays,
             log,
-        };
+        });
     }
+    const observingItem = observingItems[0] || null;
 
     // 2. 次の1位狙撃対象 (active の中で最も1位に近く、優先度が高いもの)
     const activeContenders = watchwords
@@ -379,13 +381,13 @@ export async function getSeoRankWatchState(supabase?: any): Promise<SeoRankWatch
         });
     }
 
-    // ② 残りの枠（合計3件になるまで）、未実行の候補（active）から優先度順に補充
+    // ② 残りの枠（合計3件になるまで）、未着手の候補（status === 'active' のみ！7日間観察中は除外）から優先度順に新しく自動補充
     const executedKwToday = new Set(todayLogs.map((l) => l.keyword));
+    const observingKwSet = new Set(observingKwList.map((w) => w.keyword));
+
     const candidateKeywords = watchwords
-        .filter((w) => w.status !== 'achieved' && !executedKwToday.has(w.keyword))
+        .filter((w) => w.status === 'active' && !executedKwToday.has(w.keyword) && !observingKwSet.has(w.keyword))
         .sort((a, b) => {
-            if (a.status === 'active' && b.status === 'observing') return -1;
-            if (a.status === 'observing' && b.status === 'active') return 1;
             if (a.priority === 'high' && b.priority !== 'high') return -1;
             if (b.priority === 'high' && a.priority !== 'high') return 1;
             return (a.current_rank || 100) - (b.current_rank || 100);
@@ -398,7 +400,6 @@ export async function getSeoRankWatchState(supabase?: any): Promise<SeoRankWatch
         // 404削除済みページの場合は、存在しているトップページ（/）の改善または新規LP作成の提案に切り替え
         const effectivePath = isDeletedTarget ? '/' : cand.target_path;
         const kit = generateSeoImprovementKit(cand.keyword, effectivePath, cand.current_rank);
-        const isAlreadyDone = cand.status === 'observing' || kit.isAlreadyOptimized || kit.optimizationStatus === 'optimized_in_production';
 
         const actionTitle = isDeletedTarget
             ? `【新規LP作成または既存改善】「${cand.keyword}」の集客ページ構築`
@@ -422,7 +423,7 @@ export async function getSeoRankWatchState(supabase?: any): Promise<SeoRankWatch
             pageTypeLabel,
             actionTitle,
             actionDetail,
-            status: isAlreadyDone ? 'observing' : 'ready',
+            status: 'ready',
         });
     }
 
@@ -441,6 +442,7 @@ export async function getSeoRankWatchState(supabase?: any): Promise<SeoRankWatch
         topContender,
         topActions,
         observingItem,
+        observingItems,
         stats,
     };
 }
