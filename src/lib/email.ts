@@ -111,11 +111,16 @@ export class EmailService {
         triggerId: string, 
         to: string, 
         variables: Record<string, string>, 
-        overrideTemplate?: { subject: string, body: string },
-        options?: { forceEmail?: boolean }
+        overrideTemplate?: { subject?: string, body?: string, forceEmail?: boolean, studentId?: string },
+        options?: { forceEmail?: boolean, studentId?: string }
     ): Promise<boolean> {
         try {
             const supabase = createAdminClient()
+
+            // 第4引数・第5引数の柔軟な解決（overrideTemplateが省略されてoptionsが渡された場合に対応）
+            const isFourthArgOptions = overrideTemplate && ('forceEmail' in overrideTemplate || 'studentId' in overrideTemplate) && !('subject' in overrideTemplate && 'body' in overrideTemplate)
+            const actualOptions = isFourthArgOptions ? overrideTemplate : options
+            const actualOverrideTemplate = isFourthArgOptions ? undefined : (overrideTemplate?.subject && overrideTemplate?.body ? { subject: overrideTemplate.subject, body: overrideTemplate.body } : undefined)
 
             // 変数の相互互換補完
             const mergedVariables = { ...variables }
@@ -130,13 +135,24 @@ export class EmailService {
                 mergedVariables.lesson_date = mergedVariables.trial_date
             }
 
-            // 1. LINE連携の有無を事前に確認（同一メールアドレスの重複登録に対応）
-            const { data: students } = await supabase
-                .from('students')
-                .select('line_user_id')
-                .ilike('contact_email', to.trim())
+            // 1. LINE連携および生徒情報の事前確認（同一メールアドレスの重複登録に対応）
+            let student = null
+            if (actualOptions?.studentId) {
+                const { data: s } = await supabase
+                    .from('students')
+                    .select('id, line_user_id, coach_id, full_name')
+                    .eq('id', actualOptions.studentId)
+                    .maybeSingle()
+                student = s
+            }
+            if (!student) {
+                const { data: students } = await supabase
+                    .from('students')
+                    .select('id, line_user_id, coach_id, full_name')
+                    .ilike('contact_email', to.trim())
 
-            const student = (students || []).find(s => s.line_user_id)
+                student = (students || []).find(s => s.line_user_id) || (students || [])[0] || null
+            }
             const hasLineLinked = !!student?.line_user_id
 
             const { data: trigger, error: triggerError } = await supabase
@@ -160,9 +176,9 @@ export class EmailService {
             let renderedBody = ''
             let isApprovalRequired = false
 
-            if (overrideTemplate) {
-                renderedSubject = overrideTemplate.subject
-                renderedBody = overrideTemplate.body
+            if (actualOverrideTemplate) {
+                renderedSubject = actualOverrideTemplate.subject
+                renderedBody = actualOverrideTemplate.body
 
                 // 変数を置換
                 for (const [k, v] of Object.entries(mergedVariables)) {
@@ -214,7 +230,7 @@ export class EmailService {
 
             // 2. LINE連携されており、かつLINE送信対象のトリガーである場合はLINEにのみ送信（forceEmailが指定されていない場合）
             const isLineTargetTrigger = ['trial_lesson_reserved', 'trial_payment_completed', 'trio_trial_payment_completed', 'payment_success', 'enrollment_completed'].includes(triggerId)
-            const shouldSendToLine = !options?.forceEmail && hasLineLinked && isLineTargetTrigger && student?.line_user_id
+            const shouldSendToLine = !actualOptions?.forceEmail && hasLineLinked && isLineTargetTrigger && student?.line_user_id
 
             if (shouldSendToLine) {
                 console.log(`[Notification] Student has LINE linked (${student.line_user_id}). Sending to LINE instead of email for trigger '${triggerId}'.`)
@@ -233,7 +249,7 @@ export class EmailService {
                 }
             } else {
                 // LINE未連携、またはLINE対象外のトリガーの場合は通常通りメールを送信 (フォールバック)
-                if (overrideTemplate) {
+                if (actualOverrideTemplate) {
                     await this.sendEmail({
                         to,
                         subject: renderedSubject,
@@ -268,6 +284,24 @@ export class EmailService {
                     await sendGoogleChatMessage(trigger.google_chat_webhook_url, message)
                 } catch (chatErr) {
                     console.error('[GoogleChat] Non-fatal error in trigger:', chatErr)
+                }
+            }
+
+            // --- 担当コーチ専用 Google Chat 送信（入会完了時） ---
+            if (triggerId === 'enrollment_completed') {
+                try {
+                    const { notifyCoachEnrollmentCompleted } = await import('@/lib/coach-notifications')
+                    await notifyCoachEnrollmentCompleted(supabase, {
+                        studentId: actualOptions?.studentId || student?.id,
+                        studentName: mergedVariables.name || student?.full_name || '生徒',
+                        planName: mergedVariables.plan_name || '入会プラン',
+                        startDate: mergedVariables.start_date || '翌月1日',
+                        contactEmail: to,
+                        lineUserId: student?.line_user_id,
+                        coachId: student?.coach_id
+                    })
+                } catch (coachNotifyErr) {
+                    console.error('[GoogleChat Coach] Non-fatal error in coach enrollment notification:', coachNotifyErr)
                 }
             }
 

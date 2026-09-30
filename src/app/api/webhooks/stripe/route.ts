@@ -503,6 +503,8 @@ ${slotsListText}
                                         name: student.full_name,
                                         plan_name: planDisplayName,
                                         start_date: startDateStr
+                                    }, {
+                                        studentId: student.id
                                     })
                                 } catch (e) {
                                     console.error('[Stripe Webhook] Failed to send enrollment email:', e)
@@ -557,6 +559,8 @@ ${slotsListText}
                                         name: customerName,
                                         plan_name: planDisplayName,
                                         start_date: startDateStr
+                                    }, {
+                                        studentId: newStudent?.id
                                     })
                                 } catch (e) {
                                     console.error('[Stripe Webhook] Failed to send enrollment email to new student:', e)
