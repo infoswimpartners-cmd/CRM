@@ -34,6 +34,15 @@ export interface SearchConsoleSummary {
         position: string;
     }>;
     keywordPages: SearchConsoleKeywordPerformance[];
+    geoKeywordPages?: Array<{
+        regionTag: string; // '東京', '千葉', '目黒', '横浜', '世田谷' 等
+        keyword: string;
+        pageUrl: string;
+        clicks: number;
+        impressions: number;
+        ctr: string;
+        position: number;
+    }>;
     dailyPerformance?: SearchConsoleDailyPerformance[];
 }
 
@@ -161,6 +170,18 @@ export async function fetchSearchConsoleAnalytics(): Promise<SearchConsoleSummar
         const averageCtr = totalImpressions > 0 ? `${((totalClicks / totalImpressions) * 100).toFixed(1)}%` : '0.0%';
         const averagePosition = totalImpressions > 0 ? (weightedPositionSum / totalImpressions).toFixed(1) : '0.0';
 
+        // 地域関連キーワード（東京・千葉・横浜・目黒・世田谷など）の抽出
+        const geoKeywordsList = ['東京', '千葉', '目黒', '横浜', '世田谷', '品川', '港区', '渋谷', '川崎', '埼玉', '船橋', '市川'];
+        const geoKeywordPages = keywordPages.filter((kp) =>
+            geoKeywordsList.some((tag) => kp.keyword.includes(tag))
+        ).map((kp) => {
+            const matchedTag = geoKeywordsList.find((tag) => kp.keyword.includes(tag)) || '地域関連';
+            return {
+                ...kp,
+                regionTag: matchedTag,
+            };
+        }).sort((a, b) => b.impressions - a.impressions);
+
         return {
             clicks: totalClicks,
             impressions: totalImpressions,
@@ -168,6 +189,7 @@ export async function fetchSearchConsoleAnalytics(): Promise<SearchConsoleSummar
             averagePosition,
             topQueries,
             keywordPages,
+            geoKeywordPages,
             dailyPerformance,
         };
     } catch (err) {

@@ -26,6 +26,7 @@ import { JohnMarketingConsultDrawer } from '@/components/admin/geo-seo/JohnMarke
 import { WeeklyArticleSuggestionsWidget } from '@/components/admin/geo-seo/WeeklyArticleSuggestionsWidget';
 import { GeneratedArticlesListView } from '@/components/admin/geo-seo/GeneratedArticlesListView';
 import { SeoArticleGeneratorModal } from '@/components/admin/geo-seo/SeoArticleGeneratorModal';
+import { GeoPageTrafficAnalysisCard } from '@/components/admin/geo-seo/GeoPageTrafficAnalysisCard';
 import { ArticleType } from '@/lib/generated-articles-storage';
 
 function SpTrackerContent() {
@@ -203,7 +204,7 @@ function SpTrackerContent() {
                         { id: 'conversion', label: 'CV・顧客分析（スプレッドシート連携）' },
                         { id: 'geo', label: 'GEO分析（AI回答原文 & SOV）' },
                         { id: 'citation_gap', label: '引用元ギャップリスト' },
-                        { id: 'analytics', label: 'GA4 / Search Console' },
+                        { id: 'analytics', label: '📊 GA4 / GSC（地域✕閲覧ページ分析）' },
                         { id: 'settings', label: '設定（KW・プロンプト・Webhook）' },
                     ].map((tab) => {
                         const isActive = activeTab === tab.id;
@@ -255,15 +256,21 @@ function SpTrackerContent() {
                 )}
 
                 {activeTab === 'analytics' && (
-                    <AnalyticsSyncCard
-                        isConfigured={data.config.ga4Configured}
-                        ga4Connected={data.config.ga4Configured}
-                        searchConsoleConnected={data.config.searchConsoleConfigured}
-                        lastSynced="接続稼働中"
-                        ga4Data={data.ga4Data}
-                        searchConsoleData={data.searchConsoleData}
-                        onSync={handleRefreshAll}
-                    />
+                    <div className="space-y-6">
+                        <GeoPageTrafficAnalysisCard
+                            geoPageAnalytics={data.ga4Data?.geoPageAnalytics}
+                            searchConsoleData={data.searchConsoleData}
+                        />
+                        <AnalyticsSyncCard
+                            isConfigured={data.config.ga4Configured}
+                            ga4Connected={data.config.ga4Configured}
+                            searchConsoleConnected={data.config.searchConsoleConfigured}
+                            lastSynced="接続稼働中"
+                            ga4Data={data.ga4Data}
+                            searchConsoleData={data.searchConsoleData}
+                            onSync={handleRefreshAll}
+                        />
+                    </div>
                 )}
 
                 {activeTab === 'settings' && (
