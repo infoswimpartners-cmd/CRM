@@ -26,6 +26,7 @@ interface SeoArticleGeneratorModalProps {
     initialKeyword?: string;
     initialType?: ArticleType;
     initialTargetPath?: string;
+    initialPrompt?: string;
     onArticleSaved?: (article: GeneratedArticle) => void;
 }
 
@@ -35,12 +36,13 @@ export function SeoArticleGeneratorModal({
     initialKeyword = '',
     initialType = 'seo',
     initialTargetPath = '',
+    initialPrompt = '',
     onArticleSaved,
 }: SeoArticleGeneratorModalProps) {
     const [keyword, setKeyword] = useState(initialKeyword);
     const [articleType, setArticleType] = useState<ArticleType>(initialType);
     const [targetPath, setTargetPath] = useState(initialTargetPath);
-    const [customPrompt, setCustomPrompt] = useState('');
+    const [customPrompt, setCustomPrompt] = useState(initialPrompt);
     const [isGenerating, setIsGenerating] = useState(false);
     const [generatedArticle, setGeneratedArticle] = useState<GeneratedArticle | null>(null);
     const [activeTab, setActiveTab] = useState<'preview' | 'html' | 'faq'>('preview');
@@ -48,11 +50,14 @@ export function SeoArticleGeneratorModal({
 
     useEffect(() => {
         if (isOpen) {
-            setKeyword(initialKeyword || 'スイミング 進級の 早い子');
+            setKeyword(initialKeyword || '水泳 息継ぎ コツ 大人');
             setArticleType(initialType || 'seo');
-            setTargetPath(initialTargetPath || '/zUHb45xV/swimming_tips_up');
+            setTargetPath(initialTargetPath || '/articles/adult-swimming-breathing-tips');
+            if (initialPrompt) {
+                setCustomPrompt(initialPrompt);
+            }
         }
-    }, [isOpen, initialKeyword, initialType, initialTargetPath]);
+    }, [isOpen, initialKeyword, initialType, initialTargetPath, initialPrompt]);
 
     if (!isOpen) return null;
 

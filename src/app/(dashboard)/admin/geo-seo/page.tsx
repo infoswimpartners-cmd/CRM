@@ -43,11 +43,18 @@ function SpTrackerContent() {
     const [modalKeyword, setModalKeyword] = useState('');
     const [modalArticleType, setModalArticleType] = useState<ArticleType>('seo');
     const [modalTargetPath, setModalTargetPath] = useState('');
+    const [modalInitialPrompt, setModalInitialPrompt] = useState('');
 
-    const handleOpenGenerator = (keyword: string, type: ArticleType, targetPath?: string) => {
+    const handleOpenGenerator = (
+        keyword: string,
+        type: ArticleType,
+        targetPath?: string,
+        initialPrompt?: string
+    ) => {
         setModalKeyword(keyword);
         setModalArticleType(type);
         setModalTargetPath(targetPath || '');
+        setModalInitialPrompt(initialPrompt || '');
         setIsArticleModalOpen(true);
     };
 
@@ -290,6 +297,7 @@ function SpTrackerContent() {
                 initialKeyword={modalKeyword}
                 initialType={modalArticleType}
                 initialTargetPath={modalTargetPath}
+                initialPrompt={modalInitialPrompt}
             />
 
             {/* 画面右下フローティング: ジョンに相談するFABボタン */}

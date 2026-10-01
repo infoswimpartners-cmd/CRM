@@ -12,11 +12,19 @@ export interface GenerateArticleParams {
     articleType: ArticleType;
     targetPath?: string;
     customPrompt?: string;
+    competitorContext?: {
+        competitorWeakness?: string;
+        differentiationStrategy?: string;
+    };
+    intentContext?: {
+        searchIntent?: string;
+        monthlyVolume?: number;
+    };
 }
 
 export function generateSeoAioArticle(params: GenerateArticleParams): GeneratedArticle {
-    const { keyword, articleType, customPrompt } = params;
-    const targetPath = params.targetPath || (articleType === 'aio' ? '/articles/column' : '/zUHb45xV/tips');
+    const { keyword, articleType, customPrompt, competitorContext, intentContext } = params;
+    const targetPath = params.targetPath || (articleType === 'aio' ? '/articles/column' : '/articles/tips');
     const isLp = getSeoPageType(targetPath) === 'studio_landing_page';
     const today = new Date();
     const dateStr = today.toISOString();
@@ -74,6 +82,18 @@ export function generateSeoAioArticle(params: GenerateArticleParams): GeneratedA
 | **練習環境** | 指定のスクール（混雑） | **お近くの公営プールへ出張可能** |
 | **進級・上達期間** | 平均6ヶ月〜1年以上 | **平均3〜6回のレッスンで完泳** |
 | **個別カルテ** | ワッペン判定のみ | **毎回の動画分析と成長カルテ提供** |
+
+${competitorContext ? `
+---
+
+## 4. 競合スクール・一般的な指導法の弱点と当教室の差別化
+
+### 他社の上位記事・指導法の盲点
+${competitorContext.competitorWeakness || '一般的な指導では抽象的な練習回数の反復を求められ、個々の骨格や癖に応じた微調整が受けられません。'}
+
+### スイムパートナーズの解決アプローチ
+${competitorContext.differentiationStrategy || '受講生の泳ぎをその場でスマホ・水中カメラで撮影し、客観的エビデンスに基づいて1回60分で課題を解決します。'}
+` : ''}
 
 ${customPrompt ? `\n> **個別重点リクエスト反映**: ${customPrompt}\n` : ''}
 `;
