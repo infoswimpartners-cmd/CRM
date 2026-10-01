@@ -23,18 +23,35 @@ import { syncMarketingAnalytics } from '@/actions/marketing';
 import { RefreshCw, MessageSquare, Briefcase } from 'lucide-react';
 import { AiChiefMarketerJohnCard } from '@/components/admin/geo-seo/AiChiefMarketerJohnCard';
 import { JohnMarketingConsultDrawer } from '@/components/admin/geo-seo/JohnMarketingConsultDrawer';
+import { WeeklyArticleSuggestionsWidget } from '@/components/admin/geo-seo/WeeklyArticleSuggestionsWidget';
+import { GeneratedArticlesListView } from '@/components/admin/geo-seo/GeneratedArticlesListView';
+import { SeoArticleGeneratorModal } from '@/components/admin/geo-seo/SeoArticleGeneratorModal';
+import { ArticleType } from '@/lib/generated-articles-storage';
 
 function SpTrackerContent() {
     const searchParams = useSearchParams();
     const tabParam = searchParams.get('tab');
 
-    const [activeTab, setActiveTab] = useState<'seo' | 'geo' | 'citation_gap' | 'conversion' | 'analytics' | 'settings'>('seo');
+    const [activeTab, setActiveTab] = useState<'seo' | 'articles' | 'geo' | 'citation_gap' | 'conversion' | 'analytics' | 'settings'>('seo');
     const [loading, setLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [isFloatingConsultOpen, setIsFloatingConsultOpen] = useState(false);
 
+    // 記事生成モーダル管理
+    const [isArticleModalOpen, setIsArticleModalOpen] = useState(false);
+    const [modalKeyword, setModalKeyword] = useState('');
+    const [modalArticleType, setModalArticleType] = useState<ArticleType>('seo');
+    const [modalTargetPath, setModalTargetPath] = useState('');
+
+    const handleOpenGenerator = (keyword: string, type: ArticleType, targetPath?: string) => {
+        setModalKeyword(keyword);
+        setModalArticleType(type);
+        setModalTargetPath(targetPath || '');
+        setIsArticleModalOpen(true);
+    };
+
     useEffect(() => {
-        if (tabParam && ['seo', 'geo', 'citation_gap', 'conversion', 'analytics', 'settings'].includes(tabParam)) {
+        if (tabParam && ['seo', 'articles', 'geo', 'citation_gap', 'conversion', 'analytics', 'settings'].includes(tabParam)) {
             setActiveTab(tabParam as any);
         }
     }, [tabParam]);
@@ -158,6 +175,11 @@ function SpTrackerContent() {
                 onRefresh={loadDashboard}
             />
 
+            {/* 1.5. 今週の内製化コンテンツ計画（SEO/AIO記事自動提案ウィジェット） */}
+            <WeeklyArticleSuggestionsWidget
+                onOpenGenerator={handleOpenGenerator}
+            />
+
             {/* 2. 週次最優先アクション（Today's / Weekly Action）カード */}
             <SpTrackerHeroActions
                 actions={data.actionRecommendations}
@@ -177,6 +199,7 @@ function SpTrackerContent() {
                 <div className="flex items-center gap-1.5 p-1 bg-zinc-200/60 rounded-xl min-w-max">
                     {[
                         { id: 'seo', label: 'SEO推移（エリア・セグメント）' },
+                        { id: 'articles', label: '📝 記事作成・内製化 (AIO/SEO)' },
                         { id: 'conversion', label: 'CV・顧客分析（スプレッドシート連携）' },
                         { id: 'geo', label: 'GEO分析（AI回答原文 & SOV）' },
                         { id: 'citation_gap', label: '引用元ギャップリスト' },
@@ -210,6 +233,10 @@ function SpTrackerContent() {
                         rankWatchState={data.rankWatchState}
                         onRefresh={loadDashboard}
                     />
+                )}
+
+                {activeTab === 'articles' && (
+                    <GeneratedArticlesListView />
                 )}
 
                 {activeTab === 'conversion' && (
@@ -248,6 +275,15 @@ function SpTrackerContent() {
                     />
                 )}
             </div>
+
+            {/* 記事自動生成モーダル */}
+            <SeoArticleGeneratorModal
+                isOpen={isArticleModalOpen}
+                onClose={() => setIsArticleModalOpen(false)}
+                initialKeyword={modalKeyword}
+                initialType={modalArticleType}
+                initialTargetPath={modalTargetPath}
+            />
 
             {/* 画面右下フローティング: ジョンに相談するFABボタン */}
             <button
