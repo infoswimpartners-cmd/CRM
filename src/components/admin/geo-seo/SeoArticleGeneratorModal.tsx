@@ -117,12 +117,13 @@ export function SeoArticleGeneratorModal({
                                 <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
                                     SEO・AIO記事 自動生成スタジオ
                                 </h2>
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-100 text-amber-900 border border-amber-300">
-                                    ジョン直伝・内製化
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                    Gemini 3.8 Flash 稼働中
                                 </span>
                             </div>
                             <p className="text-xs text-zinc-500 mt-0.5">
-                                検索1位奪取用SEOコンテンツ、またはChatGPT/Perplexity等に引用されるAIO記事を自律生成
+                                最新の Gemini 3.8 Flash が、水泳専門コーチの視点と検索上位ロジックを反映して本格長文記事を自律執筆
                             </p>
                         </div>
                     </div>
@@ -231,7 +232,7 @@ export function SeoArticleGeneratorModal({
                                 className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer"
                             >
                                 <Sparkles className="w-4 h-4 text-amber-300" />
-                                {isGenerating ? 'AIが記事を自動執筆中...' : '記事を自動生成する'}
+                                {isGenerating ? 'Gemini 3.8 Flash が長文記事を執筆中...' : 'Gemini 3.8 Flash で記事を執筆する'}
                             </button>
                         </div>
                     </div>

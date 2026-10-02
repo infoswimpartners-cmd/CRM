@@ -165,12 +165,25 @@ const STRATEGIC_NEW_KEYWORD_OPPORTUNITIES: ArticleSuggestion[] = [
     },
 ];
 
+import { generateArticleWithGeminiFlash } from '@/lib/gemini-article-service';
+
 /**
  * 記事生成アクション
+ * GEMINI_API_KEY が設定されている場合は最高峰の Gemini 3.8 Flash で自律執筆
  */
 export async function generateArticleAction(params: GenerateArticleParams): Promise<{ success: boolean; data?: GeneratedArticle; error?: string }> {
     try {
-        const article = generateSeoAioArticle(params);
+        const apiKey = process.env.GEMINI_API_KEY;
+        let article: GeneratedArticle;
+
+        if (apiKey && apiKey.trim()) {
+            // Gemini 3.8 Flash による本格執筆
+            article = await generateArticleWithGeminiFlash(params, apiKey.trim());
+        } else {
+            // フォールバック（ローカルエンジン）
+            article = generateSeoAioArticle(params);
+        }
+
         await saveGeneratedArticle(article);
         return { success: true, data: article };
     } catch (err: any) {
