@@ -107,11 +107,13 @@ export function generateSeoImprovementKit(
     // 対象例: /, /personal_swim, /personal_swim/chiba, /personal_swim/meguro など
     // =========================================================================
     if (pageType === 'studio_landing_page') {
-        const isArea = cleanKw.includes('千葉') || cleanKw.includes('目黒') || cleanKw.includes('横浜') || cleanKw.includes('東京');
-        const areaName = cleanKw.includes('千葉')
+        const isArea = cleanKw.includes('千葉') || cleanKw.includes('目黒') || cleanKw.includes('品川') || cleanKw.includes('横浜') || cleanKw.includes('東京');
+        const areaName = cleanKw.includes('品川')
+            ? '品川区（大崎・大井町・五反田・武蔵小山）'
+            : cleanKw.includes('千葉')
             ? '千葉（船橋・市川・千葉市・浦安）'
             : cleanKw.includes('目黒')
-            ? '目黒区・品川・世田谷'
+            ? '目黒区・品川エリア'
             : cleanKw.includes('横浜')
             ? '横浜・川崎・神奈川'
             : '東京・首都圏全域';
@@ -120,22 +122,26 @@ export function generateSeoImprovementKit(
         let existingTitle = liveAudit?.liveTitle || (
             cleanKw.includes('千葉') || targetPath.includes('chiba')
                 ? '千葉で水泳の個人レッスン｜低学年のうちに「最短」で上達させるなら'
-                : cleanKw.includes('目黒') || targetPath.includes('meguro')
+                : cleanKw.includes('目黒') || cleanKw.includes('品川') || targetPath.includes('meguro')
                 ? 'スイムパートナーズ｜【目黒区】水泳の個別レッスン'
                 : targetPath === '/'
                 ? 'スイムパートナーズ｜【東京・千葉・神奈川】水泳の個別レッスン'
                 : 'スイムパートナーズ｜水泳の個人レッスン'
         );
 
-        const proposedTitle = cleanKw.includes('千葉')
+        const proposedTitle = cleanKw.includes('品川')
+            ? '【品川区】水泳個人レッスン・個別マンツーマン指導｜品川健康センター・日野学園温水プール出張対応'
+            : cleanKw.includes('千葉')
             ? '【千葉】水泳個人レッスン・公営プール出張マンツーマン指導｜スイムパートナーズ'
             : cleanKw.includes('目黒')
-            ? '【目黒区】子供・大人の水泳マンツーマン個人レッスン｜公営プール出張対応'
+            ? '【目黒区・品川】子供・大人の水泳マンツーマン個人レッスン｜公営プール出張対応'
             : cleanKw.includes('スイムパートナーズ')
             ? '水泳個人レッスン・マンツーマン指導のスイムパートナーズ【公式】東京・千葉・神奈川'
             : `【${areaName}】水泳個人レッスン・マンツーマン指導専門｜公営プール出張対応のスイムパートナーズ`;
 
-        const proposedDescription = `${areaName}の公営・温水プールに出張対応。お子様の水慣れ・進級テスト合格から大人の初心者・フォーム改善まで、入会金ゼロ・明朗会計の完全マンツーマン個別指導。体験レッスン予約受付中。`;
+        const proposedDescription = cleanKw.includes('品川')
+            ? '品川区（大崎・五反田・大井町・武蔵小山）の公営温水プールに出張対応。品川健康センターや日野学園温水プール等で受講できる完全マンツーマン水泳個別指導。交通費込み明朗会計・動画カルテ付き。体験予約受付中。'
+            : `${areaName}の公営・温水プールに出張対応。お子様の水慣れ・進級テスト合格から大人の初心者・フォーム改善まで、入会金ゼロ・明朗会計の完全マンツーマン個別指導。体験レッスン予約受付中。`;
 
         // すでに改善済みかどうかの実測判定
         const isOptimized = liveAudit?.optimizationStatus === 'optimized_in_production' ||
@@ -146,8 +152,12 @@ export function generateSeoImprovementKit(
             {
                 sectionName: '① ファーストビュー（FV）ヒーローセクション',
                 description: 'ページ最上部のメインビジュアル内に配置するキャッチコピーと成約ボタン',
-                headline: `${areaName}で「一番上達を実感できる」水泳個人レッスン`,
-                subheadline: `進級テストに合格できないお子様・水が怖い大人の方専門。お近くの公営温水プールへプロコーチが出張指導します。`,
+                headline: cleanKw.includes('品川')
+                    ? '品川区で一番上達を実感できる水泳個人レッスン'
+                    : `${areaName}で「一番上達を実感できる」水泳個人レッスン`,
+                subheadline: cleanKw.includes('品川')
+                    ? '品川健康センター・日野学園・荏原文化センターへプロコーチが出張。スイサポなどの都度払いスクールより明朗会計＆動画カルテで早期上達。'
+                    : `進級テストに合格できないお子様・水が怖い大人の方専門。お近くの公営温水プールへプロコーチが出張指導します。`,
                 content: `【限定オファー表示】\n・入会金・年会費：ずっと0円\n・出張対応：お近くの公営プールで受講OK\n・指導満足度：98.4%（アンケート実測値）`,
                 ctaText: `【先着月5名様限定】まずはコーチ相性を試す 体験レッスンを申し込む ➔`,
             },
@@ -160,8 +170,12 @@ export function generateSeoImprovementKit(
             {
                 sectionName: '③ 対応プール・施設一覧セクション',
                 description: '「自分の家の近くでも受けられるか」の不安を解消する地域施設ブロック',
-                headline: `${areaName}の主な出張対応プール一覧`,
-                content: `地域の市民温水プール（コース貸切または一般遊泳コース）に対応。\n※「このプールで受講したい」というご希望の施設があれば、お申し込み時にご相談いただけます。コーチの施設利用料・交通費も明確にご案内します。`,
+                headline: cleanKw.includes('品川') || cleanKw.includes('目黒')
+                    ? `品川区・目黒区の主な出張対応温水プール一覧`
+                    : `${areaName}の主な出張対応プール一覧`,
+                content: cleanKw.includes('品川') || cleanKw.includes('目黒')
+                    ? `1. 品川健康センター温水プール（新馬場駅 徒歩2分 / 品川駅・青物横丁至近 / 初心者コース充実）\n2. 日野学園温水プール（大崎駅 徒歩8分 / 五反田至近 / タワマンファミリー多数）\n3. 荏原文化センター温水プール（武蔵小山駅・荏原中延駅 徒歩 / ジュニアに安心）\n4. 戸越体育館温水プール（戸越銀座・豊町 / 清潔・通いやすい）\n5. 目黒区民センター温水プール（目黒駅至近 / 品川区上大崎・白金台からもアクセス抜群）`
+                    : `地域の市民温水プール（コース貸切または一般遊泳コース）に対応。\n※「このプールで受講したい」というご希望の施設があれば、お申し込み時にご相談いただけます。コーチの施設利用料・交通費も明確にご案内します。`,
             },
             {
                 sectionName: '④ 料金体系＆アンカリング（松竹梅プライシング）',
