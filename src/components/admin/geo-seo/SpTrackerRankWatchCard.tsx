@@ -25,6 +25,8 @@ import {
     Globe,
     AlertCircle,
     PlusCircle,
+    Zap,
+    Bot,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { SeoRankWatchState, ImprovementLogEntry, SeoActionTask } from '@/lib/seo-rank-watch';
@@ -34,6 +36,7 @@ import {
     markAsAchievedAction,
     completeObservingAction,
     fetchSeoImprovementKitAction,
+    optimizeKitWithGeminiAction,
 } from '@/actions/sp-tracker-actions';
 
 interface SpTrackerRankWatchCardProps {
@@ -83,6 +86,7 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
     const [copiedField, setCopiedField] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isAnalyzingLivePage, setIsAnalyzingLivePage] = useState(false);
+    const [isAiOptimizing, setIsAiOptimizing] = useState(false);
 
     // 楽観的UI更新用のローカルアクション状態（初期値にもLocalStorageの実行済み情報を即座に反映）
     const [localActions, setLocalActions] = useState<SeoActionTask[]>(() => {
@@ -146,7 +150,7 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
         }
     };
 
-    // STUDIO改善キットを開く（最新のライブページ情報をリアルタイム取得）
+    // STUDIO改善キットを開く（最新のライブページ情報 ✕ Gemini 3.8 Flash リアルタイム最適化）
     const handleOpenKit = async (keyword: string, targetPath: string, currentRank: number, forceRefresh = false) => {
         // まず同期的にベースキットをセットして即座にモーダルを表示（待ち時間ゼロの快適UI）
         const baseKit = generateSeoImprovementKit(keyword, targetPath, currentRank);
@@ -154,20 +158,47 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
         setKitActiveTab('content');
         setIsKitModalOpen(true);
         setIsAnalyzingLivePage(true);
+        setIsAiOptimizing(true);
 
-        // サーバーアクションで最新の公開ページ実測データをフェッチ
+        // サーバーアクションで最新の公開ページ実測データおよびGemini 3.8 FlashによるAI最適化をフェッチ
         try {
-            const res = await fetchSeoImprovementKitAction(keyword, targetPath, currentRank, forceRefresh);
+            const res = await optimizeKitWithGeminiAction(keyword, targetPath, currentRank, forceRefresh);
             if (res.success && res.data) {
                 setActiveKit(res.data);
-                if (forceRefresh) {
-                    toast.success('最新のWebページ情報を再取得・分析しました');
+                if (res.isAiGenerated) {
+                    toast.success('⚡ Gemini 3.8 Flash でリアルタイムAI最適化しました');
+                } else if (forceRefresh) {
+                    toast.info(res.message);
                 }
             }
         } catch (e) {
-            console.warn('Live audit fetch error:', e);
+            console.warn('Live audit / AI fetch error:', e);
         } finally {
             setIsAnalyzingLivePage(false);
+            setIsAiOptimizing(false);
+        }
+    };
+
+    // Gemini 3.8 Flash でリアルタイムAI再推論・最適化
+    const handleAiOptimizeKit = async (keyword: string, targetPath: string, currentRank: number, forceRefresh = true) => {
+        setIsAiOptimizing(true);
+        try {
+            const res = await optimizeKitWithGeminiAction(keyword, targetPath, currentRank, forceRefresh);
+            if (res.success && res.data) {
+                setActiveKit(res.data);
+                if (res.isAiGenerated) {
+                    toast.success('⚡ Gemini 3.8 Flash によるリアルタイムAI最適化が完了しました！');
+                } else {
+                    toast.info(res.message);
+                }
+            } else {
+                toast.error(res.message || 'AI最適化に失敗しました');
+            }
+        } catch (err: any) {
+            console.error('AI optimize error:', err);
+            toast.error(err.message || 'AI最適化中にエラーが発生しました');
+        } finally {
+            setIsAiOptimizing(false);
         }
     };
 
@@ -700,6 +731,11 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                                         <span className="text-xs text-zinc-600 font-mono">
                                             現在 <strong className="text-slate-900 font-bold">{activeKit.currentRank}位</strong> ➔ 目標 <strong className="text-amber-600 font-bold">1位</strong>
                                         </span>
+                                        {activeKit.isAiGenerated && (
+                                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-purple-50 text-purple-700 border border-purple-300 flex items-center gap-1 shadow-xs">
+                                                <Zap className="w-3 h-3 text-amber-500 fill-amber-500" /> ⚡ Gemini 3.8 Flash 最適化
+                                            </span>
+                                        )}
                                         {activeKit.isAlreadyOptimized && (
                                             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-300 flex items-center gap-1">
                                                 <CheckCircle2 className="w-3 h-3 text-emerald-600" /> 本番反映済み（検証中）
@@ -709,18 +745,27 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                                     <h3 className="text-lg sm:text-2xl font-black text-slate-900 tracking-tight leading-tight">
                                         「{activeKit.keyword}」1位獲得改善キット
                                     </h3>
-                                    <div className="flex flex-wrap items-center gap-3 text-xs text-zinc-600">
+                                    <div className="flex flex-wrap items-center gap-2.5 text-xs text-zinc-600">
                                         <span className="break-all">
                                             対象: <a href={`https://swim-partners.com${activeKit.targetPath}`} target="_blank" rel="noreferrer" className="font-mono text-indigo-600 hover:underline inline-flex items-center gap-1 font-semibold">{activeKit.targetPath} <ExternalLink className="w-3 h-3" /></a>
                                         </span>
                                         <button
+                                            onClick={() => handleAiOptimizeKit(activeKit.keyword, activeKit.targetPath, activeKit.currentRank, true)}
+                                            disabled={isAiOptimizing}
+                                            className="px-3 py-1 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-[11px] font-bold flex items-center gap-1.5 transition-all shadow-xs disabled:opacity-50"
+                                            title="Gemini 3.8 Flash に実測データ・競合情報を送りリアルタイム再推論"
+                                        >
+                                            <Zap className={`w-3.5 h-3.5 ${isAiOptimizing ? 'animate-bounce text-amber-300' : 'text-amber-300 fill-amber-300'}`} />
+                                            {isAiOptimizing ? 'Gemini 3.8 Flash AI再推論中...' : '⚡ Gemini 3.8 Flash でリアルタイムAI再推論'}
+                                        </button>
+                                        <button
                                             onClick={() => handleOpenKit(activeKit.keyword, activeKit.targetPath, activeKit.currentRank, true)}
-                                            disabled={isAnalyzingLivePage}
+                                            disabled={isAnalyzingLivePage || isAiOptimizing}
                                             className="px-2.5 py-1 rounded-lg bg-white border border-zinc-200 hover:bg-zinc-50 text-[11px] font-bold text-zinc-700 flex items-center gap-1 transition-all shadow-xs disabled:opacity-50"
                                             title="公開サイトの最新HTMLを再取得して分析"
                                         >
                                             <RefreshCw className={`w-3 h-3 ${isAnalyzingLivePage ? 'animate-spin text-indigo-600' : 'text-zinc-500'}`} />
-                                            {isAnalyzingLivePage ? '最新情報取得中...' : '最新ページ情報を強制再取得'}
+                                            {isAnalyzingLivePage ? '実測取得中...' : 'ページHTML再取得'}
                                         </button>
                                     </div>
                                 </div>
@@ -732,6 +777,37 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                                     <X className="w-5 h-5" />
                                 </button>
                             </div>
+
+                            {/* Gemini 3.8 Flash リアルタイムAIマーケター戦略インサイト */}
+                            {activeKit.aiInsights && (
+                                <div className={`mt-3.5 p-3.5 sm:p-4 rounded-xl border text-xs shadow-xs transition-all ${
+                                    activeKit.isAiGenerated
+                                        ? 'bg-gradient-to-r from-purple-50/90 via-indigo-50/80 to-blue-50/90 border-purple-200 text-purple-950'
+                                        : 'bg-zinc-50 border-zinc-200 text-zinc-800'
+                                }`}>
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-purple-200/60 pb-2 mb-2">
+                                        <div className="flex items-center gap-2">
+                                            <span className="p-1 rounded-md bg-purple-600 text-white shadow-xs">
+                                                <Zap className="w-3.5 h-3.5 fill-amber-300 text-amber-300" />
+                                            </span>
+                                            <span className="font-bold text-sm text-purple-950 flex items-center gap-1.5">
+                                                プロマーケター戦略インサイト
+                                                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 border border-purple-300 font-bold">
+                                                    {activeKit.isAiGenerated ? '⚡ Gemini 3.8 Flash リアルタイム推論' : '標準最適化ルール'}
+                                                </span>
+                                            </span>
+                                        </div>
+                                        {activeKit.competitorAnalysis && (
+                                            <span className="text-[11px] text-purple-700 font-medium">
+                                                {activeKit.competitorAnalysis}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <p className="text-xs text-purple-900 leading-relaxed font-sans">
+                                        {activeKit.aiInsights}
+                                    </p>
+                                </div>
+                            )}
 
                             {/* 対象ページが存在しない（404・未作成）場合の新規作成ガイダンス */}
                             {activeKit.isNewPageRecommended && (
@@ -823,11 +899,20 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                                         <div className="space-y-4">
                                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200">
                                                 <div>
-                                                    <div className="font-bold text-amber-900 text-sm flex items-center gap-2">
-                                                        <Sparkles className="w-4 h-4 text-amber-600" />
+                                                    <div className="font-bold text-slate-900 text-sm flex flex-wrap items-center gap-2">
+                                                        {activeKit.isAiGenerated ? (
+                                                            <Zap className="w-4 h-4 text-purple-600 fill-amber-300" />
+                                                        ) : (
+                                                            <Sparkles className="w-4 h-4 text-amber-600" />
+                                                        )}
                                                         STUDIO通常デザイン編集用 LPセクション改善案（CVR・成約特化）
+                                                        {activeKit.isAiGenerated && (
+                                                            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-100 text-purple-800 border border-purple-300">
+                                                                Gemini 3.8 Flash 最適化
+                                                            </span>
+                                                        )}
                                                     </div>
-                                                    <div className="text-xs text-amber-800 mt-1">
+                                                    <div className="text-xs text-zinc-700 mt-1">
                                                         LPの各構成要素（FV・強み・料金・CTA・FAQ）ごとに最適なテキストを提供しています。各枠右上のコピーボタンをご利用ください。
                                                     </div>
                                                 </div>
@@ -874,7 +959,16 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
 
                                                         <div className="space-y-2 text-xs">
                                                             <div className="p-2.5 rounded-lg bg-zinc-50 border border-zinc-200/60">
-                                                                <div className="text-[10px] font-mono text-zinc-500 font-bold mb-0.5">見出し (Headline)</div>
+                                                                <div className="flex items-center justify-between mb-0.5">
+                                                                    <div className="text-[10px] font-mono text-zinc-500 font-bold">見出し (Headline)</div>
+                                                                    <button
+                                                                        onClick={() => handleCopy(block.headline, `headline_${idx}`, `${block.sectionName} 見出し`)}
+                                                                        className="text-[10px] text-indigo-600 hover:text-indigo-800 flex items-center gap-1 font-semibold"
+                                                                    >
+                                                                        {copiedField === `headline_${idx}` ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                                                                        見出しのみコピー
+                                                                    </button>
+                                                                </div>
                                                                 <div className="text-slate-900 font-bold text-sm leading-snug">{block.headline}</div>
                                                                 {block.subheadline && (
                                                                     <div className="text-zinc-600 text-xs mt-1">{block.subheadline}</div>
@@ -888,11 +982,62 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                                                             {block.ctaText && (
                                                                 <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 font-medium flex items-center justify-between">
                                                                     <span>ボタン文面（CTA）: <strong>{block.ctaText}</strong></span>
+                                                                    <button
+                                                                        onClick={() => handleCopy(block.ctaText || '', `cta_${idx}`, 'CTAボタン文面')}
+                                                                        className="px-2 py-1 rounded bg-amber-200 hover:bg-amber-300 text-amber-950 text-[10px] font-bold flex items-center gap-1 transition-colors"
+                                                                    >
+                                                                        {copiedField === `cta_${idx}` ? <Check className="w-3 h-3 text-emerald-800" /> : <Copy className="w-3 h-3" />}
+                                                                        ボタンのみコピー
+                                                                    </button>
                                                                 </div>
                                                             )}
                                                         </div>
                                                     </div>
                                                 ))}
+
+                                                {/* LP末尾 よくある質問（FAQアコーディオン）ブロック */}
+                                                {activeKit.faqItems && activeKit.faqItems.length > 0 && (
+                                                    <div className="p-4 rounded-xl bg-white border border-zinc-200/90 shadow-xs space-y-3">
+                                                        <div className="flex items-start justify-between gap-2 border-b border-zinc-100 pb-2.5">
+                                                            <div>
+                                                                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-zinc-100 text-zinc-700 border border-zinc-200 mr-2">
+                                                                    BLOCK 6
+                                                                </span>
+                                                                <span className="font-bold text-slate-900 text-sm">⑥ LP末尾 よくある質問（FAQアコーディオン）</span>
+                                                                <p className="text-[11px] text-zinc-500 mt-0.5">不安や疑問を解消し体験予約の離脱を防ぐFAQセクション</p>
+                                                            </div>
+                                                            <button
+                                                                onClick={() => handleCopy(
+                                                                    activeKit.faqItems.map((f, i) => `Q${i + 1}. ${f.question}\nA. ${f.answer}`).join('\n\n'),
+                                                                    'lp_faq_all',
+                                                                    'LP FAQ全項目'
+                                                                )}
+                                                                className="px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-xs font-semibold flex items-center gap-1.5 transition-colors border border-zinc-200 flex-shrink-0"
+                                                            >
+                                                                {copiedField === 'lp_faq_all' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                                                                FAQ一括コピー
+                                                            </button>
+                                                        </div>
+
+                                                        <div className="space-y-2 text-xs">
+                                                            {activeKit.faqItems.map((faq, fIdx) => (
+                                                                <div key={fIdx} className="p-3 rounded-lg bg-zinc-50 border border-zinc-200/60 space-y-1">
+                                                                    <div className="flex items-center justify-between">
+                                                                        <span className="font-bold text-slate-900 text-xs">Q{fIdx + 1}. {faq.question}</span>
+                                                                        <button
+                                                                            onClick={() => handleCopy(`Q. ${faq.question}\nA. ${faq.answer}`, `faq_${fIdx}`, `FAQ ${fIdx + 1}`)}
+                                                                            className="text-[10px] text-indigo-600 hover:text-indigo-800 flex items-center gap-1 font-semibold flex-shrink-0"
+                                                                        >
+                                                                            {copiedField === `faq_${fIdx}` ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                                                                            コピー
+                                                                        </button>
+                                                                    </div>
+                                                                    <div className="text-zinc-600 text-xs pl-3 border-l-2 border-indigo-200 mt-1">{faq.answer}</div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     ) : (
@@ -900,9 +1045,18 @@ export function SpTrackerRankWatchCard({ state, onRefresh }: SpTrackerRankWatchC
                                         <div className="space-y-4">
                                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl bg-purple-50 border border-purple-200">
                                                 <div>
-                                                    <div className="font-bold text-purple-900 text-sm flex items-center gap-2">
-                                                        <FileText className="w-4 h-4 text-purple-600" />
+                                                    <div className="font-bold text-purple-900 text-sm flex flex-wrap items-center gap-2">
+                                                        {activeKit.isAiGenerated ? (
+                                                            <Zap className="w-4 h-4 text-purple-600 fill-amber-300" />
+                                                        ) : (
+                                                            <FileText className="w-4 h-4 text-purple-600" />
+                                                        )}
                                                         STUDIO CMS記事リッチテキスト用 追記テキスト
+                                                        {activeKit.isAiGenerated && (
+                                                            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-100 text-purple-800 border border-purple-300">
+                                                                Gemini 3.8 Flash 最適化
+                                                            </span>
+                                                        )}
                                                     </div>
                                                     <div className="text-xs text-purple-800 mt-1">
                                                         既存の記事末尾に貼り付けるだけで、検索意図を満たすFAQおよび体験レッスンLP誘導CTAが完成します。

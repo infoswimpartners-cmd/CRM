@@ -37,6 +37,7 @@ import {
 import { SpreadsheetAnalyticsData } from '@/lib/spreadsheet-types';
 import { getLivePageAudit, LivePageAuditResult } from '@/lib/page-audit';
 import { generateSeoImprovementKit, SeoImprovementKit } from '@/lib/seo-improvement-generator';
+import { optimizeImprovementKitWithGemini } from '@/lib/gemini-kit-optimizer';
 
 export interface SpTrackerDashboardData {
     statusMeters: {
@@ -771,5 +772,71 @@ export async function fetchSeoImprovementKitAction(
         return { success: true, data: fallbackKit };
     }
 }
+
+/**
+ * Gemini 3.8 Flash を用いてSEO改善キットをリアルタイム再推論・最適化するServer Action
+ * GEMINI_API_KEY がある場合は最新実測Auditデータと競合情報を元に動的生成を行い、
+ * APIキーがない場合またはエラー時は高品質デフォルトテンプレートを安全に返却するハイブリッド設計
+ */
+export async function optimizeKitWithGeminiAction(
+    keyword: string,
+    targetPath: string,
+    currentRank = 2,
+    forceRefresh = false
+): Promise<{ success: boolean; data?: SeoImprovementKit; isAiGenerated: boolean; message: string }> {
+    try {
+        const audit = await getLivePageAudit(targetPath, keyword, forceRefresh).catch(() => undefined);
+        const apiKey = process.env.GEMINI_API_KEY;
+
+        if (apiKey && apiKey.trim()) {
+            try {
+                const aiKit = await optimizeImprovementKitWithGemini(
+                    {
+                        keyword,
+                        targetPath,
+                        currentRank,
+                        liveAudit: audit,
+                        competitorInfo: '競合スイサポ（都度払い・高額施設利用料・指導密度のバラツキ）および大手集団スクール（1対10の一斉指導・実際の泳ぎ時間5分未満）',
+                    },
+                    apiKey.trim()
+                );
+                return {
+                    success: true,
+                    data: aiKit,
+                    isAiGenerated: true,
+                    message: 'Gemini 3.8 Flash によるリアルタイム最適化が完了しました',
+                };
+            } catch (aiErr: any) {
+                console.warn('Gemini 3.8 Flash optimization error, falling back to default:', aiErr);
+                const fallbackKit = generateSeoImprovementKit(keyword, targetPath, currentRank, audit);
+                return {
+                    success: true,
+                    data: fallbackKit,
+                    isAiGenerated: false,
+                    message: `Gemini APIエラーのため、高品質標準テンプレートを適用しました (${aiErr.message || 'Error'})`,
+                };
+            }
+        }
+
+        // APIキー未設定時のハイブリッド・フォールバック
+        const defaultKit = generateSeoImprovementKit(keyword, targetPath, currentRank, audit);
+        return {
+            success: true,
+            data: defaultKit,
+            isAiGenerated: false,
+            message: 'GEMINI_API_KEY が未設定のため、高品質標準テンプレートを適用しました',
+        };
+    } catch (err: any) {
+        console.error('optimizeKitWithGeminiAction fatal error:', err);
+        const fallback = generateSeoImprovementKit(keyword, targetPath, currentRank);
+        return {
+            success: true,
+            data: fallback,
+            isAiGenerated: false,
+            message: '標準テンプレートを表示します',
+        };
+    }
+}
+
 
 

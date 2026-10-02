@@ -67,6 +67,12 @@ export interface SeoImprovementKit {
     // 新規ページ作成ガイダンス
     isNewPageRecommended?: boolean;
     suggestedSlug?: string;
+
+    // Gemini 3.8 Flash AI生成メタデータ
+    isAiGenerated?: boolean;
+    aiModel?: string;
+    aiInsights?: string;
+    competitorAnalysis?: string;
 }
 
 /**
@@ -341,6 +347,9 @@ ${lpBlocks[4].ctaText}
             optimizationStatus: isNewPageRecommended ? 'needs_optimization' : (liveAudit?.optimizationStatus || (isOptimized ? 'optimized_in_production' : 'needs_optimization')),
             isNewPageRecommended,
             suggestedSlug,
+            isAiGenerated: false,
+            aiModel: 'デフォルト最適化ルールエンジン',
+            aiInsights: `「${cleanKw}」の検索意図に基づき、集客LPのFV訴求・3つの選ばれる理由・出張公営プール一覧を標準構成で最適化しています。`,
         };
     }
 
@@ -520,5 +529,8 @@ ${faqItems
         liveAudit,
         isAlreadyOptimized: isCmsOptimized,
         optimizationStatus: liveAudit?.optimizationStatus || (isCmsOptimized ? 'optimized_in_production' : 'needs_optimization'),
+        isAiGenerated: false,
+        aiModel: 'デフォルト最適化ルールエンジン',
+        aiInsights: `「${cleanKw}」の検索意図に基づき、CMS記事タイトルのキーワード補正とFAQ追記を標準構成で最適化しています。`,
     };
 }
