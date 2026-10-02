@@ -206,7 +206,7 @@ function SpTrackerContent() {
             <div className="w-full overflow-x-auto no-scrollbar pb-1">
                 <div className="flex items-center gap-1.5 p-1 bg-zinc-200/60 rounded-xl min-w-max">
                     {[
-                        { id: 'seo', label: 'SEO推移（エリア・セグメント）' },
+                        { id: 'seo', label: '📍 SEO推移 ＆ 商圏エリア別SEO診断' },
                         { id: 'articles', label: '📝 記事作成・内製化 (AIO/SEO)' },
                         { id: 'conversion', label: 'CV・顧客分析（スプレッドシート連携）' },
                         { id: 'geo', label: 'GEO分析（AI回答原文 & SOV）' },
@@ -240,6 +240,7 @@ function SpTrackerContent() {
                         searchConsoleData={data.searchConsoleData}
                         rankWatchState={data.rankWatchState}
                         onRefresh={loadDashboard}
+                        onOpenGenerator={handleOpenGenerator}
                     />
                 )}
 

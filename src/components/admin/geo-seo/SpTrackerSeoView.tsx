@@ -7,15 +7,29 @@ import { Search, ArrowUp, ArrowDown, Minus, ExternalLink, Filter, Trophy, Hourgl
 import { syncGscRanksAction } from '@/actions/sp-tracker-actions';
 import { toast } from 'sonner';
 import { SpTrackerGrowthCharts } from './SpTrackerGrowthCharts';
+import { SpTrackerAreaSeoAuditCard } from './SpTrackerAreaSeoAuditCard';
+import { ArticleType } from '@/lib/generated-articles-storage';
 
 interface SpTrackerSeoViewProps {
     keywords: KeywordItem[];
     searchConsoleData?: any;
     rankWatchState?: SeoRankWatchState;
     onRefresh?: () => Promise<void>;
+    onOpenGenerator?: (
+        keyword: string,
+        type: ArticleType,
+        targetPath?: string,
+        initialPrompt?: string
+    ) => void;
 }
 
-export function SpTrackerSeoView({ keywords, searchConsoleData, rankWatchState, onRefresh }: SpTrackerSeoViewProps) {
+export function SpTrackerSeoView({
+    keywords,
+    searchConsoleData,
+    rankWatchState,
+    onRefresh,
+    onOpenGenerator,
+}: SpTrackerSeoViewProps) {
     const [areaFilter, setAreaFilter] = useState<string>('all');
     const [targetFilter, setTargetFilter] = useState<string>('all');
     const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -80,9 +94,11 @@ export function SpTrackerSeoView({ keywords, searchConsoleData, rankWatchState, 
 
     const getAreaLabel = (area: string) => {
         switch (area) {
-            case 'tokyo_23': return '東京23区';
-            case 'kanagawa': return '神奈川・横浜';
-            case 'chiba': return '千葉';
+            case 'tokyo_23': return '東京23区（目黒・世田谷）';
+            case 'tokyo_tama': return '多摩・八王子';
+            case 'kanagawa': return '神奈川（横浜・八景・川崎）';
+            case 'chiba': return '千葉（浦安・市川・船橋・千葉市）';
+            case 'saitama': return '埼玉（さいたま・川口）';
             default: return area;
         }
     };
@@ -164,6 +180,9 @@ export function SpTrackerSeoView({ keywords, searchConsoleData, rankWatchState, 
                 </div>
             )}
 
+            {/* 2.5. 商圏エリア別 SEO対策状況・診断ダッシュボード（東京23区・神奈川・八景・千葉各市・八王子など） */}
+            <SpTrackerAreaSeoAuditCard onOpenGenerator={onOpenGenerator} />
+
             {/* 3. キーワード順位推移テーブル */}
             <div className="bg-white rounded-2xl border border-zinc-200/80 p-4 sm:p-6 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] space-y-6">
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between pb-4 border-b border-zinc-100 gap-4">
@@ -195,9 +214,9 @@ export function SpTrackerSeoView({ keywords, searchConsoleData, rankWatchState, 
                             className="px-3 py-2.5 rounded-xl border border-zinc-200 bg-zinc-50 text-zinc-800 font-medium focus:outline-none shadow-xs text-xs"
                         >
                             <option value="all">全エリア</option>
-                            <option value="tokyo_23">東京23区</option>
-                            <option value="kanagawa">神奈川</option>
-                            <option value="chiba">千葉</option>
+                            <option value="tokyo_23">東京23区（目黒・世田谷）</option>
+                            <option value="kanagawa">神奈川（横浜・八景・川崎）</option>
+                            <option value="chiba">千葉（浦安・市川・船橋・千葉市）</option>
                         </select>
 
                         <select
