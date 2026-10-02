@@ -174,5 +174,16 @@
     "current_rank": 7,
     "area_category": "tokyo_23",
     "target_category": "triathlon"
+  },
+  {
+    "id": 17,
+    "keyword": "水泳 個人レッスン 品川",
+    "target_path": "/personal_swim/meguro",
+    "priority": "high",
+    "status": "active",
+    "target_rank": 1,
+    "current_rank": 5,
+    "area_category": "tokyo_23",
+    "target_category": "adult"
   }
 ]
