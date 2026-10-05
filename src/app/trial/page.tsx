@@ -40,7 +40,54 @@ export default function BookingForm() {
     agreed: false
   });
   
+  // 生年月日（年・月・日）の個別state
+  const [dobParts, setDobParts] = useState({
+    year: "",
+    month: "",
+    day: ""
+  });
+  const [dob2Parts, setDob2Parts] = useState({
+    year: "",
+    month: "",
+    day: ""
+  });
+
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // 生年月日の更新ハンドラ
+  const handleDobChange = (person: 1 | 2, field: "year" | "month" | "day", value: string) => {
+    if (person === 1) {
+      const nextParts = { ...dobParts, [field]: value };
+      setDobParts(nextParts);
+      if (nextParts.year && nextParts.month && nextParts.day) {
+        const formatted = `${nextParts.year}-${nextParts.month.padStart(2, "0")}-${nextParts.day.padStart(2, "0")}`;
+        setFormData(prev => ({ ...prev, dob: formatted }));
+      } else {
+        setFormData(prev => ({ ...prev, dob: "" }));
+      }
+    } else {
+      const nextParts = { ...dob2Parts, [field]: value };
+      setDob2Parts(nextParts);
+      if (nextParts.year && nextParts.month && nextParts.day) {
+        const formatted = `${nextParts.year}-${nextParts.month.padStart(2, "0")}-${nextParts.day.padStart(2, "0")}`;
+        setFormData(prev => ({ ...prev, dob2: formatted }));
+      } else {
+        setFormData(prev => ({ ...prev, dob2: "" }));
+      }
+    }
+  };
+
+  // 年の選択肢（今年から1930年まで降順、和暦も併記）
+  const currentYear = new Date().getFullYear();
+  const getJapaneseEra = (year: number) => {
+    if (year >= 2019) return `令和${year - 2018 === 1 ? "元" : year - 2018}年`;
+    if (year >= 1989) return `平成${year - 1988 === 1 ? "元" : year - 1988}年`;
+    if (year >= 1926) return `昭和${year - 1925 === 1 ? "元" : year - 1925}年`;
+    return "";
+  };
+  const years = Array.from({ length: currentYear - 1930 + 1 }, (_, i) => currentYear - i);
+  const months = Array.from({ length: 12 }, (_, i) => i + 1);
+  const days = Array.from({ length: 31 }, (_, i) => i + 1);
 
   // 1. 画面ロード時にLIFFを初期化し、LINE IDを取得
   useEffect(() => {
@@ -57,6 +104,32 @@ export default function BookingForm() {
           const profile = await liff.getProfile();
           setUserId(profile.userId);
           setIsLiffReady(true);
+
+          // LIFFアクセスログの記録と閲覧タグ（trial_form_viewed）の自動付与（非同期・ノンブロッキング）
+          try {
+            const urlParams = new URLSearchParams(window.location.search);
+            const refFromUrl = urlParams.get("ref") || urlParams.get("referrer") || "";
+            if (refFromUrl) {
+              setFormData(prev => prev.referrerName ? prev : { ...prev, referrerName: refFromUrl });
+            }
+
+            fetch("/api/liff-tracking", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                userId: profile.userId,
+                displayName: profile.displayName || undefined,
+                formType: "trial",
+                pageUrl: window.location.href,
+                utmSource: urlParams.get("utm_source") || undefined,
+                utmMedium: urlParams.get("utm_medium") || undefined,
+                utmCampaign: urlParams.get("utm_campaign") || undefined,
+                referrerName: refFromUrl || undefined,
+              }),
+            }).catch(() => {});
+          } catch {
+            // トラッキングの失敗はユーザーのフォーム表示・入力を阻害しない
+          }
         } else {
           const redirectUri = window.location.origin + window.location.pathname;
           // リダイレクトがブロックされた場合のためにメッセージを表示
@@ -105,6 +178,15 @@ export default function BookingForm() {
     e.preventDefault();
     
     // バリデーション
+    if (!formData.dob) {
+      alert("生年月日を選択してください。");
+      return;
+    }
+    // 2人目について、いずれか1つでも入力されている場合は年・月・日のすべてが選択されているか確認
+    if ((dob2Parts.year || dob2Parts.month || dob2Parts.day) && !formData.dob2) {
+      alert("2人目の生年月日を年・月・日まで正確に選択してください。");
+      return;
+    }
     if (formData.email !== formData.emailConfirm) {
       alert("メールアドレスが一致しません。");
       return;
@@ -241,10 +323,46 @@ export default function BookingForm() {
           <input type="text" name="kana" value={formData.kana} onChange={handleChange} required placeholder="例：ヤマダ タロウ" style={inputStyle} />
         </label>
 
-        <label style={labelStyle}>
-          生年月日:
-          <input type="date" name="dob" value={formData.dob} onChange={handleChange} required style={inputStyle} />
-        </label>
+        <div style={labelStyle}>
+          <span>生年月日: <span style={{ color: "red", fontSize: "12px" }}>※必須</span></span>
+          <div style={{ display: "flex", gap: "6px", marginTop: "6px", alignItems: "center" }}>
+            <select
+              value={dobParts.year}
+              onChange={(e) => handleDobChange(1, "year", e.target.value)}
+              required
+              style={{ ...inputStyle, marginTop: 0, flex: "1.4", minWidth: 0, padding: "12px 6px" }}
+            >
+              <option value="">年</option>
+              {years.map(y => (
+                <option key={y} value={y}>
+                  {y}年{getJapaneseEra(y) ? ` (${getJapaneseEra(y)})` : ""}
+                </option>
+              ))}
+            </select>
+            <select
+              value={dobParts.month}
+              onChange={(e) => handleDobChange(1, "month", e.target.value)}
+              required
+              style={{ ...inputStyle, marginTop: 0, flex: "1", minWidth: 0, padding: "12px 6px" }}
+            >
+              <option value="">月</option>
+              {months.map(m => (
+                <option key={m} value={m}>{m}月</option>
+              ))}
+            </select>
+            <select
+              value={dobParts.day}
+              onChange={(e) => handleDobChange(1, "day", e.target.value)}
+              required
+              style={{ ...inputStyle, marginTop: 0, flex: "1", minWidth: 0, padding: "12px 6px" }}
+            >
+              <option value="">日</option>
+              {days.map(d => (
+                <option key={d} value={d}>{d}日</option>
+              ))}
+            </select>
+          </div>
+        </div>
 
         <label style={labelStyle}>
           性別:
@@ -268,10 +386,43 @@ export default function BookingForm() {
           <input type="text" name="kana2" value={formData.kana2} onChange={handleChange} placeholder="例：ヤマダ ハナコ" style={inputStyle} />
         </label>
 
-        <label style={labelStyle}>
-          生年月日（2人目）:
-          <input type="date" name="dob2" value={formData.dob2} onChange={handleChange} style={inputStyle} />
-        </label>
+        <div style={labelStyle}>
+          <span>生年月日（2人目）:</span>
+          <div style={{ display: "flex", gap: "6px", marginTop: "6px", alignItems: "center" }}>
+            <select
+              value={dob2Parts.year}
+              onChange={(e) => handleDobChange(2, "year", e.target.value)}
+              style={{ ...inputStyle, marginTop: 0, flex: "1.4", minWidth: 0, padding: "12px 6px" }}
+            >
+              <option value="">年</option>
+              {years.map(y => (
+                <option key={y} value={y}>
+                  {y}年{getJapaneseEra(y) ? ` (${getJapaneseEra(y)})` : ""}
+                </option>
+              ))}
+            </select>
+            <select
+              value={dob2Parts.month}
+              onChange={(e) => handleDobChange(2, "month", e.target.value)}
+              style={{ ...inputStyle, marginTop: 0, flex: "1", minWidth: 0, padding: "12px 6px" }}
+            >
+              <option value="">月</option>
+              {months.map(m => (
+                <option key={m} value={m}>{m}月</option>
+              ))}
+            </select>
+            <select
+              value={dob2Parts.day}
+              onChange={(e) => handleDobChange(2, "day", e.target.value)}
+              style={{ ...inputStyle, marginTop: 0, flex: "1", minWidth: 0, padding: "12px 6px" }}
+            >
+              <option value="">日</option>
+              {days.map(d => (
+                <option key={d} value={d}>{d}日</option>
+              ))}
+            </select>
+          </div>
+        </div>
 
         <label style={labelStyle}>
           性別（2人目）:
