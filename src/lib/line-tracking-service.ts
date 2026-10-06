@@ -19,6 +19,7 @@ import {
 
 // 定数: デフォルト標準タグ
 export const STANDARD_TAGS = {
+    TRIAL_DONE: 'trial_done',              // 体験レッスン受講済
     FORM_VIEWED: 'trial_form_viewed',      // 体験申込フォーム閲覧
     FORM_APPLIED: 'trial_applied',         // 体験申込完了
     FRIEND_ONLY: 'friend_only',            // 友だち追加のみ
@@ -26,6 +27,11 @@ export const STANDARD_TAGS = {
 } as const;
 
 export const TAG_LABELS: Record<string, { label: string; category: string; description: string }> = {
+    [STANDARD_TAGS.TRIAL_DONE]: {
+        label: '体験受講後',
+        category: 'status',
+        description: '体験レッスンを受講完了した生徒'
+    },
     [STANDARD_TAGS.FORM_VIEWED]: {
         label: '体験フォーム閲覧',
         category: 'behavior',

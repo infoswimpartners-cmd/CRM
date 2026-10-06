@@ -543,7 +543,10 @@ export async function fetchAndFilterMarketingStudents(
             trialDate = trialLesson.lesson_date;
         }
 
-        const studentTags = s.line_user_id ? (userTagsMap.get(s.line_user_id) || []) : [];
+        const studentTags = s.line_user_id ? [...(userTagsMap.get(s.line_user_id) || [])] : [];
+        if (s.status === 'trial_done' && !studentTags.includes('trial_done')) {
+            studentTags.push('trial_done');
+        }
 
         filtered.push({
             id: s.id,

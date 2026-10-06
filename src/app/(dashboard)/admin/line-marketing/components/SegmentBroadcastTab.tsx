@@ -362,6 +362,40 @@ export const SegmentBroadcastTab: React.FC<SegmentBroadcastTabProps> = ({
         }
     };
 
+    // タグ別おすすめメッセージテンプレート
+    const TAG_PRESETS: Record<string, { title: string; body: string }> = {
+        trial_done: {
+            title: '【体験受講後】レッスンご参加のお礼と特別入会キャンペーンのご案内',
+            body: '{{name}} 様\n\nスイムパートナーズの {{coach_name}} です。\n先日は体験レッスンへのご参加、誠にありがとうございました！\n\n水泳の楽しさや上達の感触はいかがでしたでしょうか？\n\n現在、体験レッスン受講後の生徒様限定で【入会金無料＆初回受講特典】キャンペーンを実施しております。\n定期的なマンツーマン個別指導でさらにスムーズに楽しく泳げるよう全力で伴走いたします。\n\nご質問やご相談がございましたら、いつでもこのLINEでお気軽にご返信ください！'
+        },
+        trial_form_viewed: {
+            title: '【ご案内】体験レッスンのお申し込み・日程相談について',
+            body: '{{name}} 様\n\nスイムパートナーズ事務局です。\n公式LINEをご覧いただきありがとうございます！\n\n体験レッスンのお申し込みフォームはご確認いただけましたでしょうか？\n\n「日程が合うか不安」「どのコーチが良いかわからない」「まずは質問だけしたい」などございましたら、このLINEチャットで専任スタッフが直接ご相談に乗らせていただきます。\n\n▼ 体験レッスン日程のご確認・お申し込みはこちら\n{{trial_url}}'
+        },
+        friend_only: {
+            title: '【公式LINE】スイムパートナーズのご案内と体験レッスン',
+            body: '{{name}} 様\n\n友だち追加ありがとうございます！\n水泳の出張マンツーマン個別指導【スイムパートナーズ】です。\n\nお子様から大人・マスターズまで、お近くの公営・民間プールでプロコーチが1対1で優しく指導いたします。\n\nまずは手軽に受けられる「体験レッスン」からぜひお試しください！\n▼ 体験レッスンの詳細・お申し込みはこちら\n{{trial_url}}'
+        },
+        referral_lead: {
+            title: '【お友達紹介特典】特別優待レッスンのご案内',
+            body: '{{name}} 様\n\nスイムパートナーズです。\nご紹介者様経由でのご登録ありがとうございます！\n\nお友達紹介キャンペーンとして、体験レッスンが通常価格よりお得な【特別優待価格】でご受講いただけます。\n\nぜひこの機会にお気軽にご体験ください！\n▼ お申し込みはこちら\n{{trial_url}}'
+        },
+    };
+
+    const handleSelectQuickTag = (tag: string) => {
+        setSelectedTag(tag);
+        if (tag === 'trial_form_viewed') {
+            setViewedNotAppliedOnly(true);
+        } else {
+            setViewedNotAppliedOnly(false);
+        }
+        if (TAG_PRESETS[tag]) {
+            setCampaignTitle(TAG_PRESETS[tag].title);
+            setMessageTemplate(TAG_PRESETS[tag].body);
+            toast.info(`タグ別一斉配信テンプレートを反映しました`);
+        }
+    };
+
     return (
         <div className="space-y-6">
             {/* 上部: 複合条件絞り込みパネル */}
@@ -370,7 +404,7 @@ export const SegmentBroadcastTab: React.FC<SegmentBroadcastTabProps> = ({
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                             <Filter className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                            <CardTitle className="text-base font-bold">セグメント抽出条件（複合絞り込み）</CardTitle>
+                            <CardTitle className="text-base font-bold">セグメント抽出条件（複合絞り込み・タグ別一斉配信）</CardTitle>
                         </div>
                         <Button
                             variant="ghost"
@@ -384,13 +418,99 @@ export const SegmentBroadcastTab: React.FC<SegmentBroadcastTabProps> = ({
                         </Button>
                     </div>
                     <CardDescription className="text-xs">
-                        ステータス、地域、担当コーチ、受講プランを掛け合わせて配信対象者を瞬時に特定します。
+                        タグ、顧客ステータス、地域、担当コーチ、受講プランを掛け合わせて配信対象者を瞬時に特定し、一斉配信できます。
                     </CardDescription>
+
+                    {/* 🏷️ タグ別クイック一斉配信セレクターバー */}
+                    <div className="pt-3 border-t border-slate-100 dark:border-slate-800 mt-2">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 mr-1 flex items-center gap-1">
+                                <Tag className="h-3 w-3 text-indigo-500" />
+                                タグ別クイック一斉配信:
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => handleSelectQuickTag('all')}
+                                className={`text-xs px-2.5 py-1 rounded-full font-medium transition-all ${
+                                    selectedTag === 'all'
+                                        ? 'bg-slate-900 text-white shadow-xs font-bold'
+                                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                }`}
+                            >
+                                全生徒（条件指定なし）
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleSelectQuickTag('trial_done')}
+                                className={`text-xs px-2.5 py-1 rounded-full font-medium transition-all flex items-center gap-1 ${
+                                    selectedTag === 'trial_done'
+                                        ? 'bg-blue-600 text-white shadow-xs font-bold'
+                                        : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200/60'
+                                }`}
+                            >
+                                🏊‍♂️ 体験受講後
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleSelectQuickTag('trial_form_viewed')}
+                                className={`text-xs px-2.5 py-1 rounded-full font-medium transition-all flex items-center gap-1 ${
+                                    selectedTag === 'trial_form_viewed'
+                                        ? 'bg-amber-600 text-white shadow-xs font-bold'
+                                        : 'bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200/60'
+                                }`}
+                            >
+                                ⚡ フォーム閲覧・未申込
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleSelectQuickTag('friend_only')}
+                                className={`text-xs px-2.5 py-1 rounded-full font-medium transition-all flex items-center gap-1 ${
+                                    selectedTag === 'friend_only'
+                                        ? 'bg-emerald-600 text-white shadow-xs font-bold'
+                                        : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200/60'
+                                }`}
+                            >
+                                💬 友だち追加のみ
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleSelectQuickTag('referral_lead')}
+                                className={`text-xs px-2.5 py-1 rounded-full font-medium transition-all flex items-center gap-1 ${
+                                    selectedTag === 'referral_lead'
+                                        ? 'bg-purple-600 text-white shadow-xs font-bold'
+                                        : 'bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200/60'
+                                }`}
+                            >
+                                🎁 お友達紹介
+                            </button>
+                        </div>
+                    </div>
                 </CardHeader>
 
                 <CardContent className="space-y-4 pt-0">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                        {/* 1. ステータス */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
+                        {/* 1. タグ指定 */}
+                        <div className="space-y-1.5">
+                            <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                                <Tag className="h-3.5 w-3.5 text-indigo-500" />
+                                配信対象タグ
+                            </Label>
+                            <Select value={selectedTag} onValueChange={handleSelectQuickTag}>
+                                <SelectTrigger className="h-9 text-xs">
+                                    <SelectValue placeholder="すべてのタグ" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">すべてのタグ</SelectItem>
+                                    <SelectItem value="trial_done">🏊‍♂️ 体験受講後</SelectItem>
+                                    <SelectItem value="trial_form_viewed">⚡ 体験フォーム閲覧未申込</SelectItem>
+                                    <SelectItem value="friend_only">💬 友だち追加のみ</SelectItem>
+                                    <SelectItem value="referral_lead">🎁 お友達紹介経由</SelectItem>
+                                    <SelectItem value="trial_applied">📝 体験申込完了</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {/* 2. ステータス */}
                         <div className="space-y-1.5">
                             <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                                 顧客ステータス
@@ -410,7 +530,7 @@ export const SegmentBroadcastTab: React.FC<SegmentBroadcastTabProps> = ({
                             </Select>
                         </div>
 
-                        {/* 2. エリア */}
+                        {/* 3. エリア */}
                         <div className="space-y-1.5">
                             <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                                 対象エリア・地域
@@ -430,7 +550,7 @@ export const SegmentBroadcastTab: React.FC<SegmentBroadcastTabProps> = ({
                             </Select>
                         </div>
 
-                        {/* 3. 担当コーチ */}
+                        {/* 4. 担当コーチ */}
                         <div className="space-y-1.5">
                             <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                                 担当コーチ
@@ -450,7 +570,7 @@ export const SegmentBroadcastTab: React.FC<SegmentBroadcastTabProps> = ({
                             </Select>
                         </div>
 
-                        {/* 4. 受講プラン */}
+                        {/* 5. 受講プラン */}
                         <div className="space-y-1.5">
                             <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                                 受講プラン
@@ -466,26 +586,6 @@ export const SegmentBroadcastTab: React.FC<SegmentBroadcastTabProps> = ({
                                             {plan.name}
                                         </SelectItem>
                                     ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        {/* 5. タグ指定 (新設) */}
-                        <div className="space-y-1.5">
-                            <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                                <Tag className="h-3.5 w-3.5 text-indigo-500" />
-                                付与タグ
-                            </Label>
-                            <Select value={selectedTag} onValueChange={setSelectedTag}>
-                                <SelectTrigger className="h-9 text-xs">
-                                    <SelectValue placeholder="すべてのタグ" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">すべてのタグ</SelectItem>
-                                    <SelectItem value="trial_form_viewed">体験フォーム閲覧</SelectItem>
-                                    <SelectItem value="trial_applied">体験申込完了</SelectItem>
-                                    <SelectItem value="referral_lead">お友達紹介経由</SelectItem>
-                                    <SelectItem value="friend_only">友だち追加のみ</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>

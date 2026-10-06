@@ -1909,8 +1909,8 @@ export default function LineMonitoringPage() {
                             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                                 <div className="space-y-1">
                                     <div className="flex items-center gap-2">
-                                        <Badge className="bg-amber-500 hover:bg-amber-600 text-white text-xs">
-                                            Lステップ型 セグメント配信
+                                        <Badge className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs">
+                                            高機能セグメント・一斉配信
                                         </Badge>
                                         <Badge variant="outline" className="text-indigo-700 border-indigo-200 text-xs">
                                             属性・ステータス一括抽出

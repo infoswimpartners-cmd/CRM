@@ -115,8 +115,8 @@ export function TagStepSettingsPanel() {
                     <div className="flex items-center gap-2">
                         <Tag className="h-5 w-5 text-indigo-300" />
                         <h2 className="text-lg font-bold">タグ別ステップ配信シナリオ設定</h2>
-                        <Badge className="bg-indigo-500/40 text-indigo-100 border-indigo-400/30 text-[10px]">
-                            Lステップ連携
+                        <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-400/30 text-[10px]">
+                            自社CRM独自開発
                         </Badge>
                     </div>
                     <p className="text-xs text-indigo-200 leading-relaxed max-w-2xl">
@@ -206,16 +206,24 @@ export function TagStepSettingsPanel() {
                                 </div>
 
                                 {/* カード下部アクションボタン群 */}
-                                <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-                                    <Link href={`/admin/line-marketing`} className="w-full">
+                                <div className="pt-3 border-t border-slate-100 grid grid-cols-2 gap-2">
+                                    <Link href={`/admin/line-marketing?tab=broadcast&tag=${sc.tag}`}>
+                                        <Button
+                                            size="sm"
+                                            className="w-full text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white h-8 gap-1 shadow-xs"
+                                        >
+                                            <Send className="h-3.5 w-3.5" />
+                                            このタグへ一斉配信
+                                        </Button>
+                                    </Link>
+                                    <Link href={`/admin/line-marketing?tab=steps&tag=${sc.tag}`}>
                                         <Button
                                             variant="outline"
                                             size="sm"
-                                            className="w-full text-xs font-semibold text-indigo-600 border-indigo-200 hover:bg-indigo-50 h-8 gap-1"
+                                            className="w-full text-xs font-semibold text-slate-700 border-slate-200 hover:bg-slate-50 h-8 gap-1"
                                         >
-                                            <Layers className="h-3.5 w-3.5" />
-                                            このタグのステップを編集・追加
-                                            <ArrowRight className="h-3.5 w-3.5 ml-auto" />
+                                            <Layers className="h-3.5 w-3.5 text-slate-500" />
+                                            ステップ編集
                                         </Button>
                                     </Link>
                                 </div>

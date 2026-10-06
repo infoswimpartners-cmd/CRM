@@ -53,6 +53,17 @@ export default function LineMarketingPage() {
 
     useEffect(() => {
         fetchKpi();
+        if (typeof window !== 'undefined') {
+            const params = new URLSearchParams(window.location.search);
+            const tabParam = params.get('tab');
+            const tagParam = params.get('tag');
+            if (tabParam && ['broadcast', 'steps', 'tracking', 'logs'].includes(tabParam)) {
+                setActiveTab(tabParam as any);
+            }
+            if (tagParam) {
+                setSelectedTagForBroadcast(tagParam);
+            }
+        }
     }, [fetchKpi]);
 
     // 体験受講完了生徒の手動同期アクション
