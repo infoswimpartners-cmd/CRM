@@ -3,6 +3,7 @@ import https from "https";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { stopStepReminderForUser } from "@/lib/line-step-reminders";
 import { sendGoogleChatMessage } from "@/lib/google-chat";
+import { markConversionForUser } from "@/lib/line-tracking-service";
 
 export async function POST(req: Request) {
   try {
@@ -109,6 +110,13 @@ export async function POST(req: Request) {
         await stopStepReminderForUser(payload.userId, 'applied');
       } catch (stepErr) {
         console.error('[Trial Booking] Failed to stop step reminder:', stepErr);
+      }
+
+      // 3.2. トラッキングログのコンバージョン（CV）更新＆タグ付与（trial_applied）
+      try {
+        await markConversionForUser(payload.userId, undefined, referrer);
+      } catch (convErr) {
+        console.error('[Trial Booking] Failed to mark tracking conversion:', convErr);
       }
     }
 

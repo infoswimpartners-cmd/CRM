@@ -58,8 +58,11 @@ import {
     KeyRound,
     Loader2,
     ShieldCheck,
-    Save
+    Save,
+    Tag,
+    Sparkles
 } from 'lucide-react'
+import { TagStepSettingsPanel } from './components/TagStepSettingsPanel'
 
 /**
  * LINEメッセージから日付と時刻を簡易パースします
@@ -146,8 +149,19 @@ function parseDateTimeFromMessage(text: string): { start: string; end: string } 
 }
 
 export default function LineMonitoringPage() {
-    // 状態定義
-    const [activeTab, setActiveTab] = useState('logs')
+    // 状態定義（初期タブはタグ別ステップ配信）
+    const [activeTab, setActiveTab] = useState('tag-steps')
+    
+    // タブ切り替えとURLパラメータ同期
+    const handleTabChange = (tab: string) => {
+        setActiveTab(tab)
+        if (typeof window !== 'undefined') {
+            const url = new URL(window.location.href)
+            url.searchParams.set('tab', tab)
+            window.history.replaceState({}, '', url.toString())
+        }
+    }
+
     const [logs, setLogs] = useState<LineMonitoringLog[]>([])
     const [configs, setConfigs] = useState<LineBotConfig[]>([])
     const [coaches, setCoaches] = useState<{ id: string; full_name: string | null; role: string | null }[]>([])
@@ -279,8 +293,15 @@ export default function LineMonitoringPage() {
         }
     }
 
-    // 初期フェッチ
+    // 初期フェッチ & URLパラメータによるタブ復元
     useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const params = new URLSearchParams(window.location.search)
+            const tabParam = params.get('tab')
+            if (tabParam && ['tag-steps', 'logs', 'marketing', 'step-reminders', 'settings'].includes(tabParam)) {
+                setActiveTab(tabParam)
+            }
+        }
         fetchCoaches()
         fetchLogs()
         fetchConfigs()
@@ -797,23 +818,40 @@ export default function LineMonitoringPage() {
                 <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
                         <div className="flex items-center gap-2">
-                            <MessageSquare className="h-6 w-6 text-indigo-400" />
-                            <h1 className="text-2xl font-bold tracking-tight">LINE日程調整監視</h1>
+                            <Sparkles className="h-6 w-6 text-indigo-400" />
+                            <h1 className="text-2xl font-bold tracking-tight">LINE公式アカウント 総合管理</h1>
+                            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-500/30 text-indigo-200 border border-indigo-400/30">
+                                総合ポータル
+                            </span>
                         </div>
-                        <p className="text-slate-400 mt-1 text-sm">
-                            各コーチのLINE公式アカウントにおける、日程調整メッセージの自動検知と管理を行います。
+                        <p className="text-slate-300 mt-1 text-sm">
+                            タグ別ステップ配信・セグメント一括配信・日程調整監視・自動リマインドを一括管理します。
                         </p>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
                         <Button 
                             variant="secondary" 
                             size="sm" 
-                            disabled={isTriggeringReminder}
-                            className="bg-indigo-900/40 text-indigo-200 border border-indigo-800 hover:bg-indigo-900/60"
-                            onClick={() => handleTriggerReminder()}
+                            className={`font-bold shadow-sm transition-all ${
+                                activeTab === 'tag-steps' 
+                                    ? 'bg-white text-indigo-950 hover:bg-slate-100 font-extrabold' 
+                                    : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                            }`}
+                            onClick={() => handleTabChange('tag-steps')}
                         >
-                            <Send className="mr-2 h-4 w-4 text-indigo-400" />
-                            {isTriggeringReminder ? '処理中...' : '明日の前日連絡テスト実行'}
+                            <Tag className="mr-1.5 h-4 w-4" />
+                            タグ別ステップ配信
+                        </Button>
+                        <Button 
+                            variant="secondary" 
+                            size="sm" 
+                            asChild
+                            className="bg-indigo-900/40 text-indigo-200 border border-indigo-800 hover:bg-indigo-900/60"
+                        >
+                            <Link href="/admin/line-marketing">
+                                <Sparkles className="mr-1.5 h-4 w-4 text-amber-400" />
+                                セグメント配信作成
+                            </Link>
                         </Button>
                         <Button 
                             variant="secondary" 
@@ -822,6 +860,7 @@ export default function LineMonitoringPage() {
                             onClick={() => {
                                 fetchLogs()
                                 fetchConfigs()
+                                fetchStepLeads()
                                 toast.success('最新情報に更新しました')
                             }}
                         >
@@ -835,101 +874,33 @@ export default function LineMonitoringPage() {
                 <div className="absolute bottom-0 left-0 -ml-20 -mb-20 h-80 w-80 rounded-full bg-blue-500/10 blur-3xl"></div>
             </div>
 
-            {/* 管理者用 Google Chat 通知先設定（公式ラインチャットグループ） */}
-            <Card className="border-slate-200 shadow-sm bg-white overflow-hidden">
-                <CardHeader className="p-4 bg-slate-50/50 border-b border-slate-100 flex flex-row items-center justify-between space-y-0">
-                    <div>
-                        <CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                            <ShieldCheck className="h-4 w-4 text-indigo-600" />
-                            管理者用 Google Chat 通知先設定（公式ラインチャットグループ）
-                        </CardTitle>
-                        <CardDescription className="text-xs text-slate-500 mt-0.5">
-                            見込み客からの公式LINEチャット相談や、各コーチのLINEでの日程調整が検知された際、この公式ラインチャットグループへ自動通知が集約されます。
-                        </CardDescription>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Label htmlFor="admin-webhook-switch" className="text-xs text-slate-600 cursor-pointer">
-                            {adminWebhookEnabled ? '通知 ON' : '通知 OFF'}
-                        </Label>
-                        <Switch
-                            id="admin-webhook-switch"
-                            checked={adminWebhookEnabled}
-                            onCheckedChange={setAdminWebhookEnabled}
-                        />
-                    </div>
-                </CardHeader>
-                <CardContent className="p-4 space-y-3">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <div className="space-y-1">
-                            <Label className="text-xs text-slate-600">登録済みスペースから選択</Label>
-                            <Select value={selectedAdminWebhookId} onValueChange={handleSelectAdminSpace}>
-                                <SelectTrigger className="h-8 text-xs bg-white border-slate-200">
-                                    <SelectValue placeholder="スペースを選択" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="none">指定なし（未設定）</SelectItem>
-                                    {selectedAdminWebhookId === 'custom' && (
-                                        <SelectItem value="custom">直接入力されたURL</SelectItem>
-                                    )}
-                                    {chatWebhooks.map(webhook => (
-                                        <SelectItem key={webhook.id} value={webhook.id}>
-                                            {webhook.space_name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="md:col-span-2 space-y-1">
-                            <Label className="text-xs text-slate-600">Webhook URL</Label>
-                            <div className="flex gap-2">
-                                <Input
-                                    type="url"
-                                    value={adminWebhookUrl}
-                                    onChange={e => {
-                                        setAdminWebhookUrl(e.target.value)
-                                        setSelectedAdminWebhookId('custom')
-                                    }}
-                                    placeholder="https://chat.googleapis.com/v1/spaces/..."
-                                    className="h-8 text-xs font-mono bg-white border-slate-200 flex-1"
-                                />
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={handleTestAdminWebhook}
-                                    disabled={isTestingAdminWebhook || !adminWebhookUrl.trim()}
-                                    className="h-8 text-xs gap-1 flex-none"
-                                >
-                                    {isTestingAdminWebhook ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
-                                    テスト送信
-                                </Button>
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    onClick={handleSaveAdminWebhook}
-                                    disabled={isSavingAdminWebhook}
-                                    className="h-8 text-xs gap-1 bg-slate-900 hover:bg-slate-800 text-white flex-none"
-                                >
-                                    {isSavingAdminWebhook ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
-                                    保存
-                                </Button>
-                            </div>
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
-
             {/* メインコンテンツエリア */}
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+            <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
                 <div className="flex justify-between items-center border-b pb-2">
-                    <TabsList className="bg-slate-100 p-1 rounded-xl">
+                    <TabsList className="bg-slate-100 p-1 rounded-xl flex flex-wrap gap-1">
+                        <TabsTrigger value="tag-steps" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm font-semibold text-indigo-900">
+                            <Tag className="h-4 w-4 mr-1.5 text-indigo-600" />
+                            タグ別ステップ配信
+                            <span className="ml-1.5 px-1.5 py-0.2 bg-indigo-600 text-white rounded-full text-[10px] font-bold">
+                                NEW
+                            </span>
+                        </TabsTrigger>
                         <TabsTrigger value="logs" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
-                            <MessageSquare className="h-4 w-4 mr-2" />
-                            日程調整ログ
+                            <MessageSquare className="h-4 w-4 mr-2 text-indigo-600" />
+                            日程調整・チャット監視
+                            {logs.filter(l => l.status === 'unread').length > 0 && (
+                                <span className="ml-1.5 px-1.5 py-0.2 bg-rose-500 text-white rounded-full text-[10px] font-bold">
+                                    {logs.filter(l => l.status === 'unread').length}
+                                </span>
+                            )}
+                        </TabsTrigger>
+                        <TabsTrigger value="marketing" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                            <Sparkles className="h-4 w-4 mr-2 text-amber-500" />
+                            セグメント一括配信
                         </TabsTrigger>
                         <TabsTrigger value="step-reminders" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
                             <Send className="h-4 w-4 mr-2 text-indigo-600" />
-                            公式LINEステップ配信
+                            友だち未申込リマインド
                             {stepLeads.filter(l => l.status === 'friend_only').length > 0 && (
                                 <span className="ml-1.5 px-1.5 py-0.2 bg-amber-500 text-white rounded-full text-[10px] font-bold">
                                     {stepLeads.filter(l => l.status === 'friend_only').length}
@@ -937,8 +908,8 @@ export default function LineMonitoringPage() {
                             )}
                         </TabsTrigger>
                         <TabsTrigger value="settings" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
-                            <Bot className="h-4 w-4 mr-2" />
-                            ボット紐付け設定
+                            <Bot className="h-4 w-4 mr-2 text-indigo-600" />
+                            ボット・通知連携設定
                         </TabsTrigger>
                     </TabsList>
                     
@@ -1049,8 +1020,33 @@ export default function LineMonitoringPage() {
                     )}
                 </div>
 
-                {/* タブ1: 監視ログ */}
+                {/* タブ: 日程調整・チャット監視 */}
                 <TabsContent value="logs" className="space-y-4">
+                    {/* 日程調整監視ヘッダーアクション */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                        <div>
+                            <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                                <MessageSquare className="h-5 w-5 text-indigo-600" />
+                                コーチ別 LINE日程調整メッセージ検知ログ
+                            </h3>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                                各コーチのLINEで日程調整メッセージが検知されると、自動的にここに集約されGoogle Chatへ通知されます。
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                disabled={isTriggeringReminder}
+                                className="border-indigo-200 text-indigo-700 hover:bg-indigo-50 rounded-xl text-xs h-8"
+                                onClick={() => handleTriggerReminder()}
+                            >
+                                <Send className="mr-1.5 h-3.5 w-3.5 text-indigo-500" />
+                                {isTriggeringReminder ? '処理中...' : '明日の前日連絡テスト実行'}
+                            </Button>
+                        </div>
+                    </div>
+
                     {/* フィルタバー */}
                     <Card className="border-slate-100 shadow-sm rounded-2xl">
                         <CardContent className="p-4 flex flex-col md:flex-row gap-4 items-end">
@@ -1190,8 +1186,92 @@ export default function LineMonitoringPage() {
                     )}
                 </TabsContent>
 
-                {/* タブ2: ボット設定 */}
-                <TabsContent value="settings" className="space-y-4">
+                {/* タブ: ボット・通知連携設定 */}
+                <TabsContent value="settings" className="space-y-6">
+                    {/* 管理者用 Google Chat 通知先設定（公式ラインチャットグループ） */}
+                    <Card className="border-slate-200 shadow-sm bg-white overflow-hidden">
+                        <CardHeader className="p-4 bg-slate-50/50 border-b border-slate-100 flex flex-row items-center justify-between space-y-0">
+                            <div>
+                                <CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                    <ShieldCheck className="h-4 w-4 text-indigo-600" />
+                                    管理者用 Google Chat 通知先設定（公式ラインチャットグループ）
+                                </CardTitle>
+                                <CardDescription className="text-xs text-slate-500 mt-0.5">
+                                    見込み客からの公式LINEチャット相談や、各コーチのLINEでの日程調整が検知された際、この公式ラインチャットグループへ自動通知が集約されます。
+                                </CardDescription>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Label htmlFor="admin-webhook-switch" className="text-xs text-slate-600 cursor-pointer">
+                                    {adminWebhookEnabled ? '通知 ON' : '通知 OFF'}
+                                </Label>
+                                <Switch
+                                    id="admin-webhook-switch"
+                                    checked={adminWebhookEnabled}
+                                    onCheckedChange={setAdminWebhookEnabled}
+                                />
+                            </div>
+                        </CardHeader>
+                        <CardContent className="p-4 space-y-3">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                <div className="space-y-1">
+                                    <Label className="text-xs text-slate-600">登録済みスペースから選択</Label>
+                                    <Select value={selectedAdminWebhookId} onValueChange={handleSelectAdminSpace}>
+                                        <SelectTrigger className="h-8 text-xs bg-white border-slate-200">
+                                            <SelectValue placeholder="スペースを選択" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="none">指定なし（未設定）</SelectItem>
+                                            {selectedAdminWebhookId === 'custom' && (
+                                                <SelectItem value="custom">直接入力されたURL</SelectItem>
+                                            )}
+                                            {chatWebhooks.map(webhook => (
+                                                <SelectItem key={webhook.id} value={webhook.id}>
+                                                    {webhook.space_name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="md:col-span-2 space-y-1">
+                                    <Label className="text-xs text-slate-600">Webhook URL</Label>
+                                    <div className="flex gap-2">
+                                        <Input
+                                            type="url"
+                                            value={adminWebhookUrl}
+                                            onChange={e => {
+                                                setAdminWebhookUrl(e.target.value)
+                                                setSelectedAdminWebhookId('custom')
+                                            }}
+                                            placeholder="https://chat.googleapis.com/v1/spaces/..."
+                                            className="h-8 text-xs font-mono bg-white border-slate-200 flex-1"
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={handleTestAdminWebhook}
+                                            disabled={isTestingAdminWebhook || !adminWebhookUrl.trim()}
+                                            className="h-8 text-xs gap-1 flex-none"
+                                        >
+                                            {isTestingAdminWebhook ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+                                            テスト送信
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            onClick={handleSaveAdminWebhook}
+                                            disabled={isSavingAdminWebhook}
+                                            className="h-8 text-xs gap-1 bg-slate-900 hover:bg-slate-800 text-white flex-none"
+                                        >
+                                            {isSavingAdminWebhook ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                                            保存
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
                     {/* 一元管理案内バナー */}
                     <div className="bg-indigo-50/80 border border-indigo-100 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-indigo-950">
                         <div className="flex items-center gap-2.5">
@@ -1815,6 +1895,92 @@ export default function LineMonitoringPage() {
                                 </TableBody>
                             </Table>
                         )}
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="tag-steps" className="space-y-6">
+                    <TagStepSettingsPanel />
+                </TabsContent>
+
+                {/* タブ: セグメント一括配信（マーケティング） */}
+                <TabsContent value="marketing" className="space-y-6">
+                    <Card className="border-indigo-100 shadow-sm bg-gradient-to-br from-white via-indigo-50/20 to-white overflow-hidden rounded-2xl">
+                        <CardHeader className="p-6 border-b border-indigo-50">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-2">
+                                        <Badge className="bg-amber-500 hover:bg-amber-600 text-white text-xs">
+                                            Lステップ型 セグメント配信
+                                        </Badge>
+                                        <Badge variant="outline" className="text-indigo-700 border-indigo-200 text-xs">
+                                            属性・ステータス一括抽出
+                                        </Badge>
+                                    </div>
+                                    <CardTitle className="text-xl font-bold text-slate-800">
+                                        セグメント一括メッセージ配信
+                                    </CardTitle>
+                                    <CardDescription className="text-slate-500 text-sm">
+                                        顧客ステータス（体験申込中・体験受講済・本会員など）、エリア、担当コーチ、受講プランを掛け合わせて配信対象をリアルタイム抽出し、LINEメッセージを一括配信できます。
+                                    </CardDescription>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Button asChild className="bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl shadow-md shadow-indigo-600/20">
+                                        <Link href="/admin/line-marketing">
+                                            <Sparkles className="h-4 w-4 mr-1.5 text-amber-300" />
+                                            配信作成・エディタを開く
+                                            <ExternalLink className="h-3.5 w-3.5 ml-1.5 opacity-80" />
+                                        </Link>
+                                    </Button>
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="p-6 space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="p-4 rounded-xl bg-white border border-slate-200/80 shadow-sm space-y-2">
+                                    <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-sm">
+                                        1
+                                    </div>
+                                    <h4 className="font-bold text-slate-800 text-sm">多角的な条件抽出</h4>
+                                    <p className="text-xs text-slate-500 leading-relaxed">
+                                        ステータス（体験受講済、入会済など）、エリア、担当コーチ、受講プランの掛け合わせで、ピンポイントに対象者を絞り込めます。
+                                    </p>
+                                </div>
+                                <div className="p-4 rounded-xl bg-white border border-slate-200/80 shadow-sm space-y-2">
+                                    <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-sm">
+                                        2
+                                    </div>
+                                    <h4 className="font-bold text-slate-800 text-sm">変数差し込み & プレビュー</h4>
+                                    <p className="text-xs text-slate-500 leading-relaxed">
+                                        <code>{'{name}'}</code> などの差し込み変数に対応。テスト会員（会員番号0035、テスト太郎 様）への事前テスト送信も安心実行可能です。
+                                    </p>
+                                </div>
+                                <div className="p-4 rounded-xl bg-white border border-slate-200/80 shadow-sm space-y-2">
+                                    <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-sm">
+                                        3
+                                    </div>
+                                    <h4 className="font-bold text-slate-800 text-sm">即時・予約配信 & ログ</h4>
+                                    <p className="text-xs text-slate-500 leading-relaxed">
+                                        即時配信だけでなく日時指定配信に対応。送信履歴や到達ステータスもデータベースに安全に自動記録されます。
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+                                <div className="text-xs text-slate-600 space-y-0.5">
+                                    <div className="font-semibold text-slate-700">ステップ配信（自動追客シナリオ）の設定をご希望ですか？</div>
+                                    <div>体験受講後やフォーム離脱者向けの自動ステップ配信は「タグ別ステップ配信」タブから設定できます。</div>
+                                </div>
+                                <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    onClick={() => handleTabChange('tag-steps')}
+                                    className="rounded-xl border-indigo-200 text-indigo-600 hover:bg-indigo-50 text-xs shrink-0"
+                                >
+                                    <Tag className="h-3.5 w-3.5 mr-1" />
+                                    タグ別ステップ配信を見る
+                                </Button>
+                            </div>
+                        </CardContent>
                     </Card>
                 </TabsContent>
             </Tabs>

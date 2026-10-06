@@ -1,0 +1,1689 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>スイムステップ | 東京駅直結・少人数制水泳教室</title>
+    <meta
+      name="description"
+      content="「大手の集団指導では順番待ちばかり」「息継ぎができず進級テストに落ち続ける」そんなお子さまと親御さんに向けた、1クラス最大4名の少人数制水泳教室です。東京ミッドタウン八重洲内・城東小温水プール（水深100cm）で開催。"
+    />
+    <meta property="og:title" content="スイムステップ | 東京駅直結・少人数制水泳教室" />
+    <meta
+      property="og:description"
+      content="1クラス最大4名の超少人数制水泳レッスン。待ち時間ゼロで運動量3倍！東京ミッドタウン八重洲直結・城東小学校温水プールで開催。公式LINEから簡単予約。"
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://swim-partners.jp/swim-step/" />
+    <meta property="og:site_name" content="SWIM STEP by スイムパートナーズ" />
+
+    <!-- Google Fonts: トレース元（Noto Sans JP & Roboto）と同一仕様 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Roboto:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- Tailwind CSS (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              navy: '#354050',
+              ctaYellow: '#fed900',
+              ctaYellowHover: '#ecc800',
+              aquaBlue: '#00b4bf',
+              aquaDark: '#0096a0',
+              lineGreen: '#06c755',
+              textColor: '#231f20',
+              mutedText: '#555555',
+              gridBorder: '#c8d4e7',
+            },
+            fontFamily: {
+              sans: ['"Noto Sans JP"', 'sans-serif'],
+              roboto: ['"Roboto"', 'sans-serif'],
+            },
+          },
+        },
+      };
+    </script>
+
+    <style>
+      /* トレース元CSSの完全移植スタイル */
+      html {
+        color: #231f20;
+        background: #ffffff;
+        font-family: "Noto Sans JP", sans-serif;
+        font-weight: 500;
+        font-size: 16px;
+        line-height: 1.8;
+        word-break: normal;
+        overflow-wrap: anywhere;
+        line-break: strict;
+        scroll-behavior: smooth;
+      }
+
+      /* 方眼紙背景パターン（.hougan: 20px×20px, 罫線色 #c8d4e7） */
+      .hougan {
+        background-image:
+          linear-gradient(0deg, transparent calc(100% - 1px), #c8d4e7 calc(100% - 1px)),
+          linear-gradient(90deg, transparent calc(100% - 1px), #c8d4e7 calc(100% - 1px));
+        background-size: 20px 20px;
+        background-repeat: repeat;
+        background-position: top center;
+      }
+
+      /* トレース元特有のダブルマーカー */
+      .c-marker {
+        display: inline;
+        position: relative;
+        background-image: linear-gradient(90deg, rgba(211, 125, 152, 0.4), rgba(211, 125, 152, 0.4));
+        background-repeat: no-repeat;
+        background-position: bottom left;
+        background-size: 100% 38%;
+      }
+
+      .js-marker {
+        display: inline;
+        position: relative;
+        background-image: linear-gradient(90deg, rgba(182, 191, 0, 0.4), rgba(182, 191, 0, 0.4));
+        background-repeat: no-repeat;
+        background-position: bottom left;
+        background-size: 100% 38%;
+      }
+
+      /* ギザギザ波線下線 */
+      .text__wavy {
+        text-decoration: underline wavy #fed900 3px;
+        text-underline-offset: 8px;
+      }
+
+      /* 吹き出しの三角（下向き） */
+      .balloon-arrow-down::after {
+        content: '';
+        position: absolute;
+        bottom: -12px;
+        left: 50%;
+        transform: translateX(-50%);
+        border-width: 12px 10px 0 10px;
+        border-style: solid;
+        border-color: #ffffff transparent transparent transparent;
+      }
+
+      .balloon-arrow-down-navy::after {
+        content: '';
+        position: absolute;
+        bottom: -12px;
+        left: 50%;
+        transform: translateX(-50%);
+        border-width: 12px 10px 0 10px;
+        border-style: solid;
+        border-color: #354050 transparent transparent transparent;
+      }
+
+      /* ボタンホバーのマイクロインタラクション */
+      .c-btn-cta {
+        transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+      }
+      .c-btn-cta:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+      }
+
+      /* 水の深みと透明感を演出するアクア環境光彩（Ambient Glow） */
+      .water-ambient-glow {
+        position: absolute;
+        border-radius: 9999px;
+        pointer-events: none;
+        filter: blur(80px);
+        opacity: 0.7;
+      }
+
+      .glow-aqua-1 {
+        width: 480px;
+        height: 480px;
+        background: radial-gradient(circle, rgba(0, 180, 191, 0.16) 0%, rgba(0, 180, 191, 0) 70%);
+      }
+
+      .glow-emerald-1 {
+        width: 400px;
+        height: 400px;
+        background: radial-gradient(circle, rgba(16, 185, 129, 0.10) 0%, rgba(16, 185, 129, 0) 70%);
+      }
+
+      /* 透明感ある水面ガラスカード（グラスモーフィズム） */
+      .water-glass-card {
+        background: rgba(255, 255, 255, 0.88);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.8);
+        box-shadow: 0 10px 30px -5px rgba(0, 180, 191, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
+      }
+
+      /* 水滴バブルの微細な浮遊アニメーション */
+      @keyframes floatWaterBubble {
+        0%, 100% {
+          transform: translateY(0px) scale(1);
+          opacity: 0.6;
+        }
+        50% {
+          transform: translateY(-10px) scale(1.08);
+          opacity: 0.9;
+        }
+      }
+
+      .water-bubble {
+        position: absolute;
+        border-radius: 9999px;
+        background: radial-gradient(circle at 35% 35%, rgba(255, 255, 255, 0.95), rgba(0, 180, 191, 0.25) 55%, rgba(0, 180, 191, 0.5) 100%);
+        box-shadow: 0 2px 8px rgba(0, 180, 191, 0.25), inset 0 1px 2px rgba(255, 255, 255, 0.8);
+        pointer-events: none;
+        animation: floatWaterBubble 6s ease-in-out infinite;
+      }
+
+      .bubble-sm { width: 10px; height: 10px; }
+      .bubble-md { width: 16px; height: 16px; }
+      .bubble-lg { width: 24px; height: 24px; }
+
+      .anim-delay-1 { animation-delay: 0s; animation-duration: 5.5s; }
+      .anim-delay-2 { animation-delay: 2s; animation-duration: 6.8s; }
+      .anim-delay-3 { animation-delay: 3.5s; animation-duration: 5.0s; }
+
+      @media (prefers-reduced-motion: reduce) {
+        .water-bubble {
+          animation: none !important;
+        }
+      }
+    </style>
+
+    <!-- Schema.org 構造化データ -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "Course",
+        "name": "少人数制水泳教室 スイムステップ（SWIM STEP）",
+        "description": "東京ミッドタウン八重洲直結の城東小学校室内温水プールで開催される1クラス最大4名の少人数水泳教室。",
+        "provider": {
+          "@type": "Organization",
+          "name": "スイムパートナーズ",
+          "sameAs": "https://lin.ee/Va5wa9s"
+        },
+        "location": {
+          "@type": "Place",
+          "name": "中央区立城東小学校 室内温水プール",
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "八重洲2-2-1 東京ミッドタウン八重洲内",
+            "addressLocality": "中央区",
+            "addressRegion": "東京都",
+            "addressCountry": "JP"
+          }
+        }
+      }
+    </script>
+  </head>
+
+  <body class="bg-white text-textColor antialiased">
+    <!-- #wrapper -->
+    <div id="wrapper" class="relative overflow-hidden pb-24 sm:pb-0">
+
+      <!-- ==============================================
+           1. Header (ロゴ + LINEボタン + アンカーナビ)
+      =============================================== -->
+      <header id="header" class="w-full bg-white/95 backdrop-blur-sm sticky top-0 z-50 border-b border-gray-100 shadow-sm transition-all duration-300">
+        <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+          <a href="#wrapper" class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-aquaBlue flex items-center justify-center text-white font-bold text-xl shadow-sm">
+              S
+            </div>
+            <div>
+              <p class="text-xs text-navy font-bold tracking-widest leading-none">SWIM PARTNERS PRESENTS</p>
+              <h1 class="text-xl sm:text-2xl font-bold text-navy tracking-tight leading-snug">
+                スイムステップ<span class="text-xs text-aquaBlue ml-1 font-semibold">SWIM STEP</span>
+              </h1>
+            </div>
+          </a>
+
+          <!-- デスクトップナビゲーション -->
+          <nav class="hidden lg:flex items-center gap-6 text-sm font-bold text-navy">
+            <a href="#reason" class="hover:text-aquaDark transition">選ばれる理由</a>
+            <a href="#movie" class="hover:text-aquaDark transition">動画で見る</a>
+            <a href="#voices" class="hover:text-aquaDark transition">受講生の声</a>
+            <a href="#lesson" class="hover:text-aquaDark transition">日程・クラス</a>
+            <a href="#pricing" class="hover:text-aquaDark transition">料金プラン</a>
+            <a href="#faq" class="hover:text-aquaDark transition">よくある質問</a>
+          </nav>
+
+          <!-- 右側ヘッダーナビ・CTA -->
+          <div class="flex items-center gap-3">
+            <a
+              href="https://lin.ee/Va5wa9s"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="hidden sm:inline-flex items-center gap-2 bg-navy text-white text-sm font-bold px-5 py-2.5 rounded-full hover:bg-navy/90 transition-colors shadow-sm"
+            >
+              <svg class="w-5 h-5 fill-[#06c755]" viewBox="0 0 24 24">
+                <path d="M12 2C6.48 2 2 5.82 2 10.53c0 2.93 1.76 5.51 4.41 7.02-.19.7-.68 2.53-.78 2.92-.12.49.18.48.38.35.16-.1 2.21-1.49 3.1-2.1.92.17 1.88.26 2.89.26 5.52 0 10-3.82 10-8.53S17.52 2 12 2z"/>
+              </svg>
+              <span>LINEでお問い合わせ</span>
+            </a>
+            <a
+              href="https://lin.ee/Va5wa9s"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="inline-flex items-center gap-1.5 bg-ctaYellow text-textColor text-sm sm:text-base font-bold px-4 sm:px-6 py-2.5 rounded-full hover:bg-ctaYellowHover transition shadow-sm c-btn-cta"
+            >
+              <span>10月枠を予約する</span>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"></path>
+              </svg>
+            </a>
+          </div>
+        </div>
+      </header>
+
+      <!-- ==============================================
+           2. Hero (Main Visual: 写真 + キャッチ + 3バッジ)
+      =============================================== -->
+      <section class="mv relative bg-gradient-to-b from-[#f8fafc] via-[#f0fbfb]/40 to-white pt-8 pb-16 lg:pt-14 lg:pb-24 overflow-hidden border-b border-gray-100">
+        <!-- 背景の水モチーフ装飾（環境光彩＆浮遊バブル） -->
+        <div class="water-ambient-glow glow-aqua-1 -top-24 -right-24" aria-hidden="true"></div>
+        <div class="water-ambient-glow glow-emerald-1 -bottom-20 -left-20" aria-hidden="true"></div>
+        <div class="water-bubble bubble-md top-12 left-8 anim-delay-1" aria-hidden="true"></div>
+        <div class="water-bubble bubble-sm top-28 left-20 anim-delay-2" aria-hidden="true"></div>
+        <div class="water-bubble bubble-lg top-16 right-16 anim-delay-3" aria-hidden="true"></div>
+        <div class="water-bubble bubble-sm bottom-12 right-28 anim-delay-1" aria-hidden="true"></div>
+
+        <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+            
+            <!-- 左カラム：コピー＆バッジ＆CTA -->
+            <div class="lg:col-span-7 space-y-6 text-center lg:text-left">
+              <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-aquaBlue/10 border border-aquaBlue/20 text-aquaDark font-bold text-xs sm:text-sm shadow-sm">
+                <span class="w-2 h-2 rounded-full bg-aquaBlue animate-pulse"></span>
+                <span>東京駅直結・八重洲ミッドタウン内 城東小温水プール</span>
+              </div>
+
+              <!-- メイン大見出し -->
+              <h2 class="text-[26px] sm:text-4xl lg:text-5xl font-bold text-navy leading-[1.3] tracking-tight">
+                「できた！」が笑顔と自信に変わる。<br />
+                <span class="text-aquaDark underline decoration-ctaYellow decoration-4 underline-offset-8">4名限定</span>の少人数制水泳教室
+              </h2>
+
+              <p class="text-base sm:text-lg text-textColor font-medium leading-relaxed">
+                大手集団スクールでありがちな<strong class="text-navy font-bold">「順番待ち」は一切なし</strong>。<br class="hidden sm:inline" />
+                専任プロコーチが手取り足取りサポートし、水への恐怖心や息継ぎの壁を最短・笑顔で乗り越えます。
+              </p>
+
+              <!-- トレース元スタイルの3連キャッチバッジ -->
+              <div class="grid grid-cols-3 gap-2 sm:gap-4 pt-2">
+                <div class="bg-white/95 border-2 border-navy/10 rounded-2xl p-3 sm:p-4 text-center shadow-sm">
+                  <p class="text-xs sm:text-sm text-navy font-bold leading-tight">1クラス<br /><span class="text-aquaDark text-sm sm:text-lg">最大4名</span></p>
+                </div>
+                <div class="bg-white/95 border-2 border-navy/10 rounded-2xl p-3 sm:p-4 text-center shadow-sm">
+                  <p class="text-xs sm:text-sm text-navy font-bold leading-tight">待ち時間ゼロ<br /><span class="text-aquaDark text-sm sm:text-lg">運動量3倍</span></p>
+                </div>
+                <div class="bg-white/95 border-2 border-navy/10 rounded-2xl p-3 sm:p-4 text-center shadow-sm">
+                  <p class="text-xs sm:text-sm text-navy font-bold leading-tight">水深100cm<br /><span class="text-aquaDark text-sm sm:text-lg">足がつく安心</span></p>
+                </div>
+              </div>
+
+              <!-- ファーストビューCTA -->
+              <div class="pt-2 flex flex-col items-center lg:items-start gap-3">
+                <!-- 直上ティザーピルバッジ -->
+                <div class="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-ctaYellow/25 border border-ctaYellow/50 text-navy font-bold text-xs shadow-sm">
+                  <span>⚡️ 登録は10秒・空き枠カレンダーを即確認</span>
+                </div>
+
+                <div class="w-full sm:w-auto flex flex-col sm:flex-row items-center gap-3">
+                  <a
+                    href="https://lin.ee/Va5wa9s"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="w-full sm:w-auto min-h-[52px] inline-flex items-center justify-center gap-3 bg-ctaYellow text-textColor font-bold text-base sm:text-lg px-8 py-4 rounded-full hover:bg-ctaYellowHover transition shadow-lg hover:shadow-xl c-btn-cta border-2 border-navy/10"
+                  >
+                    <svg class="w-6 h-6 fill-[#06c755]" viewBox="0 0 24 24">
+                      <path d="M12 2C6.48 2 2 5.82 2 10.53c0 2.93 1.76 5.51 4.41 7.02-.19.7-.68 2.53-.78 2.92-.12.49.18.48.38.35.16-.1 2.21-1.49 3.1-2.1.92.17 1.88.26 2.89.26 5.52 0 10-3.82 10-8.53S17.52 2 12 2z"/>
+                    </svg>
+                    <span>LINEで日程・空き枠を確認する</span>
+                  </a>
+                  <p class="text-xs text-mutedText font-medium">※2026年10月期 金曜夕方クラス（各回限定4名）</p>
+                </div>
+
+                <!-- 直下安心マイクロコピー3連 -->
+                <div class="flex flex-wrap items-center justify-center lg:justify-start gap-3 sm:gap-4 text-[11px] sm:text-xs text-mutedText font-medium pt-1">
+                  <span class="flex items-center gap-1">
+                    <svg class="w-3.5 h-3.5 text-lineGreen" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                    </svg>
+                    しつこい営業連絡なし
+                  </span>
+                  <span class="flex items-center gap-1">
+                    <svg class="w-3.5 h-3.5 text-lineGreen" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                    </svg>
+                    相談・質問だけでもOK
+                  </span>
+                  <span class="flex items-center gap-1">
+                    <svg class="w-3.5 h-3.5 text-lineGreen" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                    </svg>
+                    各枠定員4名限定
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 右カラム：レッスンビジュアルイメージカード -->
+            <div class="lg:col-span-5 relative">
+              <div class="relative mx-auto max-w-[440px] lg:max-w-none">
+                <!-- メインカード写真風枠（aspect-[4/3] sm:aspect-[16/11] で歪み解消） -->
+                <div class="relative bg-white rounded-3xl p-3 shadow-xl border border-gray-100 rotate-1 hover:rotate-0 transition-transform duration-300">
+                  <img
+                    src="https://images.unsplash.com/photo-1530549387789-4c1017266635?auto=format&fit=crop&w=1000&q=80"
+                    alt="笑顔で水泳レッスンを受ける子どもとコーチ"
+                    class="w-full aspect-[4/3] sm:aspect-[16/11] object-cover rounded-2xl"
+                    loading="lazy"
+                  />
+                  <div class="absolute bottom-6 left-6 right-6 bg-white/95 backdrop-blur-md rounded-xl p-3.5 shadow-md border border-gray-100">
+                    <p class="text-xs font-bold text-navy flex items-center gap-1.5">
+                      <span class="w-2 h-2 rounded-full bg-lineGreen"></span>
+                      城東小学校 室内温水プール（八重洲直結）
+                    </p>
+                    <p class="text-[11px] text-mutedText mt-0.5">水深100cm・最新空調・保護者見学席完備</p>
+                  </div>
+                </div>
+
+                <!-- 浮かぶサブバッジ -->
+                <div class="absolute -top-4 -left-4 bg-navy text-white px-4 py-2 rounded-2xl shadow-lg border-2 border-white text-xs font-bold -rotate-3">
+                  ★ 入会金0円・都度払いOK
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- Wave Divider 1: Light to Navy (潜水波) -->
+      <div class="w-full overflow-hidden leading-none relative z-10 -mb-[1px]" aria-hidden="true">
+        <svg class="relative block w-full h-8 sm:h-12 lg:h-16 text-navy" viewBox="0 0 1440 80" fill="none" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M0,25 C320,65 480,10 720,40 C960,70 1200,15 1440,45 L1440,80 L0,80 Z" fill="rgba(0, 180, 191, 0.35)"/>
+          <path d="M0,42 C280,15 560,60 840,32 C1120,5 1320,50 1440,38 L1440,80 L0,80 Z" fill="currentColor"/>
+        </svg>
+      </div>
+
+      <!-- ==============================================
+           3. Intro (実績カウンター・ダーク背景: #354050)
+      =============================================== -->
+      <section class="intro bg-navy text-white py-16 sm:py-20 relative overflow-hidden">
+        <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          
+          <!-- 吹き出し見出し -->
+          <div class="inline-block relative px-8 py-3 rounded-full border-2 border-white/80 bg-navy mb-8 balloon-arrow-down shadow-md">
+            <p class="text-sm sm:text-base font-bold tracking-wide">
+              少人数特化スクールだから実現できる実績
+            </p>
+          </div>
+
+          <!-- 巨大数字アピール -->
+          <div class="mb-8">
+            <p class="text-sm sm:text-lg text-gray-300 font-medium mb-1">受講生・保護者の上達実感度は</p>
+            <div class="flex items-baseline justify-center gap-1 font-bold">
+              <span class="text-lg sm:text-2xl text-gray-300">およそ</span>
+              <span class="text-5xl sm:text-7xl font-roboto tracking-tight text-ctaYellow">98</span>
+              <span class="text-2xl sm:text-4xl text-ctaYellow">%</span>
+              <span class="text-3xl sm:text-5xl text-ctaYellow">！</span>
+            </div>
+          </div>
+
+          <!-- リードテキスト -->
+          <div class="max-w-2xl mx-auto space-y-2 mb-12">
+            <p class="text-lg sm:text-xl font-bold">受講して終わりじゃない。</p>
+            <p class="text-sm sm:text-base text-gray-200 leading-relaxed">
+              <span class="text-ctaYellow font-bold border-b border-ctaYellow pb-0.5">“水嫌い克服・25m完泳”</span> まで寄り添えるのは、1クラス4名の少人数スクールだからこそ。
+            </p>
+          </div>
+
+          <!-- 3連実績データリスト（トレース元仕様） -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+            <div class="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-6 text-center">
+              <p class="text-xs sm:text-sm text-gray-300 font-bold mb-2">受講満足度</p>
+              <p class="text-4xl sm:text-5xl font-bold font-roboto text-white">
+                98<span class="text-xl sm:text-2xl ml-1 text-ctaYellow">%</span>
+              </p>
+            </div>
+
+            <div class="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-6 text-center">
+              <p class="text-xs sm:text-sm text-gray-300 font-bold mb-2">クロール息継ぎ・25m達成率</p>
+              <p class="text-4xl sm:text-5xl font-bold font-roboto text-white">
+                92<span class="text-xl sm:text-2xl ml-1 text-ctaYellow">%</span>
+                <span class="text-xs sm:text-sm text-gray-300 font-normal ml-1">以上</span>
+              </p>
+            </div>
+
+            <div class="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-6 text-center">
+              <p class="text-xs sm:text-sm text-gray-300 font-bold mb-2">1クラス定員</p>
+              <p class="text-4xl sm:text-5xl font-bold font-roboto text-white">
+                4<span class="text-lg sm:text-xl ml-1">名限定</span>
+              </p>
+              <p class="text-[11px] text-gray-400 mt-2">※完全予約制・先着順受付</p>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- Wave Divider 2: Navy to Light (浮上波) -->
+      <div class="w-full overflow-hidden leading-none relative z-10 -mt-[1px] rotate-180" aria-hidden="true">
+        <svg class="relative block w-full h-8 sm:h-12 lg:h-16 text-navy" viewBox="0 0 1440 80" fill="none" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M0,25 C320,65 480,10 720,40 C960,70 1200,15 1440,45 L1440,80 L0,80 Z" fill="rgba(0, 180, 191, 0.35)"/>
+          <path d="M0,42 C280,15 560,60 840,32 C1120,5 1320,50 1440,38 L1440,80 L0,80 Z" fill="currentColor"/>
+        </svg>
+      </div>
+
+      <!-- ==============================================
+           4. 中間CTA (水面グラデーション + お悩み相談誘導)
+      =============================================== -->
+      <div class="ctaArea bg-gradient-to-r from-blue-50/70 via-white to-blue-50/70 py-12 border-b border-gray-200 text-center relative overflow-hidden">
+        <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8 relative z-10 space-y-4">
+          <p class="text-base sm:text-xl font-bold text-navy">
+            「うちの子、水が怖くて顔もつけられないけれど大丈夫…？」
+          </p>
+          <p class="text-xs sm:text-sm text-textColor max-w-xl mx-auto leading-relaxed">
+            そんな疑問や不安も、専任プロコーチにLINEで直接ご相談いただけます。無理な勧誘は一切ございません。
+          </p>
+          <div class="pt-2">
+            <a
+              href="https://lin.ee/Va5wa9s"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="w-full sm:w-auto min-h-[52px] inline-flex items-center justify-center gap-3 bg-ctaYellow text-textColor font-bold text-base sm:text-lg px-8 sm:px-12 py-4 rounded-full hover:bg-ctaYellowHover transition shadow-md hover:shadow-lg c-btn-cta border border-navy/10"
+            >
+              <svg class="w-6 h-6 fill-[#06c755]" viewBox="0 0 24 24">
+                <path d="M12 2C6.48 2 2 5.82 2 10.53c0 2.93 1.76 5.51 4.41 7.02-.19.7-.68 2.53-.78 2.92-.12.49.18.48.38.35.16-.1 2.21-1.49 3.1-2.1.92.17 1.88.26 2.89.26 5.52 0 10-3.82 10-8.53S17.52 2 12 2z"/>
+              </svg>
+              <span>LINEで気軽にお悩み相談・空き枠確認 ➔</span>
+            </a>
+          </div>
+          <p class="text-xs text-mutedText pt-1 font-medium">※相談無料・友だち追加後にトークで話しかけていただくだけでOKです</p>
+        </div>
+      </div>
+
+      <!-- ==============================================
+           5. Nayami (お悩み3枚カード + 波線テキスト)
+      =============================================== -->
+      <section class="nayamiArea py-16 sm:py-24 bg-white" id="problem">
+        <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
+          <div class="text-center mb-12">
+            <span class="inline-block text-xs font-bold tracking-widest text-aquaDark uppercase bg-aquaBlue/10 px-3 py-1 rounded-full mb-3">
+              TROUBLE CHECK
+            </span>
+            <h2 class="text-2xl sm:text-3xl lg:text-4xl font-bold text-navy">
+              お子さまの水泳で、こんなお悩みはありませんか？
+            </h2>
+          </div>
+
+          <!-- 3枚のお悩みカード（Flex Stretch Architecture: カード底辺水平ロック） -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 mb-12 items-stretch">
+            <!-- お悩み01 -->
+            <div class="h-full flex flex-col justify-between bg-[#fdfaf5] border-2 border-[#f0e6d6] rounded-3xl p-6 sm:p-8 shadow-sm relative transition hover:shadow-md">
+              <div class="w-12 h-12 rounded-2xl bg-[#ffebdd] text-[#e65100] flex items-center justify-center font-bold text-xl mb-4">
+                01
+              </div>
+              <div class="space-y-3 flex-1 mb-4">
+                <h3 class="text-lg font-bold text-navy leading-snug">
+                  15人の集団スクールで、順番待ちばかり…全然泳げない！
+                </h3>
+                <p class="text-sm text-textColor leading-relaxed">
+                  プールサイドに立って待っている時間が大半で、1時間のうち実際に泳げるのはほんの数分。体が冷えてやる気も落ちてしまう。
+                </p>
+              </div>
+              <div class="mt-auto pt-4 border-t border-[#f0e6d6] text-xs text-mutedText font-semibold">
+                集団スクールに通う保護者の声
+              </div>
+            </div>
+
+            <!-- お悩み02 -->
+            <div class="h-full flex flex-col justify-between bg-[#fdfaf5] border-2 border-[#f0e6d6] rounded-3xl p-6 sm:p-8 shadow-sm relative transition hover:shadow-md">
+              <div class="w-12 h-12 rounded-2xl bg-[#ffebdd] text-[#e65100] flex items-center justify-center font-bold text-xl mb-4">
+                02
+              </div>
+              <div class="space-y-3 flex-1 mb-4">
+                <h3 class="text-lg font-bold text-navy leading-snug">
+                  息継ぎが上手くできず、進級テストに何度も落ち続ける…
+                </h3>
+                <p class="text-sm text-textColor leading-relaxed">
+                  どこを直せばいいのかコーチに詳しく教えてもらえず、同じ級で何ヶ月も停滞。「もう行きたくない」と言い出して困っている。
+                </p>
+              </div>
+              <div class="mt-auto pt-4 border-t border-[#f0e6d6] text-xs text-mutedText font-semibold">
+                進級停滞に悩む保護者の声
+              </div>
+            </div>
+
+            <!-- お悩み03 -->
+            <div class="h-full flex flex-col justify-between bg-[#fdfaf5] border-2 border-[#f0e6d6] rounded-3xl p-6 sm:p-8 shadow-sm relative transition hover:shadow-md">
+              <div class="w-12 h-12 rounded-2xl bg-[#ffebdd] text-[#e65100] flex items-center justify-center font-bold text-xl mb-4">
+                03
+              </div>
+              <div class="space-y-3 flex-1 mb-4">
+                <h3 class="text-lg font-bold text-navy leading-snug">
+                  水深が深くて足がつかず、水に入るのが怖くなってしまった…
+                </h3>
+                <p class="text-sm text-textColor leading-relaxed">
+                  背が低いうちは足がつかないプールに強い恐怖を感じてしまう。一度怖い思いをすると、水への苦手意識が定着してしまう心配が。
+                </p>
+              </div>
+              <div class="mt-auto pt-4 border-t border-[#f0e6d6] text-xs text-mutedText font-semibold">
+                水が苦手なお子さまの保護者の声
+              </div>
+            </div>
+          </div>
+
+          <!-- トレース元スタイルの波線アピールテキスト -->
+          <div class="text-center">
+            <p class="text-lg sm:text-2xl font-bold text-navy leading-relaxed">
+              <span class="text__wavy">
+                子どもの水泳上達は環境選びで決まる！悩む親御さんはいっぱいです！！
+              </span>
+            </p>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ==============================================
+           6. For Kids (方眼紙背景 hougan + アンケート風)
+      =============================================== -->
+      <section class="formam hougan py-16 sm:py-24 border-t border-b border-[#c8d4e7]/60">
+        <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
+          
+          <!-- タイトルエリア -->
+          <div class="text-center mb-10">
+            <span class="inline-block text-sm font-bold text-aquaDark tracking-wider uppercase bg-white px-4 py-1 rounded-full border border-gridBorder shadow-sm mb-3">
+              FOR KIDS &amp; PARENTS
+            </span>
+            <p class="text-sm sm:text-base text-mutedText font-bold mb-1">
+              小学生の保護者約1,000人に聞きました
+            </p>
+            <h2 class="text-2xl sm:text-4xl font-bold text-navy leading-tight">
+              子どもにとって本当に理想の水泳環境って？
+            </h2>
+          </div>
+
+          <!-- インフォグラフィック風カード -->
+          <div class="max-w-3xl mx-auto bg-white rounded-3xl p-6 sm:p-10 shadow-lg border-2 border-gridBorder mb-10">
+            <div class="flex flex-col md:flex-row items-center gap-8">
+              <!-- 円グラフ風グラフィック -->
+              <div class="w-48 h-48 rounded-full bg-gradient-to-tr from-aquaBlue to-[#26d0ce] flex items-center justify-center p-3 shadow-inner shrink-0 text-white text-center">
+                <div>
+                  <p class="text-xs font-bold leading-tight">待ち時間なし<br />少人数指導を希望</p>
+                  <p class="text-4xl font-bold font-roboto my-1">86<span class="text-xl">%</span></p>
+                  <p class="text-[10px] opacity-90">約860名が回答</p>
+                </div>
+              </div>
+
+              <!-- アンケート内容の解説 -->
+              <div class="space-y-3 text-sm sm:text-base text-textColor">
+                <p class="font-bold text-navy text-lg">
+                  「もっとたくさん泳げて、個別に見てほしい」という強い願い。
+                </p>
+                <p class="leading-relaxed">
+                  多くの親御さんが「週1回通わせているのに上達が遅い」「待ち時間が長すぎる」と感じています。集団の枠組みでは一人ひとりの癖や恐怖心に向き合う時間が圧倒的に不足しているのです。
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 共感テキストブロック -->
+          <div class="max-w-3xl mx-auto bg-white/90 backdrop-blur rounded-2xl p-6 sm:p-8 border border-gridBorder space-y-4 text-center sm:text-left text-sm sm:text-base text-textColor shadow-sm">
+            <p class="font-bold text-navy text-center text-lg">
+              「泳げる楽しさ」と「本物の自信」を、スイムステップで育みませんか？
+            </p>
+            <p class="leading-relaxed">
+              水に顔をつけるのが怖かった子が、笑顔で潜れるようになった瞬間。<br />
+              息継ぎができずに苦しんでいた子が、すいすい25mを泳ぎ切った瞬間の誇らしげな笑顔。<br />
+              その小さな「できた！」の積み重ねが、一生モノの自己肯定感へとつながります。
+            </p>
+            <p class="font-bold text-aquaDark text-center pt-2">
+              そんなお子さまの成長に、私たちは少人数制でとことん寄り添います。
+            </p>
+          </div>
+
+          <!-- 下部吹き出し -->
+          <div class="mt-10 text-center">
+            <div class="inline-block relative bg-navy text-white px-8 py-4 rounded-3xl text-sm sm:text-base font-bold shadow-md balloon-arrow-down-navy">
+              スイムステップでは<br />
+              お子さまの課題にピンポイントで向き合う<span class="text-ctaYellow">少人数プログラム</span>をご用意！
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ==============================================
+           7. About (スクール紹介: ダークネイビー背景 #354050)
+      =============================================== -->
+      <section class="about bg-navy text-white py-16 sm:py-24 text-center">
+        <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
+          <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white/10 text-aquaBlue mb-6 border border-white/20">
+            <span class="text-2xl font-bold font-roboto">S</span>
+          </div>
+
+          <h2 class="text-2xl sm:text-4xl font-bold mb-6 tracking-tight">
+            スイムステップとは？
+          </h2>
+
+          <div class="max-w-2xl mx-auto space-y-4 text-sm sm:text-base text-gray-200 leading-relaxed font-medium">
+            <p>
+              「水が苦手な我が子に、無理なく泳げるようになってほしい」<br />
+              「進級テストでつまづいているクロール息継ぎを突破させたい」<br />
+              「東京駅近くの綺麗な温水プールで安心して習わせたい」
+            </p>
+            <p>
+              そんなお子さまと親御さんのための、<span class="text-ctaYellow font-bold">1クラス最大4名限定・少人数制水泳教室</span>です。<br />
+              一人ひとりの癖や骨格、心理状態に合わせてプロコーチが寄り添い、短期間で目に見える上達をお届けします。
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==============================================
+           8. Survey (保護者アンケート: 方眼紙背景 hougan)
+      =============================================== -->
+      <section class="survey hougan py-16 sm:py-24 border-b border-[#c8d4e7]/60">
+        <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
+          <div class="text-center mb-12">
+            <p class="text-sm font-bold text-mutedText mb-1">スイムステップ参加者アンケート</p>
+            <h2 class="text-2xl sm:text-4xl font-bold text-navy">
+              保護者の<span class="text-aquaDark">98％</span>が ”大満足・満足” と回答しています
+            </h2>
+          </div>
+
+          <!-- 声カード2枚のグリッド（Flex Stretch Architecture: 高さ完全統一） -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto items-stretch">
+            <div class="h-full flex flex-col justify-between bg-white rounded-3xl p-6 sm:p-8 border-2 border-gridBorder shadow-sm transition hover:shadow-md">
+              <div>
+                <div class="flex items-center gap-1 text-ctaYellow mb-3">
+                  ★★★★★ <span class="text-xs text-mutedText ml-2 font-bold text-navy">小学3年生・男子の保護者様</span>
+                </div>
+                <h3 class="text-base sm:text-lg font-bold text-navy mb-2">
+                  大手スクールで1年間合格しなかった息継ぎが、たった2回で習得できました！
+                </h3>
+              </div>
+              <p class="text-sm text-textColor leading-relaxed flex-1 mb-4">
+                集団スクールでは何が原因かわからず親子で焦っていましたが、こちらのコーチが「頭の上げすぎ」を一目で指摘し修正。驚くほど自然に息継ぎができるようになり、本人の水泳愛が再燃しました！
+              </p>
+              <p class="mt-auto pt-3 border-t border-gray-100 text-xs text-mutedText text-right">クロール息継ぎ・25m挑戦クラス受講</p>
+            </div>
+
+            <div class="h-full flex flex-col justify-between bg-white rounded-3xl p-6 sm:p-8 border-2 border-gridBorder shadow-sm transition hover:shadow-md">
+              <div>
+                <div class="flex items-center gap-1 text-ctaYellow mb-3">
+                  ★★★★★ <span class="text-xs text-mutedText ml-2 font-bold text-navy">小学1年生・女子の保護者様</span>
+                </div>
+                <h3 class="text-base sm:text-lg font-bold text-navy mb-2">
+                  水深100cmで足がつくから安心。顔つけすら怖がっていた娘が笑顔で潜れるように！
+                </h3>
+              </div>
+              <p class="text-sm text-textColor leading-relaxed flex-1 mb-4">
+                足がつかないプールだとパニックを起こしていた娘ですが、城東小プールは足が着くので安心できたようです。4人だけなのでコーチが常にそばにいて見守ってくれたおかげで、水への恐怖心が消えました。
+              </p>
+              <p class="mt-auto pt-3 border-t border-gray-100 text-xs text-mutedText text-right">水慣れ・浮き身・キック基礎クラス受講</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==============================================
+           9. Media (Movie: レッスンダイジェスト動画)
+      =============================================== -->
+      <section class="movie py-16 sm:py-24 bg-white" id="movie">
+        <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
+          <div class="text-center mb-12">
+            <span class="inline-block text-xs font-bold tracking-widest text-aquaDark uppercase bg-aquaBlue/10 px-3 py-1 rounded-full mb-3">
+              LESSON MOVIE
+            </span>
+            <h2 class="text-2xl sm:text-4xl font-bold text-navy">
+              1分でわかる！少人数レッスンのダイジェスト動画
+            </h2>
+            <p class="text-sm sm:text-base text-mutedText mt-2">
+              「どんな雰囲気で教えてくれるの？」実際のレッスンの様子をぜひご覧ください
+            </p>
+          </div>
+
+          <div class="max-w-4xl mx-auto">
+            <!-- 16:9 レスポンシブ動画コンテナ -->
+            <div class="relative bg-gray-900 rounded-3xl overflow-hidden shadow-2xl border-4 border-gray-100 aspect-video flex items-center justify-center group">
+              <!-- 背景ポスター画像 -->
+              <img
+                src="https://images.unsplash.com/photo-1519315901367-f34ff9154487?auto=format&fit=crop&w=1200&q=80"
+                alt="スイムステップ レッスン風景"
+                class="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:opacity-70 transition duration-300"
+              />
+              <div class="absolute inset-0 bg-navy/30 backdrop-blur-[2px]"></div>
+
+              <!-- 再生UI & ラベル -->
+              <div class="relative z-10 text-center space-y-4 px-4">
+                <a
+                  href="https://lin.ee/Va5wa9s"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="inline-flex items-center justify-center w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-ctaYellow text-textColor shadow-2xl hover:scale-110 hover:bg-ctaYellowHover transition duration-300 mx-auto border-4 border-white cursor-pointer"
+                  aria-label="動画を再生する"
+                >
+                  <svg class="w-8 h-8 sm:w-10 sm:h-10 fill-current ml-1" viewBox="0 0 24 24">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                </a>
+                <div class="text-white drop-shadow">
+                  <p class="text-lg sm:text-xl font-bold">【公式】スイムステップ レッスン風景ダイジェスト</p>
+                  <p class="text-xs sm:text-sm text-gray-200 mt-1">※水深100cmプールでのマンツーマン感覚の手厚いレッスン</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- 動画の注目ポイント3点 -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8">
+              <div class="bg-gray-50 border border-gray-200 rounded-2xl p-4 text-center">
+                <span class="text-xl">👀</span>
+                <p class="text-xs sm:text-sm font-bold text-navy mt-1">順番待ちゼロのスムーズな進行</p>
+                <p class="text-[11px] text-mutedText mt-0.5">次々に泳げて運動量3倍</p>
+              </div>
+              <div class="bg-gray-50 border border-gray-200 rounded-2xl p-4 text-center">
+                <span class="text-xl">🏊‍♂️</span>
+                <p class="text-xs sm:text-sm font-bold text-navy mt-1">水深100cmで足がつく安心感</p>
+                <p class="text-[11px] text-mutedText mt-0.5">怖がらずリラックスして練習</p>
+              </div>
+              <div class="bg-gray-50 border border-gray-200 rounded-2xl p-4 text-center">
+                <span class="text-xl">🤝</span>
+                <p class="text-xs sm:text-sm font-bold text-navy mt-1">プロコーチの手取り足取り指導</p>
+                <p class="text-[11px] text-mutedText mt-0.5">息継ぎのコツをその場で修正</p>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- ==============================================
+           10. Reason (選ばれる4つの理由: 01〜04)
+      =============================================== -->
+      <section class="reason py-16 sm:py-24 bg-[#fdfaf5] border-t border-b border-[#f0e6d6]" id="reason">
+        <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
+          <div class="text-center mb-16">
+            <span class="inline-block text-xs font-bold tracking-widest text-navy uppercase bg-ctaYellow px-4 py-1 rounded-full mb-3 shadow-sm">
+              REASON
+            </span>
+            <h2 class="text-2xl sm:text-4xl font-bold text-navy">
+              スイムステップが選ばれる<span class="text-aquaDark">4つの理由</span>
+            </h2>
+          </div>
+
+          <div class="space-y-10 max-w-4xl mx-auto">
+            
+            <!-- 01 -->
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-8 items-center bg-white rounded-3xl p-6 sm:p-10 border border-gray-200 shadow-sm transition hover:shadow-md">
+              <div class="md:col-span-7 space-y-4">
+                <div class="flex items-center gap-3">
+                  <span class="text-4xl sm:text-5xl font-bold font-roboto text-aquaDark">01</span>
+                  <h3 class="text-lg sm:text-xl font-bold text-navy">
+                    1クラス最大4名限定！<br class="sm:hidden" />待ち時間ゼロで運動量3倍
+                  </h3>
+                </div>
+                <p class="text-sm sm:text-base text-textColor leading-relaxed">
+                  一般的なスイミングスクール（1コース12〜15名）と異なり、最大4名までの超少人数編成。プールサイドで並んで待つ時間がなく、常に動き続けるため、1レッスンあたりの泳ぐ距離と経験値が圧倒的です。
+                </p>
+              </div>
+              <div class="md:col-span-5">
+                <img
+                  src="https://images.unsplash.com/photo-1519315901367-f34ff9154487?auto=format&fit=crop&w=800&q=80"
+                  alt="少人数で丁寧に指導を受ける水泳レッスン"
+                  class="rounded-2xl w-full aspect-[4/3] object-cover shadow-sm"
+                  loading="lazy"
+                />
+              </div>
+            </div>
+
+            <!-- 02 -->
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-8 items-center bg-white rounded-3xl p-6 sm:p-10 border border-gray-200 shadow-sm transition hover:shadow-md">
+              <div class="md:col-span-7 space-y-4">
+                <div class="flex items-center gap-3">
+                  <span class="text-4xl sm:text-5xl font-bold font-roboto text-aquaDark">02</span>
+                  <h3 class="text-lg sm:text-xl font-bold text-navy">
+                    東京ミッドタウン八重洲直結！<br class="sm:hidden" />水深100cmの安心設備
+                  </h3>
+                </div>
+                <p class="text-sm sm:text-base text-textColor leading-relaxed">
+                  会場は東京駅直結の城東小学校 室内温水プール。水深100cm（小学校低学年でも足がつく深さ）のため、足がつかない恐怖を感じることなく、リラックスして練習に集中できます。天候に左右されず通いやすさも抜群です。
+                </p>
+              </div>
+              <div class="md:col-span-5">
+                <img
+                  src="https://images.unsplash.com/photo-1576610616656-d3aa5d1f4534?auto=format&fit=crop&w=800&q=80"
+                  alt="美しく清潔な室内温水プール"
+                  class="rounded-2xl w-full aspect-[4/3] object-cover shadow-sm"
+                  loading="lazy"
+                />
+              </div>
+            </div>
+
+            <!-- 03 -->
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-8 items-center bg-white rounded-3xl p-6 sm:p-10 border border-gray-200 shadow-sm transition hover:shadow-md">
+              <div class="md:col-span-7 space-y-4">
+                <div class="flex items-center gap-3">
+                  <span class="text-4xl sm:text-5xl font-bold font-roboto text-aquaDark">03</span>
+                  <h3 class="text-lg sm:text-xl font-bold text-navy">
+                    専任プロコーチによる<br class="sm:hidden" />「受講中」と「LINE動画」のWサポート
+                  </h3>
+                </div>
+                <p class="text-sm sm:text-base text-textColor leading-relaxed">
+                  アルバイトではなく経験豊富な専任プロコーチが担当。レッスン中はその場で原因を即座に修正し、レッスン後にはお子さまの泳ぎのポイントや自宅でできるアドバイスをLINEで個別にお届けします。
+                </p>
+              </div>
+              <div class="md:col-span-5">
+                <img
+                  src="https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=800&q=80"
+                  alt="コーチと笑顔でハイタッチする様子"
+                  class="rounded-2xl w-full aspect-[4/3] object-cover shadow-sm"
+                  loading="lazy"
+                />
+              </div>
+            </div>
+
+            <!-- 04 -->
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-8 items-center bg-white rounded-3xl p-6 sm:p-10 border border-gray-200 shadow-sm transition hover:shadow-md">
+              <div class="md:col-span-7 space-y-4">
+                <div class="flex items-center gap-3">
+                  <span class="text-4xl sm:text-5xl font-bold font-roboto text-aquaDark">04</span>
+                  <h3 class="text-lg sm:text-xl font-bold text-navy">
+                    入会金0円・都度払いOK！<br class="sm:hidden" />必要な時だけ参加できる柔軟設計
+                  </h3>
+                </div>
+                <p class="text-sm sm:text-base text-textColor leading-relaxed">
+                  月謝の自動引き落としや高額な指定水着・キャップの購入義務はありません。1回だけの単発参加や、進級テスト前の2回・4回集中など、ご家庭のスケジュールと目的に合わせて無理なく受講いただけます。
+                </p>
+              </div>
+              <div class="md:col-span-5">
+                <img
+                  src="https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=800&q=80"
+                  alt="自由なスケジュールで参加できるチケットシステム"
+                  class="rounded-2xl w-full aspect-[4/3] object-cover shadow-sm"
+                  loading="lazy"
+                />
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- ==============================================
+           11. New CTA (3ステップLINE予約)
+      =============================================== -->
+      <section class="newcta bg-white py-16 sm:py-24" id="reservation">
+        <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
+          
+          <div class="text-center mb-12">
+            <span class="inline-block text-xs font-bold tracking-widest text-navy uppercase bg-ctaYellow px-4 py-1 rounded-full mb-3 shadow-sm">
+              ONLINE LINE REGISTRATION
+            </span>
+            <h2 class="text-2xl sm:text-4xl font-bold text-navy">
+              <span class="text-lineGreen">LINE登録</span>で日程・受講枠を簡単予約！
+            </h2>
+            <p class="text-sm sm:text-base text-mutedText mt-2">
+              面倒な書類記入なし！スマートフォンから1分でエントリー完了
+            </p>
+          </div>
+
+          <!-- 3ステップ図解（Flex Stretch Architecture: カード高さ揃え） -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto mb-12 items-stretch">
+            <div class="h-full flex flex-col justify-between bg-gray-50 rounded-2xl p-6 text-center shadow-sm border border-gray-200">
+              <div class="w-12 h-12 rounded-full bg-ctaYellow text-textColor font-bold text-xl flex items-center justify-center mx-auto mb-4 shadow-sm">
+                1
+              </div>
+              <div class="flex-1">
+                <h3 class="font-bold text-navy text-base mb-2">LINE友だち登録</h3>
+                <p class="text-xs text-mutedText leading-relaxed">
+                  下記のボタンから公式LINEを追加。「友だち追加」で予約画面へ進みます。
+                </p>
+              </div>
+            </div>
+
+            <div class="h-full flex flex-col justify-between bg-gray-50 rounded-2xl p-6 text-center shadow-sm border border-gray-200">
+              <div class="w-12 h-12 rounded-full bg-ctaYellow text-textColor font-bold text-xl flex items-center justify-center mx-auto mb-4 shadow-sm">
+                2
+              </div>
+              <div class="flex-1">
+                <h3 class="font-bold text-navy text-base mb-2">日程とクラス選択</h3>
+                <p class="text-xs text-mutedText leading-relaxed">
+                  10月の金曜夕方全4回から、ご都合の良い日時とクラス（基礎/息継ぎ）を選択。
+                </p>
+              </div>
+            </div>
+
+            <div class="h-full flex flex-col justify-between bg-gray-50 rounded-2xl p-6 text-center shadow-sm border border-gray-200">
+              <div class="w-12 h-12 rounded-full bg-ctaYellow text-textColor font-bold text-xl flex items-center justify-center mx-auto mb-4 shadow-sm">
+                3
+              </div>
+              <div class="flex-1">
+                <h3 class="font-bold text-navy text-base mb-2">当日プールへ参加</h3>
+                <p class="text-xs text-mutedText leading-relaxed">
+                  予約確定後、詳細な持ち物や集合場所をご案内。当日は水着1枚でご参加可能です。
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 予約の安心ポイント2つ -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto mb-8">
+            <div class="bg-gray-50 rounded-xl p-4 border border-gray-200 flex items-center gap-3">
+              <span class="text-xl">💬</span>
+              <p class="text-xs sm:text-sm font-bold text-navy">事前のお悩み相談・質問もLINEで受付中！</p>
+            </div>
+            <div class="bg-gray-50 rounded-xl p-4 border border-gray-200 flex items-center gap-3">
+              <span class="text-xl">⚠️</span>
+              <p class="text-xs sm:text-sm font-bold text-navy">各枠定員4名のため、満席になり次第締切</p>
+            </div>
+          </div>
+
+          <!-- LINE登録ボタン＆マイクロコピー -->
+          <div class="text-center space-y-3">
+            <div>
+              <p class="text-xs sm:text-sm font-bold text-navy bg-ctaYellow/20 border border-ctaYellow/40 inline-block px-4 py-1.5 rounded-full mb-3 shadow-sm">
+                【10月開講クラス】10/2・10/9・10/16・10/23（金）全4回・各回限定4名
+              </p>
+            </div>
+            <div>
+              <a
+                href="https://lin.ee/Va5wa9s"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="w-full sm:w-auto min-h-[56px] inline-flex items-center justify-center gap-3 bg-ctaYellow text-textColor font-bold text-lg sm:text-xl px-10 py-5 rounded-full hover:bg-ctaYellowHover transition shadow-xl hover:shadow-2xl c-btn-cta border-2 border-navy/10"
+              >
+                <svg class="w-7 h-7 fill-[#06c755]" viewBox="0 0 24 24">
+                  <path d="M12 2C6.48 2 2 5.82 2 10.53c0 2.93 1.76 5.51 4.41 7.02-.19.7-.68 2.53-.78 2.92-.12.49.18.48.38.35.16-.1 2.21-1.49 3.1-2.1.92.17 1.88.26 2.89.26 5.52 0 10-3.82 10-8.53S17.52 2 12 2z"/>
+                </svg>
+                <span>公式LINEで最新の空き状況を確認・予約する</span>
+              </a>
+            </div>
+            <p class="text-xs text-mutedText font-medium">※友だち追加＝即予約確定ではありません。まずは空き状況の確認のみでも大歓迎です。</p>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ==============================================
+           12. Supervision (監修・運営元紹介)
+      =============================================== -->
+      <section class="supervision py-16 sm:py-24 bg-gray-50 border-t border-b border-gray-200">
+        <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
+          <div class="text-center mb-12">
+            <span class="inline-block text-xs font-bold tracking-widest text-aquaDark uppercase bg-aquaBlue/10 px-3 py-1 rounded-full mb-3">
+              SUPERVISION
+            </span>
+            <h2 class="text-2xl sm:text-4xl font-bold text-navy">
+              水泳指導のプロ集団 <br class="sm:hidden" />スイムパートナーズが運営
+            </h2>
+            <p class="text-sm sm:text-base text-mutedText mt-3 max-w-2xl mx-auto">
+              個人レッスン・少人数指導において豊富な指導実績を持つスイムパートナーズ。お子さま一人ひとりの心理的ケアと身体動作の分析を徹底しています。
+            </p>
+          </div>
+
+          <!-- 3枚の監修カード（Flex Stretch Architecture: 高さ完全統一） -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto items-stretch">
+            <div class="h-full flex flex-col justify-between bg-white rounded-2xl p-6 border border-gray-100 shadow-sm transition hover:shadow-md">
+              <div>
+                <div class="aspect-[16/10] w-full rounded-xl overflow-hidden mb-4">
+                  <img src="https://images.unsplash.com/photo-1519315901367-f34ff9154487?auto=format&fit=crop&w=600&q=80" alt="丁寧な指導" class="w-full h-full object-cover" loading="lazy" />
+                </div>
+                <h3 class="font-bold text-navy mb-2">専任コーチ陣の指導力</h3>
+              </div>
+              <p class="text-xs text-mutedText leading-relaxed flex-1">
+                日本水泳連盟公認資格や競技実績を持つプロコーチが在籍。「なぜできないか」を科学的・運動学的にわかりやすく解説します。
+              </p>
+            </div>
+
+            <div class="h-full flex flex-col justify-between bg-white rounded-2xl p-6 border border-gray-100 shadow-sm transition hover:shadow-md">
+              <div>
+                <div class="aspect-[16/10] w-full rounded-xl overflow-hidden mb-4">
+                  <img src="https://images.unsplash.com/photo-1576610616656-d3aa5d1f4534?auto=format&fit=crop&w=600&q=80" alt="城東小学校プール" class="w-full h-full object-cover" loading="lazy" />
+                </div>
+                <h3 class="font-bold text-navy mb-2">最高峰のレッスン環境</h3>
+              </div>
+              <p class="text-xs text-mutedText leading-relaxed flex-1">
+                東京ミッドタウン八重洲内の最新温水プールを採用。清潔な更衣室・温水シャワー・観覧席を備え、保護者様も快適に見守れます。
+              </p>
+            </div>
+
+            <div class="h-full flex flex-col justify-between bg-white rounded-2xl p-6 border border-gray-100 shadow-sm transition hover:shadow-md">
+              <div>
+                <div class="aspect-[16/10] w-full rounded-xl overflow-hidden mb-4">
+                  <img src="https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=600&q=80" alt="充実の個別サポート" class="w-full h-full object-cover" loading="lazy" />
+                </div>
+                <h3 class="font-bold text-navy mb-2">心理的安全性の重視</h3>
+              </div>
+              <p class="text-xs text-mutedText leading-relaxed flex-1">
+                水が怖い子どもに無理強いは一切しません。小さなステップを褒めて伸ばすことで、「できた！」という自発的な意欲を引き出します。
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==============================================
+           13. Voice (受講生・保護者の声: 方眼紙背景 hougan)
+      =============================================== -->
+      <section class="voices hougan py-16 sm:py-24 border-b border-[#c8d4e7]/60" id="voices">
+        <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
+          <div class="text-center mb-12">
+            <span class="inline-block text-xs font-bold tracking-widest text-navy uppercase bg-ctaYellow px-4 py-1 rounded-full mb-3 shadow-sm">
+              USER VOICES
+            </span>
+            <h2 class="text-2xl sm:text-4xl font-bold text-navy">
+              受講生・保護者様のリアルな体験談
+            </h2>
+            <p class="text-sm sm:text-base text-mutedText mt-2">
+              少人数制だからこそ生まれた上達の軌跡と、親御さんからの嬉しいご感想
+            </p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto items-stretch">
+            
+            <!-- カード1: 会員番号0035 テスト太郎くん（制約データ完全維持） -->
+            <div class="h-full flex flex-col justify-between bg-white rounded-3xl p-6 sm:p-8 border-2 border-gridBorder shadow-md hover:shadow-lg transition">
+              <div>
+                <div class="flex items-center justify-between mb-3">
+                  <div class="flex items-center text-ctaYellow">★★★★★</div>
+                  <span class="text-[11px] font-bold bg-aquaBlue/10 text-aquaDark px-2.5 py-0.5 rounded-full">会員番号0035</span>
+                </div>
+                <h3 class="text-base sm:text-lg font-bold text-navy mb-1">
+                  テスト太郎くん（小学2年生）保護者様
+                </h3>
+                <div class="inline-block text-[11px] font-bold text-lineGreen bg-green-50 px-2 py-0.5 rounded mb-2">
+                  【水嫌い克服 ➔ 息継ぎ25m完泳！】
+                </div>
+                <p class="text-xs font-bold text-aquaDark mb-3">受講：水慣れ基礎 ➔ 息継ぎ25m挑戦クラス</p>
+              </div>
+              <div class="text-sm text-textColor leading-relaxed space-y-2 flex-1 mb-4">
+                <p>
+                  大手集団スクールでは1年半通ってもバタ足止まりで、足がつかない恐怖からプール嫌いに…。
+                </p>
+                <p>
+                  スイムステップでは水深100cmで足が確実に着く安心感があり、新吉航大コーチが手取り足取り褒めながら教えてくれたおかげで、なんと<strong class="text-navy font-bold">初月で息継ぎクロール25mを完泳</strong>することができました！
+                </p>
+                <p>
+                  テスト太郎本人も「プールが一番楽しい！」と毎週金曜日を心待ちにしています。
+                </p>
+              </div>
+              <div class="mt-auto pt-4 border-t border-gray-100 flex items-center justify-between text-xs text-mutedText">
+                <span>受講期間：1ヶ月集中</span>
+                <span class="font-bold text-navy bg-aquaBlue/10 px-2 py-0.5 rounded">息継ぎ25m完泳達成</span>
+              </div>
+            </div>
+
+            <!-- カード2: 小学3年生 男子 -->
+            <div class="h-full flex flex-col justify-between bg-white rounded-3xl p-6 sm:p-8 border-2 border-gridBorder shadow-md hover:shadow-lg transition">
+              <div>
+                <div class="flex items-center justify-between mb-3">
+                  <div class="flex items-center text-ctaYellow">★★★★★</div>
+                  <span class="text-[11px] font-bold bg-gray-100 text-gray-600 px-2.5 py-0.5 rounded-full">中央区八重洲</span>
+                </div>
+                <h3 class="text-base sm:text-lg font-bold text-navy mb-1">
+                  小学3年生・男の子の保護者様
+                </h3>
+                <div class="inline-block text-[11px] font-bold text-lineGreen bg-green-50 px-2 py-0.5 rounded mb-2">
+                  【たった2回で進級テスト合格！】
+                </div>
+                <p class="text-xs font-bold text-aquaDark mb-3">受講：クロール息継ぎ・25m挑戦クラス</p>
+              </div>
+              <div class="text-sm text-textColor leading-relaxed space-y-2 flex-1 mb-4">
+                <p>
+                  集団スクールで何度も落ちていた25m進級テスト。息継ぎで頭を上げすぎて体が沈む悪循環に陥っていました。
+                </p>
+                <p>
+                  こちらではコーチがマンツーマンのように隣について、顎の引き方とローリングのタイミングを一発で見抜き修正。
+                </p>
+                <p>
+                  たった2回の受講でスイスイ泳げるようになり、翌週のテストに見事合格！息子の誇らしげな笑顔を見られて感動しました。
+                </p>
+              </div>
+              <div class="mt-auto pt-4 border-t border-gray-100 flex items-center justify-between text-xs text-mutedText">
+                <span>受講期間：2回受講</span>
+                <span class="font-bold text-navy bg-aquaBlue/10 px-2 py-0.5 rounded">進級テスト合格</span>
+              </div>
+            </div>
+
+            <!-- カード3: 小学1年生 女子 -->
+            <div class="h-full flex flex-col justify-between bg-white rounded-3xl p-6 sm:p-8 border-2 border-gridBorder shadow-md hover:shadow-lg transition">
+              <div>
+                <div class="flex items-center justify-between mb-3">
+                  <div class="flex items-center text-ctaYellow">★★★★★</div>
+                  <span class="text-[11px] font-bold bg-gray-100 text-gray-600 px-2.5 py-0.5 rounded-full">千代田区在住</span>
+                </div>
+                <h3 class="text-base sm:text-lg font-bold text-navy mb-1">
+                  小学1年生・女の子の保護者様
+                </h3>
+                <div class="inline-block text-[11px] font-bold text-lineGreen bg-green-50 px-2 py-0.5 rounded mb-2">
+                  【初日で笑顔で潜れるように！】
+                </div>
+                <p class="text-xs font-bold text-aquaDark mb-3">受講：水慣れ・浮き身・キック基礎クラス</p>
+              </div>
+              <div class="text-sm text-textColor leading-relaxed space-y-2 flex-1 mb-4">
+                <p>
+                  顔に水がかかることすら嫌がっていた娘。集団では放置されて泣いてしまいトラウマになっていました。
+                </p>
+                <p>
+                  スイムステップでは水深100cmで足が底につく上、先生がずっと手をつないで温かく励ましてくれました。
+                </p>
+                <p>
+                  順番待ちがなく50分間常に体を動かせるので体も冷えず、初日で笑顔で潜れるように！本当に通わせて良かったです。
+                </p>
+              </div>
+              <div class="mt-auto pt-4 border-t border-gray-100 flex items-center justify-between text-xs text-mutedText">
+                <span>受講期間：4回完走パック</span>
+                <span class="font-bold text-navy bg-aquaBlue/10 px-2 py-0.5 rounded">水嫌い完全克服</span>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Voice直後マイクロ誘導バナー -->
+          <div class="mt-12 text-center">
+            <div class="inline-flex flex-col sm:flex-row items-center gap-3 bg-white border-2 border-ctaYellow/60 rounded-2xl px-6 py-3.5 shadow-md">
+              <span class="text-xs sm:text-sm font-bold text-navy">次はあなたのお子さまの番です！【10月限定開講】各回定員4名・先着順受付中</span>
+              <a
+                href="https://lin.ee/Va5wa9s"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-ctaYellow text-textColor font-bold text-xs sm:text-sm hover:bg-ctaYellowHover transition shadow-sm c-btn-cta whitespace-nowrap"
+              >
+                <span>LINEで空き枠を確認 ➔</span>
+              </a>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ==============================================
+           14. Lesson (開講クラス・日程詳細)
+      =============================================== -->
+      <section class="lesson py-16 sm:py-24 bg-white" id="lesson">
+        <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
+          
+          <div class="text-center mb-12">
+            <span class="inline-block text-xs font-bold tracking-widest text-navy uppercase bg-ctaYellow px-4 py-1 rounded-full mb-3 shadow-sm">
+              OCTOBER 2026 SCHEDULE
+            </span>
+            <h2 class="text-2xl sm:text-4xl font-bold text-navy">
+              2026年10月度 開講クラス概要
+            </h2>
+            <p class="text-sm sm:text-base text-mutedText mt-2">
+              全日程：2026年10月2日(金), 10月9日(金), 10月16日(金), 10月23日(金)（毎週金曜夕方・全4回開催）
+            </p>
+          </div>
+
+          <!-- 2クラスカード（Flex Stretch Architecture: カード高さ＆ボタン完全水平同期） -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto items-stretch">
+            
+            <!-- クラス01 -->
+            <div class="h-full flex flex-col justify-between bg-gray-50 rounded-3xl p-6 sm:p-8 border-2 border-gray-200 shadow-sm transition hover:shadow-md">
+              <div class="space-y-4 flex-1 mb-4">
+                <div class="inline-block bg-aquaBlue/10 text-aquaDark text-xs font-bold px-3 py-1 rounded-full">
+                  定員4名・足がつく水深100cm
+                </div>
+                <h3 class="text-xl sm:text-2xl font-bold text-navy leading-snug">
+                  17:00〜17:50<br />
+                  水慣れ・浮き身・キック基礎クラス
+                </h3>
+                <div class="space-y-2 text-sm text-textColor leading-relaxed">
+                  <p><strong>対象：</strong>水に顔をつけるのが苦手なお子さま、潜るのが怖いお子さま、バタ足の基礎を固めたいお子さま（身長120cm程度〜）</p>
+                  <p><strong>内容：</strong>呼吸法、リラックスした浮き身（だるま浮き・くらげ浮き・けのび）、水をつかむ正しいキック動作を楽しく習得します。</p>
+                </div>
+              </div>
+              <div class="mt-auto pt-4 border-t border-gray-200 flex items-center justify-between">
+                <span class="text-xs text-mutedText font-semibold">金曜17時枠（残りわずか）</span>
+                <a
+                  href="https://lin.ee/Va5wa9s"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="min-h-[44px] inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-aquaBlue/15 text-aquaDark text-xs font-bold hover:bg-aquaBlue hover:text-white transition shadow-sm"
+                >
+                  <span>金曜17時枠をLINEで確認 ➔</span>
+                </a>
+              </div>
+            </div>
+
+            <!-- クラス02 -->
+            <div class="h-full flex flex-col justify-between bg-gray-50 rounded-3xl p-6 sm:p-8 border-2 border-gray-200 shadow-sm transition hover:shadow-md">
+              <div class="space-y-4 flex-1 mb-4">
+                <div class="inline-block bg-[#ffebdd] text-[#e65100] text-xs font-bold px-3 py-1 rounded-full">
+                  定員4名・進級テスト突破特化
+                </div>
+                <h3 class="text-xl sm:text-2xl font-bold text-navy leading-snug">
+                  18:00〜18:50<br />
+                  クロール息継ぎ・25m挑戦クラス
+                </h3>
+                <div class="space-y-2 text-sm text-textColor leading-relaxed">
+                  <p><strong>対象：</strong>クロールの腕回しはできるが息継ぎで沈んでしまうお子さま、25m完泳を目指したいお子さま（身長120cm程度〜）</p>
+                  <p><strong>内容：</strong>横向き呼吸のタイミング、ローリング動作、推進力を逃さないキャッチ＆プルを個別指導で集中的に改善します。</p>
+                </div>
+              </div>
+              <div class="mt-auto pt-4 border-t border-gray-200 flex items-center justify-between">
+                <span class="text-xs text-mutedText font-semibold">金曜18時枠（一番人気）</span>
+                <a
+                  href="https://lin.ee/Va5wa9s"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="min-h-[44px] inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#ffebdd] text-[#e65100] text-xs font-bold hover:bg-[#e65100] hover:text-white transition shadow-sm"
+                >
+                  <span>金曜18時枠をLINEで確認 ➔</span>
+                </a>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ==============================================
+           15. Choice (選べる受講スタイル・料金チケット: 方眼紙背景)
+      =============================================== -->
+      <section class="choice hougan py-16 sm:py-24 border-t border-b border-[#c8d4e7]/60" id="pricing">
+        <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
+          <div class="text-center mb-16">
+            <span class="inline-block text-xs font-bold tracking-widest text-navy uppercase bg-ctaYellow px-4 py-1 rounded-full mb-3 shadow-sm">
+              CHOICE &amp; PLAN
+            </span>
+            <p class="text-sm font-bold text-mutedText mb-1">都度払いOK・入会金0円</p>
+            <h2 class="text-2xl sm:text-4xl font-bold text-navy">
+              選べる受講スタイル・料金プラン
+            </h2>
+          </div>
+
+          <!-- 3つのチケットカード（Flex Stretch Architecture: ボタン底辺水平ロック） -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto items-stretch">
+            
+            <!-- 1回チケット -->
+            <div class="h-full flex flex-col justify-between bg-white border-2 border-gray-200 rounded-3xl p-6 sm:p-8 text-center shadow-sm transition hover:shadow-md">
+              <div>
+                <h3 class="text-lg font-bold text-navy mb-2">1回チケット</h3>
+                <p class="text-xs text-mutedText mb-4">お試し・都度払いに最適</p>
+                <div class="py-4 border-y border-gray-200 mb-6">
+                  <p class="text-3xl sm:text-4xl font-bold font-roboto text-navy">
+                    6,500<span class="text-sm sm:text-base font-normal">円（税込）</span>
+                  </p>
+                </div>
+              </div>
+              <ul class="text-xs sm:text-sm text-textColor space-y-2 text-left flex-1 mb-6">
+                <li class="flex items-center gap-2">✓ 1回50分の少人数集中レッスン</li>
+                <li class="flex items-center gap-2">✓ 入会金・月会費はずっと0円</li>
+                <li class="flex items-center gap-2">✓ 雰囲気を見てから決めたい方に</li>
+              </ul>
+              <div class="mt-auto">
+                <a
+                  href="https://lin.ee/Va5wa9s"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="block w-full py-3.5 rounded-full bg-navy text-white text-sm font-bold hover:bg-navy/90 transition shadow-sm c-btn-cta min-h-[48px] flex items-center justify-center"
+                >
+                  LINEで1回枠を申し込む
+                </a>
+              </div>
+            </div>
+
+            <!-- 4回チケット（一番人気） -->
+            <div class="h-full flex flex-col justify-between bg-white border-2 border-ctaYellow rounded-3xl p-6 sm:p-8 text-center shadow-xl relative md:scale-105 z-10">
+              <div class="absolute -top-4 left-1/2 -translate-x-1/2 bg-ctaYellow text-textColor text-xs font-bold px-4 py-1 rounded-full shadow-sm whitespace-nowrap">
+                ★ 1番人気・全4回完走パック
+              </div>
+              <div>
+                <h3 class="text-xl font-bold text-navy mb-2">4回完走パック</h3>
+                <p class="text-xs text-mutedText mb-4">1ヶ月で確実に壁を突破！</p>
+                <div class="py-4 border-y border-ctaYellow/30 mb-6 bg-ctaYellow/5 rounded-2xl">
+                  <p class="text-3xl sm:text-4xl font-bold font-roboto text-navy">
+                    22,000<span class="text-sm sm:text-base font-normal">円（税込）</span>
+                  </p>
+                  <p class="text-xs text-aquaDark font-bold mt-1">1回あたり 5,500円（1,000円お得！）</p>
+                </div>
+              </div>
+              <ul class="text-xs sm:text-sm text-textColor space-y-2 text-left flex-1 mb-6">
+                <li class="flex items-center gap-2 font-bold text-navy">✓ 10月全4回（2/9/16/23日）受講</li>
+                <li class="flex items-center gap-2">✓ 毎回LINE動画フィードバック付き</li>
+                <li class="flex items-center gap-2">✓ 息継ぎ・25m完泳にコミット</li>
+              </ul>
+              <div class="mt-auto">
+                <a
+                  href="https://lin.ee/Va5wa9s"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="block w-full py-3.5 rounded-full bg-ctaYellow text-textColor text-base font-bold hover:bg-ctaYellowHover transition shadow-md c-btn-cta min-h-[48px] flex items-center justify-center border border-navy/10"
+                >
+                  ★ 1番人気！LINEで4回パックを予約
+                </a>
+              </div>
+            </div>
+
+            <!-- 2回チケット -->
+            <div class="h-full flex flex-col justify-between bg-white border-2 border-gray-200 rounded-3xl p-6 sm:p-8 text-center shadow-sm transition hover:shadow-md">
+              <div>
+                <h3 class="text-lg font-bold text-navy mb-2">2回チケット</h3>
+                <p class="text-xs text-mutedText mb-4">隔週参加・要点集中に</p>
+                <div class="py-4 border-y border-gray-200 mb-6">
+                  <p class="text-3xl sm:text-4xl font-bold font-roboto text-navy">
+                    12,000<span class="text-sm sm:text-base font-normal">円（税込）</span>
+                  </p>
+                  <p class="text-xs text-mutedText mt-1">1回あたり 6,000円（500円お得）</p>
+                </div>
+              </div>
+              <ul class="text-xs sm:text-sm text-textColor space-y-2 text-left flex-1 mb-6">
+                <li class="flex items-center gap-2">✓ お好きな2日程を選択可能</li>
+                <li class="flex items-center gap-2">✓ 進級テスト直前の仕上げに最適</li>
+                <li class="flex items-center gap-2">✓ 入会金・年会費0円</li>
+              </ul>
+              <div class="mt-auto">
+                <a
+                  href="https://lin.ee/Va5wa9s"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="block w-full py-3.5 rounded-full bg-navy text-white text-sm font-bold hover:bg-navy/90 transition shadow-sm c-btn-cta min-h-[48px] flex items-center justify-center"
+                >
+                  LINEで2回枠を申し込む
+                </a>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- 料金プラン共通安心補足 -->
+          <p class="text-xs text-mutedText text-center mt-8 font-medium">
+            ※すべて入会金・月会費0円（都度払いOK）。LINEから簡単3ステップでお申し込みいただけます。
+          </p>
+
+        </div>
+      </section>
+
+      <!-- ==============================================
+           16. Message (コーチメッセージ: 2カラム)
+      =============================================== -->
+      <section class="message py-16 sm:py-24 bg-gray-50 border-t border-gray-200">
+        <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
+          <div class="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-10 items-center">
+            
+            <div class="md:col-span-5 text-center">
+              <div class="relative inline-block">
+                <img
+                  src="https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=800&q=80"
+                  alt="スイムパートナーズ チーフコーチ 新吉 航大"
+                  class="w-full max-w-[280px] sm:max-w-[320px] aspect-square rounded-3xl object-cover shadow-lg mx-auto border-4 border-white"
+                  loading="lazy"
+                />
+                <div class="absolute -bottom-3 -right-3 bg-navy text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow">
+                  Chief Coach 新吉 航大
+                </div>
+              </div>
+            </div>
+
+            <div class="md:col-span-7 space-y-4">
+              <span class="inline-block text-xs font-bold tracking-widest text-aquaDark uppercase bg-aquaBlue/10 px-3 py-1 rounded-full mb-1">
+                COACH MESSAGE
+              </span>
+              <p class="text-xs text-mutedText font-bold">チーフコーチ 新吉 航大 ＆ 専任コーチ陣</p>
+              <h2 class="text-xl sm:text-3xl font-bold text-navy leading-snug">
+                「泳げない子」なんて、ひとりもいません。<br />
+                つまづいているポイントを一緒に解きほぐします。
+              </h2>
+              <div class="space-y-3 text-sm sm:text-base text-textColor leading-relaxed">
+                <p>
+                  集団指導の現場で、顔に水がかかるのが怖くて泣いてしまう子や、息継ぎのタイミングが合わずに苦しんでいる子をたくさん見てきました。
+                </p>
+                <p>
+                  でも、それはお子さまの運動神経のせいではありません。<span class="c-marker">ただ「自分の足がつかない」「どこを直せばいいかわからない」という不安があるだけ</span>なのです。
+                </p>
+                <p>
+                  スイムステップでは、最大4名だからこそ、お子さまの目の高さに合わせて安心できる言葉をかけ、できた瞬間を思いきり褒めます。<span class="js-marker">「水泳が大好き！」という自信</span>を、ぜひ一緒に咲かせましょう。
+                </p>
+                <p class="text-xs text-mutedText font-semibold pt-2">
+                  ※毎回のレッスン終了後には、専任コーチからお子さま専用の個別アドバイス動画をLINEでお届けします。
+                </p>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- ==============================================
+           17. FAQ (よくあるご質問: アコーディオン)
+      =============================================== -->
+      <section class="faq py-16 sm:py-24 bg-white" id="faq">
+        <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
+          <div class="text-center mb-12">
+            <span class="inline-block text-xs font-bold tracking-widest text-aquaDark uppercase bg-aquaBlue/10 px-3 py-1 rounded-full mb-3">
+              FAQ
+            </span>
+            <h2 class="text-2xl sm:text-4xl font-bold text-navy">
+              よくあるご質問
+            </h2>
+            <p class="text-sm sm:text-base text-mutedText mt-2">
+              保護者様からよくいただくご質問にお答えします
+            </p>
+          </div>
+
+          <div class="max-w-3xl mx-auto space-y-4">
+            
+            <details class="group bg-gray-50 border border-gray-200 rounded-2xl p-5 open:bg-white transition-all">
+              <summary class="flex justify-between items-center font-bold text-navy cursor-pointer list-none text-sm sm:text-base">
+                <span>Q. まったく水に顔をつけられませんが参加できますか？</span>
+                <span class="transition group-open:rotate-180">
+                  <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </span>
+              </summary>
+              <p class="text-sm text-textColor mt-3 pt-3 border-t border-gray-100 leading-relaxed">
+                もちろん大歓迎です！17:00からの基礎クラスは、水慣れや浮き身からスタートします。コーチがお子さまの手を取り、水の中でリラックスできるよう段階的に進めますのでご安心ください。
+              </p>
+            </details>
+
+            <details class="group bg-gray-50 border border-gray-200 rounded-2xl p-5 open:bg-white transition-all">
+              <summary class="flex justify-between items-center font-bold text-navy cursor-pointer list-none text-sm sm:text-base">
+                <span>Q. プールの水深はどのくらいですか？足はつきますか？</span>
+                <span class="transition group-open:rotate-180">
+                  <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </span>
+              </summary>
+              <p class="text-sm text-textColor mt-3 pt-3 border-t border-gray-100 leading-relaxed">
+                会場の中央区立城東小学校プールは水深100cmとなっております。小学生低学年（身長120cm程度〜）のお子さまであれば無理なく足が届く安心設計です。
+              </p>
+            </details>
+
+            <details class="group bg-gray-50 border border-gray-200 rounded-2xl p-5 open:bg-white transition-all">
+              <summary class="flex justify-between items-center font-bold text-navy cursor-pointer list-none text-sm sm:text-base">
+                <span>Q. 保護者の見学は可能ですか？</span>
+                <span class="transition group-open:rotate-180">
+                  <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </span>
+              </summary>
+              <p class="text-sm text-textColor mt-3 pt-3 border-t border-gray-100 leading-relaxed">
+                プールサイド併設の保護者観覧席から間近でお子さまの様子をご覧いただけます。お子さまが頑張る姿や上達していく表情をぜひご覧ください。
+              </p>
+            </details>
+
+            <details class="group bg-gray-50 border border-gray-200 rounded-2xl p-5 open:bg-white transition-all">
+              <summary class="flex justify-between items-center font-bold text-navy cursor-pointer list-none text-sm sm:text-base">
+                <span>Q. 指定の水着やキャップを購入する必要はありますか？</span>
+                <span class="transition group-open:rotate-180">
+                  <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </span>
+              </summary>
+              <p class="text-sm text-textColor mt-3 pt-3 border-t border-gray-100 leading-relaxed">
+                指定用品は一切ございません。学校やお手持ちの水着・スイミングキャップ・ゴーグルをそのままご利用いただけます。
+              </p>
+            </details>
+
+            <details class="group bg-gray-50 border border-gray-200 rounded-2xl p-5 open:bg-white transition-all">
+              <summary class="flex justify-between items-center font-bold text-navy cursor-pointer list-none text-sm sm:text-base">
+                <span>Q. 体調不良時の振替やキャンセルはどうなりますか？</span>
+                <span class="transition group-open:rotate-180">
+                  <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </span>
+              </summary>
+              <p class="text-sm text-textColor mt-3 pt-3 border-t border-gray-100 leading-relaxed">
+                公式LINEより前日までにご連絡いただければ、別の日程への振替対応が可能です。急な発熱などについても柔軟に対応いたしますので、LINEからお気軽にご連絡ください。
+              </p>
+            </details>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- ==============================================
+           18. Closing (方眼紙背景 hougan + お申し込みボタン)
+      =============================================== -->
+      <section class="closing hougan py-16 sm:py-24 border-t border-gridBorder text-center">
+        <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
+          <p class="text-xs sm:text-sm font-bold text-aquaDark mb-2">
+            水深100cm・東京駅直結・専任プロコーチが手取り足取りサポート
+          </p>
+          <p class="text-base sm:text-xl font-bold text-navy mb-3">
+            水が苦手だった昨日から、泳げる喜びを知る明日へ。
+          </p>
+          <h2 class="text-xl sm:text-3xl font-bold text-navy mb-8">
+            <span class="c-marker">” 水泳が好き！ ”</span> と言える自信を、<br class="sm:hidden" />お子さまと一緒に育てませんか？
+          </h2>
+          <div>
+            <a
+              href="https://lin.ee/Va5wa9s"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="w-full sm:w-auto min-h-[56px] inline-flex items-center justify-center gap-3 bg-ctaYellow text-textColor text-lg sm:text-xl font-bold px-12 py-5 rounded-full hover:bg-ctaYellowHover transition shadow-xl hover:shadow-2xl c-btn-cta border-2 border-navy/20"
+            >
+              <svg class="w-6 h-6 fill-[#06c755]" viewBox="0 0 24 24">
+                <path d="M12 2C6.48 2 2 5.82 2 10.53c0 2.93 1.76 5.51 4.41 7.02-.19.7-.68 2.53-.78 2.92-.12.49.18.48.38.35.16-.1 2.21-1.49 3.1-2.1.92.17 1.88.26 2.89.26 5.52 0 10-3.82 10-8.53S17.52 2 12 2z"/>
+              </svg>
+              <span>公式LINEで10月枠を予約する（無料相談つき）</span>
+            </a>
+          </div>
+          <p class="text-xs text-mutedText mt-4 font-medium max-w-lg mx-auto leading-relaxed">
+            【安心のお約束】面倒な会員登録フォーム不要 / しつこい営業・勧誘は一切なし / 前日までのご連絡で別日程へ振替可能
+          </p>
+        </div>
+      </section>
+
+      <!-- Wave Divider 3: Closing to Footer (引き波) -->
+      <div class="w-full overflow-hidden leading-none relative z-10 -mb-[1px]" aria-hidden="true">
+        <svg class="relative block w-full h-6 sm:h-10 lg:h-12 text-navy" viewBox="0 0 1440 60" fill="none" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M0,20 C360,45 720,10 1080,35 C1260,48 1380,25 1440,30 L1440,60 L0,60 Z" fill="rgba(0, 180, 191, 0.25)"/>
+          <path d="M0,32 C300,12 600,48 900,28 C1200,8 1350,38 1440,30 L1440,60 L0,60 Z" fill="currentColor"/>
+        </svg>
+      </div>
+
+      <!-- ==============================================
+           19. Footer (ダークネイビー背景 #354050)
+      =============================================== -->
+      <footer id="footer" class="bg-navy text-white py-12 border-t border-white/10">
+        <div class="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
+          <div class="flex flex-col md:flex-row justify-between items-center gap-8 mb-8 pb-8 border-b border-white/10 text-center md:text-left">
+            <div>
+              <h2 class="text-2xl font-bold tracking-tight">スイムステップ</h2>
+              <p class="text-xs text-gray-400 mt-1">運営：スイムパートナーズ</p>
+              <p class="text-xs text-gray-400 mt-0.5">会場：中央区立城東小学校 室内温水プール（東京ミッドタウン八重洲内／東京駅直結・水深100cm）</p>
+            </div>
+            <div>
+              <a
+                href="https://lin.ee/Va5wa9s"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="inline-flex items-center gap-2 text-sm text-gray-300 hover:text-white transition"
+              >
+                <svg class="w-5 h-5 fill-[#06c755]" viewBox="0 0 24 24">
+                  <path d="M12 2C6.48 2 2 5.82 2 10.53c0 2.93 1.76 5.51 4.41 7.02-.19.7-.68 2.53-.78 2.92-.12.49.18.48.38.35.16-.1 2.21-1.49 3.1-2.1.92.17 1.88.26 2.89.26 5.52 0 10-3.82 10-8.53S17.52 2 12 2z"/>
+                </svg>
+                <span>公式LINEアカウント</span>
+              </a>
+            </div>
+          </div>
+          <p class="text-center text-xs text-gray-500">
+            &copy; SWIM STEP by SWIM PARTNERS. All Rights Reserved.
+          </p>
+        </div>
+      </footer>
+
+      <!-- ==============================================
+           20. スマホ固定追従CTAバー (Following Bar: Safe Area対応)
+      =============================================== -->
+      <div id="following" class="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-md border-t border-gray-200 px-4 pt-2.5 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:hidden shadow-2xl">
+        <!-- マイクロティザー帯 -->
+        <div class="text-center text-[10px] font-bold text-navy bg-ctaYellow/30 py-0.5 rounded-t-lg mb-1.5 flex items-center justify-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-lineGreen animate-ping"></span>
+          <span>10月期 金曜夕方クラス【各回定員4名】先着順受付中</span>
+        </div>
+        <a
+          href="https://lin.ee/Va5wa9s"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="flex items-center justify-center gap-2 w-full min-h-[50px] py-3.5 bg-ctaYellow text-textColor font-bold rounded-full text-base shadow-md c-btn-cta border border-navy/10"
+        >
+          <svg class="w-5 h-5 fill-[#06c755]" viewBox="0 0 24 24">
+            <path d="M12 2C6.48 2 2 5.82 2 10.53c0 2.93 1.76 5.51 4.41 7.02-.19.7-.68 2.53-.78 2.92-.12.49.18.48.38.35.16-.1 2.21-1.49 3.1-2.1.92.17 1.88.26 2.89.26 5.52 0 10-3.82 10-8.53S17.52 2 12 2z"/>
+          </svg>
+          <span>LINEで空き状況カレンダーを確認・予約</span>
+        </a>
+      </div>
+
+      <!-- ==============================================
+           21. ページトップへ戻るボタン (PageTop)
+      =============================================== -->
+      <a
+        id="pageTop"
+        href="#wrapper"
+        class="fixed bottom-20 sm:bottom-8 right-4 sm:right-8 z-40 w-11 h-11 sm:w-12 sm:h-12 rounded-full bg-navy text-white shadow-lg flex items-center justify-center hover:bg-navy/85 hover:-translate-y-1 transition duration-300 border-2 border-white cursor-pointer opacity-90 hover:opacity-100"
+        aria-label="ページ最上部へ戻る"
+      >
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 15l7-7 7 7"></path>
+        </svg>
+      </a>
+
+    </div>
+    <!-- /#wrapper -->
+
+    <!-- スムーズスクロール & アコーディオン制御スクリプト -->
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        // ページトップボタンのスムーズスクロール
+        const pageTop = document.getElementById('pageTop');
+        if (pageTop) {
+          pageTop.addEventListener('click', (e) => {
+            e.preventDefault();
+            window.scrollTo({
+              top: 0,
+              behavior: 'smooth'
+            });
+          });
+        }
+
+        // アンカーリンクのスムーズスクロール
+        document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
+          anchor.addEventListener('click', function (e) {
+            const href = this.getAttribute('href');
+            if (href === '#' || href === '#wrapper') return;
+            const target = document.querySelector(href);
+            if (target) {
+              e.preventDefault();
+              target.scrollIntoView({
+                behavior: 'smooth'
+              });
+            }
+          });
+        });
+      });
+    </script>
+  </body>
+</html>

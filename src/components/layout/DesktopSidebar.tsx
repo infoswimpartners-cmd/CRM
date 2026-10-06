@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { LogOut, LayoutDashboard, Users, Calendar, DollarSign, Settings, User, History, PlusCircle, CreditCard, BookOpen, Mail, FileCheck, Megaphone, MessageCircle, Crown, Timer, UserPlus, Sparkles, Bell, Waves } from 'lucide-react'
+import { LogOut, LayoutDashboard, Users, Calendar, DollarSign, Settings, User, History, PlusCircle, CreditCard, BookOpen, Mail, FileCheck, Megaphone, MessageCircle, MessageSquare, Crown, Timer, UserPlus, Sparkles, Bell, Waves } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 
 interface DesktopSidebarProps {
@@ -69,6 +69,7 @@ export function DesktopSidebar({ role }: DesktopSidebarProps) {
                         <NavItem href="/admin/swim-step" icon={Waves} label="スイムステップ管理" isActive={pathname?.startsWith('/admin/swim-step')} />
                         <NavItem href="/admin/coaches" icon={User} label="コーチ管理" isActive={pathname?.startsWith('/admin/coaches')} />
                         <NavItem href="/admin/line-monitoring" icon={MessageCircle} label="LINE管理" isActive={pathname?.startsWith('/admin/line-monitoring')} />
+                        <NavItem href="/admin/line-marketing" icon={MessageSquare} label="LINEマーケティング" isActive={pathname?.startsWith('/admin/line-marketing')} />
 
                         <NavHeading>実務メニュー</NavHeading>
                         <NavItem href="/coach/history" icon={History} label="レッスン履歴" isActive={pathname?.startsWith('/coach/history')} />
