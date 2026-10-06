@@ -31,6 +31,7 @@ import {
     Search,
     Loader2,
     Tag,
+    Calendar,
 } from 'lucide-react';
 import {
     SegmentFilterConditions,
@@ -45,6 +46,7 @@ import {
 } from '@/actions/line-marketing';
 import { PhonePreviewModal } from './PhonePreviewModal';
 import { SafetyConfirmDialog } from './SafetyConfirmDialog';
+import { ScheduledCampaignsModal } from './ScheduledCampaignsModal';
 
 export interface MasterDataProps {
     coaches: Array<{ id: string; fullName: string; baseArea: string | null }>;
@@ -144,6 +146,7 @@ export const SegmentBroadcastTab: React.FC<SegmentBroadcastTabProps> = ({
     // -------------------------------------------------------------
     const [isPhonePreviewOpen, setIsPhonePreviewOpen] = useState<boolean>(false);
     const [isSafetyDialogOpen, setIsSafetyDialogOpen] = useState<boolean>(false);
+    const [isScheduledCampaignsOpen, setIsScheduledCampaignsOpen] = useState<boolean>(false);
     const [isSendingTest, setIsSendingTest] = useState<boolean>(false);
     const [isSubmittingBroadcast, setIsSubmittingBroadcast] = useState<boolean>(false);
     const [previewTargetStudent, setPreviewTargetStudent] = useState<FilterPreviewStudent | null>(null);
@@ -406,16 +409,27 @@ export const SegmentBroadcastTab: React.FC<SegmentBroadcastTabProps> = ({
                             <Filter className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                             <CardTitle className="text-base font-bold">セグメント抽出条件（複合絞り込み・タグ別一斉配信）</CardTitle>
                         </div>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={fetchStudentsPreview}
-                            disabled={isLoadingPreview}
-                            className="text-xs text-slate-600 hover:text-slate-900"
-                        >
-                            <RefreshCw className={`w-3.5 h-3.5 mr-1 ${isLoadingPreview ? 'animate-spin' : ''}`} />
-                            最新に更新
-                        </Button>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setIsScheduledCampaignsOpen(true)}
+                                className="text-xs bg-blue-50/70 hover:bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800"
+                            >
+                                <Calendar className="w-3.5 h-3.5 mr-1.5 text-blue-600 dark:text-blue-400" />
+                                配信予約の確認・編集
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={fetchStudentsPreview}
+                                disabled={isLoadingPreview}
+                                className="text-xs text-slate-600 hover:text-slate-900"
+                            >
+                                <RefreshCw className={`w-3.5 h-3.5 mr-1 ${isLoadingPreview ? 'animate-spin' : ''}`} />
+                                最新に更新
+                            </Button>
+                        </div>
                     </div>
                     <CardDescription className="text-xs">
                         タグ、顧客ステータス、地域、担当コーチ、受講プランを掛け合わせて配信対象者を瞬時に特定し、一斉配信できます。
@@ -913,14 +927,25 @@ export const SegmentBroadcastTab: React.FC<SegmentBroadcastTabProps> = ({
                         </div>
 
                         {deliveryMode === 'scheduled' && (
-                            <div className="flex items-center gap-2">
-                                <Clock className="w-4 h-4 text-blue-600 shrink-0" />
-                                <Input
-                                    type="datetime-local"
-                                    value={scheduledDateTime}
-                                    onChange={e => setScheduledDateTime(e.target.value)}
-                                    className="h-8 text-xs w-48"
-                                />
+                            <div className="flex flex-wrap items-center gap-2">
+                                <div className="flex items-center gap-1.5">
+                                    <Clock className="w-4 h-4 text-blue-600 shrink-0" />
+                                    <Input
+                                        type="datetime-local"
+                                        value={scheduledDateTime}
+                                        onChange={e => setScheduledDateTime(e.target.value)}
+                                        className="h-8 text-xs w-48"
+                                    />
+                                </div>
+                                <Button
+                                    type="button"
+                                    variant="link"
+                                    size="sm"
+                                    onClick={() => setIsScheduledCampaignsOpen(true)}
+                                    className="h-8 text-xs text-blue-600 dark:text-blue-400 p-0 hover:underline"
+                                >
+                                    登録済みの予約一覧・編集はこちら →
+                                </Button>
                             </div>
                         )}
                     </div>
@@ -1007,6 +1032,16 @@ export const SegmentBroadcastTab: React.FC<SegmentBroadcastTabProps> = ({
                 deliveryMode={deliveryMode}
                 scheduledAt={scheduledDateTime}
                 sampleStudent={targetStudents[0] || null}
+            />
+
+            {/* 配信予約・送信キャンペーン確認＆編集モーダル */}
+            <ScheduledCampaignsModal
+                isOpen={isScheduledCampaignsOpen}
+                onClose={() => setIsScheduledCampaignsOpen(false)}
+                onCampaignUpdated={() => {
+                    fetchStudentsPreview();
+                    if (onBroadcastSuccess) onBroadcastSuccess();
+                }}
             />
         </div>
     );

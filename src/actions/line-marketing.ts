@@ -28,6 +28,7 @@ import {
     DeliveryLogsResult,
     SyncTrialDoneResult,
     LineMarketingKpiSummary,
+    LineBroadcastCampaign,
 } from '@/types/line-marketing';
 import {
     getTrackingKpiSummary,
@@ -357,6 +358,260 @@ export async function createBroadcastCampaign(
         };
     } catch (err: any) {
         console.error('[createBroadcastCampaign] Error:', err);
+        return { success: false, error: err.message };
+    }
+}
+
+/**
+ * キャンペーン一覧（予約配信および送信履歴）取得アクション
+ */
+export async function getBroadcastCampaigns(params: {
+    status?: string;
+    limit?: number;
+} = {}): Promise<{
+    success: boolean;
+    campaigns: LineBroadcastCampaign[];
+    error?: string;
+}> {
+    try {
+        await assertAdminUser();
+        const supabaseAdmin = createAdminClient();
+        const limit = params.limit || 50;
+
+        // 1. テーブルからの取得試行
+        try {
+            let query = supabaseAdmin
+                .from('line_broadcast_campaigns')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(limit);
+
+            if (params.status && params.status !== 'all') {
+                query = query.eq('status', params.status);
+            }
+
+            const { data, error } = await query;
+            if (!error && data) {
+                return { success: true, campaigns: data as LineBroadcastCampaign[] };
+            }
+        } catch {}
+
+        // 2. app_configs フォールバック
+        const { data: config } = await supabaseAdmin
+            .from('app_configs')
+            .select('value')
+            .eq('key', 'line_broadcast_campaigns_data_v1')
+            .maybeSingle();
+
+        let campaigns: LineBroadcastCampaign[] = [];
+        if (config?.value) {
+            try {
+                campaigns = JSON.parse(config.value);
+            } catch {}
+        }
+
+        if (params.status && params.status !== 'all') {
+            campaigns = campaigns.filter(c => c.status === params.status);
+        }
+
+        return { success: true, campaigns: campaigns.slice(0, limit) };
+    } catch (err: any) {
+        console.error('[getBroadcastCampaigns] Error:', err);
+        return { success: false, campaigns: [], error: err.message };
+    }
+}
+
+/**
+ * 配信予約の編集・更新アクション
+ */
+export async function updateBroadcastCampaign(
+    campaignId: string,
+    params: {
+        title?: string;
+        messageTemplate?: string;
+        scheduledAt?: string | null;
+        filterConditions?: SegmentFilterConditions;
+    }
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        await assertAdminUser();
+        const supabaseAdmin = createAdminClient();
+        const nowIso = new Date().toISOString();
+
+        let updatedInTable = false;
+
+        try {
+            const updatePayload: Record<string, any> = {
+                updated_at: nowIso,
+            };
+            if (params.title !== undefined) updatePayload.title = params.title;
+            if (params.messageTemplate !== undefined) {
+                updatePayload.message_text = params.messageTemplate;
+                updatePayload.message_template = params.messageTemplate;
+            }
+            if (params.scheduledAt !== undefined) {
+                updatePayload.scheduled_at = params.scheduledAt ? new Date(params.scheduledAt).toISOString() : null;
+            }
+            if (params.filterConditions !== undefined) {
+                updatePayload.filter_conditions = params.filterConditions;
+            }
+
+            const { data, error } = await supabaseAdmin
+                .from('line_broadcast_campaigns')
+                .update(updatePayload)
+                .eq('id', campaignId)
+                .select('id')
+                .maybeSingle();
+
+            if (!error && data) {
+                updatedInTable = true;
+            }
+        } catch {}
+
+        if (!updatedInTable) {
+            // app_configs フォールバック更新
+            const { data: config } = await supabaseAdmin
+                .from('app_configs')
+                .select('value')
+                .eq('key', 'line_broadcast_campaigns_data_v1')
+                .maybeSingle();
+
+            if (config?.value) {
+                let campaigns: any[] = JSON.parse(config.value);
+                const idx = campaigns.findIndex((c: any) => c.id === campaignId);
+                if (idx !== -1) {
+                    if (params.title !== undefined) campaigns[idx].title = params.title;
+                    if (params.messageTemplate !== undefined) {
+                        campaigns[idx].message_text = params.messageTemplate;
+                        campaigns[idx].message_template = params.messageTemplate;
+                    }
+                    if (params.scheduledAt !== undefined) {
+                        campaigns[idx].scheduled_at = params.scheduledAt ? new Date(params.scheduledAt).toISOString() : null;
+                    }
+                    if (params.filterConditions !== undefined) {
+                        campaigns[idx].filter_conditions = params.filterConditions;
+                    }
+                    campaigns[idx].updated_at = nowIso;
+
+                    await supabaseAdmin
+                        .from('app_configs')
+                        .upsert({
+                            key: 'line_broadcast_campaigns_data_v1',
+                            value: JSON.stringify(campaigns),
+                            updated_at: nowIso,
+                        });
+                }
+            }
+        }
+
+        safeRevalidate('/admin/line-marketing');
+        return { success: true };
+    } catch (err: any) {
+        console.error('[updateBroadcastCampaign] Error:', err);
+        return { success: false, error: err.message };
+    }
+}
+
+/**
+ * 配信予約のキャンセルアクション (status -> 'cancelled')
+ */
+export async function cancelBroadcastCampaign(
+    campaignId: string
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        await assertAdminUser();
+        const supabaseAdmin = createAdminClient();
+        const nowIso = new Date().toISOString();
+
+        let cancelledInTable = false;
+
+        try {
+            const { data, error } = await supabaseAdmin
+                .from('line_broadcast_campaigns')
+                .update({ status: 'cancelled', updated_at: nowIso })
+                .eq('id', campaignId)
+                .select('id')
+                .maybeSingle();
+
+            if (!error && data) {
+                cancelledInTable = true;
+            }
+        } catch {}
+
+        if (!cancelledInTable) {
+            const { data: config } = await supabaseAdmin
+                .from('app_configs')
+                .select('value')
+                .eq('key', 'line_broadcast_campaigns_data_v1')
+                .maybeSingle();
+
+            if (config?.value) {
+                let campaigns: any[] = JSON.parse(config.value);
+                const idx = campaigns.findIndex((c: any) => c.id === campaignId);
+                if (idx !== -1) {
+                    campaigns[idx].status = 'cancelled';
+                    campaigns[idx].updated_at = nowIso;
+
+                    await supabaseAdmin
+                        .from('app_configs')
+                        .upsert({
+                            key: 'line_broadcast_campaigns_data_v1',
+                            value: JSON.stringify(campaigns),
+                            updated_at: nowIso,
+                        });
+                }
+            }
+        }
+
+        safeRevalidate('/admin/line-marketing');
+        return { success: true };
+    } catch (err: any) {
+        console.error('[cancelBroadcastCampaign] Error:', err);
+        return { success: false, error: err.message };
+    }
+}
+
+/**
+ * キャンペーンの削除アクション
+ */
+export async function deleteBroadcastCampaign(
+    campaignId: string
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        await assertAdminUser();
+        const supabaseAdmin = createAdminClient();
+        const nowIso = new Date().toISOString();
+
+        try {
+            await supabaseAdmin
+                .from('line_broadcast_campaigns')
+                .delete()
+                .eq('id', campaignId);
+        } catch {}
+
+        const { data: config } = await supabaseAdmin
+            .from('app_configs')
+            .select('value')
+            .eq('key', 'line_broadcast_campaigns_data_v1')
+            .maybeSingle();
+
+        if (config?.value) {
+            let campaigns: any[] = JSON.parse(config.value);
+            campaigns = campaigns.filter((c: any) => c.id !== campaignId);
+
+            await supabaseAdmin
+                .from('app_configs')
+                .upsert({
+                    key: 'line_broadcast_campaigns_data_v1',
+                    value: JSON.stringify(campaigns),
+                    updated_at: nowIso,
+                });
+        }
+
+        safeRevalidate('/admin/line-marketing');
+        return { success: true };
+    } catch (err: any) {
+        console.error('[deleteBroadcastCampaign] Error:', err);
         return { success: false, error: err.message };
     }
 }

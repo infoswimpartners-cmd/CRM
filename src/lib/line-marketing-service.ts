@@ -637,15 +637,39 @@ export async function processScheduledBroadcasts(options: { dryRun?: boolean } =
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     await supabase
         .from('line_broadcast_campaigns')
-        .update({ status: 'scheduled', updated_at: nowIso })
-        .eq('status', 'sending')
-        .lt('updated_at', tenMinutesAgo);
+    let scheduledCampaigns: any[] = [];
+    let useFallback = false;
 
-    const { data: scheduledCampaigns } = await supabase
-        .from('line_broadcast_campaigns')
-        .select('*')
-        .eq('status', 'scheduled')
-        .lte('scheduled_at', nowIso);
+    try {
+        const { data } = await supabase
+            .from('line_broadcast_campaigns')
+            .select('*')
+            .eq('status', 'scheduled')
+            .lte('scheduled_at', nowIso);
+        if (data) {
+            scheduledCampaigns = data;
+        } else {
+            useFallback = true;
+        }
+    } catch {
+        useFallback = true;
+    }
+
+    if (useFallback) {
+        try {
+            const { data: config } = await supabase
+                .from('app_configs')
+                .select('value')
+                .eq('key', 'line_broadcast_campaigns_data_v1')
+                .maybeSingle();
+            if (config?.value) {
+                const allCampaigns: any[] = JSON.parse(config.value);
+                scheduledCampaigns = allCampaigns.filter((c: any) =>
+                    c.status === 'scheduled' && c.scheduled_at && new Date(c.scheduled_at) <= new Date(nowIso)
+                );
+            }
+        } catch {}
+    }
 
     if (!scheduledCampaigns || scheduledCampaigns.length === 0) {
         return { processedCampaigns: 0, successCount: 0, failedCount: 0 };
@@ -717,18 +741,48 @@ export async function processScheduledBroadcasts(options: { dryRun?: boolean } =
         totalFailed += campFailed;
 
         if (!dryRun) {
-            await supabase
-                .from('line_broadcast_campaigns')
-                .update({
-                    status: campSuccess > 0 ? 'completed' : 'failed',
-                    sent_count: campSuccess,
-                    success_count: campSuccess,
-                    failed_count: campFailed,
-                    sent_at: nowIso,
-                    executed_at: nowIso,
-                    updated_at: new Date().toISOString(),
-                })
-                .eq('id', camp.id);
+            if (!useFallback) {
+                await supabase
+                    .from('line_broadcast_campaigns')
+                    .update({
+                        status: campSuccess > 0 ? 'completed' : 'failed',
+                        sent_count: campSuccess,
+                        success_count: campSuccess,
+                        failed_count: campFailed,
+                        sent_at: nowIso,
+                        executed_at: nowIso,
+                        updated_at: new Date().toISOString(),
+                    })
+                    .eq('id', camp.id);
+            } else {
+                try {
+                    const { data: config } = await supabase
+                        .from('app_configs')
+                        .select('value')
+                        .eq('key', 'line_broadcast_campaigns_data_v1')
+                        .maybeSingle();
+                    if (config?.value) {
+                        const allCamps: any[] = JSON.parse(config.value);
+                        const idx = allCamps.findIndex((c: any) => c.id === camp.id);
+                        if (idx !== -1) {
+                            allCamps[idx].status = campSuccess > 0 ? 'completed' : 'failed';
+                            allCamps[idx].sent_count = campSuccess;
+                            allCamps[idx].success_count = campSuccess;
+                            allCamps[idx].failed_count = campFailed;
+                            allCamps[idx].sent_at = nowIso;
+                            allCamps[idx].executed_at = nowIso;
+                            allCamps[idx].updated_at = new Date().toISOString();
+                            await supabase
+                                .from('app_configs')
+                                .upsert({
+                                    key: 'line_broadcast_campaigns_data_v1',
+                                    value: JSON.stringify(allCamps),
+                                    updated_at: new Date().toISOString(),
+                                });
+                        }
+                    }
+                } catch {}
+            }
         }
     }
 
