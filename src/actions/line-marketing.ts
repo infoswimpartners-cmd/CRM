@@ -179,23 +179,74 @@ export async function createBroadcastCampaign(
 
         // 2. キャンペーンレコードの作成
         const initialStatus = isScheduled ? 'scheduled' : 'sending';
-        const { data: campaign, error: campError } = await supabaseAdmin
-            .from('line_broadcast_campaigns')
-            .insert({
-                title: params.title,
-                message_text: params.messageTemplate,
-                message_template: params.messageTemplate,
-                filter_conditions: params.filterConditions,
-                target_count: targetStudents.length,
-                status: initialStatus,
-                scheduled_at: isScheduled ? new Date(params.scheduledAt!).toISOString() : null,
-                created_by: userId !== '00000000-0000-0000-0000-000000000000' ? userId : null,
-            })
-            .select()
-            .single();
+        let campaignId = crypto.randomUUID();
+        let useFallbackCampaigns = false;
 
-        if (campError || !campaign) {
-            return { success: false, error: 'キャンペーン登録エラー: ' + campError?.message };
+        try {
+            const { data: campaign, error: campError } = await supabaseAdmin
+                .from('line_broadcast_campaigns')
+                .insert({
+                    title: params.title,
+                    message_text: params.messageTemplate,
+                    message_template: params.messageTemplate,
+                    filter_conditions: params.filterConditions,
+                    target_count: targetStudents.length,
+                    status: initialStatus,
+                    scheduled_at: isScheduled ? new Date(params.scheduledAt!).toISOString() : null,
+                    created_by: userId !== '00000000-0000-0000-0000-000000000000' ? userId : null,
+                })
+                .select()
+                .single();
+
+            if (!campError && campaign) {
+                campaignId = campaign.id;
+            } else {
+                useFallbackCampaigns = true;
+            }
+        } catch {
+            useFallbackCampaigns = true;
+        }
+
+        // テーブル未作成時は app_configs にフォールバック保存
+        if (useFallbackCampaigns) {
+            try {
+                const { data: config } = await supabaseAdmin
+                    .from('app_configs')
+                    .select('value')
+                    .eq('key', 'line_broadcast_campaigns_data_v1')
+                    .maybeSingle();
+
+                let campaigns: any[] = [];
+                if (config?.value) {
+                    try { campaigns = JSON.parse(config.value); } catch {}
+                }
+
+                campaigns.unshift({
+                    id: campaignId,
+                    title: params.title,
+                    message_text: params.messageTemplate,
+                    message_template: params.messageTemplate,
+                    filter_conditions: params.filterConditions,
+                    target_count: targetStudents.length,
+                    status: initialStatus,
+                    scheduled_at: isScheduled ? new Date(params.scheduledAt!).toISOString() : null,
+                    created_by: userId !== '00000000-0000-0000-0000-000000000000' ? userId : null,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString(),
+                });
+
+                if (campaigns.length > 50) campaigns = campaigns.slice(0, 50);
+
+                await supabaseAdmin
+                    .from('app_configs')
+                    .upsert({
+                        key: 'line_broadcast_campaigns_data_v1',
+                        value: JSON.stringify(campaigns),
+                        updated_at: new Date().toISOString(),
+                    });
+            } catch (fbErr) {
+                console.warn('[createBroadcastCampaign] Fallback config save warning:', fbErr);
+            }
         }
 
         // 予約配信の場合はここで完了返却（Cronが実行）
@@ -203,7 +254,7 @@ export async function createBroadcastCampaign(
             safeRevalidate('/admin/line-marketing');
             return {
                 success: true,
-                campaignId: campaign.id,
+                campaignId,
                 status: 'scheduled',
                 targetCount: targetStudents.length,
             };
@@ -231,7 +282,7 @@ export async function createBroadcastCampaign(
                 rawMessage: params.messageTemplate,
                 variables,
                 deliveryType: 'broadcast',
-                campaignId: campaign.id,
+                campaignId,
             });
 
             if (result.success) {
@@ -247,24 +298,58 @@ export async function createBroadcastCampaign(
         const finalStatus = successCount > 0 ? 'completed' : 'failed';
 
         // キャンペーン状態更新
-        await supabaseAdmin
-            .from('line_broadcast_campaigns')
-            .update({
-                status: finalStatus,
-                sent_count: successCount,
-                success_count: successCount,
-                failed_count: failedCount,
-                sent_at: new Date().toISOString(),
-                executed_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-            })
-            .eq('id', campaign.id);
+        if (!useFallbackCampaigns) {
+            await supabaseAdmin
+                .from('line_broadcast_campaigns')
+                .update({
+                    status: finalStatus,
+                    sent_count: successCount,
+                    success_count: successCount,
+                    failed_count: failedCount,
+                    sent_at: new Date().toISOString(),
+                    executed_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString(),
+                })
+                .eq('id', campaignId);
+        } else {
+            try {
+                const { data: config } = await supabaseAdmin
+                    .from('app_configs')
+                    .select('value')
+                    .eq('key', 'line_broadcast_campaigns_data_v1')
+                    .maybeSingle();
+
+                if (config?.value) {
+                    let campaigns: any[] = JSON.parse(config.value);
+                    const idx = campaigns.findIndex((c: any) => c.id === campaignId);
+                    if (idx !== -1) {
+                        campaigns[idx].status = finalStatus;
+                        campaigns[idx].sent_count = successCount;
+                        campaigns[idx].success_count = successCount;
+                        campaigns[idx].failed_count = failedCount;
+                        campaigns[idx].sent_at = new Date().toISOString();
+                        campaigns[idx].executed_at = new Date().toISOString();
+                        campaigns[idx].updated_at = new Date().toISOString();
+
+                        await supabaseAdmin
+                            .from('app_configs')
+                            .upsert({
+                                key: 'line_broadcast_campaigns_data_v1',
+                                value: JSON.stringify(campaigns),
+                                updated_at: new Date().toISOString(),
+                            });
+                    }
+                }
+            } catch (fbUpdateErr) {
+                console.warn('[createBroadcastCampaign] Fallback config update warning:', fbUpdateErr);
+            }
+        }
 
         safeRevalidate('/admin/line-marketing');
 
         return {
             success: true,
-            campaignId: campaign.id,
+            campaignId,
             status: finalStatus,
             targetCount: targetStudents.length,
             successCount,
@@ -738,28 +823,60 @@ export async function getDeliveryLogs(
 
         query = query.order('sent_at', { ascending: false }).range(offset, offset + pageSize - 1);
 
-        const { data: logs, count, error } = await query;
+        const { data: dataLogs, count, error } = await query;
+
+        let logs: any[] = [];
+        let totalCount = 0;
+        let allStats: any[] = [];
 
         if (error) {
-            return {
-                success: false,
-                logs: [],
-                totalCount: 0,
-                stats: { totalSent: 0, successCount: 0, failedCount: 0, skippedCount: 0 },
-                error: error.message,
-            };
-        }
+            // テーブル未作成時は app_configs フォールバックから取得
+            const { data: config } = await supabaseAdmin
+                .from('app_configs')
+                .select('value')
+                .eq('key', 'line_delivery_logs_data_v1')
+                .maybeSingle();
 
-        // サマリー集計 (全体統計)
-        const { data: allStats } = await supabaseAdmin
-            .from('line_delivery_logs')
-            .select('status');
+            let fallbackLogs: any[] = [];
+            if (config?.value) {
+                try { fallbackLogs = JSON.parse(config.value); } catch {}
+            }
+
+            // 簡易フィルタリング
+            let filtered = fallbackLogs;
+            if (params.deliveryType && params.deliveryType !== 'all') {
+                filtered = filtered.filter((l: any) => l.delivery_type === params.deliveryType);
+            }
+            if (params.status && params.status !== 'all') {
+                filtered = filtered.filter((l: any) => l.status === params.status);
+            }
+            if (params.searchQuery && params.searchQuery.trim() !== '') {
+                const q = params.searchQuery.toLowerCase();
+                filtered = filtered.filter((l: any) =>
+                    (l.student_name && l.student_name.toLowerCase().includes(q)) ||
+                    (l.student_number && l.student_number.toLowerCase().includes(q)) ||
+                    (l.rendered_message && l.rendered_message.toLowerCase().includes(q))
+                );
+            }
+
+            totalCount = filtered.length;
+            logs = filtered.slice(offset, offset + pageSize);
+            allStats = fallbackLogs;
+        } else {
+            logs = dataLogs || [];
+            totalCount = count || 0;
+
+            const { data: rawStats } = await supabaseAdmin
+                .from('line_delivery_logs')
+                .select('status');
+            allStats = rawStats || [];
+        }
 
         let successCount = 0;
         let failedCount = 0;
         let skippedCount = 0;
 
-        (allStats || []).forEach((row: any) => {
+        allStats.forEach((row: any) => {
             if (row.status === 'success' || row.status === 'sent') successCount++;
             else if (row.status === 'failed') failedCount++;
             else if (row.status === 'skipped') skippedCount++;
@@ -767,10 +884,10 @@ export async function getDeliveryLogs(
 
         return {
             success: true,
-            logs: logs || [],
-            totalCount: count || 0,
+            logs,
+            totalCount,
             stats: {
-                totalSent: (allStats || []).length,
+                totalSent: allStats.length,
                 successCount,
                 failedCount,
                 skippedCount,
@@ -877,36 +994,61 @@ export async function getMarketingKpiSummaryAction(): Promise<{
         const supabaseAdmin = createAdminClient();
 
         // 1. 配信ログの全件ステータス集計
-        const { data: logStats, error: logError } = await supabaseAdmin
-            .from('line_delivery_logs')
-            .select('status');
+        let allLogs: any[] = [];
+        try {
+            const { data: logStats, error: logError } = await supabaseAdmin
+                .from('line_delivery_logs')
+                .select('status');
 
-        if (logError) {
-            return { success: false, error: logError.message };
+            if (!logError && logStats) {
+                allLogs = logStats;
+            } else {
+                // app_configs フォールバック
+                const { data: config } = await supabaseAdmin
+                    .from('app_configs')
+                    .select('value')
+                    .eq('key', 'line_delivery_logs_data_v1')
+                    .maybeSingle();
+                if (config?.value) {
+                    try { allLogs = JSON.parse(config.value); } catch {}
+                }
+            }
+        } catch {
+            const { data: config } = await supabaseAdmin
+                .from('app_configs')
+                .select('value')
+                .eq('key', 'line_delivery_logs_data_v1')
+                .maybeSingle();
+            if (config?.value) {
+                try { allLogs = JSON.parse(config.value); } catch {}
+            }
         }
 
         let successCount = 0;
         let failedCount = 0;
         let skippedCount = 0;
 
-        (logStats || []).forEach((row: any) => {
+        allLogs.forEach((row: any) => {
             if (row.status === 'success' || row.status === 'sent') successCount++;
             else if (row.status === 'failed') failedCount++;
             else if (row.status === 'skipped') skippedCount++;
         });
 
-        const totalSent = (logStats || []).length;
+        const totalSent = allLogs.length;
         const successRate = totalSent > 0 ? Math.round((successCount / totalSent) * 1000) / 10 : 0;
 
         // 2. ステップ配信中生徒数の集計 (status = 'in_progress')
-        const { count: inProgressCount, error: stepError } = await supabaseAdmin
-            .from('line_step_student_progress')
-            .select('*', { count: 'exact', head: true })
-            .eq('status', 'in_progress');
+        let inProgressStudentsCount = 0;
+        try {
+            const { count: inProgressCount, error: stepError } = await supabaseAdmin
+                .from('line_step_student_progress')
+                .select('*', { count: 'exact', head: true })
+                .eq('status', 'in_progress');
 
-        if (stepError) {
-            return { success: false, error: stepError.message };
-        }
+            if (!stepError && inProgressCount !== null) {
+                inProgressStudentsCount = inProgressCount;
+            }
+        } catch {}
 
         return {
             success: true,
@@ -916,7 +1058,7 @@ export async function getMarketingKpiSummaryAction(): Promise<{
                 failedCount,
                 skippedCount,
                 successRate,
-                inProgressStudentsCount: inProgressCount || 0,
+                inProgressStudentsCount,
             }
         };
     } catch (err: any) {

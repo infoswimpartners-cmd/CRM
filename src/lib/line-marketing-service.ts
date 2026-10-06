@@ -269,7 +269,7 @@ export async function writeDeliveryLog(params: {
 }): Promise<void> {
     try {
         const supabase = createAdminClient();
-        await supabase.from('line_delivery_logs').insert({
+        const { error } = await supabase.from('line_delivery_logs').insert({
             student_id: params.studentId || null,
             student_number: params.studentNumber || null,
             student_name: params.studentName || null,
@@ -287,9 +287,53 @@ export async function writeDeliveryLog(params: {
             is_test_preview: params.isTestPreview || params.deliveryType === 'test_preview',
             sent_at: new Date().toISOString(),
         });
+
+        if (error) {
+            // テーブル未作成時は app_configs にフォールバック保存
+            const { data: config } = await supabase
+                .from('app_configs')
+                .select('value')
+                .eq('key', 'line_delivery_logs_data_v1')
+                .maybeSingle();
+
+            let logs: any[] = [];
+            if (config?.value) {
+                try { logs = JSON.parse(config.value); } catch {}
+            }
+
+            logs.unshift({
+                id: crypto.randomUUID(),
+                student_id: params.studentId || null,
+                student_number: params.studentNumber || null,
+                student_name: params.studentName || null,
+                line_user_id: params.lineUserId,
+                delivery_type: params.deliveryType,
+                campaign_id: params.campaignId || null,
+                step_id: params.stepId || null,
+                step_name: params.stepName || null,
+                message_body: params.renderedMessage,
+                rendered_message: params.renderedMessage,
+                status: params.status,
+                error_message: params.errorMessage || null,
+                response_status_code: params.responseStatusCode || null,
+                line_request_id: params.lineRequestId || null,
+                is_test_preview: params.isTestPreview || params.deliveryType === 'test_preview',
+                sent_at: new Date().toISOString(),
+            });
+
+            if (logs.length > 200) logs = logs.slice(0, 200);
+
+            await supabase
+                .from('app_configs')
+                .upsert({
+                    key: 'line_delivery_logs_data_v1',
+                    value: JSON.stringify(logs),
+                    updated_at: new Date().toISOString(),
+                });
+        }
     } catch (logErr) {
-        // テーブルが存在しない場合やDBエラー時も処理全体を止めない
-        console.warn('[LineMarketingService] Delivery log insertion warning (table may be pending migration):', logErr);
+        // 例外時も処理を落とさない
+        console.warn('[LineMarketingService] Delivery log insertion warning:', logErr);
     }
 }
 
