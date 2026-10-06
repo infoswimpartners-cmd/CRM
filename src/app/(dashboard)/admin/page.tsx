@@ -23,6 +23,8 @@ import { CoachRankingTable } from '@/components/admin/analytics/CoachRankingTabl
 import { CustomerRankingTable } from '@/components/admin/analytics/CustomerRankingTable'
 import { calculateCoachRate, calculateMonthlyStats, calculateLessonReward } from '@/lib/reward-system'
 import { getTrioOnboardingStatus } from '@/actions/trio_onboarding'
+import { getBroadcastCampaigns } from '@/actions/line-marketing'
+import { AdminScheduledBroadcastWidget } from '@/components/admin/AdminScheduledBroadcastWidget'
 import { Crown, Timer } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -223,6 +225,17 @@ async function AdminDashboardContent({ monthParam }: { monthParam: string }) {
         }
     } catch (err) {
         console.error('Failed to fetch TRIO status in admin dashboard:', err);
+    }
+
+    // 11. LINE一括配信予約キャンペーンの取得
+    let scheduledCampaigns: any[] = [];
+    try {
+        const campRes = await getBroadcastCampaigns({ status: 'scheduled', limit: 10 });
+        if (campRes.success) {
+            scheduledCampaigns = campRes.campaigns;
+        }
+    } catch (err) {
+        console.error('Failed to fetch scheduled campaigns in admin dashboard:', err);
     }
 
     // Calculate Reward Rate for current user (Admin is always 100% locally, but for display logic)
@@ -495,6 +508,11 @@ async function AdminDashboardContent({ monthParam }: { monthParam: string }) {
                     </div>
                 </section>
             )}
+
+            {/* LINE一括配信の予約状況・クイックアクセスセクション */}
+            <section className="space-y-4">
+                <AdminScheduledBroadcastWidget initialCampaigns={scheduledCampaigns} />
+            </section>
 
             {/* ビジネス概要セクション */}
             <section className="space-y-6">
