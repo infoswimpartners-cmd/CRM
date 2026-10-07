@@ -120,33 +120,75 @@ ${competitorContext}
     { "question": "よくある質問2", "answer": "回答2" },
     { "question": "よくある質問3", "answer": "回答3" }
   ],
-  "articleHeadline": "CMS記事の場合の見出し",
-  "articleBodyText": "CMS記事の場合の本文追記テキスト",
+  "articleHeadline": "CMS記事・ページリライトの場合の大見出し",
+  "articleBodyText": "CMS記事・ページリライトの場合のMarkdown形式による高品質リライト本文（見出しH2/H3、生体力学に基づく解説、3ステップ改善ドリル、比較表、FAQ、体験レッスンCTAを含む1,500〜2,500文字以上の本格Markdown文章）",
   "articleCtaBox": "CMS記事の場合のCTA案内文"
 }
 `;
 
-    const userPrompt = `キーワード「${cleanKw}」およびパス「${targetPath}」に対する最高精度のLP改善案を、指定のJSON形式で出力してください。`;
+    const userPrompt = `キーワード「${cleanKw}」およびパス「${targetPath}」に対する最高精度の${isLandingPage ? '集客LP改善案' : 'CMS記事・ページMarkdownリライト案'}を、指定のJSON形式で出力してください。CMS記事の場合は単なるFAQ追記ではなく、生体力学的な理由や実践ドリルを含んだ本格的なMarkdown記事リライト本文をarticleBodyTextに記載してください。`;
 
-    // Gemini API呼び出し（gemini-3.8-flash を最優先し、API仕様に応じて利用可能なFlashモデルへ自動フォールバック）
+    // Gemini API呼び出し（実稼働している高速Flashモデルを優先し自動フォールバック）
     const candidateModels = [
-        'gemini-3.8-flash',
-        'gemini-2.5-flash',
-        'gemini-2.0-flash',
-        'gemini-1.5-flash',
+        'gemini-flash-lite-latest',
+        'gemini-3.5-flash-lite',
+        'gemini-flash-latest',
     ];
+
+    const kitJsonSchema = {
+        type: 'OBJECT',
+        properties: {
+            proposedTitle: { type: 'STRING' },
+            proposedDescription: { type: 'STRING' },
+            aiInsights: { type: 'STRING' },
+            lpBlocks: {
+                type: 'ARRAY',
+                items: {
+                    type: 'OBJECT',
+                    properties: {
+                        sectionName: { type: 'STRING' },
+                        description: { type: 'STRING' },
+                        headline: { type: 'STRING' },
+                        subheadline: { type: 'STRING' },
+                        content: { type: 'STRING' },
+                        ctaText: { type: 'STRING' },
+                    },
+                    required: ['sectionName', 'headline', 'content'],
+                },
+            },
+            faqItems: {
+                type: 'ARRAY',
+                items: {
+                    type: 'OBJECT',
+                    properties: {
+                        question: { type: 'STRING' },
+                        answer: { type: 'STRING' },
+                    },
+                    required: ['question', 'answer'],
+                },
+            },
+            articleHeadline: { type: 'STRING' },
+            articleBodyText: { type: 'STRING' },
+            articleCtaBox: { type: 'STRING' },
+        },
+        required: ['proposedTitle', 'proposedDescription', 'faqItems'],
+    };
 
     let candidateText = '';
     let lastError = '';
 
     for (const model of candidateModels) {
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+
         try {
             const res = await fetch(endpoint, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
+                signal: controller.signal,
                 body: JSON.stringify({
                     contents: [
                         {
@@ -159,9 +201,12 @@ ${competitorContext}
                     generationConfig: {
                         temperature: 0.65,
                         maxOutputTokens: 8192,
+                        responseMimeType: 'application/json',
+                        responseSchema: kitJsonSchema,
                     },
                 }),
             });
+            clearTimeout(timeoutId);
 
             if (res.ok) {
                 const data = await res.json();
@@ -172,19 +217,13 @@ ${competitorContext}
             } else {
                 const errText = await res.text();
                 lastError = `Gemini API (${model}) Error [${res.status}]: ${errText}`;
-                // 404（モデル未検出）の場合は次期/現行モデルへフォールバックを継続
-                if (res.status === 404) {
-                    continue;
-                }
-                // 400, 401, 403等の認証・リクエストエラーは即座にスロー
-                throw new Error(lastError);
+                // 404, 503, 429などエラー時は後続モデルへ自動フォールバック
+                continue;
             }
         } catch (fetchErr: any) {
+            clearTimeout(timeoutId);
             lastError = fetchErr.message || String(fetchErr);
-            // 404以外の致命的エラーは再スロー
-            if (!lastError.includes('404')) {
-                throw fetchErr;
-            }
+            continue;
         }
     }
 
@@ -291,16 +330,26 @@ ${lpBlocks[4]?.ctaText || ''}
 ■ 6. LP末尾 よくある質問（FAQアコーディオン）
 ` + faqItems.map((f, i) => `Q${i + 1}. ${f.question}\nA. ${f.answer}`).join('\n\n');
     } else {
-        const articleHeadline = parsed.articleHeadline || `【CMS記事追記用】「${cleanKw}」のFAQ & 個人レッスン案内`;
+        const articleHeadline = parsed.articleHeadline || `【完全攻略】「${cleanKw}」の生体力学と最短上達ロードマップ`;
         const articleCtaBox = parsed.articleCtaBox || `---
 ### 💡 【先着月5名様】「${cleanKw}」の壁を最短で突破したい方へ
 マンツーマンの個人レッスンなら、たった60分でお子様やご自身の泳ぎの癖を見抜き、最短で上達へ導きます。
 👉 [体験レッスンの空き枠を確認する（公式LPへ）](https://swim-partners.com/personal_swim)
 ---`;
-        const articleBodyText = parsed.articleBodyText || `## 「${cleanKw}」に関するよくある質問（FAQ）\n\n` +
-            faqItems.map((f, i) => `### Q${i + 1}. ${f.question}\n\n${f.answer}`).join('\n\n') + `\n\n${articleCtaBox}`;
+        const articleBodyText = parsed.articleBodyText || `# ${proposedTitle}
 
-        bodyText = `【STUDIO CMS記事用 Gemini 3.8 Flash 追記テキスト】
+## 1. なぜ「${cleanKw}」でつまずくのか？プロが教える生体力学的メカニズム
+水中で前に進まない最大の原因は、筋力不足ではなく「水の抵抗」と「姿勢の崩れ」にあります。頭が上がるとてこの原理で下半身が水底に沈み、推進力に強烈なブレーキがかかります。まずは力を抜いて水に身を預ける脱力感覚と水平姿勢（ストリームライン）の定着が最優先です。
+
+## 2. 最短で改善するための3ステップ実践ドリル
+1. **陸上・自宅ドリル**: お風呂や鏡の前で頭の角度（あご引き）と鼻息吐きの呼吸リズムを確認
+2. **水中基本ドリル**: 壁蹴りけのびと脱力キックで水面を滑る水平姿勢を体感
+3. **連動ドリル**: 体幹の自然なローリングに合わせた省エネストロークと脱力呼吸
+
+## 3. よくあるご質問（FAQ）
+` + faqItems.map((f, i) => `### Q${i + 1}. ${f.question}\n\n${f.answer}`).join('\n\n') + `\n\n${articleCtaBox}`;
+
+        bodyText = `【STUDIO CMS記事用 Markdownリライト・追記テキスト】
 対象記事: https://swim-partners.com${targetPath}
 
 ■ 記事タイトル（H1）:
@@ -309,7 +358,7 @@ ${proposedTitle}
 ■ メタディスクリプション:
 ${proposedDescription}
 
-■ 記事末尾に貼り付けるリッチテキスト:
+■ 記事本文（Markdownリッチテキスト）:
 ${articleBodyText}`;
     }
 

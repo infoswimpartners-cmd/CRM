@@ -16,6 +16,8 @@ export async function generateArticleWithGeminiFlash(
     const dateStr = today.toISOString();
     const id = `art_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
+    const isRewrite = params.isRewrite || (targetPath && !targetPath.startsWith('/articles/'));
+
     const systemPrompt = `
 あなたは出張個別指導スイミング「スイムパートナーズ」の専属チーフコーチ兼、検索エンジンの上位表示（SEO）およびAI検索（AIO）を熟知した最高峰のコンテンツマーケターです。
 
@@ -32,11 +34,19 @@ export async function generateArticleWithGeminiFlash(
 
 【生成要件】
 - 読者が検索したターゲットキーワード: 「${keyword}」
-- 記事種別: ${articleType === 'seo' ? 'SEO記事（検索1位狙撃・論理的網羅性とCVR最大化）' : 'AIO記事（ChatGPT/Perplexity等のAI検索が引用・推奨しやすい明確な結論とエビデンス構成）'}
+- 記事種別: ${isRewrite ? '既存ページ・記事のリライト強化（Google検索1位奪取＆CVR最大化）' : articleType === 'seo' ? 'SEO記事（検索1位狙撃・論理的網羅性とCVR最大化）' : 'AIO記事（ChatGPT/Perplexity等のAI検索が引用・推奨しやすい明確な結論とエビデンス構成）'}
+- 対象パス: ${targetPath}
 ${competitorContext?.competitorWeakness ? `- 競合他社の弱点: ${competitorContext.competitorWeakness}` : ''}
 ${competitorContext?.differentiationStrategy ? `- 差別化戦略: ${competitorContext.differentiationStrategy}` : ''}
 ${intentContext?.searchIntent ? `- 読者のリアルな悩み・検索意図: ${intentContext.searchIntent}` : ''}
 ${customPrompt ? `- ユーザーからの追加リクエスト: ${customPrompt}` : ''}
+
+【Markdown本文執筆の厳格ルール】
+- 抽象的な定型文や一般論の羅列は厳禁です。
+- 生体力学的メカニズム（重心移動、頭の角度、浮力と肺の浮心、脱力、ローリング等）を専門的かつわかりやすく解説してください。
+- 読者がすぐに試せる具体的な改善ドリル（お風呂・陸上ドリル、水中ドリル）をステップ形式で記載してください。
+- 一般的な集団スクールや自己流との比較表（Markdownテーブル）を必ず含めてください。
+- 読者が抱く疑問を解消するFAQ（3〜4項目）と、安心感のある体験レッスン誘導CTAを配置してください。
 
 【出力フォーマット（厳密なJSON形式のみを出力してください。バッククォート \`\`\`json のみで囲み、余計な前置きや後置きの挨拶は一切不要です）】
 {
@@ -52,44 +62,94 @@ ${customPrompt ? `- ユーザーからの追加リクエスト: ${customPrompt}`
 }
 `;
 
-    const userPrompt = `キーワード「${keyword}」に関するプロ品質の記事を、指定のJSON形式で出力してください。一般的な抽象論ではなく、水泳指導のプロならではの生体力学的な理由（重心、頭の位置、浮力、脱力等）と、マンツーマン個別指導の優位性を具体的に書いてください。`;
+    const userPrompt = `キーワード「${keyword}」${isRewrite ? `および対象パス「${targetPath}」のリライト記事` : ''}に関するプロ品質の記事を、指定のJSON形式で出力してください。一般的な抽象論ではなく、水泳指導のプロならではの生体力学的な理由（重心、頭の位置、浮力、脱力等）と、マンツーマン個別指導の優位性を具体的に書いてください。`;
 
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
+    // 利用可能な高速Geminiモデルの自動フォールバック候補
+    const candidateModels = [
+        'gemini-flash-lite-latest',
+        'gemini-3.5-flash-lite',
+        'gemini-flash-latest',
+    ];
 
-    const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            contents: [
-                {
-                    parts: [
-                        { text: systemPrompt },
-                        { text: userPrompt },
-                    ],
+    let candidateText = '';
+    let lastError = '';
+
+    const articleJsonSchema = {
+        type: 'OBJECT',
+        properties: {
+            title: { type: 'STRING' },
+            meta_description: { type: 'STRING' },
+            content_md: { type: 'STRING' },
+            content_html: { type: 'STRING' },
+            faq_items: {
+                type: 'ARRAY',
+                items: {
+                    type: 'OBJECT',
+                    properties: {
+                        question: { type: 'STRING' },
+                        answer: { type: 'STRING' },
+                    },
+                    required: ['question', 'answer'],
                 },
-            ],
-            generationConfig: {
-                temperature: 0.7,
-                maxOutputTokens: 8192,
             },
-        }),
-    });
+        },
+        required: ['title', 'meta_description', 'content_md', 'faq_items'],
+    };
 
-    if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(`Gemini API Error (${res.status}): ${errorText}`);
+    for (const model of candidateModels) {
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+        try {
+            const res = await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                signal: controller.signal,
+                body: JSON.stringify({
+                    contents: [
+                        {
+                            parts: [
+                                { text: systemPrompt },
+                                { text: userPrompt },
+                            ],
+                        },
+                    ],
+                    generationConfig: {
+                        temperature: 0.7,
+                        maxOutputTokens: 8192,
+                        responseMimeType: 'application/json',
+                        responseSchema: articleJsonSchema,
+                    },
+                }),
+            });
+            clearTimeout(timeoutId);
+
+            if (res.ok) {
+                const data = await res.json();
+                candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+                if (candidateText) {
+                    break;
+                }
+            } else {
+                const errorText = await res.text();
+                lastError = `Gemini API (${model}) Error (${res.status}): ${errorText}`;
+                continue;
+            }
+        } catch (fetchErr: any) {
+            clearTimeout(timeoutId);
+            lastError = fetchErr.message || String(fetchErr);
+            continue;
+        }
     }
-
-    const data = await res.json();
-    const candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!candidateText) {
-        throw new Error('Gemini APIから回答が取得できませんでした');
+        throw new Error(lastError || 'Gemini APIから回答が取得できませんでした');
     }
 
-    // JSONブロックの抽出
+    // JSONブロックの抽出と安全なパース
     let jsonStr = candidateText.trim();
     if (jsonStr.includes('```json')) {
         jsonStr = jsonStr.split('```json')[1].split('```')[0].trim();
@@ -97,18 +157,36 @@ ${customPrompt ? `- ユーザーからの追加リクエスト: ${customPrompt}`
         jsonStr = jsonStr.split('```')[1].split('```')[0].trim();
     }
 
+    // 最外郭の { ... } を抽出
+    const firstBrace = jsonStr.indexOf('{');
+    const lastBrace = jsonStr.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        jsonStr = jsonStr.substring(firstBrace, lastBrace + 1);
+    }
+
     let parsed: any;
     try {
         parsed = JSON.parse(jsonStr);
-    } catch (e) {
-        // パース失敗時のフォールバック処理
-        parsed = {
-            title: `【プロ指導員監修】「${keyword}」の真実と上達の秘訣`,
-            meta_description: `「${keyword}」でお悩みの方へ。水泳個別指導スイムパートナーズが教える最短の上達ロードマップ。`,
-            content_md: candidateText,
-            content_html: `<div class="article-content space-y-6">${candidateText.replace(/\n/g, '<br/>')}</div>`,
-            faq_items: [],
-        };
+    } catch {
+        try {
+            // 制御文字や未エスケープ改行のサニタイズ修復
+            const sanitized = jsonStr.replace(/[\x00-\x1F\x7F-\x9F]/g, (match) => {
+                if (match === '\n') return '\\n';
+                if (match === '\r') return '\\r';
+                if (match === '\t') return '\\t';
+                return '';
+            });
+            parsed = JSON.parse(sanitized);
+        } catch (e) {
+            // パース失敗時のフォールバック処理
+            parsed = {
+                title: `【プロ指導員監修】「${keyword}」の真実と上達の秘訣`,
+                meta_description: `「${keyword}」でお悩みの方へ。水泳個別指導スイムパートナーズが教える最短の上達ロードマップ。`,
+                content_md: candidateText,
+                content_html: `<div class="article-content space-y-6">${candidateText.replace(/\n/g, '<br/>')}</div>`,
+                faq_items: [],
+            };
+        }
     }
 
     const faqItems = parsed.faq_items || [];
@@ -145,7 +223,9 @@ ${customPrompt ? `- ユーザーからの追加リクエスト: ${customPrompt}`
         title: parsed.title,
         meta_description: parsed.meta_description,
         content_md: parsed.content_md,
-        content_html: parsed.content_html,
+        content_html: (parsed.content_html && parsed.content_html.trim())
+            ? parsed.content_html
+            : `<div class="article-content space-y-6">${(parsed.content_md || '').replace(/\n/g, '<br/>')}</div>`,
         faq_items: faqItems,
         json_ld: jsonLd,
         target_path: targetPath,

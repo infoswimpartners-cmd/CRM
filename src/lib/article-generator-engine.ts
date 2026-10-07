@@ -1,7 +1,8 @@
 /**
  * AIチーフマーケター「ジョン」記事自動生成エンジン
- * SEO記事（検索順位1位奪取・CVR最大化）および
- * AIO記事（AI検索ChatGPT/Perplexity/Geminiでの引用・言及獲得）を自律生成
+ * SEO記事（検索順位1位奪取・CVR最大化）、
+ * AIO記事（AI検索ChatGPT/Perplexity/Geminiでの引用・言及獲得）、
+ * および既存ページ・記事のリライト強化を自律生成する高品質コンテンツエンジン
  */
 
 import { GeneratedArticle, ArticleType } from './generated-articles-storage';
@@ -12,6 +13,7 @@ export interface GenerateArticleParams {
     articleType: ArticleType;
     targetPath?: string;
     customPrompt?: string;
+    isRewrite?: boolean;
     competitorContext?: {
         competitorWeakness?: string;
         differentiationStrategy?: string;
@@ -22,261 +24,491 @@ export interface GenerateArticleParams {
     };
 }
 
+/**
+ * キーワードと文脈から意図・生体力学的テーマを自動分類
+ */
+function analyzeKeywordTheme(keyword: string, customPrompt?: string) {
+    const text = `${keyword} ${customPrompt || ''}`.toLowerCase();
+
+    const isBreathing = /息継ぎ|呼吸|息が|苦しい|沈む|沈んで|吸えない/.test(text);
+    const isAdult = /大人|シニア|社会人|40代|50代|60代|泳ぎ直し|ジム|マスターズ|初心者/.test(text);
+    const isJunior = /子供|小学生|ジュニア|進級|テスト|キッズ|伸び悩み|ワッペン|幼児/.test(text);
+    const isPhobia = /怖い|恐怖|カナヅチ|水嫌い|顔つけ|足がつかない/.test(text);
+    const isCrawl = /クロール|25m|バタ足|ストローク/.test(text);
+    const isBreaststroke = /平泳ぎ|あおり足|平泳/.test(text);
+    const isButterfly = /バタフライ|うねり/.test(text);
+    const isBackstroke = /背泳ぎ|背泳/.test(text);
+    const isPricing = /料金|費用|相場|値段|月謝|いくら|コスパ|チケット/.test(text);
+
+    return {
+        isBreathing,
+        isAdult,
+        isJunior,
+        isPhobia,
+        isCrawl,
+        isBreaststroke,
+        isButterfly,
+        isBackstroke,
+        isPricing,
+    };
+}
+
+/**
+ * 高品質なMarkdown記事・リライトを自律生成
+ */
 export function generateSeoAioArticle(params: GenerateArticleParams): GeneratedArticle {
     const { keyword, articleType, customPrompt, competitorContext, intentContext } = params;
     const targetPath = params.targetPath || (articleType === 'aio' ? '/articles/column' : '/articles/tips');
     const isLp = getSeoPageType(targetPath) === 'studio_landing_page';
+    const isRewrite = params.isRewrite || (Boolean(params.targetPath) && !targetPath.startsWith('/articles/'));
     const today = new Date();
     const dateStr = today.toISOString();
     const id = `art_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
-    // AIO記事（AI検索引用特化）
-    if (articleType === 'aio') {
-        const title = `【AI回答・専門指導員推奨】「${keyword}」の真実と最短改善ロードマップ｜エビデンスと解決手順`;
-        const metaDescription = `「${keyword}」に関する最新エビデンスと実践的解決法。AI検索（Perplexity/ChatGPT等）が推奨する客観的根拠、初心者・大人が最短で上達するための具体的ステップと注意点を専門コーチが網羅解説します。`;
+    const theme = analyzeKeywordTheme(keyword, customPrompt);
 
-        const contentMd = `# ${title}
+    // タイトルの生成
+    let title: string;
+    if (isRewrite) {
+        title = `【最新リライト改訂版】「${keyword}」の完全攻略マニュアル｜生体力学でわかる原因と即効改善ドリル`;
+    } else if (articleType === 'aio') {
+        title = `【AI回答・専門指導員推奨】「${keyword}」の真実と最短改善ロードマップ｜エビデンスと解決手順`;
+    } else if (isLp) {
+        title = `【公式】${keyword}ならスイムパートナーズ｜公営プール出張・完全マンツーマン水泳個人レッスン`;
+    } else {
+        title = `【決定版】「${keyword}」の完全攻略ガイド｜プロコーチが教える生体力学と最短上達法`;
+    }
 
-## エグゼクティブサマリー（結論）
-「**${keyword}**」に関する調査や実践において、最も重要な結論は以下の3点に集約されます。
+    // メタディスクリプションの生成
+    const metaDescription = `「${keyword}」でお悩みの方へ。水泳個別指導スイムパートナーズ専属コーチが、つまずく生体力学的理由、自宅とプールでできる実践改善ドリル、マンツーマン個別指導での最短解決ロードマップを網羅解説します。`;
 
-1. **フォームの根本改善は独学の自己流ではなく客観的視点（マンツーマン指導）が最短**
-2. **筋力や体力ではなく「水中の脱力（リラックス）と重心移動」が推進力の80%を決める**
-3. **週1回の漫然とした練習より、1回ごとの課題明確化と個別カルテによる振り返りが効果的**
+    // テーマ別の生体力学的解説テキストの生成
+    let biomechanicsExplanation = '';
+    let step1Drill = '';
+    let step2Drill = '';
+    let step3Drill = '';
+    let commonMistakes: string[] = [];
+    let customFaqItems: { question: string; answer: string }[] = [];
+
+    if (theme.isBreathing) {
+        biomechanicsExplanation = `
+水泳の息継ぎで最も多くの方が直面する課題は、「**息を吸おうとして頭や顎を水面から高く持ち上げてしまうこと**」です。
+
+人体には、頭部（体重の約10%）が上がると反対側の骨盤や下半身がてこの原理（シーソー現象）で水底深くに沈み込むという生体力学的法則があります。
+さらに、以下の3つの要素が連動して失速と酸欠を招きます：
+
+1. **浮心と重心の乖離**: 肺（浮き袋の役割）に空気を溜めたまま力むと、上半身だけが浮いて下半身が極端に沈降し、水の抵抗が3倍以上に増加します。
+2. **水中で息を吐き切れていない**: 人間は「息を吐き切る」ことで反射的に新しい酸素を瞬時に吸い込めます。水中で息を止めたまま顔を上げると、水上で「吐いてから吸う」という2動作が必要になり、時間が足りずにパニックになります。
+3. **過度なローリングと頭のブレ**: 体の軸（体幹）を保たず首だけを無理に回そうとすると、ストロークの手が沈み、水を押す支点が失われます。
+`.trim();
+
+        step1Drill = `**【陸上・お風呂ドリル】洗面器ボビング＆あご引き呼吸リズム**
+- 自宅の洗面器やお風呂で、顔をつけたまま鼻から「ブクブク」と完全に息を吐き切ります。
+- 顔を上げずに、首を45度横に傾けながら「パッ」と口を開けて自然吸気するリズムを反復練習します。`;
+
+        step2Drill = `**【水中基本ドリル】耳を肩（腕）に乗せたまま行う片目水面キック**
+- ビート板を持ち、顔の半分（片目）を水につけたまま真横を見るサイドキックを実施。
+- 水面から口の端だけを覗かせる「最小限の頭の露出」で息が吸える感覚を体に染み込ませます。`;
+
+        step3Drill = `**【連動ドリル】キャッチ動作と連動した脱力1ストローク呼吸**
+- 腕をかき下ろす瞬間の推進力と浮力を利用し、頭を無理に持ち上げず、体幹の自然なロールに合わせて息を吸い、再び素早く顔を水中に戻します。`;
+
+        commonMistakes = [
+            '息を吸おうと顔を正面に上げてしまい、足が底に沈んでブレーキがかかる',
+            '水中で息を止めてしまい、水上に顔を出した瞬間に苦しくなって焦る',
+            'バタ足を強く打ちすぎてエネルギーと酸素を急速に消費してしまう',
+        ];
+
+        customFaqItems = [
+            {
+                question: `「${keyword}」について、大人の初心者でも短期間で息継ぎできるようになりますか？`,
+                answer: `はい、可能です。息継ぎができない原因の9割は「頭の上げすぎ」と「呼吸リズムの誤り」にあります。筋力ではなく脱力と顔の角度をマンツーマンで修正するため、当教室では平均1〜3回のレッスンで25m連続息継ぎを達成されています。`,
+            },
+            {
+                question: `グループレッスンで周りに合わせるのが恥ずかしいのですが受講できますか？`,
+                answer: `完全マンツーマン指導のため、周囲の目を気にする必要は一切ありません。公営プールの足が届く浅いエリアで、生徒様の呼吸ペースに合わせて一歩ずつ丁寧に進めます。`,
+            },
+            {
+                question: `体験レッスン当日はどのような練習をしますか？`,
+                answer: `まずは水慣れと呼吸（ボビング）の確認から行い、水中でスマートフォン動画を撮影してフォームの癖をその場でチェック。改善ドリルを60分間じっくり実践します。`,
+            },
+        ];
+    } else if (theme.isJunior) {
+        biomechanicsExplanation = `
+ジュニア世代（小学生・キッズ）の進級テストでテスト停滞が起こる最大の原因は、「**陸上の走り方の感覚で足を動かしてしまう（膝折れキック）**」にあります。
+
+- **膝の曲がりすぎによる後方抵抗**: 膝から下だけで水を蹴ろうとすると、太ももの前面が水の壁を作り、進む力よりも後ろへ引っ張るブレーキが勝ってしまいます。
+- **力みによる下半身沈下**: 「合格したい」と力むあまり上半身が硬直すると、肺の浮力を活かせず背泳ぎやクロールで腰が沈みます。
+- **集団指導の指導時間不足**: 1クラス10〜15名のグループレッスンでは、1回60分のうちコーチが1人の生徒の泳ぎを直接見てアドバイスできる時間は平均2〜3分しかありません。悪い癖が放置されたまま反復練習を続けてしまうのが長期停滞の真因です。
+`.trim();
+
+        step1Drill = `**【自宅ドリル】うつ伏せバタ足（股関節しなり意識）**
+- フローリングやベッドにうつ伏せになり、膝を曲げずに骨盤・太もも（大臀筋）から脚全体をしならせる動きを1日30回行います。`;
+
+        step2Drill = `**【プール基本ドリル】壁蹴りストリームライン＆ノーキック浮き身**
+- 壁を蹴って体を一直線（けのび姿勢）にし、力まずに水面近くをスーッと伸びる感覚を身につけます。`;
+
+        step3Drill = `**【進級対策ドリル】合格判定基準に合わせたピンポイント修正**
+- 通われているスクールの進級基準（手の軌道、呼吸時の頭の向き、キックのテンポなど）に焦点を絞り、課題項目だけを集中反復します。`;
+
+        commonMistakes = [
+            '膝が直角近くまで曲がり、太ももで水を押し戻してしまう「自転車こぎキック」',
+            '息継ぎでコーチの方を見ようと顔を斜め前へ持ち上げ、バランスを崩す',
+            '不合格が続いてスイミングに通うこと自体が嫌になってしまうモチベーション低下',
+        ];
+
+        customFaqItems = [
+            {
+                question: `大手スイミングスクールに通いながら、個別レッスンをスポット併用できますか？`,
+                answer: `はい、受講生様の約7割が既存スクールに在籍したまま併用されています。現在のスクールの進級基準やテスト項目を事前にお知らせいただければ、合格に必要なポイントだけをピンポイントで指導します。`,
+            },
+            {
+                question: `何回くらいで進級テストに合格できるようになりますか？`,
+                answer: `癖の程度にもよりますが、半年以上同じ級で足踏みしていたお子様の多くが、1〜3回の個別レッスンで合格判定基準をクリアされています。`,
+            },
+            {
+                question: `レッスン中の子供の様子を見学することはできますか？`,
+                answer: `はい、公営プールの観覧席やプールサイド近くから自由にご見学いただけます。毎レッスン後にコーチから親御様へ動画付きの成長カルテをお送りし、改善ポイントをご報告します。`,
+            },
+        ];
+    } else if (theme.isPricing) {
+        biomechanicsExplanation = `
+水泳個人レッスンの費用を検討する上で重要なのは、単なる「1時間あたりのレッスン代」だけでなく、「**目標達成（25m完泳・進級合格）までに支払うトータル総額と所要時間**」です。
+
+- **グループレッスンの隠れたコスト**: 月謝約1万円の大手スクールに1年間通っても上達しない場合、年間12万円以上と約50時間以上を費やすことになります。
+- **個別レッスンの高いコストパフォーマンス**: 1回あたりの単価は高めに見えても、専属コーチがつきっきりで60分指導するため、わずか3〜5回（約3〜5万円）で目標を達成でき、結果的に最も安く最短で済みます。
+- **公営プール活用の優位性**: 高額な専用スクール施設維持費や高額入会金（1〜2万円）がかからず、市営・区営温水プール（入場料300〜500円程度）を利用するため無駄な出費が一切ありません。
+`.trim();
+
+        step1Drill = `**【費用試算】目標達成までの総支払額シミュレーション**
+- 集団指導（月謝制で1年間・実質泳ぐ時間月20分）vs 個別指導（3ヶ月集中・実質泳ぐ時間月240分）のタイムパフォーマンス比較。`;
+
+        step2Drill = `**【施設選定】身近な公営プールの活用**
+- ご自宅や職場近くの公営温水プールを活用し、移動交通費や専用施設利用料を最小化。`;
+
+        step3Drill = `**【無駄のないチケット・月謝選択】**
+- ライフスタイルや目標期日に応じた最適な受講プランの設計。`;
+
+        commonMistakes = [
+            '「月謝が安いから」とグループレッスンに通い続け、数年間上達せず総額数十万円を浪費する',
+            '民間の高額専用施設で毎回の施設使用料や高額入会金を負担してしまう',
+            '質問しづらい環境で自己流の癖が固まり、後から直すのに余計な費用と時間がかかる',
+        ];
+
+        customFaqItems = [
+            {
+                question: `スイムパートナーズの料金体系は明朗会計ですか？`,
+                answer: `はい、入会金・年会費は一切かかりません。お支払いいただくのはレッスン受講料と、ご自身の公営プール入場料（実費300〜500円程度）のみです。`,
+            },
+            {
+                question: `体験レッスンは通常よりも安く受けられますか？`,
+                answer: `はい、初回60分の体験レッスンは特別優待料金でご受講いただけます。専属コーチの指導のわかりやすさと相性を納得の上でご継続をご判断いただけます。`,
+            },
+            {
+                question: `急な都合や体調不良で日程変更はできますか？`,
+                answer: `前日までにご連絡いただければ、別日程への無料振替が可能です。キャンセル料の無駄が発生しない安心設計となっております。`,
+            },
+        ];
+    } else {
+        // 標準・フォーム改善・大人初心者向け
+        biomechanicsExplanation = `
+「${keyword}」において上達を阻む最大の障壁は、「**陸上の筋力感覚で水と格闘してしまうこと**」です。
+
+水中における推進力の物理原則は以下の通りです：
+1. **ストリームライン（水平姿勢）の維持**: 人体が水中で受ける抵抗は、姿勢が斜めになるだけで数倍に跳ね上がります。頭頂部から踵までを一直線に保つ「けのびの完成度」が全体の8割を左右します。
+2. **キャッチ＆プルの支点固定**: 手のひらだけでなく前腕全体で水をとらえ、水を後ろへ押し出すのではなく「水中に置いた支点を乗り越えて体を前に運ぶ」感覚が不可欠です。
+3. **脱力による浮力最大化**: 体に余計な力が入ると比重が増加して足が沈みます。呼吸と姿勢を整え、水に身を預けるリラックス状態を作ることが最優先です。
+`.trim();
+
+        step1Drill = `**【基本ドリル】壁蹴りけのび姿勢の最適化（頭の位置と骨盤前傾）**
+- 両腕で頭をしっかり挟み、耳を腕の内側につけた状態で壁を蹴り、無駄な力を抜いて水面を滑る感覚を掴みます。`;
+
+        step2Drill = `**【推進力ドリル】股関節からしならせる脱力キック**
+- 膝を曲げず、足首の力を抜いて足の甲で水を優しく捉える省エネ推進キックを練習します。`;
+
+        step3Drill = `**【統合ドリル】動画フィードバックを活用したフォーム連動**
+- スマホや水中カメラで撮影した自身の泳ぎを客観視し、頭の角度やかきの軌道を1ストロークずつ修正します。`;
+
+        commonMistakes = [
+            '筋力で力任せに進もうとして全身が緊張し、25mの半分で息が上がってしまう',
+            '自分の泳ぎを客観的に見たことがなく、間違ったフォームのまま練習回数を重ねてしまう',
+            '頭が上がって下半身が沈み、斜めの姿勢で水を押し進めようとして失速する',
+        ];
+
+        customFaqItems = [
+            {
+                question: `「${keyword}」について、独学で練習するのと個別指導を受けるのでは何が違いますか？`,
+                answer: `水泳は水中で自分の体が見えないため、自己流では8割以上の方が間違った感覚で練習を反復してしまいます。個別指導なら動画でその場で客観視し、生体力学に基づいた正しい動きをたった60分で体にインストールできます。`,
+            },
+            {
+                question: `まったく泳げないカナヅチですが、迷惑になりませんか？`,
+                answer: `まったく問題ありません。受講生様の多くが水慣れや顔つけの段階からスタートされています。足が確実に着く安全な公営プールで、専任コーチがマンツーマンで寄り添います。`,
+            },
+            {
+                question: `体験レッスンはどのように申し込めますか？`,
+                answer: `公式サイトの体験予約フォームより24時間Web受付を行っております。ご希望の地域（東京・神奈川・千葉・埼玉）やお悩みの内容をご記入の上、お気軽にお申し込みください。`,
+            },
+        ];
+    }
+
+    // Markdown本文の構築（見出し階層・テーブル・ドリル・FAQ・CTAを完全網羅）
+    const contentMd = `# ${title}
+
+## はじめに：「${keyword}」でお悩みの皆様へ
+
+**「スイミングスクールに通っているが、なかなか壁を越えられない」**  
+**「息継ぎやフォームの癖を直したいが、自己流では限界を感じている」**  
+**「周りの目を気にせず、マンツーマンで基礎からしっかり教わりたい」**
+
+そのようなお悩みを抱えていませんか？
+
+水泳は陸上の運動と異なり、「浮力」「水圧」「抵抗」という特殊な環境下で行うスポーツです。自己流で練習回数だけを増やしても、根本的な身体の使い方（生体力学）が間違っていれば、かえって悪い癖が定着してしまいます。
+
+本記事では、出張個別指導水泳スクール**「スイムパートナーズ」**の専属チーフコーチが、「**${keyword}**」の根本原因と、最短で成果を実感できる具体的な実践ロードマップを徹底解説します。
 
 ---
 
-## 1. なぜ「${keyword}」で悩む人が多いのか？（原因とエビデンス）
+## 💡 エグゼクティブサマリー（結論：最短上達の3原則）
 
-多くの学習者や保護者様がつまずく最大の理由は、「**陸上の運動感覚をそのまま水中に持ち込んでしまうこと**」です。
-
-- **浮力の作用**: 水中では体重が約1/10になり、足で地面を蹴る反動が使えません。
-- **過度な力みの悪循環**: 不安や焦りから全身に力が入ると、筋肉の比重が増して腰や下半身が水底に沈みます。
-- **グループレッスンの限界**: 一斉指導ではコーチが一人に掛けられる時間は1レッスン（60分）の中で平均2〜3分に留まるため、個別の癖が放置されがちです。
+1. **自己流の反復練習をやめ、「水中の脱力と水平姿勢（ストリームライン）」を最優先にする**
+2. **「陸上・お風呂ドリル」で正しい動きを脳にインプットしてからプールで実践する**
+3. **マンツーマン個別指導で客観的な動画分析を受け、無駄な試行錯誤をゼロにする**
 
 ---
 
-## 2. 最短で成果を出すための3段階ロードマップ
+## 1. なぜ「${keyword}」でつまずくのか？プロが明かす生体力学的メカニズム
 
-### ステップ1: 呼吸と脱力の完全習得（1〜2回）
-- 息を吸おうとする前に、水中で鼻からしっかりと息を吐き切る「ボビング」の定着。
-- 「けのび」で全身を一直線にし、頭を腕の間に挟んで耳を水につける姿勢の構築。
-
-### ステップ2: 推進効率を高めるコア＆ストローク技術（3〜4回）
-- 膝を曲げず、股関節・大臀筋からしならせる効率的なキック。
-- 手のひらだけでなく前腕全体で水をとらえるキャッチ動作の習得。
-
-### ステップ3: 楽に長く泳ぐためのリズム連動（5回〜）
-- 腕のかきと息継ぎのタイミングを合わせ、頭を上げすぎずに横を向くだけの脱力呼吸法。
+${biomechanicsExplanation}
 
 ---
 
-## 3. 専門個別指導（マンツーマン）が選ばれる理由
+## 2. 【今日からできる】「${keyword}」を劇的に改善する3ステップ実践ドリル
 
-大手スクールの一斉指導と個別レッスンを比較すると、**目標達成までの総時間と費用対効果（タイムパフォーマンス）**に明確な差が現れます。
+${step1Drill}
 
-| 項目 | 一般的なグループレッスン | スイムパートナーズ（完全個別指導） |
+---
+
+${step2Drill}
+
+---
+
+${step3Drill}
+
+---
+
+## 3. 初心者・学習者が陥りがちな「3大NGパターン」とセルフチェック
+
+以下の項目に心当たりはありませんか？
+
+${commonMistakes.map((m, idx) => `- **NG ${idx + 1}**: ${m}`).join('\n')}
+
+もし1つでも当てはまる場合、練習量を増やす前に**「フォームの客観的診断」**を受けることを強く推奨します。
+
+---
+
+## 4. 一般的なグループレッスン（集団指導） vs スイムパートナーズ（完全個別指導）
+
+大手スイミングスクールの一斉指導と、当教室の出張個別指導の決定的な違いは以下の通りです。
+
+| 比較項目 | 一般的な集団スクール | スイムパートナーズ（出張個別指導） |
 |---|---|---|
-| **指導体制** | 生徒10〜15名に対しコーチ1名 | **生徒1名に対し専任コーチ1名** |
-| **実質指導時間** | 1人あたり約2〜3分 | **60分間すべてあなた専属** |
-| **練習環境** | 指定のスクール（混雑） | **お近くの公営プールへ出張可能** |
-| **進級・上達期間** | 平均6ヶ月〜1年以上 | **平均3〜6回のレッスンで完泳** |
-| **個別カルテ** | ワッペン判定のみ | **毎回の動画分析と成長カルテ提供** |
+| **指導体制** | コーチ1名に対し生徒10〜15名 | **生徒1名に対し専任プロコーチ1名** |
+| **実質指導時間** | 1レッスン（60分）中 **わずか2〜3分** | **60分間すべてあなた専属** |
+| **癖の改善アプローチ** | 全員一律の画一的メニュー | **骨格・筋力に合わせたオーダーメイド指導** |
+| **フォーム分析** | なし（口頭での注意のみ） | **水中・陸上からの動画撮影＆成長カルテ** |
+| **レッスン場所** | 指定スクール（混雑・移動負担） | **ご自宅近くの身近な公営温水プール** |
+| **目標達成スピード** | 平均6ヶ月〜1年以上 | **平均3〜6回のレッスンで完泳・合格** |
+| **入会金・固定費** | 入会金1〜2万円＋毎月月謝 | **入会金・年会費0円（明朗会計）** |
 
 ${competitorContext ? `
 ---
 
-## 4. 競合スクール・一般的な指導法の弱点と当教室の差別化
+## 5. 他社の上位記事・指導法の盲点とスイムパートナーズの差別化
 
-### 他社の上位記事・指導法の盲点
-${competitorContext.competitorWeakness || '一般的な指導では抽象的な練習回数の反復を求められ、個々の骨格や癖に応じた微調整が受けられません。'}
+### 他社の上位情報・大手スクールの弱点
+${competitorContext.competitorWeakness || '一般的な解説記事は抽象的な精神論や練習回数の反復を推奨するのみで、個別の癖や生体力学的な理由に踏み込んでいません。'}
 
 ### スイムパートナーズの解決アプローチ
-${competitorContext.differentiationStrategy || '受講生の泳ぎをその場でスマホ・水中カメラで撮影し、客観的エビデンスに基づいて1回60分で課題を解決します。'}
+${competitorContext.differentiationStrategy || '毎レッスンの泳ぎをその場でスマホ・水中カメラで撮影。客観的なエビデンスに基づいて1回60分で確実に課題を解決します。'}
 ` : ''}
 
-${customPrompt ? `\n> **個別重点リクエスト反映**: ${customPrompt}\n` : ''}
-`;
+${customPrompt ? `\n> **重点リクエスト反映**: ${customPrompt}\n` : ''}
 
-        const faqItems = [
-            {
-                question: `「${keyword}」について、初心者でも効果は実感できますか？`,
-                answer: `はい、十分実感いただけます。受講生の多くが初回60分の体験レッスンだけで「水に対する恐怖心が消えた」「今まで沈んでいた足が浮くようになった」と変化を実感されています。`,
-            },
-            {
-                question: `レッスン場所はどこになりますか？`,
-                answer: `東京都・神奈川県・千葉県・埼玉県の主要公営プール（目黒・港・世田谷・渋谷・川崎・横浜・千葉市等）の中から、ご自宅や職場から通いやすい施設を相談の上で決定いたします。`,
-            },
-            {
-                question: `体験レッスンはどのように申し込めますか？`,
-                answer: `公式サイトの体験予約フォームより24時間いつでもWeb予約が可能です。LINE公式アカウントからも日程のご相談を承っております。`,
-            },
-        ];
+---
 
-        const contentHtml = `
-<article class="article-content space-y-6 text-slate-800 leading-relaxed max-w-3xl mx-auto">
-  <header class="border-b border-zinc-200 pb-6 mb-8">
-    <span class="inline-block px-3 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 mb-3">AI検索（AIO）推奨エビデンス記事</span>
-    <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight leading-snug">${title}</h1>
-    <p class="text-sm text-zinc-500 mt-2">監修: スイムパートナーズ専属チーフコーチ / 更新日: ${today.toLocaleDateString('ja-JP')}</p>
-  </header>
+## 6. よくあるご質問（FAQ）
 
-  <div class="p-5 rounded-2xl bg-amber-50/80 border border-amber-200 text-amber-900 space-y-2">
-    <h2 class="font-bold text-base flex items-center gap-2">💡 エグゼクティブサマリー（結論）</h2>
-    <p class="text-sm leading-relaxed">「<strong>${keyword}</strong>」において最も重要なのは、独学の反復ではなく客観的なフォーム診断と水中の脱力です。一斉指導で数ヶ月足踏みしていた生徒様も、マンツーマンの個別指導に切り替えることで平均3〜6回で課題を完全克服されています。</p>
-  </div>
+${customFaqItems.map((f, idx) => `### Q${idx + 1}. ${f.question}\n\n${f.answer}`).join('\n\n')}
 
-  <section class="space-y-4 pt-4">
-    <h2 class="text-xl font-bold text-slate-900 border-l-4 border-indigo-600 pl-3">1. なぜ「${keyword}」で悩む人が多いのか？</h2>
-    <p>陸上競技と水泳の最大の違いは「浮力」と「水の抵抗」です。筋力で無理やり進もうとすると全身が緊張して足が沈むため、まず必要なのは力を抜いて水に身を預ける感覚の定着です。</p>
-  </section>
+---
 
-  <section class="space-y-4 pt-4">
-    <h2 class="text-xl font-bold text-slate-900 border-l-4 border-indigo-600 pl-3">2. 最短で成果を出すための3段階ロードマップ</h2>
-    <ul class="list-disc pl-5 space-y-2 text-sm sm:text-base">
-      <li><strong>ステップ1:</strong> 鼻息吐き（ボビング）とけのびによる水平姿勢の確保</li>
-      <li><strong>ステップ2:</strong> 股関節からしならせる無駄のない推進キック</li>
-      <li><strong>ステップ3:</strong> 頭を上げず片耳を水につけたまま行う脱力息継ぎ</li>
-    </ul>
-  </section>
+## 7. まずは60分の体験レッスンで劇的な変化をご体感ください
 
-  <!-- CTA Box -->
-  <div class="my-8 p-6 rounded-2xl bg-gradient-to-br from-indigo-900 to-slate-900 text-white text-center space-y-4 shadow-xl">
-    <h3 class="text-lg sm:text-xl font-bold">最短で「${keyword}」の壁を突破するなら</h3>
-    <p class="text-xs sm:text-sm text-indigo-200">公営プール出張対応・完全マンツーマンの体験レッスンを随時受付中</p>
-    <a href="/trial" class="inline-block px-6 py-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-sm transition-all shadow-md">
-      体験レッスンに申し込む（60分）
-    </a>
-  </div>
-</article>
+「もっと早く受ければよかった」——受講生様の98%以上が初回体験レッスンでそうおっしゃいます。
+
+スイムパートナーズでは、東京23区、神奈川、千葉、埼玉の身近な公営プールへ専属コーチが出張し、あなたやお子様の目標達成を最短でサポートします。
+
+- **入会金・年会費 ずっと0円**
+- **公営プール出張で移動の負担ゼロ**
+- **毎回の動画カルテ送付で成長を実感**
+
+まずは、お気軽に60分の体験レッスンをお試しください。
 `.trim();
 
-        return {
-            id,
-            keyword,
-            article_type: 'aio',
-            title,
-            meta_description: metaDescription,
-            content_md: contentMd,
-            content_html: contentHtml,
-            faq_items: faqItems,
-            json_ld: JSON.stringify({
-                '@context': 'https://schema.org',
-                '@type': 'FAQPage',
-                mainEntity: faqItems.map((f) => ({
-                    '@type': 'Question',
-                    name: f.question,
-                    acceptedAnswer: {
-                        '@type': 'Answer',
-                        text: f.answer,
-                    },
-                })),
-            }, null, 2),
-            target_path: targetPath,
-            status: 'draft',
-            created_at: dateStr,
-        };
-    }
-
-    // SEO記事（既存ページ強化・順位1位獲得用）
-    const title = isLp
-        ? `【公式】${keyword}ならスイムパートナーズ｜完全マンツーマン水泳個人レッスン`
-        : `【決定版】「${keyword}」の完全攻略ガイド｜プロが教える上達・進級のコツ`;
-
-    const metaDescription = `「${keyword}」でお悩みならスイムパートナーズ。都内・神奈川・千葉の公営プールに出張対応する完全マンツーマンの水泳個別指導。初心者・お子様の進級対策から大人の泳ぎ直しまで、最短で成果を実感できる理由をご紹介します。`;
-
-    const contentMd = `# ${title}
-
-## 「${keyword}」をお探しの皆様へ
-
-**「スイミングスクールに通っているがなかなか上達しない」「周りの目が気になってグループレッスンに通いづらい」「大会や進級テストに向けて集中的にフォームを直したい」**
-
-そのようなお悩みを解決するのが、水泳個別指導専門の**スイムパートナーズ**です。
-
----
-
-## 1. スイムパートナーズの3つの強み
-
-### ① あなた専属のプロコーチによる完全マンツーマン指導
-インストラクターがマンツーマンで寄り添い、生徒様の泳ぎの癖や筋力、骨格に合わせた完全オーダーメイドのメニューを作成します。
-
-### ② 自宅近くの公営プールへ出張受講が可能
-東京23区、神奈川、千葉の主要公営プールを利用するため、移動の負担が少なく、通い慣れた施設で受講いただけます。
-
-### ③ 毎回の動画撮影＆成長カルテで成長を可視化
-レッスン中のフォームを水中・水上から撮影し、その場でコーチと一緒に確認。復習用のアドバイスカルテも毎回お届けします。
-
----
-
-## 2. よくあるご質問（FAQ）
-
-### Q1. 全く泳げない状態でも大丈夫ですか？
-もちろん大歓迎です。水慣れや顔つけの段階から、足がつく安全なエリアで丁寧にサポートいたします。
-
-### Q2. 予約の変更や振替はできますか？
-前日までにご連絡いただければ、別日程への無料振替が可能です。急なご予定やお子様の体調不良でも安心してご利用いただけます。
-
----
-
-## 3. まずはお気軽に体験レッスンへお越しください
-
-60分間の体験レッスンで、専属コーチとの相性や指導の分かりやすさを直接ご体感ください。
-`;
-
-    const faqItems = [
-        {
-            question: `「${keyword}」のレッスン料金はいくらですか？`,
-            answer: `体験レッスンは特別優待料金でご受講いただけます。月額プラン（月2回・月4回）や単発チケットなど、ライフスタイルに合わせた多彩なプランをご用意しております。`,
-        },
-        {
-            question: `コーチは指名できますか？`,
-            answer: `はい、お子様向け・女性向け・競技者向けなど、ご希望の指導スタイルに合わせて最適なコーチをご紹介いたします。`,
-        },
-    ];
-
+    // セマンティックHTMLの構築
     const contentHtml = `
-<div class="seo-article-block space-y-6 text-slate-800">
-  <h1 class="text-2xl font-black text-slate-900">${title}</h1>
-  <p class="text-slate-600 leading-relaxed">都内・神奈川・千葉の公営プールに出張する完全マンツーマンの水泳個別指導。「${keyword}」でお悩みの方に最短の上達ソリューションをお届けします。</p>
-  
-  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 my-6">
-    <div class="p-4 rounded-xl bg-slate-50 border border-slate-200">
-      <h3 class="font-bold text-slate-900 text-sm mb-1">完全個別指導</h3>
-      <p class="text-xs text-slate-600">60分間専属で癖を瞬時に改善</p>
+<article class="article-content space-y-8 text-slate-800 leading-relaxed max-w-3xl mx-auto font-sans">
+  <header class="border-b border-zinc-200 pb-6">
+    <div class="flex items-center gap-2 mb-3">
+      <span class="inline-block px-3 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+        ${isRewrite ? '既存ページ改善・リライト版' : articleType === 'aio' ? 'AI検索（AIO）推奨エビデンス記事' : 'SEO専門指導員監修記事'}
+      </span>
+      <span class="text-xs text-zinc-400 font-mono">更新日: ${today.toLocaleDateString('ja-JP')}</span>
     </div>
-    <div class="p-4 rounded-xl bg-slate-50 border border-slate-200">
-      <h3 class="font-bold text-slate-900 text-sm mb-1">公営プール出張</h3>
-      <p class="text-xs text-slate-600">お近くの施設で手軽に受講</p>
-    </div>
-    <div class="p-4 rounded-xl bg-slate-50 border border-slate-200">
-      <h3 class="font-bold text-slate-900 text-sm mb-1">動画分析カルテ</h3>
-      <p class="text-xs text-slate-600">成長をスマホでいつでも確認</p>
-    </div>
+    <h1 class="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight leading-snug">${title}</h1>
+    <p class="text-sm text-zinc-600 mt-3 leading-relaxed">${metaDescription}</p>
+  </header>
+
+  <!-- 要点サマリーBOX -->
+  <div class="p-5 sm:p-6 rounded-2xl bg-amber-50/80 border border-amber-200 text-amber-950 space-y-3 shadow-xs">
+    <h2 class="font-bold text-base flex items-center gap-2 text-amber-900">
+      💡 エグゼクティブサマリー（最短上達の3原則）
+    </h2>
+    <ul class="list-disc pl-5 space-y-1.5 text-sm">
+      <li><strong>自己流の反復をやめる:</strong> 水中の脱力と水平姿勢（ストリームライン）の確保が8割を決める</li>
+      <li><strong>陸上・お風呂ドリルを活用:</strong> 正しい身体の使い方を脳に記憶させてからプールに入る</li>
+      <li><strong>マンツーマン指導で客観視:</strong> 水中動画カルテで自分の癖を見抜き、無駄な試行錯誤をゼロにする</li>
+    </ul>
   </div>
 
-  <div class="text-center pt-4">
-    <a href="/trial" class="inline-block px-8 py-3.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm shadow-md transition-all">
-      60分体験レッスンを申し込む
-    </a>
+  <!-- 1. 生体力学解説 -->
+  <section class="space-y-4 pt-2">
+    <h2 class="text-xl sm:text-2xl font-black text-slate-900 border-l-4 border-indigo-600 pl-3">
+      1. なぜ「${keyword}」でつまずくのか？生体力学的メカニズム
+    </h2>
+    <div class="text-slate-700 text-sm sm:text-base leading-relaxed space-y-3 whitespace-pre-wrap">
+      ${biomechanicsExplanation}
+    </div>
+  </section>
+
+  <!-- 2. 改善ドリル -->
+  <section class="space-y-4 pt-2">
+    <h2 class="text-xl sm:text-2xl font-black text-slate-900 border-l-4 border-indigo-600 pl-3">
+      2. 「${keyword}」を劇的に改善する3ステップ実践ドリル
+    </h2>
+    <div class="space-y-3">
+      <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 text-sm">
+        ${step1Drill}
+      </div>
+      <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 text-sm">
+        ${step2Drill}
+      </div>
+      <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 text-sm">
+        ${step3Drill}
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. 比較表 -->
+  <section class="space-y-4 pt-2">
+    <h2 class="text-xl sm:text-2xl font-black text-slate-900 border-l-4 border-indigo-600 pl-3">
+      3. 集団スクール vs スイムパートナーズ（完全個別指導）
+    </h2>
+    <div class="overflow-x-auto rounded-xl border border-zinc-200">
+      <table class="w-full text-xs sm:text-sm text-left">
+        <thead class="bg-zinc-100 text-zinc-700 font-bold">
+          <tr>
+            <th class="p-3">項目</th>
+            <th class="p-3">一般的な集団指導</th>
+            <th class="p-3 text-indigo-700 font-extrabold bg-indigo-50/50">スイムパートナーズ</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-zinc-200">
+          <tr>
+            <td class="p-3 font-medium">指導比率</td>
+            <td class="p-3 text-zinc-500">生徒10〜15名にコーチ1名</td>
+            <td class="p-3 font-bold text-indigo-900 bg-indigo-50/20">生徒1名に専任コーチ1名</td>
+          </tr>
+          <tr>
+            <td class="p-3 font-medium">実質指導時間</td>
+            <td class="p-3 text-zinc-500">60分中 約2〜3分</td>
+            <td class="p-3 font-bold text-indigo-900 bg-indigo-50/20">60分間すべて専属指導</td>
+          </tr>
+          <tr>
+            <td class="p-3 font-medium">進級・上達期間</td>
+            <td class="p-3 text-zinc-500">平均6ヶ月〜1年以上</td>
+            <td class="p-3 font-bold text-indigo-900 bg-indigo-50/20">平均3〜6回で完泳・合格</td>
+          </tr>
+          <tr>
+            <td class="p-3 font-medium">動画カルテ</td>
+            <td class="p-3 text-zinc-500">なし</td>
+            <td class="p-3 font-bold text-indigo-900 bg-indigo-50/20">毎回の水中動画カルテ送付</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 4. FAQアコーディオン/リスト -->
+  <section class="space-y-4 pt-2">
+    <h2 class="text-xl sm:text-2xl font-black text-slate-900 border-l-4 border-indigo-600 pl-3">
+      4. よくあるご質問（FAQ）
+    </h2>
+    <div class="space-y-3">
+      ${customFaqItems.map((f, i) => `
+      <div class="p-4 rounded-xl bg-white border border-zinc-200 shadow-2xs space-y-1.5">
+        <h3 class="font-bold text-sm text-slate-900 flex items-center gap-2">
+          <span class="w-5 h-5 rounded-md bg-indigo-100 text-indigo-800 flex items-center justify-center text-xs font-black">Q</span>
+          ${f.question}
+        </h3>
+        <p class="text-xs sm:text-sm text-zinc-600 pl-7 leading-relaxed">${f.answer}</p>
+      </div>
+      `).join('')}
+    </div>
+  </section>
+
+  <!-- 5. 体験レッスンCTAボックス -->
+  <div class="my-8 p-6 sm:p-8 rounded-2xl bg-gradient-to-br from-indigo-950 via-slate-900 to-indigo-900 text-white text-center space-y-4 shadow-xl">
+    <span class="inline-block px-3 py-1 rounded-full text-xs font-bold bg-amber-400 text-slate-950">公営プール出張対応・入会金0円</span>
+    <h3 class="text-xl sm:text-2xl font-black">「${keyword}」の壁を最短で突破するなら</h3>
+    <p class="text-xs sm:text-sm text-indigo-200 max-w-lg mx-auto">
+      60分間の完全マンツーマン体験レッスンで、専任コーチによる客観的フォーム診断と確かな上達をご体感ください。
+    </p>
+    <div class="pt-2">
+      <a href="/personal_swim" class="inline-block px-8 py-3.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-sm transition-all shadow-md transform hover:-translate-y-0.5">
+        体験レッスンに申し込む（60分）
+      </a>
+    </div>
   </div>
-</div>
+</article>
 `.trim();
 
     return {
         id,
         keyword,
-        article_type: 'seo',
+        article_type: articleType,
         title,
         meta_description: metaDescription,
         content_md: contentMd,
         content_html: contentHtml,
-        faq_items: faqItems,
+        faq_items: customFaqItems,
         json_ld: JSON.stringify({
             '@context': 'https://schema.org',
-            '@type': 'Service',
-            name: title,
-            provider: { '@type': 'Organization', name: 'スイムパートナーズ' },
+            '@type': articleType === 'aio' ? 'FAQPage' : 'Article',
+            headline: title,
             description: metaDescription,
+            author: {
+                '@type': 'Organization',
+                name: 'スイムパートナーズ',
+            },
+            mainEntity: customFaqItems.map((f) => ({
+                '@type': 'Question',
+                name: f.question,
+                acceptedAnswer: {
+                    '@type': 'Answer',
+                    text: f.answer,
+                },
+            })),
         }, null, 2),
         target_path: targetPath,
         status: 'draft',
