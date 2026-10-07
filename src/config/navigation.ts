@@ -14,6 +14,8 @@ import {
     DollarSign,
     History,
     PlusCircle,
+    Receipt,
+    Sparkles,
     type LucideIcon,
 } from 'lucide-react'
 
@@ -112,10 +114,10 @@ export const navigationConfig: NavigationConfig = {
                 title: '請求・財務',
                 items: [
                     {
-                        title: '請求・承認管理',
+                        title: '請求・決済履歴',
                         href: '/admin/approvals',
-                        icon: FileCheck,
-                        description: 'レッスン請求承認・プラン変更承認',
+                        icon: Receipt,
+                        description: 'Stripe請求履歴・プラン変更管理',
                     },
                     {
                         title: '報酬・財務分析',
@@ -127,7 +129,7 @@ export const navigationConfig: NavigationConfig = {
             },
             {
                 domain: 'marketing',
-                title: 'LINE・マーケティング',
+                title: 'マーケティング・SEO',
                 items: [
                     {
                         title: 'LINEマーケティング',
@@ -140,6 +142,12 @@ export const navigationConfig: NavigationConfig = {
                         href: '/admin/line-monitoring',
                         icon: MessageCircle,
                         description: 'LINEチャット履歴・日程調整検知',
+                    },
+                    {
+                        title: 'SP-Tracker（SEO・GEO）',
+                        href: '/admin/geo-seo',
+                        icon: Sparkles,
+                        description: 'Googleマップ・検索順位トラッキング',
                     },
                 ],
             },
