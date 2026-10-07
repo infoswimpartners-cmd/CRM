@@ -6,6 +6,8 @@
 
 import { LivePageAuditResult } from './page-audit';
 import { SeoImprovementKit, SeoPageType, getSeoPageType, FaqItem, LpSectionBlock, generateSeoImprovementKit } from './seo-improvement-generator';
+import { KeywordCompetitorIntelligence } from '@/types/competitor-benchmark';
+import { BENCHMARK_COMPETITORS, buildComparisonMarkdownTable } from './competitor-benchmark-data';
 
 export interface OptimizeKitParams {
     keyword: string;
@@ -13,6 +15,8 @@ export interface OptimizeKitParams {
     currentRank: number;
     liveAudit?: LivePageAuditResult;
     competitorInfo?: string;
+    /** 競合3社（Swimmy, ベースプラス, スイサポ）のベンチマーク分析インテリジェンス */
+    competitorIntelligence?: KeywordCompetitorIntelligence;
 }
 
 /**
@@ -22,7 +26,7 @@ export async function optimizeImprovementKitWithGemini(
     params: OptimizeKitParams,
     apiKey: string
 ): Promise<SeoImprovementKit> {
-    const { keyword, targetPath, currentRank, liveAudit } = params;
+    const { keyword, targetPath, currentRank, liveAudit, competitorIntelligence } = params;
     const pageType: SeoPageType = liveAudit?.detectedPageType || getSeoPageType(targetPath);
     const isLandingPage = pageType === 'studio_landing_page';
 
@@ -32,25 +36,48 @@ export async function optimizeImprovementKitWithGemini(
     const existingH2List = liveAudit?.h2List || [];
     const hasJsonLd = liveAudit?.hasLdJson || false;
 
-    // 競合情報と差別化コンテキスト
-    const competitorContext = params.competitorInfo ||
-        '競合スイサポ（都度払い・高額施設利用料・指導密度のバラツキ）および大手集団スクール（1対10の一斉指導・実際の泳ぎ時間5分未満）';
+    // 競合3社ベンチマーク（Swimmy, ベースプラス, スイサポ）および大手集団スクールの差別化コンテキスト
+    const defaultCompetitorContext = `
+【ベンチマーク競合3社（Swimmy / ベースプラス / スイサポ）の実態と自社の勝ち筋】
+1. Swimmy (東京スイミーSS):
+   - 弱点: 入会金10,800円、一律交通費1,400円/回、港区・夏季割増など加算項目が多く総額不明瞭。知育・児童中心で成人の息継ぎ・25m完泳や大手進級テスト即効対策が希薄。
+   - 自社勝ち筋: 入会金・年会費0円、交通費込み、公営温水プール入場料実費（300〜500円）のみの完全明朗会計。生体力学的フォーム分析で平均3〜5回で25m完泳。
+2. ベースプラス (BASE PLUS 関東):
+   - 弱点: 初年度固定初期費用（入会金10,000円＋年会費5,500円＋保険料）が約1.8万円と高額。2名受講割安を謳うが実質指導密度が分散。毎レッスンの動画カルテDXがない。
+   - 自社勝ち筋: 初期費用0円。専任プロコーチが1対1で60分完全密着。毎レッスン水中・陸上動画カルテを無料送付。
+3. スイサポ:
+   - 弱点: 都度払い8,000円を掲げるが、交通費+1,000円/回や代表指名料+2,500円/回が後から加算され実質1回11,500円〜に跳ね上がる。都度予約で専任性が薄い。
+   - 自社勝ち筋: 交通費込み・指名料0円。最初から同一の専任プロコーチが伴走。品川・城南エリアはもちろん東京23区・神奈川・千葉・埼玉まで公営プール出張。
+`;
+
+    const competitorContext = competitorIntelligence
+        ? `
+【特定キーワード「${cleanKw}」に対する競合3社（Swimmy / ベースプラス / スイサポ）の分析インテリジェンス】
+- 総合要約: ${competitorIntelligence.summary}
+- Swimmy弱点: ${competitorIntelligence.competitorAnalyses.swimmy.topRankWeakness} ➔ 当教室勝ち筋: ${competitorIntelligence.competitorAnalyses.swimmy.ourWinningAngle}
+- ベースプラス弱点: ${competitorIntelligence.competitorAnalyses.base_plus.topRankWeakness} ➔ 当教室勝ち筋: ${competitorIntelligence.competitorAnalyses.base_plus.ourWinningAngle}
+- スイサポ弱点: ${competitorIntelligence.competitorAnalyses.suisapo.topRankWeakness} ➔ 当教室勝ち筋: ${competitorIntelligence.competitorAnalyses.suisapo.ourWinningAngle}
+- 3社共通の盲点: ${competitorIntelligence.blindSpots.join(' / ')}
+- 自社必勝総合戦略: ${competitorIntelligence.ourWinningStrategy}
+- 推奨CTA: 見出し「${competitorIntelligence.recommendedCta.headline}」、ボタン「${competitorIntelligence.recommendedCta.buttonText}」
+`
+        : (params.competitorInfo ? `${params.competitorInfo}\n${defaultCompetitorContext}` : defaultCompetitorContext);
 
     // プロンプト設計
     const systemPrompt = `
-あなたは出張個別指導スイミング「スイムパートナーズ」の専属チーフマーケター兼SEO統括ディレクターです。
+あなたはお出張個別指導スイミング「スイムパートナーズ」の専属チーフマーケター兼SEO統括ディレクターです。
 Google検索順位1位の獲得（SEO）と、体験レッスン予約成約率（CVR）の最大化を両立させるプロマーケティングの第一人者です。
 
-【スイムパートナーズの独自強み（競合スイサポ・大手集団スクールとの差別化ポイント）】
+【スイムパートナーズの独自強み（競合3社 Swimmy / ベースプラス / スイサポ・大手集団スクールとの差別化ポイント）】
 1. 圧倒的な練習密度:
    - 大手スクールは1対10名以上の一斉指導で、1回50分中実際に泳ぐ時間はわずか5分未満。
    - スイムパートナーズは「専属プロコーチ1名がつきっきりで60分指導」。練習量は集団の5倍以上、平均3〜5回で25m完泳へ導く。
-2. 競合スイサポ対比の明朗会計＆高満足度:
-   - スイサポなどの都度払いスクールに比べ、高額な施設利用料縛りや隠れた追加費用がなく、公営温水プール（入場料実費300〜500円のみ）を活用するため極めてリーズナブル。
-   - 入会金・年会費ずっと0円。
+2. 競合3社対比の完全明朗会計＆高満足度:
+   - Swimmy（入会金10,800円・交通費1,400円）、ベースプラス（初期約1.8万円）、スイサポ（指名料+2,500円・交通費+1,000円）のような隠れた追加費用が一切なし。
+   - 入会金・年会費・指名料ずっと0円。交通費込み。公営温水プール（入場料実費300〜500円のみ）を活用するため極めてリーズナブル。
 3. 最先端の動画カルテ・生体力学アプローチ:
    - 水中・陸上からのスマホ撮影動画によるフォーム分析カルテを毎レッスン後に送付。
-   - 根性論ではなく、重心移動・浮力・脱力の生体力学に基づき、進級テストに落ちている本当の原因だけをピンポイント修正。
+   - 根性論ではなく、重心移動・浮力・脱力の生体力学に基づき、進級テストに落ちている本当の原因や息継ぎで沈む理由をピンポイント修正。
 4. 対象顧客:
    - ジュニア: 進級テスト（クロール息継ぎ・バタフライ・平泳ぎ）で停滞している子、水が怖い子。
    - 大人: 25m泳げるようになりたい初心者、ジムで息が続かない40代・50代、マスターズ愛好者。
@@ -71,12 +98,12 @@ ${competitorContext}
 
 【生成要件】
 プロマーケター視点から、このキーワードでGoogle1位を奪取し体験予約成約率を最大化するためのLP改善キットを考案してください。
-抽象的な一般論ではなく、ターゲット読者の心理（「なぜテストに落ちるのか」「スイサポ等と何が違うのか」「近くのどの公営プールで受けられるのか」）に突き刺さる解像度で作成してください。
+抽象的な一般論ではなく、ターゲット読者の心理（「なぜテストに落ちるのか」「他社個別指導スクール（Swimmy・ベースプラス・スイサポ）と何が違うのか」「近くのどの公営プールで受けられるのか」）に突き刺さる解像度で作成してください。
 
 【出力フォーマット】
 厳密なJSON形式のみを出力してください（バッククォート \`\`\`json で囲み、挨拶文などの余計なテキストは含めないでください）。
 {
-  "aiInsights": "Gemini 3.8 Flashによる戦略的インサイト（1位獲得の決定打、競合スイサポとの差別化、およびFV改善の要点。200〜300文字）",
+  "aiInsights": "Gemini 3.8 Flashによる戦略的インサイト（1位獲得の決定打、競合3社Swimmy・ベースプラス・スイサポとの差別化、およびFV改善の要点。200〜300文字）",
   "proposedTitle": "完全一致キーワードを含みクリック率を最大化するSEOタイトル（32〜45文字）",
   "proposedDescription": "公営プール出張・明朗会計・入会金0円・動画カルテ・体験予約CTAを含むメタ説明文（110〜140文字）",
   "lpBlocks": [
@@ -84,31 +111,37 @@ ${competitorContext}
       "sectionName": "① ファーストビュー（FV）ヒーローセクション",
       "description": "ページ最上部のメインビジュアル内に配置するキャッチコピーと成約ボタン",
       "headline": "メインキャッチコピー（キーワードを含み強烈に惹きつける見出し）",
-      "subheadline": "サブキャッチコピー（公営プール出張、スイサポ等との差別化、信頼性）",
-      "content": "限定オファーや実績バレット（例: 入会金0円、満足度98.4%、待ち時間ゼロ）",
+      "subheadline": "サブキャッチコピー（公営プール出張、競合3社との差別化、信頼性）",
+      "content": "限定オファーや実績バレット（例: 入会金0円、交通費込み、動画カルテ付き、満足度98.4%）",
       "ctaText": "成約率を高めるマイクロコピー付きボタン文面"
     },
     {
       "sectionName": "② 悩み共感＆解決ベネフィット（3つの選ばれる理由）",
-      "description": "集団スクールやスイサポとの差別化を明確にする3つの強みブロック",
+      "description": "集団スクールや競合3社との差別化を明確にする3つの強みブロック",
       "headline": "なぜスイムパートナーズのマンツーマン指導は最短で上達できるのか？",
-      "content": "1. 【待ち時間ゼロ・1対1完全密着】集団スクールの5倍以上の練習密度...\\n2. 【癖に合わせたピンポイント修正】動画カルテと脱力指導...\\n3. 【公営プール活用で明朗会計】高額な入会金・施設利用料不要..."
+      "content": "1. 【待ち時間ゼロ・1対1完全密着】集団スクールの5倍以上の練習密度...\\n2. 【癖に合わせたピンポイント修正】毎回の水中動画カルテと脱力指導...\\n3. 【公営プール活用で明朗会計】入会金・年会費・指名料0円、追加費用なし..."
     },
     {
-      "sectionName": "③ 対応プール・施設一覧セクション",
+      "sectionName": "③ 競合3社・大手スクール徹底比較セクション",
+      "description": "Swimmy、ベースプラス、スイサポとの料金・指導体制・DXの違いを直接対比するブロック",
+      "headline": "他社水泳スクール・個別指導との決定的な違い",
+      "content": "初期費用（他社1〜1.8万 vs 0円）、交通費（他社1,000〜1,400円加算 vs 0円）、動画カルテ有無の明確な比較表"
+    },
+    {
+      "sectionName": "④ 対応プール・施設一覧セクション",
       "description": "安心感を与える地域の出張対応公営温水プール一覧ブロック",
       "headline": "主な出張対応温水プール一覧",
       "content": "具体的な公営プール名（駅名・アクセス特徴付き）"
     },
     {
-      "sectionName": "④ 料金体系＆アンカリング（明朗会計）",
+      "sectionName": "⑤ 料金体系＆アンカリング（明朗会計）",
       "description": "迷わせずに成約へ導く価格表ブロック",
       "headline": "入会金・年会費0円の明朗会計プラン",
       "content": "体験レッスン、月謝コース、都度チケットのわかりやすい提示",
       "ctaText": "体験レッスンの空き枠を確認する"
     },
     {
-      "sectionName": "⑤ 最終CTAセクション（予約オファー）",
+      "sectionName": "⑥ 最終CTAセクション（予約オファー）",
       "description": "離脱を防ぎ体験予約へ着地させる最終クロージングブロック",
       "headline": "まずは1回、コーチとの相性と上達の感動をご体感ください",
       "content": "強引な勧誘なしの安心メッセージ",
@@ -116,12 +149,12 @@ ${competitorContext}
     }
   ],
   "faqItems": [
-    { "question": "よくある質問1", "answer": "回答1" },
-    { "question": "よくある質問2", "answer": "回答2" },
-    { "question": "よくある質問3", "answer": "回答3" }
+    { "question": "競合スクール（Swimmy、ベースプラス、スイサポ等）との違いは？", "answer": "完全明朗会計（入会金0円・指名料0円・交通費込み）と毎レッスンの水中動画カルテ送付です..." },
+    { "question": "集団スクールと併用して受講できますか？", "answer": "約6割の生徒様が併用されており、進級テスト対策に特化して指導します..." },
+    { "question": "交通費やプール利用料は別途必要ですか？", "answer": "交通費は指導料に含まれており、公営プールの入場料実費（300〜500円）のみご負担いただきます..." }
   ],
   "articleHeadline": "CMS記事・ページリライトの場合の大見出し",
-  "articleBodyText": "CMS記事・ページリライトの場合のMarkdown形式による高品質リライト本文（見出しH2/H3、生体力学に基づく解説、3ステップ改善ドリル、比較表、FAQ、体験レッスンCTAを含む1,500〜2,500文字以上の本格Markdown文章）",
+  "articleBodyText": "CMS記事・ページリライトの場合のMarkdown形式による高品質リライト本文（見出しH2/H3、生体力学に基づく解説、3ステップ改善ドリル、4社徹底比較表、FAQ、体験レッスンCTAを含む1,500〜2,500文字以上の本格Markdown文章）",
   "articleCtaBox": "CMS記事の場合のCTA案内文"
 }
 `;
@@ -478,6 +511,136 @@ ${faqItems
         isAiGenerated: true,
         aiModel: 'Gemini 3.8 Flash',
         aiInsights,
-        competitorAnalysis: '競合スクール（スイサポ・集団スクール）の弱点である「高額施設利用料・待ち時間・指導密度の低さ」を突くポジショニングを採用。',
+        competitorAnalysis: '競合3社（Swimmy, ベースプラス, スイサポ）の弱点である「加算諸費用・初期費用1.8万・指名料/交通費加算・指導密度の低さ」を打破する完全明朗会計＆動画カルテポジショニングを採用。',
     };
 }
+
+/**
+ * 競合3社（Swimmy, ベースプラス, スイサポ）ベンチマークに基づく
+ * 高品質ローカルフォールバック改善キット生成エンジン
+ * APIキー未設定時やネットワーク障害時でも、プロ品質のLP改善キットを即座に返却
+ */
+export function generateHighRankWinningKitFallback(
+    params: OptimizeKitParams
+): SeoImprovementKit {
+    const { keyword, targetPath, currentRank, liveAudit, competitorIntelligence } = params;
+    const cleanKw = keyword.trim();
+    const pageType: SeoPageType = liveAudit?.detectedPageType || getSeoPageType(targetPath);
+    const isLandingPage = pageType === 'studio_landing_page';
+
+    // ベースラインのキットを取得
+    const baseline = generateSeoImprovementKit(cleanKw, targetPath, currentRank, liveAudit);
+
+    const intel = competitorIntelligence;
+    const proposedTitle = intel?.recommendedCta?.headline
+        ? `【出張個別指導】「${cleanKw}」克服専門マンツーマン｜完全明朗会計・動画カルテのスイムパートナーズ`
+        : `【公式】「${cleanKw}」水泳個人レッスン・個別指導専門｜入会金0円・動画カルテのスイムパートナーズ`;
+
+    const proposedDescription = `【入会金・年会費0円・交通費込み】「${cleanKw}」でお悩みの方へ。他社のような初期費用1.8万円や指名料・交通費の上乗せなし。公営プール出張マンツーマン＋毎回の動画カルテで平均3〜5回で上達。体験予約受付中。`;
+
+    const aiInsights = `【競合3社ベンチマーク戦略分析】「${cleanKw}」において、Swimmy（加算項目多数・知育寄り）、ベースプラス（初期約1.8万円・2名指導）、スイサポ（指名料+2,500円/交通費+1,000円加算）の各社弱点に対し、「入会金0円・交通費込みの完全明朗会計」「専任プロコーチ1対1密着」「毎回の水中動画カルテ」の3大勝ち筋をFVおよびブロックに配置しました。`;
+
+    // LP改善ブロックの構築
+    const lpBlocks: LpSectionBlock[] = isLandingPage ? [
+        {
+            sectionName: '① ファーストビュー（FV）ヒーローセクション',
+            description: 'ページ最上部のメインビジュアル内に配置するキャッチコピーと成約ボタン',
+            headline: intel?.recommendedCta?.headline || `「${cleanKw}」の悩み、たった60分のマンツーマン指導で解決します`,
+            subheadline: intel?.recommendedCta?.subheadline || '他社のような入会金・指名料・交通費の追加加算は一切なし。身近な公営プールでプロコーチが専任指導',
+            content: '✓ 入会金・年会費ずっと0円\n✓ 指導料に交通費込み・指名料0円\n✓ 毎レッスン水中・陸上「動画カルテ」無料送付\n✓ 大手スクール進級停滞・大人の息継ぎ即効対策',
+            ctaText: intel?.recommendedCta?.buttonText || '【Web限定】体験レッスンの空き枠を確認する（60分）',
+        },
+        {
+            sectionName: '② 悩み共感＆解決ベネフィット（3つの選ばれる理由）',
+            description: '大手集団スクールおよび競合3社（Swimmy, ベースプラス, スイサポ）との差別化ブロック',
+            headline: 'なぜスイムパートナーズの出張マンツーマン指導は圧倒的に選ばれるのか？',
+            content: `1. 【入会金・指名料0円の完全明朗会計】\n   他社で発生する入会金10,000円〜や交通費・代表指名料（+2,500円）の追加費用は一切不要。公営プール入場料実費（300〜500円）のみで受講可能です。\n\n2. 【毎レッスン水中・陸上「動画カルテ」送付】\n   感覚だけの指導ではなく、スマホで撮影したフォームを客観的に分析。進級テストに落ちる本当の原因をピンポイントで修正します。\n\n3. 【専任プロコーチが1対1で60分完全密着】\n   集団スクール（1対10名で実質指導2〜3分）やペア受講とは異なり、60分間つきっきりで練習量は5倍以上。平均3〜5回で25m完泳へ導きます。`,
+        },
+        {
+            sectionName: '③ 競合3社（Swimmy・ベースプラス・スイサポ）徹底比較セクション',
+            description: '大手スクールおよび主要個別指導他社との料金・体制の直接対比ブロック',
+            headline: '他社水泳スクール・個別指導との決定的な違い',
+            content: `【料金・体制の直接対比】\n・当教室: 入会金0円 / 交通費込み / 指名料0円 / 毎レッスン動画カルテ付き\n・Swimmy: 入会金10,800円 / 交通費一律1,400円 / 港区・夏季加算あり / 知育中心\n・ベースプラス: 入会金10,000円＋年会費5,500円＋保険料（初期約1.8万円） / 2名受講制\n・スイサポ: 都度8,000円＋交通費1,000円＋指名料2,500円（実質11,500円〜）\n\n※隠れた追加課金のない完全明朗会計と動画カルテDXで、受講総額・上達スピードともに最高評価を獲得しています。`,
+        },
+        {
+            sectionName: '④ 対応プール・施設一覧セクション',
+            description: '安心感を与える地域の出張対応公営温水プール一覧ブロック',
+            headline: '身近な公営温水プールへプロコーチが出張指導',
+            content: baseline.lpBlocks?.[2]?.content || '東京23区・神奈川（横浜・川崎）・千葉・埼玉の公営温水プールに出張対応。ご自宅近くのプールで受講いただけます。',
+        },
+        {
+            sectionName: '⑤ 料金体系＆アンカリング（明朗会計）',
+            description: '迷わせずに成約へ導く価格表ブロック',
+            headline: '追加諸費用一切なし。シンプルで安心の受講料プラン',
+            content: '・初回体験レッスン（60分）: 特別割引料金\n・パーソナル月謝コース / 都度チケットコース\n※入会金・年会費・更新料・コーチ指名料・交通費はずっと0円です。',
+            ctaText: '体験レッスンの空き枠を確認する',
+        },
+        {
+            sectionName: '⑥ 最終CTAセクション（予約オファー）',
+            description: '離脱を防ぎ体験予約へ着地させる最終クロージングブロック',
+            headline: 'まずは1回60分。泳げるようになる感動を体験してください',
+            content: '無理な勧誘や後からの追加請求は一切ございません。お気軽にご相談ください。',
+            ctaText: '【Web限定】体験レッスンを申し込む ➔',
+        },
+    ] : (baseline.lpBlocks || []);
+
+    const faqItems: FaqItem[] = [
+        {
+            question: '他の個人レッスン（Swimmy、ベースプラス、スイサポ等）と何が違いますか？',
+            answer: '大きな違いは「追加料金が一切ない完全明朗会計」と「毎レッスンの水中動画カルテ送付」です。他社で発生する入会金（10,000円〜）、年会費、交通費加算（1,000〜1,400円）、指名料（2,500円）などが一切ありません。また、初回から同一の専任プロコーチが一貫指導いたします。',
+        },
+        {
+            question: '大手集団スイミングスクールに通いながらでも受講できますか？',
+            answer: 'はい、生徒様の約6割が集団スクールと併用されています。現在のスクールの進級テスト基準（クロール息継ぎ・平泳ぎ・バタフライ等）に合わせて弱点をピンポイントで対策し、最短1〜2回の受講で合格突破を目指します。',
+        },
+        {
+            question: '交通費やプール利用料は別途かかりますか？',
+            answer: 'コーチの交通費は指導料に含まれております。お客様にご負担いただくのはご自身の公営プール入場料（実費300〜500円程度）のみです。',
+        },
+        {
+            question: '大人の息継ぎや水恐怖症でも本当に60分で変わりますか？',
+            answer: 'はい、大人が沈む原因は筋力不足ではなく「重心位置」と「頭の角度」にあります。生体力学に基づき、足が確実に届く水深の浅い公営プールで段階的に指導するため、初日の60分で息継ぎの恐怖が解消されます。',
+        },
+    ];
+
+    const bodyText = `【集客LP用 競合3社ベンチマーク最適化構成案】
+対象URL: https://swim-partners.com${targetPath}
+
+■ マーケター戦略インサイト:
+${aiInsights}
+
+■ 1. ファーストビュー（FV）キャッチコピー
+H1メインコピー: ${lpBlocks[0]?.headline || ''}
+サブコピー: ${lpBlocks[0]?.subheadline || ''}
+CTAボタン文面: ${lpBlocks[0]?.ctaText || ''}
+
+■ 2. 悩み共感＆選ばれる理由ブロック
+${lpBlocks[1]?.content || ''}
+
+■ 3. 競合3社徹底比較ブロック
+${lpBlocks[2]?.content || ''}
+
+■ 4. 対応公営プール一覧ブロック
+${lpBlocks[3]?.content || ''}
+
+■ 5. 料金プラン提示ブロック
+${lpBlocks[4]?.content || ''}
+
+■ 6. よくあるご質問（FAQ）
+` + faqItems.map((f, i) => `Q${i + 1}. ${f.question}\nA. ${f.answer}`).join('\n\n');
+
+    return {
+        ...baseline,
+        actionTitle: `【競合3社ベンチマーク最適化】「${cleanKw}」1位獲得LP改善`,
+        actionDetail: `競合3社（Swimmy・ベースプラス・スイサポ）の弱点に対する完全明朗会計・専任制・動画カルテの勝ち筋を反映したLP改善キットです。`,
+        proposedTitle,
+        proposedDescription,
+        lpBlocks,
+        bodyText,
+        faqItems,
+        aiInsights,
+        isAiGenerated: false,
+        competitorAnalysis: '競合3社（Swimmy, ベースプラス, スイサポ）の弱点（追加諸費用、初期費用1.8万、指名料+2,500円加算）を打破する完全明朗会計＆動画カルテポジショニングを適用。',
+    };
+}
+

@@ -28,15 +28,20 @@ import { GeneratedArticlesListView } from '@/components/admin/geo-seo/GeneratedA
 import { SeoArticleGeneratorModal } from '@/components/admin/geo-seo/SeoArticleGeneratorModal';
 import { GeoPageTrafficAnalysisCard } from '@/components/admin/geo-seo/GeoPageTrafficAnalysisCard';
 import { ArticleType } from '@/lib/generated-articles-storage';
+import { BenchmarkCompetitorPanel } from '@/components/admin/geo-seo/BenchmarkCompetitorPanel';
+import { KeywordCompetitorIntelligence } from '@/types/competitor-benchmark';
 
 function SpTrackerContent() {
     const searchParams = useSearchParams();
     const tabParam = searchParams.get('tab');
 
-    const [activeTab, setActiveTab] = useState<'seo' | 'articles' | 'geo' | 'citation_gap' | 'conversion' | 'analytics' | 'settings'>('seo');
+    const [activeTab, setActiveTab] = useState<'seo' | 'competitors' | 'articles' | 'geo' | 'citation_gap' | 'conversion' | 'analytics' | 'settings'>('seo');
     const [loading, setLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [isFloatingConsultOpen, setIsFloatingConsultOpen] = useState(false);
+
+    // 競合分析パネル選択キーワード
+    const [selectedCompetitorKeyword, setSelectedCompetitorKeyword] = useState<string>('水泳 息継ぎ コツ 大人');
 
     // 記事生成モーダル管理
     const [isArticleModalOpen, setIsArticleModalOpen] = useState(false);
@@ -44,22 +49,30 @@ function SpTrackerContent() {
     const [modalArticleType, setModalArticleType] = useState<ArticleType>('seo');
     const [modalTargetPath, setModalTargetPath] = useState('');
     const [modalInitialPrompt, setModalInitialPrompt] = useState('');
+    const [modalCompetitorIntelligence, setModalCompetitorIntelligence] = useState<KeywordCompetitorIntelligence | undefined>(undefined);
 
     const handleOpenGenerator = (
         keyword: string,
         type: ArticleType,
         targetPath?: string,
-        initialPrompt?: string
+        initialPrompt?: string,
+        competitorIntelligence?: KeywordCompetitorIntelligence
     ) => {
         setModalKeyword(keyword);
         setModalArticleType(type);
         setModalTargetPath(targetPath || '');
         setModalInitialPrompt(initialPrompt || '');
+        setModalCompetitorIntelligence(competitorIntelligence);
         setIsArticleModalOpen(true);
     };
 
+    const handleSelectCompetitorKeyword = (keyword: string) => {
+        setSelectedCompetitorKeyword(keyword);
+        setActiveTab('competitors');
+    };
+
     useEffect(() => {
-        if (tabParam && ['seo', 'articles', 'geo', 'citation_gap', 'conversion', 'analytics', 'settings'].includes(tabParam)) {
+        if (tabParam && ['seo', 'competitors', 'articles', 'geo', 'citation_gap', 'conversion', 'analytics', 'settings'].includes(tabParam)) {
             setActiveTab(tabParam as any);
         }
     }, [tabParam]);
@@ -181,6 +194,7 @@ function SpTrackerContent() {
             <SpTrackerRankWatchCard
                 state={data.rankWatchState}
                 onRefresh={loadDashboard}
+                onOpenGenerator={handleOpenGenerator}
             />
 
             {/* 1.5. 今週の内製化コンテンツ計画（SEO/AIO記事自動提案ウィジェット） */}
@@ -207,6 +221,7 @@ function SpTrackerContent() {
                 <div className="flex items-center gap-1.5 p-1 bg-zinc-200/60 rounded-xl min-w-max">
                     {[
                         { id: 'seo', label: '📍 SEO推移 ＆ 商圏エリア別SEO診断' },
+                        { id: 'competitors', label: '⚔️ 競合3社分析' },
                         { id: 'articles', label: '📝 記事作成・内製化 (AIO/SEO)' },
                         { id: 'conversion', label: 'CV・顧客分析（スプレッドシート連携）' },
                         { id: 'geo', label: 'GEO分析（AI回答原文 & SOV）' },
@@ -240,6 +255,14 @@ function SpTrackerContent() {
                         searchConsoleData={data.searchConsoleData}
                         rankWatchState={data.rankWatchState}
                         onRefresh={loadDashboard}
+                        onOpenGenerator={handleOpenGenerator}
+                        onSelectCompetitorKeyword={handleSelectCompetitorKeyword}
+                    />
+                )}
+
+                {activeTab === 'competitors' && (
+                    <BenchmarkCompetitorPanel
+                        initialKeyword={selectedCompetitorKeyword}
                         onOpenGenerator={handleOpenGenerator}
                     />
                 )}
@@ -294,11 +317,15 @@ function SpTrackerContent() {
             {/* 記事自動生成モーダル */}
             <SeoArticleGeneratorModal
                 isOpen={isArticleModalOpen}
-                onClose={() => setIsArticleModalOpen(false)}
+                onClose={() => {
+                    setIsArticleModalOpen(false);
+                    setModalCompetitorIntelligence(undefined);
+                }}
                 initialKeyword={modalKeyword}
                 initialType={modalArticleType}
                 initialTargetPath={modalTargetPath}
                 initialPrompt={modalInitialPrompt}
+                competitorIntelligence={modalCompetitorIntelligence}
             />
 
             {/* 画面右下フローティング: ジョンに相談するFABボタン */}

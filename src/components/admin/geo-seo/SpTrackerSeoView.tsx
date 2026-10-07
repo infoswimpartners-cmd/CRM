@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { KeywordItem } from '@/lib/sp-tracker-seed';
 import { SeoRankWatchState } from '@/lib/seo-rank-watch';
-import { Search, ArrowUp, ArrowDown, Minus, ExternalLink, Filter, Trophy, Hourglass, Target, RefreshCw } from 'lucide-react';
+import { Search, ArrowUp, ArrowDown, Minus, ExternalLink, Filter, Trophy, Hourglass, Target, RefreshCw, Swords } from 'lucide-react';
 import { syncGscRanksAction } from '@/actions/sp-tracker-actions';
 import { toast } from 'sonner';
 import { SpTrackerGrowthCharts } from './SpTrackerGrowthCharts';
@@ -21,6 +21,7 @@ interface SpTrackerSeoViewProps {
         targetPath?: string,
         initialPrompt?: string
     ) => void;
+    onSelectCompetitorKeyword?: (keyword: string) => void;
 }
 
 export function SpTrackerSeoView({
@@ -29,6 +30,7 @@ export function SpTrackerSeoView({
     rankWatchState,
     onRefresh,
     onOpenGenerator,
+    onSelectCompetitorKeyword,
 }: SpTrackerSeoViewProps) {
     const [areaFilter, setAreaFilter] = useState<string>('all');
     const [targetFilter, setTargetFilter] = useState<string>('all');
@@ -260,6 +262,7 @@ export function SpTrackerSeoView({
                                 <th className="pb-3 px-3 text-center">前週比</th>
                                 <th className="pb-3 px-3 text-center">Clicks / Imp</th>
                                 <th className="pb-3 px-3">自社URL</th>
+                                <th className="pb-3 px-3 text-center">操作</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-100 text-sm">
@@ -320,6 +323,16 @@ export function SpTrackerSeoView({
                                                 <span className="truncate">{kw.target_url}</span>
                                                 <ExternalLink className="w-3 h-3 flex-shrink-0" />
                                             </a>
+                                        </td>
+                                        <td className="py-4 px-3 text-center whitespace-nowrap">
+                                            <button
+                                                onClick={() => onSelectCompetitorKeyword?.(kw.keyword)}
+                                                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-amber-50 text-amber-950 border border-amber-300 hover:bg-amber-100 hover:border-amber-400 transition-all shadow-2xs cursor-pointer"
+                                                title={`「${kw.keyword}」の競合3社ベンチマーク分析を表示`}
+                                            >
+                                                <Swords className="w-3.5 h-3.5 text-amber-700" />
+                                                <span>⚔️ 競合分析</span>
+                                            </button>
                                         </td>
                                     </tr>
                                 );

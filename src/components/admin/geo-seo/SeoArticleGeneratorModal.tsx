@@ -15,10 +15,12 @@ import {
     Layers,
     ExternalLink,
     CheckCircle2,
+    Swords,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { GeneratedArticle, ArticleType } from '@/lib/generated-articles-storage';
 import { generateArticleAction } from '@/actions/seo-content-actions';
+import { KeywordCompetitorIntelligence } from '@/types/competitor-benchmark';
 
 interface SeoArticleGeneratorModalProps {
     isOpen: boolean;
@@ -27,6 +29,7 @@ interface SeoArticleGeneratorModalProps {
     initialType?: ArticleType;
     initialTargetPath?: string;
     initialPrompt?: string;
+    competitorIntelligence?: KeywordCompetitorIntelligence;
     onArticleSaved?: (article: GeneratedArticle) => void;
 }
 
@@ -37,12 +40,14 @@ export function SeoArticleGeneratorModal({
     initialType = 'seo',
     initialTargetPath = '',
     initialPrompt = '',
+    competitorIntelligence,
     onArticleSaved,
 }: SeoArticleGeneratorModalProps) {
     const [keyword, setKeyword] = useState(initialKeyword);
     const [articleType, setArticleType] = useState<ArticleType>(initialType);
     const [targetPath, setTargetPath] = useState(initialTargetPath);
     const [customPrompt, setCustomPrompt] = useState(initialPrompt);
+    const [activeCompetitorIntelligence, setActiveCompetitorIntelligence] = useState<KeywordCompetitorIntelligence | undefined>(competitorIntelligence);
     const [isGenerating, setIsGenerating] = useState(false);
     const [generatedArticle, setGeneratedArticle] = useState<GeneratedArticle | null>(null);
     const [activeTab, setActiveTab] = useState<'preview' | 'html' | 'faq'>('preview');
@@ -56,8 +61,9 @@ export function SeoArticleGeneratorModal({
             if (initialPrompt) {
                 setCustomPrompt(initialPrompt);
             }
+            setActiveCompetitorIntelligence(competitorIntelligence);
         }
-    }, [isOpen, initialKeyword, initialType, initialTargetPath, initialPrompt]);
+    }, [isOpen, initialKeyword, initialType, initialTargetPath, initialPrompt, competitorIntelligence]);
 
     if (!isOpen) return null;
 
@@ -69,16 +75,19 @@ export function SeoArticleGeneratorModal({
 
         setIsGenerating(true);
         try {
+            const isTargetRewrite = Boolean(targetPath.trim()) && !targetPath.trim().startsWith('/articles/');
             const res = await generateArticleAction({
                 keyword: keyword.trim(),
                 articleType,
                 targetPath: targetPath.trim() || undefined,
                 customPrompt: customPrompt.trim() || undefined,
+                isRewrite: isTargetRewrite,
+                competitorIntelligence: activeCompetitorIntelligence,
             });
 
             if (res.success && res.data) {
                 setGeneratedArticle(res.data);
-                toast.success(`「${res.data.keyword}」の${articleType === 'seo' ? 'SEO記事' : 'AIO記事'}を自動生成しました！`);
+                toast.success(`「${res.data.keyword}」の${isTargetRewrite ? 'リライト記事' : articleType === 'seo' ? 'SEO記事' : 'AIO記事'}を生成しました！`);
                 if (onArticleSaved) {
                     onArticleSaved(res.data);
                 }
@@ -115,15 +124,15 @@ export function SeoArticleGeneratorModal({
                         <div>
                             <div className="flex items-center gap-2">
                                 <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
-                                    SEO・AIO記事 自動生成スタジオ
+                                    SEO・AIO記事＆ページリライト 自動生成スタジオ
                                 </h2>
                                 <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
                                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                                    Gemini 3.8 Flash 稼働中
+                                    AI自律執筆 稼働中
                                 </span>
                             </div>
                             <p className="text-xs text-zinc-500 mt-0.5">
-                                最新の Gemini 3.8 Flash が、水泳専門コーチの視点と検索上位ロジックを反映して本格長文記事を自律執筆
+                                水泳専門コーチの生体力学視点と検索上位ロジックを反映し、新規記事執筆および既存ページのリライトをMarkdown形式で自律生成
                             </p>
                         </div>
                     </div>
@@ -137,6 +146,67 @@ export function SeoArticleGeneratorModal({
 
                 {/* メインエリア */}
                 <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
+                    {/* 競合3社ベンチマーク反映中ハイライトバッジ＆サマリー */}
+                    {activeCompetitorIntelligence && (
+                        <div className="bg-gradient-to-r from-amber-50/90 via-indigo-50/40 to-amber-50/90 border border-amber-200/90 rounded-2xl p-4 sm:p-5 space-y-3 shadow-xs animate-in fade-in duration-200">
+                            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200/60 pb-2.5">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-7 h-7 rounded-lg bg-amber-400 text-slate-950 flex items-center justify-center font-bold shadow-2xs">
+                                        <Swords className="w-4 h-4" />
+                                    </div>
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-extrabold text-xs sm:text-sm text-slate-900">
+                                                ⚔️ 競合3社分析（Swimmy / ベースプラス / スイサポ）反映中
+                                            </span>
+                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-white text-indigo-700 border border-indigo-200">
+                                                4社徹底比較表 ＆ 差別化CTAを本文へ強制注入
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <span className="text-[11px] text-zinc-500 font-medium">
+                                    分析対象: <strong className="text-slate-900">「{activeCompetitorIntelligence.keyword}」</strong>
+                                </span>
+                            </div>
+
+                            {/* 3社弱点と自社勝ち筋サマリー */}
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                                <div className="bg-white/90 p-3 rounded-xl border border-amber-200/60 space-y-1">
+                                    <div className="text-[10px] font-bold text-zinc-500 uppercase">Swimmy 対比弱点</div>
+                                    <div className="text-zinc-800 text-xs line-clamp-2 leading-snug" title={activeCompetitorIntelligence.competitorAnalyses.swimmy?.topRankWeakness}>
+                                        {activeCompetitorIntelligence.competitorAnalyses.swimmy?.topRankWeakness}
+                                    </div>
+                                </div>
+                                <div className="bg-white/90 p-3 rounded-xl border border-amber-200/60 space-y-1">
+                                    <div className="text-[10px] font-bold text-zinc-500 uppercase">ベースプラス 対比弱点</div>
+                                    <div className="text-zinc-800 text-xs line-clamp-2 leading-snug" title={activeCompetitorIntelligence.competitorAnalyses.base_plus?.topRankWeakness}>
+                                        {activeCompetitorIntelligence.competitorAnalyses.base_plus?.topRankWeakness}
+                                    </div>
+                                </div>
+                                <div className="bg-white/90 p-3 rounded-xl border border-amber-200/60 space-y-1">
+                                    <div className="text-[10px] font-bold text-zinc-500 uppercase">スイサポ 対比弱点</div>
+                                    <div className="text-zinc-800 text-xs line-clamp-2 leading-snug" title={activeCompetitorIntelligence.competitorAnalyses.suisapo?.topRankWeakness}>
+                                        {activeCompetitorIntelligence.competitorAnalyses.suisapo?.topRankWeakness}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* 推奨CTA */}
+                            {activeCompetitorIntelligence.recommendedCta && (
+                                <div className="text-xs text-indigo-950 bg-white/90 p-2.5 rounded-xl border border-indigo-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                    <div className="truncate">
+                                        <span className="font-bold text-indigo-700 mr-1.5">🏆 自社推奨CTA:</span>
+                                        <span className="font-semibold text-slate-800">{activeCompetitorIntelligence.recommendedCta.headline}</span>
+                                    </div>
+                                    <span className="text-[10px] font-mono font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded flex-shrink-0">
+                                        ボタン: {activeCompetitorIntelligence.recommendedCta.buttonText}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     {/* 入力フォーム */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-zinc-50 p-4 sm:p-5 rounded-2xl border border-zinc-200/80">
                         <div className="space-y-3">
@@ -232,7 +302,7 @@ export function SeoArticleGeneratorModal({
                                 className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-extrabold text-sm flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer"
                             >
                                 <Sparkles className="w-4 h-4 text-amber-300" />
-                                {isGenerating ? 'Gemini 3.8 Flash が長文記事を執筆中...' : 'Gemini 3.8 Flash で記事を執筆する'}
+                                {isGenerating ? 'AIがMarkdown記事・リライトを執筆中...' : 'Markdownで記事・リライトを執筆する'}
                             </button>
                         </div>
                     </div>

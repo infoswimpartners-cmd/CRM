@@ -9,7 +9,15 @@ import {
     updateArticleStatus,
     deleteGeneratedArticle,
 } from '@/lib/generated-articles-storage';
-import { generateSeoAioArticle, GenerateArticleParams } from '@/lib/article-generator-engine';
+import { generateSeoAioArticle } from '@/lib/article-generator-engine';
+import { KeywordCompetitorIntelligence } from '@/types/competitor-benchmark';
+import {
+    generateArticleWithGeminiFlash,
+    enrichArticleWithCompetitorIntelligence,
+    type GenerateArticleParams,
+} from '@/lib/gemini-article-service';
+
+export type { GenerateArticleParams };
 
 export interface CompetitorAnalysis {
     topCompetitorSites: string[];
@@ -165,11 +173,11 @@ const STRATEGIC_NEW_KEYWORD_OPPORTUNITIES: ArticleSuggestion[] = [
     },
 ];
 
-import { generateArticleWithGeminiFlash } from '@/lib/gemini-article-service';
-
 /**
  * 記事生成アクション
  * GEMINI_API_KEY が設定されている場合は最高峰の Gemini 3.8 Flash で自律執筆
+ * 競合3社ベンチマーク（Swimmy, ベースプラス, スイサポ）インテリジェンスが渡された場合、
+ * Geminiプロンプトおよびローカルエンジンの双方に安全に反映・比較表を組み込み
  */
 export async function generateArticleAction(params: GenerateArticleParams): Promise<{ success: boolean; data?: GeneratedArticle; error?: string }> {
     try {
@@ -177,11 +185,23 @@ export async function generateArticleAction(params: GenerateArticleParams): Prom
         let article: GeneratedArticle;
 
         if (apiKey && apiKey.trim()) {
-            // Gemini 3.8 Flash による本格執筆
-            article = await generateArticleWithGeminiFlash(params, apiKey.trim());
+            try {
+                // Gemini API による本格執筆（モデル自動フォールバック・競合3社比較注入付き）
+                article = await generateArticleWithGeminiFlash(params, apiKey.trim());
+            } catch (aiErr: any) {
+                console.warn('Gemini article generation failed, falling back to local engine:', aiErr);
+                // Gemini呼び出し失敗（404/クォータ上限/ネットワークエラー等）時は高品質ローカルエンジンへ即座にフォールバック
+                article = generateSeoAioArticle(params);
+                if (params.competitorIntelligence) {
+                    article = enrichArticleWithCompetitorIntelligence(article, params.competitorIntelligence);
+                }
+            }
         } else {
-            // フォールバック（ローカルエンジン）
+            // APIキー未設定時は高品質ローカル自律執筆エンジンで生成
             article = generateSeoAioArticle(params);
+            if (params.competitorIntelligence) {
+                article = enrichArticleWithCompetitorIntelligence(article, params.competitorIntelligence);
+            }
         }
 
         await saveGeneratedArticle(article);
