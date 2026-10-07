@@ -2,8 +2,9 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { LogOut, LayoutDashboard, Users, Calendar, DollarSign, Settings, User, History, PlusCircle, CreditCard, BookOpen, Mail, FileCheck, Megaphone, MessageCircle, MessageSquare, Crown, Timer, UserPlus, Sparkles, Bell, Waves } from 'lucide-react'
+import { LogOut } from 'lucide-react'
 import { usePathname } from 'next/navigation'
+import { navigationConfig, type NavItem as NavItemType } from '@/config/navigation'
 
 interface DesktopSidebarProps {
     role: string
@@ -12,30 +13,52 @@ interface DesktopSidebarProps {
 export function DesktopSidebar({ role }: DesktopSidebarProps) {
     const pathname = usePathname()
 
-    const NavItem = ({ href, icon: Icon, label, isActive }: { href: string, icon: any, label: string, isActive?: boolean }) => (
-        <Link
-            href={href}
-            prefetch={true}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-150 group ${isActive
-                ? 'bg-blue-50 text-blue-700 border-l-4 border-blue-600 font-bold shadow-sm'
-                : 'text-slate-500 hover:text-blue-700 hover:bg-blue-50'
-                }`}
-        >
-            <Icon className={`h-5 w-5 ${isActive ? 'text-primary drop-shadow-sm' : 'group-hover:text-primary'}`} />
-            <span className="font-medium tracking-wide">{label}</span>
-        </Link>
-    )
+    const roleKey = role === 'admin' ? 'admin' : 'coach'
+    const config = navigationConfig[roleKey] || navigationConfig.coach
+
+    const checkIsActive = (item: NavItemType) => {
+        if (!pathname) return false
+        if (item.exact) {
+            return pathname === item.href
+        }
+        return pathname === item.href || pathname.startsWith(item.href + '/')
+    }
+
+    const NavItem = ({ item }: { item: NavItemType }) => {
+        const Icon = item.icon
+        const isActive = checkIsActive(item)
+
+        return (
+            <Link
+                href={item.href}
+                prefetch={true}
+                className={`flex items-center gap-2.5 px-3 py-1.5 rounded-lg transition-all duration-150 group ${isActive
+                    ? 'bg-blue-50 text-blue-700 font-semibold shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
+                    }`}
+            >
+                <Icon className={`h-4 w-4 shrink-0 transition-colors ${isActive ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-600'}`} />
+                <span className="font-medium tracking-normal text-xs truncate">{item.title}</span>
+                {item.badge && (
+                    <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold">
+                        {item.badge}
+                    </span>
+                )}
+            </Link>
+        )
+    }
 
     const NavHeading = ({ children }: { children: React.ReactNode }) => (
-        <div className="px-4 mt-6 mb-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+        <div className="px-3 pt-3 pb-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider select-none">
             {children}
         </div>
     )
 
     return (
-        <aside className="hidden md:flex fixed left-0 top-0 h-screen w-64 glass z-50 flex-col border-r border-white/20 shadow-xl overflow-y-auto">
-            <div className="p-6 flex items-center justify-center sticky top-0 bg-white/20 backdrop-blur-md z-10">
-                <div className="relative w-full h-14">
+        <aside className="hidden md:flex fixed left-0 top-0 h-screen w-64 bg-white/80 backdrop-blur-xl border-r border-slate-200/80 z-50 flex flex-col shadow-xs overflow-y-auto">
+            {/* ヘッダーロゴ */}
+            <div className="px-5 py-3.5 flex items-center justify-center sticky top-0 bg-white/80 backdrop-blur-xl border-b border-slate-200/80 z-10">
+                <div className="relative w-full h-9">
                     <Image
                         src="/logo.png"
                         alt="Swim Partners"
@@ -46,79 +69,35 @@ export function DesktopSidebar({ role }: DesktopSidebarProps) {
                 </div>
             </div>
 
-            <nav className="flex-1 px-4 space-y-1 pb-4">
-                {role === 'admin' ? (
-                    <>
-                        <NavItem href="/admin" icon={LayoutDashboard} label="ダッシュボード" isActive={pathname === '/admin'} />
-
-                        <NavHeading>分析・集計</NavHeading>
-                        <NavItem href="/admin/analytics" icon={DollarSign} label="分析・集計" isActive={pathname?.startsWith('/admin/analytics')} />
-                        <NavItem href="/admin/reports" icon={Calendar} label="全レッスン報告" isActive={pathname?.startsWith('/admin/reports')} />
-                        <NavItem href="/admin/geo-seo" icon={Sparkles} label="SP-Tracker（SEO・GEO）" isActive={pathname?.startsWith('/admin/geo-seo')} />
-
-                        <NavHeading>財務管理</NavHeading>
-                        <NavItem href="/admin/finance/payouts" icon={CreditCard} label="報酬支払管理" isActive={pathname?.startsWith('/admin/finance/payouts')} />
-                        <NavItem href="/admin/approvals" icon={FileCheck} label="請求・決済管理" isActive={pathname?.startsWith('/admin/approvals')} />
-                        <NavItem href="/admin/approvals/plans" icon={FileCheck} label="プラン変更承認" isActive={pathname?.startsWith('/admin/approvals/plans')} />
-
-                        <NavHeading>運営管理</NavHeading>
-                        <NavItem href="/admin/leads" icon={UserPlus} label="体験申込リード管理" isActive={pathname?.startsWith('/admin/leads')} />
-                        <NavItem href="/admin/schedule" icon={Calendar} label="全体スケジュール" isActive={pathname?.startsWith('/admin/schedule')} />
-                        <NavItem href="/customers" icon={Users} label="会員管理" isActive={pathname?.startsWith('/customers')} />
-                        <NavItem href="/admin/trio" icon={Crown} label="TRIO管理" isActive={pathname?.startsWith('/admin/trio')} />
-                        <NavItem href="/admin/swim-step" icon={Waves} label="スイムステップ管理" isActive={pathname?.startsWith('/admin/swim-step')} />
-                        <NavItem href="/admin/coaches" icon={User} label="コーチ管理" isActive={pathname?.startsWith('/admin/coaches')} />
-                        <NavItem href="/admin/line-monitoring" icon={MessageCircle} label="LINE管理" isActive={pathname?.startsWith('/admin/line-monitoring')} />
-                        <NavItem href="/admin/line-marketing" icon={MessageSquare} label="LINEマーケティング" isActive={pathname?.startsWith('/admin/line-marketing')} />
-
-                        <NavHeading>実務メニュー</NavHeading>
-                        <NavItem href="/coach/history" icon={History} label="レッスン履歴" isActive={pathname?.startsWith('/coach/history')} />
-                        <NavItem href="/coach/report" icon={PlusCircle} label="レッスン報告" isActive={pathname?.startsWith('/coach/report')} />
-
-                        <NavHeading>システム</NavHeading>
-                        <NavItem href="/admin/masters" icon={Settings} label="マスタ設定" isActive={pathname?.startsWith('/admin/masters')} />
-                        <NavItem href="/admin/webhooks" icon={Bell} label="Webhook設定" isActive={pathname?.startsWith('/admin/webhooks')} />
-                        <NavItem href="/admin/announcements" icon={Megaphone} label="お知らせ管理" isActive={pathname?.startsWith('/admin/announcements')} />
-                        <NavItem href="/admin/email-templates" icon={Mail} label="メッセージ設定" isActive={pathname?.startsWith('/admin/email-templates')} />
-                        <NavItem href="/admin/settings" icon={Settings} label="全体設定" isActive={pathname?.startsWith('/admin/settings')} />
-
-                        <NavHeading>ヘルプ</NavHeading>
-                        <NavItem href="/admin/manual" icon={BookOpen} label="管理者マニュアル" isActive={pathname?.startsWith('/admin/manual')} />
-                        <NavItem href="/coach/manual" icon={BookOpen} label="コーチマニュアル" isActive={pathname?.startsWith('/coach/manual')} />
-                    </>
-                ) : (
-                    <>
-                        <NavItem href="/coach" icon={LayoutDashboard} label="ダッシュボード" isActive={pathname === '/coach'} />
-
-                        <NavHeading>運営管理</NavHeading>
-                        <NavItem href="/students" icon={Users} label="生徒一覧" isActive={pathname?.startsWith('/students')} />
-                        <NavItem href="/coach/leads" icon={UserPlus} label="案件紹介一覧" isActive={pathname?.startsWith('/coach/leads')} />
-
-                        <NavHeading>実務メニュー</NavHeading>
-                        <NavItem href="/coach/schedule" icon={Calendar} label="スケジュール管理" isActive={pathname === '/coach/schedule'} />
-                        <NavItem href="/coach/history" icon={History} label="レッスン履歴" isActive={pathname?.startsWith('/coach/history')} />
-                        <NavItem href="/coach/report" icon={PlusCircle} label="レッスン報告" isActive={pathname?.startsWith('/coach/report')} />
-
-                        <NavHeading>分析・集計</NavHeading>
-                        <NavItem href="/finance" icon={DollarSign} label="支払い通知書一覧" isActive={pathname?.startsWith('/finance')} />
-
-                        <NavHeading>設定</NavHeading>
-                        <NavItem href="/settings" icon={Settings} label="アカウント設定" isActive={pathname?.startsWith('/settings')} />
-
-                        <NavHeading>ヘルプ</NavHeading>
-                        <NavItem href="/coach/manual" icon={BookOpen} label="コーチマニュアル" isActive={pathname?.startsWith('/coach/manual')} />
-                    </>
-                )}
+            {/* メインナビゲーション */}
+            <nav className="flex-1 px-3 py-2 space-y-0.5">
+                {config.mainNav.map((section, idx) => (
+                    <div key={section.domain || idx} className="space-y-0.5">
+                        {section.title && <NavHeading>{section.title}</NavHeading>}
+                        {section.items.map((item) => (
+                            <NavItem key={item.href} item={item} />
+                        ))}
+                    </div>
+                ))}
             </nav>
 
-            <div className="flex-shrink-0 p-4 border-t border-white/20 bg-white/10">
-                <form action="/auth/signout" method="post">
-                    <button className="flex items-center gap-3 w-full min-h-[44px] px-4 py-2.5 text-slate-500 hover:text-red-500 transition-colors rounded-xl hover:bg-red-50">
-                        <LogOut className="h-5 w-5 flex-shrink-0" />
-                        <span className="font-medium">ログアウト</span>
+            {/* フッター固定部（設定・マニュアル・ログアウト） */}
+            <div className="flex-shrink-0 p-2.5 border-t border-slate-200/80 bg-white/60 backdrop-blur-md space-y-0.5">
+                {config.footerNav.map((item) => (
+                    <NavItem key={item.href} item={item} />
+                ))}
+
+                <form action="/auth/signout" method="post" className="pt-1">
+                    <button
+                        type="submit"
+                        className="flex items-center gap-2.5 w-full px-3 py-1.5 text-slate-500 hover:text-rose-600 transition-colors rounded-lg hover:bg-rose-50/80"
+                    >
+                        <LogOut className="h-4 w-4 shrink-0" />
+                        <span className="font-medium text-xs">ログアウト</span>
                     </button>
                 </form>
             </div>
         </aside>
     )
 }
+

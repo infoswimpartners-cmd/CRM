@@ -1,18 +1,14 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
-import { Suspense } from 'react' // Add Suspense
-import { Button } from '@/components/ui/button'
+import { Suspense } from 'react'
 import Link from 'next/link'
-import { User, Bell, Search, LayoutDashboard, Users, Calendar, DollarSign, Settings, LogOut } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Input } from '@/components/ui/input'
 import { MobileSidebar } from '@/components/layout/MobileSidebar'
 import { DesktopSidebar } from '@/components/layout/DesktopSidebar'
-import { GlobalSearchContainer } from '@/components/layout/GlobalSearchContainer' // Import Container
-import { NotificationBell } from '@/components/layout/NotificationBell' // [NEW]
-import { CoachBottomNav } from '@/components/layout/CoachBottomNav' // [NEW]
-import Image from 'next/image'
+import { GlobalSearchContainer } from '@/components/layout/GlobalSearchContainer'
+import { NotificationBell } from '@/components/layout/NotificationBell'
+import { CoachBottomNav } from '@/components/layout/CoachBottomNav'
 
 export const dynamic = 'force-dynamic'
 
@@ -58,26 +54,6 @@ export default async function DashboardLayout({
     }
 
 
-
-    const NavItem = ({ href, icon: Icon, label, isActive }: { href: string, icon: any, label: string, isActive?: boolean }) => (
-        <Link
-            href={href}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-150 group ${isActive
-                ? 'bg-cyan-100 text-cyan-900 border-l-4 border-cyan-500 font-bold shadow-sm'
-                : 'text-slate-500 hover:text-cyan-700 hover:bg-cyan-50'
-                }`}
-        >
-            <Icon className={`h-5 w-5 ${isActive ? 'text-primary drop-shadow-sm' : 'group-hover:text-primary'}`} />
-            <span className="font-medium tracking-wide">{label}</span>
-        </Link>
-    )
-
-    const NavHeading = ({ children }: { children: React.ReactNode }) => (
-        <div className="px-4 mt-6 mb-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">
-            {children}
-        </div>
-    )
-
     return (
         <div className="min-h-screen bg-transparent flex font-sans selection:bg-primary/30">
             {/* Mobile Sidebar */}
@@ -88,12 +64,12 @@ export default async function DashboardLayout({
 
             {/* Main Content */}
             <div className="md:ml-64 ml-0 flex-1 flex flex-col min-h-screen transition-all duration-150 pt-16 md:pt-0 min-w-0">
-                {/* Floating Header（モバイルでは非表示・デスクトップのみ） */}
-                <header className="hidden md:block md:sticky md:top-4 z-40 md:mx-6 md:mt-4">
-                    <div className="glass rounded-2xl px-4 md:px-6 py-2 md:py-3 flex items-center justify-between shadow-sm border border-white/40">
+                {/* Flat Sticky Header（Apple HIG macOS風すりガラス・上端フラット接地） */}
+                <header className="hidden md:block sticky top-0 z-40 w-full border-b border-slate-200/80 bg-white/80 backdrop-blur-xl px-6 py-3">
+                    <div className="flex items-center justify-between">
                         <div className="flex-1 max-w-md relative">
                             <Suspense fallback={
-                                <div className="h-11 w-full max-w-md bg-white/20 backdrop-blur-md rounded-full animate-pulse ring-1 ring-white/10" />
+                                <div className="h-10 w-full max-w-md bg-slate-100/60 rounded-lg animate-pulse border border-slate-200/60" />
                             }>
                                 <GlobalSearchContainer isAdmin={safeProfile.role === 'admin'} />
                             </Suspense>
@@ -105,15 +81,15 @@ export default async function DashboardLayout({
                                 <NotificationBell isAdmin={safeProfile.role === 'admin' || safeProfile.role === 'owner'} />
                             </Suspense>
 
-                            <Link href="/settings" className="flex items-center gap-3 hover:bg-white/5 p-1.5 pr-4 rounded-full transition-all border border-transparent hover:border-white/5">
-                                <Avatar className="h-9 w-9 ring-2 ring-white/10">
+                            <Link href="/settings" className="flex items-center gap-3 hover:bg-slate-100/80 p-1.5 pr-3 rounded-lg transition-all border border-transparent hover:border-slate-200/60">
+                                <Avatar className="h-8 w-8 ring-1 ring-slate-200">
                                     <AvatarImage src={safeProfile.avatar_url || undefined} />
-                                    <AvatarFallback className="bg-gradient-to-br from-cyan-900 to-blue-900 text-cyan-100">
+                                    <AvatarFallback className="bg-slate-100 text-slate-700 font-semibold text-xs">
                                         {safeProfile.full_name?.slice(0, 1) || 'U'}
                                     </AvatarFallback>
                                 </Avatar>
                                 <div className="hidden md:block text-left">
-                                    <p className="text-sm font-bold text-slate-900 leading-none">{safeProfile.full_name}</p>
+                                    <p className="text-sm font-semibold text-slate-900 leading-none">{safeProfile.full_name}</p>
                                     <div className="flex flex-col mt-1 gap-1">
                                         <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">{safeProfile.role}</p>
                                         {safeProfile.role === 'coach' ? (

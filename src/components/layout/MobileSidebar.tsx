@@ -2,34 +2,56 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Menu, X, LayoutDashboard, Users, Calendar, DollarSign, Settings, LogOut, History, PlusCircle, Mail, FileCheck, Megaphone, MessageCircle, MessageSquare, CreditCard, BookOpen, Crown, Timer, User, UserPlus, Sparkles, Bell, Waves } from 'lucide-react'
+import { Menu, X, LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { usePathname } from 'next/navigation'
 import Image from 'next/image'
+import { navigationConfig, type NavItem as NavItemType } from '@/config/navigation'
 
 export function MobileSidebar({ userProfile }: { userProfile: any }) {
     const [isOpen, setIsOpen] = useState(false)
     const pathname = usePathname()
 
+    const roleKey = userProfile?.role === 'admin' ? 'admin' : 'coach'
+    const config = navigationConfig[roleKey] || navigationConfig.coach
+
+    const checkIsActive = (item: NavItemType) => {
+        if (!pathname) return false
+        if (item.exact) {
+            return pathname === item.href
+        }
+        return pathname === item.href || pathname.startsWith(item.href + '/')
+    }
+
     // ナビアイテム：min-h-[44px] でタップターゲット確保
-    const NavItem = ({ href, icon: Icon, label, isActive }: { href: string, icon: any, label: string, isActive?: boolean }) => (
-        <Link
-            href={href}
-            prefetch={true}
-            onClick={() => setIsOpen(false)}
-            className={`flex items-center gap-3 min-h-[44px] px-4 py-2.5 rounded-xl transition-all duration-150 group ${isActive
-                ? 'bg-blue-50 text-blue-600 border-l-4 border-blue-600 font-bold shadow-sm'
-                : 'text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 active:bg-blue-100'
-                }`}
-        >
-            <Icon className={`h-5 w-5 flex-shrink-0 ${isActive ? 'text-blue-600' : 'group-hover:text-blue-600'}`} />
-            <span className="font-medium tracking-wide">{label}</span>
-        </Link>
-    )
+    const NavItem = ({ item }: { item: NavItemType }) => {
+        const Icon = item.icon
+        const isActive = checkIsActive(item)
+
+        return (
+            <Link
+                href={item.href}
+                prefetch={true}
+                onClick={() => setIsOpen(false)}
+                className={`flex items-center gap-3 min-h-[44px] px-3.5 py-2.5 rounded-xl transition-all duration-150 group ${isActive
+                    ? 'bg-blue-50 text-blue-700 border-l-4 border-blue-600 font-bold shadow-2xs'
+                    : 'text-slate-600 hover:text-blue-600 hover:bg-blue-50/50 active:bg-blue-100'
+                    }`}
+            >
+                <Icon className={`h-5 w-5 flex-shrink-0 ${isActive ? 'text-blue-600' : 'text-slate-400 group-hover:text-blue-600'}`} />
+                <span className="font-medium tracking-wide text-sm truncate">{item.title}</span>
+                {item.badge && (
+                    <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold">
+                        {item.badge}
+                    </span>
+                )}
+            </Link>
+        )
+    }
 
     // セクション見出し
     const NavHeading = ({ children }: { children: React.ReactNode }) => (
-        <div className="px-3 pt-5 pb-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wider select-none">
+        <div className="px-3 pt-4 pb-1 text-[11px] font-bold text-slate-400 uppercase tracking-wider select-none">
             {children}
         </div>
     )
@@ -93,7 +115,7 @@ export function MobileSidebar({ userProfile }: { userProfile: any }) {
                 flex-col で 3 ゾーンに分割：
                   [① ヘッダー flex-shrink-0]
                   [② ナビ    flex-1 + overflow-y-auto]
-                  [③ ログアウト flex-shrink-0]
+                  [③ フッター・ログアウト flex-shrink-0]
                 これにより ③ は絶対に ② と重ならない
             */}
             <div
@@ -116,79 +138,29 @@ export function MobileSidebar({ userProfile }: { userProfile: any }) {
 
                 {/* ② ナビゲーション（独立スクロール） */}
                 <nav className="flex-1 overflow-y-auto overscroll-contain p-3 space-y-0.5">
-                    {userProfile?.role === 'admin' ? (
-                        <>
-                            <NavItem href="/admin" icon={LayoutDashboard} label="ダッシュボード" isActive={pathname === '/admin'} />
-
-                            <NavHeading>分析・集計</NavHeading>
-                            <NavItem href="/admin/analytics" icon={DollarSign} label="売上詳細" isActive={pathname?.startsWith('/admin/analytics')} />
-                            <NavItem href="/admin/reports" icon={Calendar} label="全レッスン報告" isActive={pathname?.startsWith('/admin/reports')} />
-                            <NavItem href="/admin/geo-seo" icon={Sparkles} label="SP-Tracker（SEO・GEO）" isActive={pathname?.startsWith('/admin/geo-seo')} />
-
-                            <NavHeading>財務管理</NavHeading>
-                            <NavItem href="/admin/finance/payouts" icon={CreditCard} label="報酬支払管理" isActive={pathname?.startsWith('/admin/finance/payouts')} />
-                            <NavItem href="/admin/approvals" icon={FileCheck} label="請求・決済管理" isActive={pathname?.startsWith('/admin/approvals')} />
-                            <NavItem href="/admin/approvals/plans" icon={FileCheck} label="プラン変更承認" isActive={pathname?.startsWith('/admin/approvals/plans')} />
-
-                            <NavHeading>運営管理</NavHeading>
-                            <NavItem href="/admin/leads" icon={UserPlus} label="体験申込リード管理" isActive={pathname?.startsWith('/admin/leads')} />
-                            <NavItem href="/admin/schedule" icon={Calendar} label="全体スケジュール" isActive={pathname?.startsWith('/admin/schedule')} />
-                            <NavItem href="/customers" icon={Users} label="会員管理" isActive={pathname?.startsWith('/customers')} />
-                            <NavItem href="/admin/trio" icon={Crown} label="TRIO管理" isActive={pathname?.startsWith('/admin/trio')} />
-                            <NavItem href="/admin/swim-step" icon={Waves} label="スイムステップ管理" isActive={pathname?.startsWith('/admin/swim-step')} />
-                            <NavItem href="/admin/coaches" icon={User} label="コーチ管理" isActive={pathname?.startsWith('/admin/coaches')} />
-                            <NavItem href="/admin/line-monitoring" icon={MessageCircle} label="LINE管理" isActive={pathname?.startsWith('/admin/line-monitoring')} />
-                            <NavItem href="/admin/line-marketing" icon={MessageSquare} label="LINEマーケティング" isActive={pathname?.startsWith('/admin/line-marketing')} />
-
-                            <NavHeading>実務メニュー</NavHeading>
-                            <NavItem href="/coach/history" icon={History} label="レッスン履歴" isActive={pathname?.startsWith('/coach/history')} />
-                            <NavItem href="/coach/report" icon={PlusCircle} label="レッスン報告" isActive={pathname?.startsWith('/coach/report')} />
-
-                            <NavHeading>システム</NavHeading>
-                            <NavItem href="/admin/masters" icon={Settings} label="マスタ設定" isActive={pathname?.startsWith('/admin/masters')} />
-                            <NavItem href="/admin/webhooks" icon={Bell} label="Webhook設定" isActive={pathname?.startsWith('/admin/webhooks')} />
-                            <NavItem href="/admin/announcements" icon={Megaphone} label="お知らせ管理" isActive={pathname?.startsWith('/admin/announcements')} />
-                            <NavItem href="/admin/email-templates" icon={Mail} label="メッセージ設定" isActive={pathname?.startsWith('/admin/email-templates')} />
-                            <NavItem href="/admin/settings" icon={Settings} label="全体設定" isActive={pathname?.startsWith('/admin/settings')} />
-
-                            <NavHeading>ヘルプ</NavHeading>
-                            <NavItem href="/admin/manual" icon={BookOpen} label="管理者マニュアル" isActive={pathname?.startsWith('/admin/manual')} />
-                            <NavItem href="/coach/manual" icon={BookOpen} label="コーチマニュアル" isActive={pathname?.startsWith('/coach/manual')} />
-                        </>
-                    ) : (
-                        <>
-                            <NavItem href="/coach" icon={LayoutDashboard} label="ダッシュボード" isActive={pathname === '/coach'} />
-
-                            <NavHeading>運営管理</NavHeading>
-                            <NavItem href="/students" icon={Users} label="生徒管理" isActive={pathname?.startsWith('/students')} />
-                            <NavItem href="/coach/leads" icon={UserPlus} label="案件紹介一覧" isActive={pathname?.startsWith('/coach/leads')} />
-
-                            <NavHeading>実務メニュー</NavHeading>
-                            <NavItem href="/coach/schedule" icon={Calendar} label="スケジュール管理" isActive={pathname === '/coach/schedule'} />
-                            <NavItem href="/coach/history" icon={History} label="レッスン履歴" isActive={pathname?.startsWith('/coach/history')} />
-                            <NavItem href="/coach/report" icon={PlusCircle} label="レッスン報告" isActive={pathname?.startsWith('/coach/report')} />
-
-                            <NavHeading>分析・集計</NavHeading>
-                            <NavItem href="/finance" icon={DollarSign} label="支払い通知書一覧" isActive={pathname?.startsWith('/finance')} />
-
-                            <NavHeading>設定</NavHeading>
-                            <NavItem href="/settings" icon={Settings} label="アカウント設定" isActive={pathname?.startsWith('/settings')} />
-
-                            <NavHeading>ヘルプ</NavHeading>
-                            <NavItem href="/coach/manual" icon={BookOpen} label="コーチマニュアル" isActive={pathname?.startsWith('/coach/manual')} />
-                        </>
-                    )}
+                    {config.mainNav.map((section, idx) => (
+                        <div key={section.domain || idx} className="space-y-0.5">
+                            {section.title && <NavHeading>{section.title}</NavHeading>}
+                            {section.items.map((item) => (
+                                <NavItem key={item.href} item={item} />
+                            ))}
+                        </div>
+                    ))}
                 </nav>
 
-                {/* ③ ログアウト（flex-shrink-0 → 常に最下部・重なりゼロ） */}
-                <div className="flex-shrink-0 border-t border-slate-100 bg-slate-50 safe-bottom">
-                    <form action="/auth/signout" method="post" className="p-3">
+                {/* ③ フッター（設定・マニュアル・ログアウト） */}
+                <div className="flex-shrink-0 border-t border-slate-100 bg-slate-50/80 p-2.5 space-y-0.5 safe-bottom">
+                    {config.footerNav.map((item) => (
+                        <NavItem key={item.href} item={item} />
+                    ))}
+
+                    <form action="/auth/signout" method="post" className="pt-1">
                         <button
                             type="submit"
-                            className="flex items-center gap-3 w-full min-h-[44px] px-4 py-2.5 text-slate-500 hover:text-red-500 active:text-red-600 transition-colors rounded-xl hover:bg-red-50 active:bg-red-100 touch-manipulation"
+                            className="flex items-center gap-3 w-full min-h-[44px] px-3.5 py-2.5 text-slate-500 hover:text-red-500 active:text-red-600 transition-colors rounded-xl hover:bg-red-50 active:bg-red-100 touch-manipulation"
                         >
                             <LogOut className="h-5 w-5 flex-shrink-0" />
-                            <span className="font-medium">ログアウト</span>
+                            <span className="font-medium text-sm">ログアウト</span>
                         </button>
                     </form>
                 </div>
@@ -196,3 +168,4 @@ export function MobileSidebar({ userProfile }: { userProfile: any }) {
         </div>
     )
 }
+

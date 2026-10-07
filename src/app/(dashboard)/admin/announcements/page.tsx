@@ -37,7 +37,7 @@ export default async function AdminAnnouncementsPage() {
                 </div>
                 <div className="flex items-center gap-2">
                     <Button variant="outline" asChild>
-                        <Link href="/admin/announcements/webhooks">
+                        <Link href="/admin/webhooks">
                             <Settings className="mr-2 h-4 w-4 text-indigo-600" />
                             Google Chat連携設定
                         </Link>

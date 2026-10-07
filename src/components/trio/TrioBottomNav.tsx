@@ -16,8 +16,8 @@ export default function TrioBottomNav() {
   ];
 
   return (
-    <div className="fixed bottom-6 left-0 right-0 z-50 px-4 md:hidden">
-      <nav className="max-w-lg mx-auto bg-[#0A192F]/80 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] shadow-[0_20px_70px_rgba(0,0,0,0.4)] flex justify-between items-center px-4 py-2 relative overflow-hidden">
+    <div className="fixed bottom-0 left-0 right-0 z-50 bg-[#0A192F]/90 backdrop-blur-xl border-t border-white/10 pb-[env(safe-area-inset-bottom)] shadow-xs md:hidden">
+      <nav className="max-w-lg mx-auto flex items-center justify-around h-16 px-2">
         {navItems.map((item) => {
           const isActive = pathname === item.href;
           const isScrollLink = item.href.startsWith('#');
@@ -27,8 +27,8 @@ export default function TrioBottomNav() {
               key={item.href}
               href={item.href}
               className={cn(
-                "relative flex flex-col items-center justify-center py-2 px-1 transition-all duration-500 rounded-3xl flex-1",
-                isActive ? "scale-105" : "hover:scale-105 active:scale-95 text-slate-500"
+                "relative flex flex-col items-center justify-center flex-1 h-full py-1 transition-colors duration-200",
+                isActive ? "text-indigo-400" : "text-slate-400 hover:text-slate-200"
               )}
               onClick={(e) => {
                 if (isScrollLink) {
@@ -40,24 +40,21 @@ export default function TrioBottomNav() {
                 }
               }}
             >
-              <div className={cn(
-                "relative z-10 p-2.5 rounded-2xl transition-all duration-500",
-                isActive
-                  ? "bg-gradient-to-br from-indigo-600 to-blue-500 text-white shadow-xl shadow-indigo-500/20"
-                  : "text-slate-400"
-              )}>
-                <item.icon className={cn("h-5 w-5", isActive && "scale-110")} strokeWidth={isActive ? 2.5 : 2} />
-              </div>
+              {/* アクティブ時の上部インジケーターライン */}
+              {isActive && (
+                <span className="absolute top-0 w-8 h-[2px] rounded-full bg-indigo-400" />
+              )}
+
+              <item.icon 
+                className={cn("h-5 w-5 transition-transform duration-200", isActive && "scale-105")} 
+                strokeWidth={isActive ? 2.2 : 1.8} 
+              />
               <span className={cn(
-                "relative z-10 text-[9px] font-black mt-1 text-center truncate w-full px-1",
-                isActive ? "text-indigo-400" : "text-slate-500 font-medium"
+                "text-[10px] mt-1 text-center truncate w-full px-1 tracking-tight",
+                isActive ? "font-bold text-indigo-400" : "font-medium text-slate-400"
               )}>
                 {item.label}
               </span>
-              
-              {isActive && (
-                <div className="absolute top-0 w-1 h-1 bg-indigo-400 rounded-full animate-pulse" />
-              )}
             </Link>
           );
         })}

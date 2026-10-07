@@ -33,13 +33,7 @@ export default function EnrollSuccessPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 font-sans relative overflow-hidden">
-      {/* 美しい背景エフェクト */}
-      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none select-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[45%] h-[45%] bg-blue-100/40 rounded-full mix-blend-multiply filter blur-[80px] animate-[blob_20s_infinite_ease-in-out]"></div>
-        <div className="absolute bottom-[10%] right-[-5%] w-[40%] h-[40%] bg-cyan-100/30 rounded-full mix-blend-multiply filter blur-[80px] animate-[blob_25s_infinite_ease-in-out_2s]"></div>
-      </div>
-
-      <div className="relative z-10 max-w-md w-full bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden animate-fadeIn">
+      <div className="relative z-10 max-w-md w-full bg-white rounded-xl shadow-lg border border-slate-200/80 overflow-hidden animate-fadeIn">
         {/* ヘッダー */}
         <div className="bg-gradient-to-r from-blue-700 to-cyan-500 p-8 text-center text-white">
           <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-sm animate-bounce">

@@ -19,7 +19,6 @@ export const viewport: Viewport = {
 };
 
 import AuthProvider from "@/components/providers/AuthProvider";
-import { FluidWaterBackground } from "@/components/layout/FluidWaterBackground";
 
 export default function RootLayout({
   children,
@@ -29,14 +28,11 @@ export default function RootLayout({
   return (
     <html lang="ja" suppressHydrationWarning>
       <body
-        className={`antialiased font-sans relative min-h-screen bg-white`}
+        className="antialiased font-sans relative min-h-screen bg-white text-slate-900 selection:bg-blue-100"
         suppressHydrationWarning
       >
-        <FluidWaterBackground />
         <AuthProvider>
-          <div className="relative z-10">
-            {children}
-          </div>
+          {children}
         </AuthProvider>
         <Toaster />
       </body>

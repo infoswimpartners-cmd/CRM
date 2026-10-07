@@ -37,8 +37,8 @@ export function CoachBottomNav() {
     const pathname = usePathname()
 
     return (
-        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-lg border-t border-slate-200/50 shadow-[0_-8px_30px_rgba(0,0,0,0.06)] pb-[env(safe-area-inset-bottom)]">
-            <div className="h-16 flex items-center justify-around px-4 max-w-lg mx-auto">
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl border-t border-slate-200/80 shadow-xs pb-[env(safe-area-inset-bottom)]">
+            <div className="h-16 flex items-center justify-around px-2 max-w-lg mx-auto">
                 {NAV_ITEMS.map((item) => {
                     // 現在のパスがアクティブかどうかを判定
                     const isActive = item.exact
@@ -53,22 +53,13 @@ export function CoachBottomNav() {
                             href={item.href}
                             className="relative flex flex-col items-center justify-center flex-1 h-full py-1 text-slate-500 transition-colors"
                         >
-                            {/* アクティブ時のプレミアムな背景発光 & アンダーライン演出 */}
+                            {/* アクティブ時の端正な上部インジケーターライン */}
                             {isActive && (
-                                <>
-                                    {/* タブ背景の微かな円形グラデーション発光 */}
-                                    <motion.div
-                                        layoutId="bottom-nav-active-glow"
-                                        className="absolute inset-0 bg-cyan-50/50 rounded-2xl -z-10 mx-3 my-1"
-                                        transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-                                    />
-                                    {/* 上部のアクティブインジケーターライン */}
-                                    <motion.div
-                                        layoutId="bottom-nav-active-indicator"
-                                        className="absolute top-0 h-[3px] w-8 bg-cyan-600 rounded-full"
-                                        transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-                                    />
-                                </>
+                                <motion.div
+                                    layoutId="coach-bottom-nav-active-indicator"
+                                    className="absolute top-0 h-[2px] w-8 bg-cyan-600 rounded-full"
+                                    transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                                />
                             )}
 
                             {/* アイコン部分のスケールアニメーション */}

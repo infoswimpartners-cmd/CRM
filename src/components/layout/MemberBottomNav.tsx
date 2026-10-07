@@ -2,12 +2,12 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, FileText, Crown, User, CreditCard } from 'lucide-react'
+import { Home, Crown, User, CreditCard } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 /**
  * MemberBottomNav
- * 明るくクールなガラスモーフィズム・ナビゲーション
+ * Apple HIG標準の画面下端フラット接地ボトムナビゲーション
  */
 export default function MemberBottomNav({ 
     isTrioMember = false,
@@ -32,11 +32,8 @@ export default function MemberBottomNav({
     if (pathname === '/member/login' || pathname === '/member/signup') return null;
 
     return (
-        <div className="fixed bottom-8 left-0 right-0 z-[100] px-6 md:hidden">
-            <nav className="max-w-md mx-auto bg-white/80 backdrop-blur-3xl border border-sky-100 rounded-[2.5rem] shadow-[0_20px_80px_rgba(56,189,248,0.15)] flex justify-between items-center px-4 py-3 relative overflow-hidden">
-                {/* 繊細なアクセントグラデーション */}
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-sky-50/50 via-transparent to-transparent pointer-events-none" />
-                
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl border-t border-slate-200/80 pb-[env(safe-area-inset-bottom)] shadow-xs md:hidden">
+            <nav className="max-w-lg mx-auto flex items-center justify-around h-16 px-2">
                 {navItems.map((item) => {
                     const isActive = pathname === item.href || (item.href !== '/member/dashboard' && pathname.startsWith(item.href + '/'))
 
@@ -45,34 +42,28 @@ export default function MemberBottomNav({
                             key={item.href}
                             href={item.href}
                             className={cn(
-                                "relative flex flex-col items-center justify-center py-1 transition-all duration-500",
-                                isActive ? "scale-110 flex-1" : "flex-1 opacity-40 hover:opacity-100"
+                                "relative flex flex-col items-center justify-center flex-1 h-full py-1 transition-colors duration-200",
+                                isActive 
+                                    ? (item.isTrio ? "text-amber-600" : "text-sky-600")
+                                    : "text-slate-400 hover:text-slate-600"
                             )}
                         >
-                            {/* アクティブ時のグローインジケーター */}
+                            {/* アクティブ時の上部インジケーターライン */}
                             {isActive && (
-                                <div className={cn(
-                                    "absolute inset-0 rounded-3xl blur-2xl opacity-30 transition-all duration-1000",
-                                    item.isTrio ? "bg-amber-400" : "bg-sky-400"
+                                <span className={cn(
+                                    "absolute top-0 w-8 h-[2px] rounded-full",
+                                    item.isTrio ? "bg-amber-500" : "bg-sky-600"
                                 )} />
                             )}
 
-                            <div className={cn(
-                                "relative z-10 p-2.5 rounded-2xl transition-all duration-500",
-                                isActive
-                                    ? (item.isTrio 
-                                        ? "bg-amber-500 text-white shadow-lg shadow-amber-200" 
-                                        : "bg-sky-600 text-white shadow-lg shadow-sky-200")
-                                    : "text-slate-900"
-                            )}>
-                                <item.icon className={cn("h-5 w-5 transition-transform duration-500", isActive && "scale-110")} strokeWidth={isActive ? 2.5 : 2} />
-                            </div>
+                            <item.icon 
+                                className={cn("h-5 w-5 transition-transform duration-200", isActive && "scale-105")} 
+                                strokeWidth={isActive ? 2.2 : 1.8} 
+                            />
                             
                             <span className={cn(
-                                "relative z-10 text-[9px] font-black mt-1.5 text-center truncate w-full px-1 transition-all duration-300 tracking-tighter",
-                                isActive 
-                                    ? (item.isTrio ? "text-amber-600" : "text-sky-600") 
-                                    : "text-slate-400"
+                                "text-[10px] mt-1 text-center truncate w-full px-1 tracking-tight",
+                                isActive ? "font-bold" : "font-medium"
                             )}>
                                 {item.label}
                             </span>
