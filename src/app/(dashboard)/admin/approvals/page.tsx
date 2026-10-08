@@ -1,97 +1,28 @@
 import { createAdminClient } from '@/lib/supabase/admin'
-import { FileCheck, ChevronRight, Home } from 'lucide-react'
+import { FileCheck, ChevronRight, Home, CreditCard } from 'lucide-react'
 import Link from 'next/link'
 import { ApprovalsTabsClient } from './ApprovalsTabsClient'
+import { getStripeInvoices } from '@/actions/stripe'
 
 export const dynamic = 'force-dynamic'
 
 interface ApprovalsPageProps {
-    searchParams: Promise<{ tab?: string }>
+    searchParams: Promise<{ tab?: string; q?: string }>
 }
 
 export default async function ApprovalsPage({ searchParams }: ApprovalsPageProps) {
     const resolvedSearchParams = await searchParams
     const initialTab = resolvedSearchParams?.tab === 'plans' ? 'plans' : 'billing'
+    const initialQuery = resolvedSearchParams?.q || ''
 
     const supabase = createAdminClient()
 
-    // 1. レッスン請求（体験）の未払い/承認待ちデータ取得
-    const { data: unpaidSchedules } = await supabase
-        .from('lesson_schedules')
-        .select(`
-            id, start_time, title, price, billing_status, stripe_invoice_item_id,
-            student:students (
-                full_name,
-                second_student_name
-            ),
-            lesson_master:lesson_masters!inner (
-                name,
-                is_trial
-            )
-        `)
-        .in('billing_status', ['awaiting_payment', 'awaiting_approval', 'error', 'pending', 'approved'])
-        .eq('lesson_master.is_trial', true)
-        .order('start_time', { ascending: true })
+    // 1. Stripeで請求を行った履歴（インボイス履歴）を取得
+    const invoicesResult = await getStripeInvoices({ limit: 50 })
+    const initialInvoices = invoicesResult.success ? invoicesResult.data : []
+    const initialHasMore = invoicesResult.success ? invoicesResult.hasMore : false
 
-    // 2. レッスン請求（体験）の決済履歴取得
-    const { data: paidSchedules } = await supabase
-        .from('lesson_schedules')
-        .select(`
-            id, start_time, title, price, billing_status, status, stripe_invoice_item_id,
-            student:students (
-                full_name,
-                second_student_name
-            ),
-            lesson_master:lesson_masters!inner (
-                name,
-                is_trial
-            )
-        `)
-        .in('billing_status', ['paid', 'refunded', 'partially_refunded'])
-        .eq('lesson_master.is_trial', true)
-        .order('start_time', { ascending: false })
-        .limit(20)
-
-    // 3. レッスン請求（超過レッスン等）の未払い/承認待ちデータ取得
-    const { data: unpaidRegularSchedules } = await supabase
-        .from('lesson_schedules')
-        .select(`
-            id, start_time, title, price, billing_status, stripe_invoice_item_id,
-            student:students (
-                full_name,
-                second_student_name
-            ),
-            lesson_master:lesson_masters!inner (
-                name,
-                is_trial
-            )
-        `)
-        .eq('is_overage', true)
-        .eq('lesson_master.is_trial', false)
-        .in('billing_status', ['ready_to_invoice', 'awaiting_payment', 'awaiting_approval', 'error', 'pending', 'approved'])
-        .order('start_time', { ascending: true })
-
-    // 4. レッスン請求（超過レッスン等）の決済履歴取得
-    const { data: paidRegularSchedules } = await supabase
-        .from('lesson_schedules')
-        .select(`
-            id, start_time, title, price, billing_status, status, stripe_invoice_item_id,
-            student:students (
-                full_name,
-                second_student_name
-            ),
-            lesson_master:lesson_masters!inner (
-                name,
-                is_trial
-            )
-        `)
-        .eq('is_overage', true)
-        .eq('lesson_master.is_trial', false)
-        .in('billing_status', ['paid', 'refunded', 'partially_refunded'])
-        .order('start_time', { ascending: false })
-        .limit(30)
-
-    // 5. プラン変更・解約申請データの取得
+    // 2. プラン変更・解約申請データの取得
     const { data: planRequests, error: planError } = await supabase
         .from('membership_change_requests')
         .select(`
@@ -125,29 +56,29 @@ export default async function ApprovalsPage({ searchParams }: ApprovalsPageProps
                     ダッシュボード
                 </Link>
                 <ChevronRight className="w-3 h-3 text-slate-300" />
-                <span className="text-slate-600">請求・承認管理</span>
+                <span className="text-slate-600">請求・決済履歴管理</span>
             </nav>
 
             {/* ヘッダーエリア */}
             <div className="flex flex-col gap-1">
                 <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2.5">
-                    <FileCheck className="h-7 w-7 text-blue-600" />
-                    請求・承認管理
+                    <CreditCard className="h-7 w-7 text-blue-600" />
+                    請求・決済管理
                 </h1>
                 <p className="text-sm text-slate-500">
-                    レッスン請求（体験・超過）の承認、および生徒からのプラン変更・解約申請の承認を一元管理します。
+                    Stripeで請求を行った履歴（インボイス履歴・決済状況）の確認・閲覧、および生徒からのプラン変更・解約申請を管理します。
                 </p>
             </div>
 
             {/* タブ統合コンテンツ */}
             <ApprovalsTabsClient
                 initialTab={initialTab}
-                unpaidSchedules={(unpaidSchedules as any) || []}
-                paidSchedules={(paidSchedules as any) || []}
-                unpaidRegularSchedules={(unpaidRegularSchedules as any) || []}
-                paidRegularSchedules={(paidRegularSchedules as any) || []}
+                initialInvoices={initialInvoices}
+                initialHasMore={initialHasMore}
+                initialSearchQuery={initialQuery}
                 pendingRequests={(pendingRequests as any) || []}
             />
         </div>
     )
 }
+

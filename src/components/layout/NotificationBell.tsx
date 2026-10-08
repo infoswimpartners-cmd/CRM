@@ -17,13 +17,13 @@ export async function NotificationBell({ isAdmin }: NotificationBellProps) {
 
     const supabase = createAdminClient()
 
-    // 1. Pending Billing Approvals
-    const { count: billingCount } = await supabase
-        .from('lesson_schedules')
+    // 1. 保留中のプラン変更・解約申請
+    const { count: planCount } = await supabase
+        .from('membership_change_requests')
         .select('*', { count: 'exact', head: true })
-        .eq('billing_status', 'awaiting_approval')
+        .eq('status', 'pending')
 
-    const totalCount = billingCount || 0
+    const totalCount = planCount || 0
     const hasNotifications = totalCount > 0
 
     return (
@@ -60,17 +60,17 @@ export async function NotificationBell({ isAdmin }: NotificationBellProps) {
                         <div className="flex justify-between items-center text-sm">
                             <div className="flex items-center gap-2 text-slate-600">
                                 <CreditCard className="h-4 w-4" />
-                                <span>請求承認待ち</span>
+                                <span>プラン変更申請</span>
                             </div>
-                            <span className={`font-bold ${billingCount && billingCount > 0 ? 'text-red-600' : 'text-slate-400'}`}>
-                                {billingCount || 0}件
+                            <span className={`font-bold ${planCount && planCount > 0 ? 'text-red-600' : 'text-slate-400'}`}>
+                                {planCount || 0}件
                             </span>
                         </div>
                     )}
                 </div>
                 <div className="p-3 bg-slate-50 border-t">
                     <Button asChild className="w-full text-xs" size="sm" variant="outline">
-                        <Link href="/admin/approvals">ページへ移動</Link>
+                        <Link href="/admin/approvals?tab=plans">ページへ移動</Link>
                     </Button>
                 </div>
             </PopoverContent>

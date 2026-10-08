@@ -102,12 +102,12 @@ async function createTrialScheduleForLead(params: {
         const supabaseAdmin = createAdminClient()
 
         // 1. 体験レッスンマスタの取得
-        const { data: trialMaster } = await supabaseAdmin
+        const { data: trialMasters } = await supabaseAdmin
             .from('lesson_masters')
             .select('id, name, unit_price, pair_unit_price')
             .eq('is_trial', true)
             .eq('active', true)
-            .maybeSingle()
+            .order('display_order', { ascending: true })
 
         // 2. 日時のパース
         const { start, end } = parseConfirmedDateTime(params.confirmedDate)
@@ -116,17 +116,20 @@ async function createTrialScheduleForLead(params: {
         const durationMinutes = Math.round((new Date(end).getTime() - new Date(start).getTime()) / (60 * 1000))
         const is90Min = durationMinutes >= 80 || params.confirmedDate.includes('90分') || (params.leadNotes || '').includes('90分')
 
+        // 90分対応のマスタ選定
+        const trialMaster90 = trialMasters?.find(m => m.name.includes('90'))
+        const trialMaster60 = trialMasters?.find(m => !m.name.includes('90') && m.unit_price === 6000) || trialMasters?.[0]
+        const trialMaster = is90Min ? (trialMaster90 || trialMaster60) : trialMaster60
+
         // お友達紹介キャンペーンの判定（notesに「【ご紹介者様】」が含まれるか判定）
         const isReferral = !!(params.leadNotes && params.leadNotes.includes('【ご紹介者様】'))
 
-        // 料金の計算（基本6,000円、お友達紹介の場合は特別価格3,500円、2名同時または90分の場合は9,000円）
-        const baseUnitPrice = trialMaster?.unit_price || 6000
-        let lessonPrice = baseUnitPrice
+        // 料金の計算
+        let lessonPrice = trialMaster?.unit_price || (is90Min ? 9000 : 6000)
         if (isReferral) {
-            // お友達紹介キャンペーン特別価格: 3,500円（2名同時の場合は7,000円）
-            lessonPrice = params.hasSecondStudent ? 7000 : 3500
-        } else if (params.hasSecondStudent || is90Min) {
-            lessonPrice = trialMaster?.pair_unit_price || 9000
+            lessonPrice = params.hasSecondStudent ? (is90Min ? 10500 : 7000) : (is90Min ? 5250 : 3500)
+        } else if (params.hasSecondStudent) {
+            lessonPrice = trialMaster?.pair_unit_price || (is90Min ? 13500 : 9000)
         }
 
         // コーチ名の取得

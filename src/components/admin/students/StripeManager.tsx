@@ -1,9 +1,10 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { CreditCard, ExternalLink, Loader2, Link as LinkIcon, AlertTriangle, Pencil, Copy, Check } from 'lucide-react'
+import { CreditCard, ExternalLink, Loader2, Link as LinkIcon, AlertTriangle, Pencil, Copy, Check, Receipt } from 'lucide-react'
 import { createStripeCustomer, createPaymentSetupLink, updateStudentStripeId } from '@/actions/stripe'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
@@ -230,15 +231,28 @@ export function StripeManager({ studentId, stripeCustomerId, paymentMethodStatus
                                 </div>
                             </div>
 
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                className="h-8 w-full sm:w-auto px-3 text-xs text-slate-600 border-slate-200 hover:bg-white hover:text-indigo-600 hover:border-indigo-200 shadow-sm transition-all shrink-0"
-                                onClick={() => window.open(`https://dashboard.stripe.com/customers/${stripeCustomerId}`, '_blank')}
-                            >
-                                <ExternalLink className="w-3 h-3 mr-1.5" />
-                                管理画面
-                            </Button>
+                            <div className="flex items-center gap-2 w-full sm:w-auto">
+                                <Button
+                                    asChild
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 flex-1 sm:flex-initial px-2.5 text-xs text-slate-600 border-slate-200 hover:bg-white hover:text-indigo-600 hover:border-indigo-200 shadow-xs transition-all shrink-0"
+                                >
+                                    <Link href={`/admin/approvals?q=${encodeURIComponent(stripeCustomerId)}`}>
+                                        <Receipt className="w-3 h-3 mr-1 text-blue-600" />
+                                        請求履歴
+                                    </Link>
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 flex-1 sm:flex-initial px-2.5 text-xs text-slate-600 border-slate-200 hover:bg-white hover:text-indigo-600 hover:border-indigo-200 shadow-xs transition-all shrink-0"
+                                    onClick={() => window.open(`https://dashboard.stripe.com/customers/${stripeCustomerId}`, '_blank')}
+                                >
+                                    <ExternalLink className="w-3 h-3 mr-1" />
+                                    管理画面
+                                </Button>
+                            </div>
                         </div>
                     </div>
                 )}

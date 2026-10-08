@@ -345,7 +345,7 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
                 
                 setTitle(`${displayName}様　担当：${coachName}`)
                 // Trial check ...
-                if (student.status === 'trial_pending' || student.status === 'trial_confirmed') {
+                if (student.status === 'trial_pending' || student.status === 'trial_confirmed' || student.status === 'trial_billed' || student.status === 'applied') {
                     setIsTrialMode(true)
                 } else {
                     setIsTrialMode(false)
@@ -395,12 +395,15 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
     useEffect(() => {
         let duration = 60 // Default 60 min
 
-        if (isOverage && selectedMasterId !== 'default') {
-            const master = lessonMasters.find(m => m.id === selectedMasterId)
+        if (selectedMasterId && selectedMasterId !== 'default') {
+            const master = (availableLessons || []).find((m: any) => m.id === selectedMasterId) || lessonMasters.find(m => m.id === selectedMasterId)
             if (master) {
-                const match = master.name.match(/(\d+)分/)
+                const match = master.name?.match(/(\d+)分/)
                 if (match && match[1]) {
                     duration = parseInt(match[1])
+                }
+                if (master.name?.includes('体験')) {
+                    setIsTrialMode(true)
                 }
             }
         } else if (studentId !== 'none') {
@@ -739,6 +742,12 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
                                                             (¥{l.unit_price.toLocaleString()})
                                                         </span>
                                                     )}
+                                                </SelectItem>
+                                            ))
+                                        ) : lessonMasters.length > 0 ? (
+                                            lessonMasters.map((l: any) => (
+                                                <SelectItem key={l.id} value={l.id}>
+                                                    {l.name}
                                                 </SelectItem>
                                             ))
                                         ) : (

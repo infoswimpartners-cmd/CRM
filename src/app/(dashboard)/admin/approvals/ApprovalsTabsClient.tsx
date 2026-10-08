@@ -3,24 +3,27 @@
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { CreditCard, FileCheck } from 'lucide-react'
-import { BillingApprovalList } from '@/components/admin/BillingApprovalList'
+import { StripeInvoiceList } from '@/components/admin/StripeInvoiceList'
 import PlanApprovalsList from '@/components/admin/PlanApprovalsList'
+import { StripeInvoiceSummary } from '@/actions/stripe'
 
 interface ApprovalsTabsClientProps {
     initialTab: string
-    unpaidSchedules: any[]
-    paidSchedules: any[]
-    unpaidRegularSchedules: any[]
-    paidRegularSchedules: any[]
+    initialInvoices: StripeInvoiceSummary[]
+    initialHasMore?: boolean
+    initialSearchQuery?: string
     pendingRequests: any[]
+    unpaidSchedules?: any[]
+    paidSchedules?: any[]
+    unpaidRegularSchedules?: any[]
+    paidRegularSchedules?: any[]
 }
 
 export function ApprovalsTabsClient({
     initialTab,
-    unpaidSchedules,
-    paidSchedules,
-    unpaidRegularSchedules,
-    paidRegularSchedules,
+    initialInvoices,
+    initialHasMore = false,
+    initialSearchQuery = '',
     pendingRequests,
 }: ApprovalsTabsClientProps) {
     const router = useRouter()
@@ -32,7 +35,6 @@ export function ApprovalsTabsClient({
         router.push(`/admin/approvals?tab=${value}`, { scroll: false })
     }
 
-    const pendingBillingCount = (unpaidSchedules?.length || 0) + (unpaidRegularSchedules?.length || 0)
     const pendingPlansCount = pendingRequests?.length || 0
 
     return (
@@ -44,19 +46,14 @@ export function ApprovalsTabsClient({
                         className="gap-2 px-4 py-2 rounded-lg text-xs font-semibold data-[state=active]:bg-white data-[state=active]:text-blue-700 data-[state=active]:shadow-xs transition-all"
                     >
                         <CreditCard className="h-4 w-4" />
-                        <span>レッスン請求承認</span>
-                        {pendingBillingCount > 0 && (
-                            <span className="ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700">
-                                {pendingBillingCount}
-                            </span>
-                        )}
+                        <span>Stripe請求・決済履歴</span>
                     </TabsTrigger>
                     <TabsTrigger
                         value="plans"
                         className="gap-2 px-4 py-2 rounded-lg text-xs font-semibold data-[state=active]:bg-white data-[state=active]:text-blue-700 data-[state=active]:shadow-xs transition-all"
                     >
                         <FileCheck className="h-4 w-4" />
-                        <span>プラン変更・解約申請承認</span>
+                        <span>プラン変更・解約申請</span>
                         {pendingPlansCount > 0 && (
                             <span className="ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700">
                                 {pendingPlansCount}
@@ -67,11 +64,10 @@ export function ApprovalsTabsClient({
             </div>
 
             <TabsContent value="billing" className="space-y-4 focus-visible:outline-none mt-0">
-                <BillingApprovalList
-                    unpaidSchedules={unpaidSchedules}
-                    paidSchedules={paidSchedules}
-                    unpaidRegularSchedules={unpaidRegularSchedules}
-                    paidRegularSchedules={paidRegularSchedules}
+                <StripeInvoiceList
+                    initialInvoices={initialInvoices}
+                    initialHasMore={initialHasMore}
+                    initialSearchQuery={initialSearchQuery}
                 />
             </TabsContent>
 
@@ -81,3 +77,4 @@ export function ApprovalsTabsClient({
         </Tabs>
     )
 }
+

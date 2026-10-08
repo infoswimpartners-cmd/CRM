@@ -155,12 +155,12 @@ export function CoachRewardCard() {
                     if (!master) return
 
                     if (master.is_trial) {
-                        // Trial Lesson: Fixed 4,500 JPY
-                        // Check for Special Exception Rate for Trial Lessons
-                        // Special Exception Rate (approx 0.7000001) gets 5000 JPY for trial
-                        let amount = 4500
+                        // Trial Lesson: Standard 4,500 JPY (90min: 6,750 JPY)
+                        // Special Exception Rate (0.7000001): 5,000 JPY (90min: 7,000 JPY)
+                        const is90Min = master.name?.includes('90') || (master.unit_price && master.unit_price >= 9000)
+                        let amount = is90Min ? 6750 : 4500
                         if (Math.abs(rate - 0.7000001) < 0.0000001) {
-                            amount = 5000
+                            amount = is90Min ? 7000 : 5000
                         }
 
                         totalReward += amount

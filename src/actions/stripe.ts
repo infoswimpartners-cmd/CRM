@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { stripe } from '@/lib/stripe'
+import Stripe from 'stripe'
 import { revalidatePath } from 'next/cache'
 import * as fs from 'fs'
 import * as path from 'path'
@@ -603,3 +604,149 @@ export async function createTrioTicketCheckoutSession(studentId: string, ticketC
         return { success: false, error: error.message || 'チケット購入画面の生成に失敗しました' }
     }
 }
+
+export interface StripeInvoiceItemSummary {
+    id: string
+    description: string | null
+    amount: number
+    quantity: number | null
+    period_start?: number
+    period_end?: number
+}
+
+export interface StripeInvoiceSummary {
+    id: string
+    number: string | null
+    customer_id: string | null
+    customer_name: string | null
+    customer_email: string | null
+    student?: {
+        id: string
+        full_name: string | null
+        second_student_name?: string | null
+        student_number: string | null
+    } | null
+    amount_due: number
+    amount_paid: number
+    currency: string
+    status: string | null
+    created: number // unix timestamp (seconds)
+    due_date: number | null
+    billing_reason: string | null
+    hosted_invoice_url: string | null
+    invoice_pdf: string | null
+    lines: StripeInvoiceItemSummary[]
+}
+
+export interface GetStripeInvoicesOptions {
+    limit?: number
+    customerId?: string
+    status?: string // 'all' | 'paid' | 'open' | 'void' | 'draft' | 'uncollectible'
+    startingAfter?: string
+    endingBefore?: string
+}
+
+/**
+ * Stripeで請求を行った履歴（インボイス履歴）を取得する
+ */
+export async function getStripeInvoices(options: GetStripeInvoicesOptions = {}) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+        return { success: false, error: 'Unauthorized', data: [], hasMore: false }
+    }
+
+    try {
+        const stripeClient = process.env.STRIPE_SECRET_KEY_LIVE
+            ? new Stripe(process.env.STRIPE_SECRET_KEY_LIVE, { apiVersion: '2025-12-15.clover' as any })
+            : stripe
+
+        const params: any = {
+            limit: Math.min(options.limit || 50, 100),
+        }
+        if (options.customerId) {
+            params.customer = options.customerId
+        }
+        if (options.status && options.status !== 'all') {
+            params.status = options.status
+        }
+        if (options.startingAfter) {
+            params.starting_after = options.startingAfter
+        }
+        if (options.endingBefore) {
+            params.ending_before = options.endingBefore
+        }
+
+        const invoicesList = await stripeClient.invoices.list(params)
+
+        // Supabaseの生徒テーブルと突合して生徒名・会員番号を取得
+        const customerIds = [...new Set(invoicesList.data.map(i => typeof i.customer === 'string' ? i.customer : (i.customer as any)?.id).filter(Boolean))] as string[]
+        const studentMap: Record<string, { id: string; full_name: string | null; second_student_name?: string | null; student_number: string | null }> = {}
+
+        if (customerIds.length > 0) {
+            const { createAdminClient } = await import('@/lib/supabase/admin')
+            const adminClient = createAdminClient()
+            const { data: students } = await adminClient
+                .from('students')
+                .select('id, full_name, second_student_name, student_number, stripe_customer_id')
+                .in('stripe_customer_id', customerIds)
+
+            if (students) {
+                for (const st of students) {
+                    if (st.stripe_customer_id) {
+                        studentMap[st.stripe_customer_id] = {
+                            id: st.id,
+                            full_name: st.full_name,
+                            second_student_name: st.second_student_name,
+                            student_number: st.student_number,
+                        }
+                    }
+                }
+            }
+        }
+
+        const formattedInvoices: StripeInvoiceSummary[] = invoicesList.data.map(inv => {
+            const cusId = typeof inv.customer === 'string' ? inv.customer : (inv.customer as any)?.id || null
+            return {
+                id: inv.id,
+                number: inv.number || null,
+                customer_id: cusId,
+                customer_name: inv.customer_name || null,
+                customer_email: inv.customer_email || null,
+                student: cusId ? studentMap[cusId] || null : null,
+                amount_due: inv.amount_due,
+                amount_paid: inv.amount_paid,
+                currency: inv.currency,
+                status: inv.status || null,
+                created: inv.created,
+                due_date: inv.due_date || null,
+                billing_reason: inv.billing_reason || null,
+                hosted_invoice_url: inv.hosted_invoice_url || null,
+                invoice_pdf: inv.invoice_pdf || null,
+                lines: (inv.lines?.data || []).map(line => ({
+                    id: line.id,
+                    description: line.description,
+                    amount: line.amount,
+                    quantity: line.quantity,
+                    period_start: line.period?.start,
+                    period_end: line.period?.end,
+                })),
+            }
+        })
+
+        return {
+            success: true,
+            data: formattedInvoices,
+            hasMore: invoicesList.has_more,
+        }
+    } catch (error: any) {
+        console.error('[getStripeInvoices] Error:', error)
+        return {
+            success: false,
+            error: error.message || 'インボイス履歴の取得に失敗しました',
+            data: [],
+            hasMore: false,
+        }
+    }
+}
+

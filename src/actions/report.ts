@@ -127,13 +127,14 @@ export async function getCalculatedLessonAmounts(
     if (coachProfile?.role === 'admin' || coachProfile?.role === 'owner') {
         baseReward = basePrice + facilityFee
     } else if (master.is_trial) {
-        // 体験レッスン
+        // 体験レッスン（90分体験の特別ランクは7,000円）
+        const is90Min = master.name?.includes('90') || (master.unit_price && master.unit_price >= 9000)
         if (rate === 1.0) {
             baseReward = basePrice
         } else if (Math.abs(rate - 0.7000001) < 0.00000001) {
-            baseReward = 5000 // trial_special
+            baseReward = is90Min ? 7000 : 5000 // 特別ランク (60分: 5,000円, 90分: 7,000円)
         } else {
-            baseReward = 4500 // trial_standard
+            baseReward = is90Min ? 6750 : 4500 // 通常ランク (60分: 4,500円, 90分: 6,750円)
         }
     } else if (planBaseRewardPrice !== null) {
         // プラン報酬設定額にコーチの報酬率を適用する

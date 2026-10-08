@@ -388,8 +388,8 @@ export async function createLessonSchedule(params: CreateLessonScheduleParams) {
                     // @ts-ignore (pairUnitPrice defined above)
                     overagePrice = calculateLessonPrice(overagePrice, applyPairPrice, pairUnitPrice)
 
-                    // Determine Billing Status
-                    billingStatus = 'awaiting_approval'
+                    // 承認フロー撤廃に伴い、直接次月合算（ready_to_invoice）に設定
+                    billingStatus = 'ready_to_invoice'
                     console.log(`[CreateLesson] Overage Detected. Price: ${overagePrice} (Attendance: ${params.attendance_type}). Status: ${billingStatus}`)
                 } // End if (checkOverage)
 
@@ -800,17 +800,18 @@ export async function checkStudentLessonStatus(studentId: string, dateStr: strin
         let isOverage = false
         let availableLessons: any[] = []
 
-        // [NEW] Trial Logic: If student is 'trial_pending' OR 'trial_confirmed' (and no membership), return ONLY Trial Lessons
-        // Note: 'trial_confirmed' happens after they book, but if they cancel and re-book, they might still be 'trial_confirmed' but no membership.
-        if ((student.status === 'trial_pending' || student.status === 'trial_confirmed') && !membership) {
-            console.log(`[CheckStatus] Student is ${student.status}. Fetching Trial Lessons only.`)
+        // [NEW] Trial Logic: If student is trial status (and no membership), return Trial Lessons
+        const isTrialStudent = (student.status === 'trial_pending' || student.status === 'trial_confirmed' || student.status === 'trial_billed' || student.status === 'applied') && !membership
+        if (isTrialStudent) {
+            console.log(`[CheckStatus] Student is ${student.status}. Fetching Trial Lessons.`)
 
-            // Fetch lessons with "体験" in name
+            // Fetch lessons with "体験" in name, ordered by display_order
             const { data: trialLessons, error: trialError } = await supabaseAdmin
                 .from('lesson_masters')
                 .select('id, name, unit_price, pair_unit_price')
                 .ilike('name', '%体験%')
                 .eq('active', true)
+                .order('display_order', { ascending: true })
 
             if (trialError) {
                 console.error('[CheckStatus] Error fetching trial lessons:', trialError)
@@ -820,11 +821,7 @@ export async function checkStudentLessonStatus(studentId: string, dateStr: strin
 
             availableLessons = trialLessons || []
             membershipName = '体験利用' // Override for UI display
-
-            // Trial lessons must be billed (even if free/special price), so we treat them as "Overage"
-            // to trigger the Billing Flow (which will be set to 'awaiting_approval' in createLessonSchedule).
             isOverage = true
-
         } else {
             // Normal Logic (Existing)
 

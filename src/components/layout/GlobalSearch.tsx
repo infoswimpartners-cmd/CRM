@@ -78,7 +78,7 @@ export function GlobalSearch({ students, coaches = [], leads = [], announcements
                 { title: "分析・集計", path: "/admin/analytics", icon: DollarSign },
                 { title: "全レッスン報告", path: "/admin/reports", icon: Calendar },
                 { title: "報酬支払管理", path: "/admin/finance/payouts", icon: CreditCard },
-                { title: "請求・決済管理", path: "/admin/approvals", icon: FileCheck },
+                { title: "請求・決済履歴", path: "/admin/approvals", icon: CreditCard },
                 { title: "体験申込リード管理", path: "/admin/leads", icon: UserPlus },
                 { title: "全体スケジュール", path: "/admin/schedule", icon: Calendar },
                 { title: "会員管理", path: "/customers", icon: Users },

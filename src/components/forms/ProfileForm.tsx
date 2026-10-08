@@ -215,7 +215,7 @@ export function ProfileForm({ profileId, initialData, redirectPath, title = "プ
                                 <SelectContent>
                                     <SelectItem value="auto">自動判定 (実績ベース)</SelectItem>
                                     <SelectItem value="1.0">管理者 (100%)</SelectItem>
-                                    <SelectItem value="0.7000001">特例 (70% + 体験¥5,000)</SelectItem>
+                                    <SelectItem value="0.7000001">特例 (70% + 体験¥5,000 / 90分¥7,000)</SelectItem>
                                     <SelectItem value="0.7">Special (70%)</SelectItem>
                                     <SelectItem value="0.65">S (65%)</SelectItem>
                                     <SelectItem value="0.6">A (60%)</SelectItem>
