@@ -10,6 +10,8 @@ import { SpTrackerGrowthCharts } from './SpTrackerGrowthCharts';
 import { SpTrackerAreaSeoAuditCard } from './SpTrackerAreaSeoAuditCard';
 import { ArticleType } from '@/lib/generated-articles-storage';
 
+import { KeywordCompetitorIntelligence } from '@/types/competitor-benchmark';
+
 interface SpTrackerSeoViewProps {
     keywords: KeywordItem[];
     searchConsoleData?: any;
@@ -19,7 +21,8 @@ interface SpTrackerSeoViewProps {
         keyword: string,
         type: ArticleType,
         targetPath?: string,
-        initialPrompt?: string
+        initialPrompt?: string,
+        competitorIntelligence?: KeywordCompetitorIntelligence
     ) => void;
     onSelectCompetitorKeyword?: (keyword: string) => void;
 }

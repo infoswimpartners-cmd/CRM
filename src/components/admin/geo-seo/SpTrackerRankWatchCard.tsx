@@ -40,6 +40,8 @@ import {
     optimizeKitWithGeminiAction,
 } from '@/actions/sp-tracker-actions';
 
+import { KeywordCompetitorIntelligence } from '@/types/competitor-benchmark';
+
 interface SpTrackerRankWatchCardProps {
     state?: SeoRankWatchState;
     onRefresh: () => Promise<void>;
@@ -47,7 +49,8 @@ interface SpTrackerRankWatchCardProps {
         keyword: string,
         type: ArticleType,
         targetPath?: string,
-        initialPrompt?: string
+        initialPrompt?: string,
+        competitorIntelligence?: KeywordCompetitorIntelligence
     ) => void;
 }
 
