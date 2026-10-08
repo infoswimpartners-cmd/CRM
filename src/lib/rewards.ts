@@ -86,8 +86,8 @@ export async function calculateHistoricalPayments(
     const { data: allLessons, error } = await supabase
         .from('lessons')
         .select(`
-            id, price, lesson_date, coach_id, attendance_type,
-            lesson_masters (id, unit_price, is_trial),
+            id, price, lesson_date, coach_id, attendance_type, base_reward, final_reward_amount,
+            lesson_masters (id, name, unit_price, is_trial),
             profiles ( distant_reward_fee, role ),
             students (
                 id,
@@ -160,7 +160,9 @@ export async function calculateHistoricalPayments(
             }
 
             const price = l.price || 0
-            const reward = calculateLessonReward(l, rate, rewardSettings)
+            const reward = (l.final_reward_amount !== null && l.final_reward_amount !== undefined)
+                ? l.final_reward_amount
+                : calculateLessonReward(l, rate, rewardSettings)
 
             let title = l.lesson_masters?.is_trial ? '体験レッスン' : '通常レッスン'
             if (l.lesson_masters && price > l.lesson_masters.unit_price) {

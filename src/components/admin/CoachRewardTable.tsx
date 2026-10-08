@@ -36,6 +36,8 @@ interface Lesson {
             }
         }
     }
+    base_reward?: number
+    final_reward_amount?: number
 }
 
 interface Coach {
@@ -121,10 +123,17 @@ export function CoachRewardTable({ coaches, lessons, targetDate }: CoachRewardTa
 
             if (master) {
                 if (master.is_trial) {
-                    // Trial Lesson: Fixed 4,500 JPY
-                    totalReward += 4500
+                    const is90Min = master.name?.includes('90') || (master.unit_price && master.unit_price >= 9000) || (l.price && l.price >= 9000)
+                    let amount = is90Min ? 6750 : 4500
+                    if (Math.abs(rate - 0.7000001) < 0.0000001) {
+                        amount = is90Min ? 7000 : 5000
+                    }
+                    if (l.final_reward_amount !== null && l.final_reward_amount !== undefined) {
+                        amount = l.final_reward_amount
+                    }
+                    totalReward += amount
                     trialCount++
-                    trialAmount += 4500
+                    trialAmount += amount
                 } else {
                     // Determine base price: Membership Reward Master > Lesson Master Price
                     const basePrice = membershipRewardMaster?.unit_price ?? master.unit_price

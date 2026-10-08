@@ -38,6 +38,8 @@ interface Lesson {
             }
         }
     }
+    base_reward?: number
+    final_reward_amount?: number
 }
 
 interface Coach {
@@ -144,9 +146,13 @@ export function CoachRewardDetailDialog({ coach, stats, lessons, open, onOpenCha
                                     const membershipRewardMaster = lesson.students?.membership_types?.reward_master
                                     const basePrice = membershipRewardMaster?.unit_price ?? lesson.lesson_masters?.unit_price ?? 0
 
-                                    const reward = isTrial
-                                        ? 4500
-                                        : basePrice * stats.rate
+                                    const is90Min = lesson.lesson_masters?.name?.includes('90') || (lesson.lesson_masters?.unit_price && lesson.lesson_masters?.unit_price >= 9000) || (lesson.price && lesson.price >= 9000)
+                                    const isSpecialRate = Math.abs(stats.rate - 0.7000001) < 0.0000001
+                                    const defaultTrialReward = isSpecialRate ? (is90Min ? 7000 : 5000) : (is90Min ? 6750 : 4500)
+
+                                    const reward = lesson.final_reward_amount ?? (isTrial
+                                        ? defaultTrialReward
+                                        : basePrice * stats.rate)
 
                                     return (
                                         <TableRow key={lesson.id}>

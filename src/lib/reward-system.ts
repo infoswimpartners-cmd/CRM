@@ -4,11 +4,15 @@ export type LessonData = {
     id: string
     lesson_date: string
     price: number
+    base_price?: number
+    base_reward?: number
+    final_reward_amount?: number
     coach_id: string
     attendance_type?: string
     student_id?: string
     lesson_masters?: {
         id: string
+        name?: string
         unit_price: number
         pair_unit_price?: number | null
         is_trial: boolean
@@ -166,14 +170,18 @@ export function calculateLessonReward(
     // Calculate base reward
     let reward = 0
     if (master.is_trial) {
+        // 体験レッスン（90分体験の判定）
+        const is90Min = master.name?.includes('90') || (master.unit_price && master.unit_price >= 9000) || (lesson.base_price && lesson.base_price >= 9000) || (lesson.price && lesson.price >= 9000)
         // Admin Rate (100%) -> Return Full Price
         if (rate === 1.0) {
             reward = basePrice
         }
         else if (Math.abs(rate - settings.special_rate) < 0.00000001) {
-            reward = settings.trial_special
+            // 特別ランク: 60分は5,000円、90分は7,000円
+            reward = is90Min ? 7000 : settings.trial_special
         } else {
-            reward = settings.trial_standard
+            // 通常ランク: 60分は4,500円、90分は6,750円
+            reward = is90Min ? 6750 : settings.trial_standard
         }
     } else if (planBaseRewardPrice !== null) {
         // プラン報酬設定額にコーチの報酬率を適用する
@@ -219,7 +227,9 @@ export function calculateMonthlyStats(
         }
 
         const price = l.price || 0
-        const reward = calculateLessonReward(l, rate, settings)
+        const reward = (l.final_reward_amount !== null && l.final_reward_amount !== undefined)
+            ? l.final_reward_amount
+            : calculateLessonReward(l, rate, settings)
 
         let title = l.lesson_masters?.is_trial ? '体験レッスン' : '通常レッスン';
         if (l.lesson_masters && price > l.lesson_masters.unit_price) {

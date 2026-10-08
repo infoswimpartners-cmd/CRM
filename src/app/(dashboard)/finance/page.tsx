@@ -24,7 +24,7 @@ export default async function FinancePage() {
         .from('lessons')
         .select(`
             *,
-            lesson_masters ( is_trial, unit_price ),
+            lesson_masters ( id, name, is_trial, unit_price ),
             profiles ( distant_reward_fee ),
             students (
                 full_name,
