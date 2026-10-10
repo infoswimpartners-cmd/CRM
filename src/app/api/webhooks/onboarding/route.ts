@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
             full_name: 'Webhook ParseError',
             contact_email: 'error@example.com',
             notes: String(e),
-            status: 'inquiry'
+            status: 'inquired'
         });
         return NextResponse.json({ error: 'Invalid Body Format' }, { status: 400 })
     }
@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
                 full_name: 'Webhook ValidationError',
                 contact_email: 'error@example.com',
                 notes: JSON.stringify({ rawBody, body, error: result.error.flatten() }, null, 2),
-                status: 'inquiry'
+                status: 'inquired'
             });
             return NextResponse.json(
                 { error: 'Validation Failed', details: result.error.flatten() },
@@ -205,7 +205,7 @@ export async function POST(req: NextRequest) {
                 contact_email: email,
                 contact_phone: phone,
                 notes: notes || null,
-                status: 'inquiry', // Use existing 'inquiry' status
+                status: 'inquired',
                 stripe_customer_id: null,
                 apply_pair_pricing: hasSecondStudent,
                 apply_pair_membership_fee: hasSecondStudent
