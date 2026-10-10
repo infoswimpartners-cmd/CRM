@@ -624,29 +624,39 @@ export async function fetchAndFilterMarketingStudents(
 // 10. 予約一括配信の実行 (processScheduledBroadcasts)
 // ==============================================================================
 
-export async function processScheduledBroadcasts(options: { dryRun?: boolean } = {}): Promise<{
+export async function processScheduledBroadcasts(options: { dryRun?: boolean; campaignId?: string } = {}): Promise<{
     processedCampaigns: number;
     successCount: number;
     failedCount: number;
 }> {
-    const { dryRun = false } = options;
+    const { dryRun = false, campaignId } = options;
     const supabase = createAdminClient();
     const nowIso = new Date().toISOString();
 
     // ゾンビロック解除ガード (10分以上 sending のままスタックしたキャンペーンを scheduled に復旧)
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-    await supabase
-        .from('line_broadcast_campaigns')
     let scheduledCampaigns: any[] = [];
     let useFallback = false;
 
     try {
-        const { data } = await supabase
+        await supabase
             .from('line_broadcast_campaigns')
-            .select('*')
-            .eq('status', 'scheduled')
-            .lte('scheduled_at', nowIso);
-        if (data) {
+            .update({ status: 'scheduled', updated_at: nowIso })
+            .eq('status', 'sending')
+            .lte('updated_at', tenMinutesAgo);
+
+        let query = supabase
+            .from('line_broadcast_campaigns')
+            .select('*');
+
+        if (campaignId) {
+            query = query.eq('id', campaignId);
+        } else {
+            query = query.eq('status', 'scheduled').lte('scheduled_at', nowIso);
+        }
+
+        const { data, error: selectErr } = await query;
+        if (!selectErr && data) {
             scheduledCampaigns = data;
         } else {
             useFallback = true;
@@ -664,9 +674,32 @@ export async function processScheduledBroadcasts(options: { dryRun?: boolean } =
                 .maybeSingle();
             if (config?.value) {
                 const allCampaigns: any[] = JSON.parse(config.value);
-                scheduledCampaigns = allCampaigns.filter((c: any) =>
-                    c.status === 'scheduled' && c.scheduled_at && new Date(c.scheduled_at) <= new Date(nowIso)
-                );
+                // ゾンビロック解除（10分以上 sending のままスタックしたものを scheduled に戻す）
+                let configModified = false;
+                for (const c of allCampaigns) {
+                    if (c.status === 'sending' && c.updated_at && new Date(c.updated_at) <= new Date(tenMinutesAgo)) {
+                        c.status = 'scheduled';
+                        c.updated_at = nowIso;
+                        configModified = true;
+                    }
+                }
+                if (configModified) {
+                    await supabase
+                        .from('app_configs')
+                        .upsert({
+                            key: 'line_broadcast_campaigns_data_v1',
+                            value: JSON.stringify(allCampaigns),
+                            updated_at: nowIso,
+                        });
+                }
+
+                if (campaignId) {
+                    scheduledCampaigns = allCampaigns.filter((c: any) => c.id === campaignId && c.status !== 'completed');
+                } else {
+                    scheduledCampaigns = allCampaigns.filter((c: any) =>
+                        c.status === 'scheduled' && c.scheduled_at && new Date(c.scheduled_at) <= new Date(nowIso)
+                    );
+                }
             }
         } catch {}
     }
@@ -680,18 +713,47 @@ export async function processScheduledBroadcasts(options: { dryRun?: boolean } =
 
     for (const camp of scheduledCampaigns) {
         if (!dryRun) {
-            // アトミック楽観ロック: status が 'scheduled' の場合のみ 'sending' に遷移
-            const { data: lockedCamp } = await supabase
-                .from('line_broadcast_campaigns')
-                .update({ status: 'sending', updated_at: nowIso })
-                .eq('id', camp.id)
-                .eq('status', 'scheduled')
-                .select('id')
-                .maybeSingle();
+            if (!useFallback) {
+                // DBテーブル利用時: アトミック楽観ロック
+                const { data: lockedCamp } = await supabase
+                    .from('line_broadcast_campaigns')
+                    .update({ status: 'sending', updated_at: nowIso })
+                    .eq('id', camp.id)
+                    .eq('status', 'scheduled')
+                    .select('id')
+                    .maybeSingle();
 
-            if (!lockedCamp) {
-                // 他の並行プロセスが既に処理を開始したためスキップ
-                continue;
+                if (!lockedCamp) {
+                    // 他の並行プロセスが既に処理を開始したためスキップ
+                    continue;
+                }
+            } else {
+                // app_configs フォールバック利用時: 楽観ロック
+                try {
+                    const { data: config } = await supabase
+                        .from('app_configs')
+                        .select('value')
+                        .eq('key', 'line_broadcast_campaigns_data_v1')
+                        .maybeSingle();
+                    if (config?.value) {
+                        const allCamps: any[] = JSON.parse(config.value);
+                        const target = allCamps.find((c: any) => c.id === camp.id);
+                        if (!target || target.status !== 'scheduled') {
+                            continue; // 既に処理中または送信済み
+                        }
+                        target.status = 'sending';
+                        target.updated_at = nowIso;
+                        await supabase
+                            .from('app_configs')
+                            .upsert({
+                                key: 'line_broadcast_campaigns_data_v1',
+                                value: JSON.stringify(allCamps),
+                                updated_at: nowIso,
+                            });
+                    }
+                } catch {
+                    continue;
+                }
             }
         }
 

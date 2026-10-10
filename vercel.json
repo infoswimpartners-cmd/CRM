@@ -19,6 +19,10 @@
         {
             "path": "/api/cron/sp-tracker-weekly",
             "schedule": "30 23 * * 0"
+        },
+        {
+            "path": "/api/cron/line-marketing-dispatcher",
+            "schedule": "*/10 * * * *"
         }
     ]
 }

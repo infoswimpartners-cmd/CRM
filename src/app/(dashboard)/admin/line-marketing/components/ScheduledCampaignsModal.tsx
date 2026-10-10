@@ -48,6 +48,7 @@ import {
     updateBroadcastCampaign,
     cancelBroadcastCampaign,
     deleteBroadcastCampaign,
+    executeScheduledBroadcastsAction,
 } from '@/actions/line-marketing';
 
 interface ScheduledCampaignsModalProps {
@@ -71,6 +72,8 @@ export const ScheduledCampaignsModal: React.FC<ScheduledCampaignsModalProps> = (
     const [editMessage, setEditMessage] = useState<string>('');
     const [editScheduledAt, setEditScheduledAt] = useState<string>('');
     const [isSaving, setIsSaving] = useState<boolean>(false);
+    const [isExecutingId, setIsExecutingId] = useState<string | null>(null);
+    const [isBatchExecuting, setIsBatchExecuting] = useState<boolean>(false);
 
     // キャンペーン一覧読み込み
     const loadCampaigns = useCallback(async () => {
@@ -146,6 +149,52 @@ export const ScheduledCampaignsModal: React.FC<ScheduledCampaignsModalProps> = (
             toast.error('エラーが発生しました: ' + err.message);
         } finally {
             setIsSaving(false);
+        }
+    };
+
+    // 予約キャンペーンの即時送信実行
+    const handleExecuteNow = async (camp: LineBroadcastCampaign) => {
+        if (!confirm(`「${camp.title}」を今すぐ対象生徒（${camp.target_count || 0}名）へ一斉送信しますか？\n（LINE公式アカウントから実際のメッセージが送信されます）`)) {
+            return;
+        }
+
+        setIsExecutingId(camp.id);
+        try {
+            const res = await executeScheduledBroadcastsAction({ campaignId: camp.id });
+            if (res.success) {
+                toast.success(`送信完了: ${res.successCount || 0}件成功 / ${res.failedCount || 0}件失敗`);
+                await loadCampaigns();
+                if (onCampaignUpdated) onCampaignUpdated();
+            } else {
+                toast.error('配信実行に失敗しました: ' + (res.error || ''));
+            }
+        } catch (err: any) {
+            toast.error('配信エラー: ' + err.message);
+        } finally {
+            setIsExecutingId(null);
+        }
+    };
+
+    // 予定時刻が到来した全予約キャンペーンの一括ディスパッチ実行
+    const handleBatchExecute = async () => {
+        if (!confirm('予定時刻が到来しているすべての予約配信を今すぐ実行しますか？')) {
+            return;
+        }
+
+        setIsBatchExecuting(true);
+        try {
+            const res = await executeScheduledBroadcastsAction();
+            if (res.success) {
+                toast.success(`一括実行完了: ${res.processedCampaigns || 0}件のキャンペーン (${res.successCount || 0}通送信成功)`);
+                await loadCampaigns();
+                if (onCampaignUpdated) onCampaignUpdated();
+            } else {
+                toast.error('一括実行に失敗しました: ' + (res.error || ''));
+            }
+        } catch (err: any) {
+            toast.error('一括実行エラー: ' + err.message);
+        } finally {
+            setIsBatchExecuting(false);
         }
     };
 
@@ -265,16 +314,29 @@ export const ScheduledCampaignsModal: React.FC<ScheduledCampaignsModalProps> = (
                                     一括配信予約・送信キャンペーンの管理
                                 </DialogTitle>
                             </div>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={loadCampaigns}
-                                disabled={isLoading}
-                                className="h-8 text-xs text-slate-600"
-                            >
-                                <RefreshCw className={`w-3.5 h-3.5 mr-1 ${isLoading ? 'animate-spin' : ''}`} />
-                                更新
-                            </Button>
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleBatchExecute}
+                                    disabled={isBatchExecuting || isLoading}
+                                    className="h-8 text-xs font-semibold text-emerald-700 border-emerald-200 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-400"
+                                    title="予定日時を過ぎた予約配信を今すぐ実行"
+                                >
+                                    <Send className={`w-3.5 h-3.5 mr-1 ${isBatchExecuting ? 'animate-spin' : ''}`} />
+                                    {isBatchExecuting ? '送信中...' : '予定到来分を一括送信'}
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={loadCampaigns}
+                                    disabled={isLoading}
+                                    className="h-8 text-xs text-slate-600"
+                                >
+                                    <RefreshCw className={`w-3.5 h-3.5 mr-1 ${isLoading ? 'animate-spin' : ''}`} />
+                                    更新
+                                </Button>
+                            </div>
                         </div>
                         <DialogDescription className="text-xs">
                             予約中のメッセージ確認・配信日時の変更・本文の修正・予約キャンセルが可能です。
@@ -350,7 +412,7 @@ export const ScheduledCampaignsModal: React.FC<ScheduledCampaignsModalProps> = (
                                         <TableHead className="text-xs font-bold">キャンペーン名 / 配信予定日時</TableHead>
                                         <TableHead className="w-20 text-xs font-bold text-center">対象</TableHead>
                                         <TableHead className="w-24 text-xs font-bold text-center">結果</TableHead>
-                                        <TableHead className="w-32 text-xs font-bold text-right">操作</TableHead>
+                                        <TableHead className="w-56 text-xs font-bold text-right">操作</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -395,6 +457,21 @@ export const ScheduledCampaignsModal: React.FC<ScheduledCampaignsModalProps> = (
                                                     <div className="flex items-center justify-end gap-1">
                                                         {isScheduled && (
                                                             <>
+                                                                <Button
+                                                                    variant="default"
+                                                                    size="sm"
+                                                                    onClick={() => handleExecuteNow(camp)}
+                                                                    disabled={isExecutingId === camp.id}
+                                                                    className="h-7 px-2 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-xs"
+                                                                    title="今すぐこの予約配信を実行"
+                                                                >
+                                                                    {isExecutingId === camp.id ? (
+                                                                        <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                                                                    ) : (
+                                                                        <Send className="w-3.5 h-3.5 mr-1" />
+                                                                    )}
+                                                                    今すぐ送信
+                                                                </Button>
                                                                 <Button
                                                                     variant="outline"
                                                                     size="sm"

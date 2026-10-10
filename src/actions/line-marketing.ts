@@ -17,6 +17,7 @@ import {
     SendMessageResult,
     fetchAndFilterMarketingStudents,
     syncTrialDoneStudentsToProgress,
+    processScheduledBroadcasts,
 } from '@/lib/line-marketing-service';
 import {
     SegmentFilterConditions,
@@ -1390,6 +1391,33 @@ export async function removeTagFromUserAction(
         return { success: true };
     } catch (err: any) {
         console.error('[removeTagFromUserAction] Error:', err);
+        return { success: false, error: err.message };
+    }
+}
+
+/**
+ * 予定時刻が到来した一括予約配信（または指定の予約キャンペーン）を手動で即時実行するアクション
+ */
+export async function executeScheduledBroadcastsAction(options: { dryRun?: boolean; campaignId?: string } = {}): Promise<{
+    success: boolean;
+    processedCampaigns?: number;
+    successCount?: number;
+    failedCount?: number;
+    error?: string;
+}> {
+    try {
+        await assertAdminUser();
+        const res = await processScheduledBroadcasts(options);
+        safeRevalidate('/admin/line-marketing');
+        safeRevalidate('/admin');
+        return {
+            success: true,
+            processedCampaigns: res.processedCampaigns,
+            successCount: res.successCount,
+            failedCount: res.failedCount,
+        };
+    } catch (err: any) {
+        console.error('[executeScheduledBroadcastsAction] Error:', err);
         return { success: false, error: err.message };
     }
 }
