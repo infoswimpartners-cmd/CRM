@@ -53,19 +53,29 @@ export async function POST(req: NextRequest) {
                     }
 
                     // 2. Update Lesson Schedule Status
-                    if (scheduleId) {
+                    let scheduleIdsToUpdate: string[] = scheduleId ? [scheduleId] : []
+                    if (session.metadata?.relatedScheduleIds) {
+                        try {
+                            const parsed = JSON.parse(session.metadata.relatedScheduleIds)
+                            if (Array.isArray(parsed) && parsed.length > 0) {
+                                scheduleIdsToUpdate = parsed
+                            }
+                        } catch {}
+                    }
+
+                    if (scheduleIdsToUpdate.length > 0) {
                         const { error: schedError } = await supabaseAdmin
                             .from('lesson_schedules')
                             .update({ 
                                 billing_status: 'paid',
                                 payment_intent_id: session.payment_intent as string || null 
                             })
-                            .eq('id', scheduleId)
+                            .in('id', scheduleIdsToUpdate)
                         
                         if (schedError) {
                             console.error('[Stripe Webhook] Schedule Status Update Failed:', schedError)
                         } else {
-                            console.log(`[Stripe Webhook] Schedule ${scheduleId} marked as paid`)
+                            console.log(`[Stripe Webhook] Schedules [${scheduleIdsToUpdate.join(', ')}] marked as paid`)
                         }
                     }
 

@@ -58,6 +58,7 @@ import {
     DialogFooter,
 } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 
 const itemLabels: Record<string, string> = {
     name: '氏名',
@@ -293,6 +294,7 @@ export default function AdminLeadsPage() {
     const [assignTargetCoachId, setAssignTargetCoachId] = useState('')
     const [assignConfirmedDate, setAssignConfirmedDate] = useState('')
     const [assignConfirmedLocation, setAssignConfirmedLocation] = useState('')
+    const [assignSplitIndividual, setAssignSplitIndividual] = useState(true)
     const [isAssigning, setIsAssigning] = useState(false)
 
     // 案件編集用のステート
@@ -1020,6 +1022,7 @@ export default function AdminLeadsPage() {
         setAssignTargetCoachId(lead.assigned_coach_id || '')
         setAssignConfirmedDate(lead.confirmed_datetime || lead.datetime1 || '')
         setAssignConfirmedLocation(lead.confirmed_location || lead.lesson_location || lead.area || '')
+        setAssignSplitIndividual(!!lead.second_student_name)
         setIsAssignDialogOpen(true)
     }
 
@@ -1044,7 +1047,8 @@ export default function AdminLeadsPage() {
                 assigningLead.id,
                 assignTargetCoachId,
                 assignConfirmedDate.trim(),
-                assignConfirmedLocation.trim()
+                assignConfirmedLocation.trim(),
+                assignSplitIndividual
             )
 
             if (res.success) {
@@ -2075,6 +2079,48 @@ export default function AdminLeadsPage() {
                                                 </SelectContent>
                                             </Select>
                                         </div>
+
+                                        {/* 2名申込時の受講形式選択 */}
+                                        {assigningLead.second_student_name && (
+                                            <div className="space-y-2 p-2.5 bg-blue-50/60 rounded-md border border-blue-200">
+                                                <div className="flex items-center justify-between">
+                                                    <Label className="text-xs font-bold text-blue-900">
+                                                        受講形式（2名申込）
+                                                    </Label>
+                                                    <span className="text-[10px] text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded font-medium">
+                                                        2人目: {assigningLead.second_student_name} 様
+                                                    </span>
+                                                </div>
+                                                <RadioGroup
+                                                    value={assignSplitIndividual ? 'individual' : 'pair'}
+                                                    onValueChange={(val) => setAssignSplitIndividual(val === 'individual')}
+                                                    className="space-y-1.5"
+                                                >
+                                                    <div className="flex items-start space-x-2 bg-white p-2 rounded border border-blue-100 cursor-pointer">
+                                                        <RadioGroupItem value="individual" id="r-indiv" className="mt-0.5" />
+                                                        <Label htmlFor="r-indiv" className="text-xs cursor-pointer flex-1">
+                                                            <div className="font-semibold text-gray-900">
+                                                                一人ずつ1時間（個別受講・計2時間）
+                                                            </div>
+                                                            <div className="text-[10px] text-gray-500 mt-0.5 leading-snug">
+                                                                1人目 1時間 / 2人目 1時間 でスケジュールを2枠連続で自動登録します。
+                                                            </div>
+                                                        </Label>
+                                                    </div>
+                                                    <div className="flex items-start space-x-2 bg-white p-2 rounded border border-gray-100 cursor-pointer">
+                                                        <RadioGroupItem value="pair" id="r-pair" className="mt-0.5" />
+                                                        <Label htmlFor="r-pair" className="text-xs cursor-pointer flex-1">
+                                                            <div className="font-semibold text-gray-900">
+                                                                2名同時受講（ペアレッスン・1枠）
+                                                            </div>
+                                                            <div className="text-[10px] text-gray-500 mt-0.5 leading-snug">
+                                                                1つの枠（60分または90分）で2名同時に受講します。
+                                                            </div>
+                                                        </Label>
+                                                    </div>
+                                                </RadioGroup>
+                                            </div>
+                                        )}
 
                                         {/* 確定体験日時 */}
                                         <div className="space-y-1.5">

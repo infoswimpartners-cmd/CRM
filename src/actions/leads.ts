@@ -22,68 +22,87 @@ function calculateAge(birthDateString: string | null | undefined): number | null
 
 // 確定日時の文字列から開始時刻と終了時刻（ISO 8601）を抽出するヘルパー関数
 function parseConfirmedDateTime(dateTimeStr: string): { start: string; end: string } {
+    const pad = (n: number) => String(n).padStart(2, '0')
     const now = new Date()
-    let parsedStart: Date | null = null
-    let parsedEnd: Date | null = null
+    let parsedStartISO: string | null = null
+    let parsedEndISO: string | null = null
 
     if (dateTimeStr) {
         // 年月日時分 例: 2026/08/30 10:00, 2026-08-30 10:00, 2026年8月30日 10:00
         const fullMatch = dateTimeStr.match(/(\d{4})[年\/\-](\d{1,2})[月\/\-](\d{1,2})[日\s]*\s*(\d{1,2}):(\d{2})/)
+        let startYear = now.getFullYear()
+        let startMonth = now.getMonth() + 1
+        let startDay = now.getDate()
+        let startHour = 10
+        let startMin = 0
+        let foundStart = false
+
         if (fullMatch) {
-            const year = parseInt(fullMatch[1], 10)
-            const month = parseInt(fullMatch[2], 10) - 1
-            const day = parseInt(fullMatch[3], 10)
-            const hour = parseInt(fullMatch[4], 10)
-            const minute = parseInt(fullMatch[5], 10)
-            parsedStart = new Date(year, month, day, hour, minute)
+            startYear = parseInt(fullMatch[1], 10)
+            startMonth = parseInt(fullMatch[2], 10)
+            startDay = parseInt(fullMatch[3], 10)
+            startHour = parseInt(fullMatch[4], 10)
+            startMin = parseInt(fullMatch[5], 10)
+            foundStart = true
         } else {
             // 年省略 例: 8/30 10:00, 8月30日 10:00
             const noYearMatch = dateTimeStr.match(/(\d{1,2})[月\/\-](\d{1,2})[日\s]*\s*(\d{1,2}):(\d{2})/)
             if (noYearMatch) {
-                const year = now.getFullYear()
-                const month = parseInt(noYearMatch[1], 10) - 1
-                const day = parseInt(noYearMatch[2], 10)
-                const hour = parseInt(noYearMatch[3], 10)
-                const minute = parseInt(noYearMatch[4], 10)
-                parsedStart = new Date(year, month, day, hour, minute)
+                startMonth = parseInt(noYearMatch[1], 10)
+                startDay = parseInt(noYearMatch[2], 10)
+                startHour = parseInt(noYearMatch[3], 10)
+                startMin = parseInt(noYearMatch[4], 10)
+                foundStart = true
             } else {
                 // 日付のみ 例: 2026/08/30, 2026-08-30
                 const dateOnlyMatch = dateTimeStr.match(/(\d{4})[年\/\-](\d{1,2})[月\/\-](\d{1,2})/)
                 if (dateOnlyMatch) {
-                    const year = parseInt(dateOnlyMatch[1], 10)
-                    const month = parseInt(dateOnlyMatch[2], 10) - 1
-                    const day = parseInt(dateOnlyMatch[3], 10)
-                    parsedStart = new Date(year, month, day, 10, 0)
+                    startYear = parseInt(dateOnlyMatch[1], 10)
+                    startMonth = parseInt(dateOnlyMatch[2], 10)
+                    startDay = parseInt(dateOnlyMatch[3], 10)
+                    startHour = 10
+                    startMin = 0
+                    foundStart = true
                 }
             }
         }
 
-        // 終了時刻の抽出（例: 〜11:00, -11:00）
-        if (parsedStart && !isNaN(parsedStart.getTime())) {
-            const endMatch = dateTimeStr.match(/[〜\-\~]\s*(\d{1,2}):(\d{2})/)
-            if (endMatch) {
-                const endHour = parseInt(endMatch[1], 10)
-                const endMin = parseInt(endMatch[2], 10)
-                parsedEnd = new Date(parsedStart)
-                parsedEnd.setHours(endHour, endMin, 0, 0)
-            }
-            if (!parsedEnd || isNaN(parsedEnd.getTime()) || parsedEnd <= parsedStart) {
-                // デフォルトは開始時刻の60分後
-                parsedEnd = new Date(parsedStart.getTime() + 60 * 60 * 1000)
+        if (foundStart) {
+            // 日本時間（+09:00）としてDateを生成
+            const startDate = new Date(`${startYear}-${pad(startMonth)}-${pad(startDay)}T${pad(startHour)}:${pad(startMin)}:00+09:00`)
+            if (!isNaN(startDate.getTime())) {
+                parsedStartISO = startDate.toISOString()
+
+                // 終了時刻の抽出（例: 〜11:00, -11:00）
+                const endMatch = dateTimeStr.match(/[〜\-\~]\s*(\d{1,2}):(\d{2})/)
+                if (endMatch) {
+                    const endHour = parseInt(endMatch[1], 10)
+                    const endMin = parseInt(endMatch[2], 10)
+                    const endDate = new Date(`${startYear}-${pad(startMonth)}-${pad(startDay)}T${pad(endHour)}:${pad(endMin)}:00+09:00`)
+                    if (!isNaN(endDate.getTime()) && endDate > startDate) {
+                        parsedEndISO = endDate.toISOString()
+                    }
+                }
+                if (!parsedEndISO) {
+                    // デフォルトは開始時刻の60分後
+                    parsedEndISO = new Date(startDate.getTime() + 60 * 60 * 1000).toISOString()
+                }
             }
         }
     }
 
-    if (!parsedStart || isNaN(parsedStart.getTime())) {
-        // パースできなかった場合のフォールバック（翌日10:00〜11:00）
-        parsedStart = new Date(now.getTime() + 24 * 60 * 60 * 1000)
-        parsedStart.setHours(10, 0, 0, 0)
-        parsedEnd = new Date(parsedStart.getTime() + 60 * 60 * 1000)
+    if (!parsedStartISO) {
+        // パースできなかった場合のフォールバック（翌日10:00〜11:00 JST）
+        const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000)
+        const dStr = tomorrow.toISOString().split('T')[0]
+        const fallbackStart = new Date(`${dStr}T10:00:00+09:00`)
+        parsedStartISO = fallbackStart.toISOString()
+        parsedEndISO = new Date(fallbackStart.getTime() + 60 * 60 * 1000).toISOString()
     }
 
     return {
-        start: parsedStart.toISOString(),
-        end: parsedEnd ? parsedEnd.toISOString() : new Date(parsedStart.getTime() + 60 * 60 * 1000).toISOString()
+        start: parsedStartISO,
+        end: parsedEndISO || new Date(new Date(parsedStartISO).getTime() + 60 * 60 * 1000).toISOString()
     }
 }
 
@@ -93,10 +112,12 @@ async function createTrialScheduleForLead(params: {
     coachId: string
     studentId: string | null
     studentName: string
+    secondStudentName?: string | null
     confirmedDate: string
     confirmedLocation: string
     leadNotes?: string | null
     hasSecondStudent?: boolean
+    splitIndividual?: boolean
 }) {
     try {
         const supabaseAdmin = createAdminClient()
@@ -112,25 +133,12 @@ async function createTrialScheduleForLead(params: {
         // 2. 日時のパース
         const { start, end } = parseConfirmedDateTime(params.confirmedDate)
 
-        // 所要時間（分）の判定（90分判定）
-        const durationMinutes = Math.round((new Date(end).getTime() - new Date(start).getTime()) / (60 * 1000))
-        const is90Min = durationMinutes >= 80 || params.confirmedDate.includes('90分') || (params.leadNotes || '').includes('90分')
-
         // 90分対応のマスタ選定
         const trialMaster90 = trialMasters?.find(m => m.name.includes('90'))
         const trialMaster60 = trialMasters?.find(m => !m.name.includes('90') && m.unit_price === 6000) || trialMasters?.[0]
-        const trialMaster = is90Min ? (trialMaster90 || trialMaster60) : trialMaster60
 
         // お友達紹介キャンペーンの判定（notesに「【ご紹介者様】」が含まれるか判定）
         const isReferral = !!(params.leadNotes && params.leadNotes.includes('【ご紹介者様】'))
-
-        // 料金の計算
-        let lessonPrice = trialMaster?.unit_price || (is90Min ? 9000 : 6000)
-        if (isReferral) {
-            lessonPrice = params.hasSecondStudent ? (is90Min ? 10500 : 7000) : (is90Min ? 5250 : 3500)
-        } else if (params.hasSecondStudent) {
-            lessonPrice = trialMaster?.pair_unit_price || (is90Min ? 13500 : 9000)
-        }
 
         // コーチ名の取得
         let coachName = '担当コーチ'
@@ -145,66 +153,186 @@ async function createTrialScheduleForLead(params: {
             }
         }
 
-        const title = `${params.studentName}様　担当：${coachName}`
-        const notes = `[体験レッスンスケジュール]\n案件ID: ${params.leadId}\n確定日時: ${params.confirmedDate}\n確定場所: ${params.confirmedLocation}\nご要望・備考: ${params.leadNotes || 'なし'}`
-
-        // 3. 既存スケジュールの確認（二重登録防止・既存更新）
+        // 既存スケジュールの確認
         const { data: existingSchedules } = await supabaseAdmin
             .from('lesson_schedules')
             .select('*')
             .ilike('notes', `%案件ID: ${params.leadId}%`)
-            .order('created_at', { ascending: false })
-            .limit(1)
+            .order('start_time', { ascending: true })
 
+        const shouldSplit = !!params.hasSecondStudent && (params.splitIndividual ?? true)
         let targetScheduleId: string | null = null
+        let totalBillingPrice = 0
 
-        if (existingSchedules && existingSchedules.length > 0) {
-            const existing = existingSchedules[0]
-            targetScheduleId = existing.id
-            // 既存スケジュールの内容を更新
-            await supabaseAdmin
-                .from('lesson_schedules')
-                .update({
-                    coach_id: params.coachId,
-                    student_id: params.studentId || existing.student_id || null,
-                    lesson_master_id: trialMaster?.id || existing.lesson_master_id || null,
-                    title: title,
-                    start_time: start,
-                    end_time: end,
-                    location: params.confirmedLocation || null,
-                    notes: notes,
-                    price: lessonPrice,
-                    billing_status: existing.billing_status === 'paid' ? 'paid' : 'awaiting_payment',
-                    attendance_type: params.hasSecondStudent ? 'both' : 'single',
-                    is_overage: true
-                })
-                .eq('id', existing.id)
-        } else {
-            // lesson_schedules へ新規登録
-            const { data: insertedSchedule, error: insertError } = await supabaseAdmin
-                .from('lesson_schedules')
-                .insert({
-                    coach_id: params.coachId,
-                    student_id: params.studentId || null,
-                    lesson_master_id: trialMaster?.id || null,
-                    title: title,
-                    start_time: start,
-                    end_time: end,
-                    location: params.confirmedLocation || null,
-                    notes: notes,
-                    price: lessonPrice,
-                    billing_status: 'awaiting_payment',
-                    attendance_type: params.hasSecondStudent ? 'both' : 'single',
-                    is_overage: true
-                })
-                .select('id')
-                .single()
+        if (shouldSplit) {
+            // ==========================================
+            // 【一人ずつ1時間（計2時間）登録モード】
+            // ==========================================
+            const startDate = new Date(start)
+            const slot1Start = startDate.toISOString()
+            const slot1End = new Date(startDate.getTime() + 60 * 60 * 1000).toISOString()
+            const slot2Start = slot1End
+            const slot2End = new Date(startDate.getTime() + 120 * 60 * 1000).toISOString()
 
-            if (insertError || !insertedSchedule) {
-                console.error('Failed to insert trial schedule:', insertError)
-                return null
+            const perPersonPrice = isReferral ? 3500 : (trialMaster60?.unit_price || 6000)
+            totalBillingPrice = perPersonPrice * 2
+
+            const secondName = params.secondStudentName || '2人目'
+
+            const title1 = `${params.studentName}様　担当：${coachName}`
+            const notes1 = `[体験レッスンスケジュール (1人目: 60分)]\n案件ID: ${params.leadId}\n生徒: ${params.studentName} 様\n確定日時: ${params.confirmedDate}\n確定場所: ${params.confirmedLocation}\nご要望・備考: ${params.leadNotes || 'なし'}`
+
+            const title2 = `${secondName}様　担当：${coachName}`
+            const notes2 = `[体験レッスンスケジュール (2人目: 60分)]\n案件ID: ${params.leadId}\n生徒: ${secondName} 様\n確定日時: ${params.confirmedDate}\n確定場所: ${params.confirmedLocation}\nご要望・備考: ${params.leadNotes || 'なし'}`
+
+            // 枠1の更新/登録
+            const exist1 = existingSchedules?.[0]
+            if (exist1) {
+                targetScheduleId = exist1.id
+                await supabaseAdmin
+                    .from('lesson_schedules')
+                    .update({
+                        coach_id: params.coachId,
+                        student_id: params.studentId || exist1.student_id || null,
+                        lesson_master_id: trialMaster60?.id || exist1.lesson_master_id || null,
+                        title: title1,
+                        start_time: slot1Start,
+                        end_time: slot1End,
+                        location: params.confirmedLocation || null,
+                        notes: notes1,
+                        price: perPersonPrice,
+                        billing_status: exist1.billing_status === 'paid' ? 'paid' : 'awaiting_payment',
+                        attendance_type: 'single',
+                        is_overage: true
+                    })
+                    .eq('id', exist1.id)
+            } else {
+                const { data: ins1 } = await supabaseAdmin
+                    .from('lesson_schedules')
+                    .insert({
+                        coach_id: params.coachId,
+                        student_id: params.studentId || null,
+                        lesson_master_id: trialMaster60?.id || null,
+                        title: title1,
+                        start_time: slot1Start,
+                        end_time: slot1End,
+                        location: params.confirmedLocation || null,
+                        notes: notes1,
+                        price: perPersonPrice,
+                        billing_status: 'awaiting_payment',
+                        attendance_type: 'single',
+                        is_overage: true
+                    })
+                    .select('id')
+                    .single()
+                if (ins1) targetScheduleId = ins1.id
             }
-            targetScheduleId = insertedSchedule.id
+
+            // 枠2の更新/登録
+            const exist2 = existingSchedules?.[1]
+            if (exist2) {
+                await supabaseAdmin
+                    .from('lesson_schedules')
+                    .update({
+                        coach_id: params.coachId,
+                        student_id: params.studentId || exist2.student_id || null,
+                        lesson_master_id: trialMaster60?.id || exist2.lesson_master_id || null,
+                        title: title2,
+                        start_time: slot2Start,
+                        end_time: slot2End,
+                        location: params.confirmedLocation || null,
+                        notes: notes2,
+                        price: perPersonPrice,
+                        billing_status: exist2.billing_status === 'paid' ? 'paid' : 'awaiting_payment',
+                        attendance_type: 'student2',
+                        is_overage: true
+                    })
+                    .eq('id', exist2.id)
+            } else {
+                await supabaseAdmin
+                    .from('lesson_schedules')
+                    .insert({
+                        coach_id: params.coachId,
+                        student_id: params.studentId || null,
+                        lesson_master_id: trialMaster60?.id || null,
+                        title: title2,
+                        start_time: slot2Start,
+                        end_time: slot2End,
+                        location: params.confirmedLocation || null,
+                        notes: notes2,
+                        price: perPersonPrice,
+                        billing_status: 'awaiting_payment',
+                        attendance_type: 'student2',
+                        is_overage: true
+                    })
+            }
+        } else {
+            // ==========================================
+            // 【通常 / 2名同時ペアレッスンモード】
+            // ==========================================
+            const durationMinutes = Math.round((new Date(end).getTime() - new Date(start).getTime()) / (60 * 1000))
+            const is90Min = durationMinutes >= 80 || params.confirmedDate.includes('90分') || (params.leadNotes || '').includes('90分')
+            const trialMaster = is90Min ? (trialMaster90 || trialMaster60) : trialMaster60
+
+            let lessonPrice = trialMaster?.unit_price || (is90Min ? 9000 : 6000)
+            if (isReferral) {
+                lessonPrice = params.hasSecondStudent ? (is90Min ? 10500 : 7000) : (is90Min ? 5250 : 3500)
+            } else if (params.hasSecondStudent) {
+                lessonPrice = trialMaster?.pair_unit_price || (is90Min ? 13500 : 9000)
+            }
+            totalBillingPrice = lessonPrice
+
+            const title = `${params.studentName}様　担当：${coachName}`
+            const notes = `[体験レッスンスケジュール]\n案件ID: ${params.leadId}\n確定日時: ${params.confirmedDate}\n確定場所: ${params.confirmedLocation}\nご要望・備考: ${params.leadNotes || 'なし'}`
+
+            const existing = existingSchedules?.[0]
+            if (existing) {
+                targetScheduleId = existing.id
+                await supabaseAdmin
+                    .from('lesson_schedules')
+                    .update({
+                        coach_id: params.coachId,
+                        student_id: params.studentId || existing.student_id || null,
+                        lesson_master_id: trialMaster?.id || existing.lesson_master_id || null,
+                        title: title,
+                        start_time: start,
+                        end_time: end,
+                        location: params.confirmedLocation || null,
+                        notes: notes,
+                        price: lessonPrice,
+                        billing_status: existing.billing_status === 'paid' ? 'paid' : 'awaiting_payment',
+                        attendance_type: params.hasSecondStudent ? 'both' : 'single',
+                        is_overage: true
+                    })
+                    .eq('id', existing.id)
+
+                // 余剰スケジュールがあれば削除
+                if (existingSchedules && existingSchedules.length > 1) {
+                    for (let i = 1; i < existingSchedules.length; i++) {
+                        await supabaseAdmin.from('lesson_schedules').delete().eq('id', existingSchedules[i].id)
+                    }
+                }
+            } else {
+                const { data: ins } = await supabaseAdmin
+                    .from('lesson_schedules')
+                    .insert({
+                        coach_id: params.coachId,
+                        student_id: params.studentId || null,
+                        lesson_master_id: trialMaster?.id || null,
+                        title: title,
+                        start_time: start,
+                        end_time: end,
+                        location: params.confirmedLocation || null,
+                        notes: notes,
+                        price: lessonPrice,
+                        billing_status: 'awaiting_payment',
+                        attendance_type: params.hasSecondStudent ? 'both' : 'single',
+                        is_overage: true
+                    })
+                    .select('id')
+                    .single()
+                if (ins) targetScheduleId = ins.id
+            }
         }
 
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://manager.swim-partners.com'
@@ -214,14 +342,16 @@ async function createTrialScheduleForLead(params: {
         try {
             const { createCalendarEvent, getAdminRefreshToken, getCoachRefreshToken } = await import('@/lib/google-calendar')
             let finalEventId: string | null = null
+            const calSummary = `${params.studentName}様${params.hasSecondStudent ? ` & ${params.secondStudentName || '2人目'}様` : ''}　担当：${coachName}`
+            const calDescription = `[体験レッスンスケジュール]\n案件ID: ${params.leadId}\n確定日時: ${params.confirmedDate}\n確定場所: ${params.confirmedLocation}\nご要望・備考: ${params.leadNotes || 'なし'}`
 
             // a) コーチのカレンダー同期
             if (params.coachId) {
                 const coachRefreshToken = await getCoachRefreshToken(supabaseAdmin, params.coachId)
                 if (coachRefreshToken) {
                     finalEventId = await createCalendarEvent(coachRefreshToken, {
-                        summary: title,
-                        description: notes,
+                        summary: calSummary,
+                        description: calDescription,
                         location: params.confirmedLocation || '',
                         start: start,
                         end: end
@@ -233,8 +363,8 @@ async function createTrialScheduleForLead(params: {
             const adminRefreshToken = await getAdminRefreshToken(supabaseAdmin)
             if (adminRefreshToken) {
                 const adminEventId = await createCalendarEvent(adminRefreshToken, {
-                    summary: title,
-                    description: notes,
+                    summary: calSummary,
+                    description: calDescription,
                     location: params.confirmedLocation || '',
                     start: start,
                     end: end
@@ -262,7 +392,7 @@ async function createTrialScheduleForLead(params: {
         return {
             scheduleId: targetScheduleId,
             paymentLink: paymentLink,
-            price: lessonPrice
+            price: totalBillingPrice
         }
     } catch (error) {
         console.error('Error in createTrialScheduleForLead:', error)
@@ -786,10 +916,12 @@ export async function assignLeadAction(leadId: string, confirmedDate: string, co
             coachId: profile.id,
             studentId: studentId,
             studentName: lead.name || 'お客様',
+            secondStudentName: lead.second_student_name,
             confirmedDate: confirmedDate,
             confirmedLocation: confirmedLocation,
             leadNotes: lead.notes,
-            hasSecondStudent: !!lead.second_student_name
+            hasSecondStudent: !!lead.second_student_name,
+            splitIndividual: true
         })
 
         const paymentLink = trialResult?.paymentLink || ''
@@ -1059,7 +1191,8 @@ export async function adminAssignLeadAction(
     leadId: string,
     coachId: string,
     confirmedDate: string,
-    confirmedLocation: string
+    confirmedLocation: string,
+    splitIndividual: boolean = true
 ) {
     const supabase = await createClient()
 
@@ -1255,10 +1388,12 @@ export async function adminAssignLeadAction(
             coachId: targetCoach.id,
             studentId: studentId,
             studentName: lead.name || 'お客様',
+            secondStudentName: lead.second_student_name,
             confirmedDate: confirmedDate,
             confirmedLocation: confirmedLocation,
             leadNotes: lead.notes,
-            hasSecondStudent: !!lead.second_student_name
+            hasSecondStudent: !!lead.second_student_name,
+            splitIndividual: splitIndividual
         })
 
         const paymentLink = trialResult?.paymentLink || ''
@@ -2615,10 +2750,12 @@ export async function getOrCreateTrialPaymentUrlAction(leadId: string): Promise<
             coachId: coachId,
             studentId: studentId,
             studentName: lead.name || 'お客様',
+            secondStudentName: lead.second_student_name,
             confirmedDate: confirmedDate,
             confirmedLocation: confirmedLocation,
             leadNotes: lead.notes,
-            hasSecondStudent: !!lead.second_student_name
+            hasSecondStudent: !!lead.second_student_name,
+            splitIndividual: true
         })
 
         if (!trialResult) {
