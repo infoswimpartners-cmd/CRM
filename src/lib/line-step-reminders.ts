@@ -32,59 +32,110 @@ export interface StepTemplatesConfig {
 
 export const DEFAULT_STEP_TEMPLATES: StepTemplatesConfig = {
     step1: {
-        title: '翌日 (24時間後): 出張プール案内・柔軟な利便性',
+        title: 'Day 1 (24時間後・19:00): 場所と日程の不安解消',
         delay_hours: 24,
         is_active: true,
         body: `{name} 様、昨日はSwim Partners公式LINEへのご登録ありがとうございます！事務局です😊
 
-「個人レッスンって、どこで練習するの？」と気になっている方も多いのではないでしょうか？
+「近くに使えるプールがあるか分からない…」
+「平日の夕方や土日でもレッスンできるのかな？」
+と迷われていませんか？🏊‍♂️
 
-当スクールでは、ご自宅近くの公営プールや区民プールへインストラクターが出張いたします！🏊‍♂️
-わざわざ遠くのスイミングスクールまで送迎する必要がなく、平日の夕方や土日祝日など、ご都合の良い日時で柔軟にレッスンが可能です✨
+当スクールでは、ご自宅近くの区民プールや市民プールなど、出張可能な施設を事務局でお調べしてご提案いたします！
+わざわざ遠くのスイミングスクールまで送迎する必要がなく、土日や平日の夕方など、ご都合の良い日時・場所に合わせて調整が可能です✨
 
 まずは一度、お近くのプールで体験してみませんか？
+気になるプールがある場合や場所のご相談も、このチャットでお気軽にお尋ねくださいね。
+
 ▼体験レッスンの詳細・空き状況はこちら
 {trial_url}`
     },
     step2: {
-        title: '3日後 (72時間後): お悩み解消・マンツーマンの安心感',
+        title: 'Day 2 (72時間後・12:00): 悩みへの共感と安心感（大人・子ども両対応）',
         delay_hours: 72,
         is_active: true,
         body: `こんにちは！Swim Partners事務局です✨
 
-お子様の水泳について、こんなお悩みはありませんか？
-・スイミングスクールの進級テストで何度も落ちてしまっている…
+水泳について、こんなお悩みはありませんか？
+
+【お子様のお悩み】
 ・水に顔をつけるのが怖くて泣いてしまう…
-・集団レッスンだと待ち時間が多くて泳ぐ量が少ない…
+・集団スクールの進級テストで半年以上合格できない…
+・周りの目が気になってレッスンに集中できない…
 
-集団スクールでは一人ひとりのペースに合わせるのが難しいですが、マンツーマン個人指導なら大丈夫です。
-お子様の表情や苦手なポイントに1対1でじっくり寄り添い、「できた！」という自信と笑顔を引き出します😊
+【大人の方のお悩み】
+・クロールで息継ぎがうまくできず、25m泳ぎ切れない…
+・ブランクがあって水泳を再開したいけれど、基礎から見直したい…
+・自分のペースに合わせたフォーム改善の指導を受けたい…
 
-お子様専属のコーチと一緒に、最初の一歩を踏み出してみませんか？
+Swim Partnersのマンツーマン個人指導なら、お子様から大人の方まで、一人ひとりの表情や苦手なポイントに専属コーチが1対1でじっくり寄り添います。
+周りを気にせず無理のないペースで進められるので、「できた！」という実感と楽しさを実感していただけます😊
+
+まずは体験レッスンで、その違いを体感してみませんか？
 ▼体験レッスンのお申し込みはこちら
 {trial_url}`
     },
     step3: {
-        title: '5日後 (120時間後): 気軽なチャット返信ルート案内',
+        title: 'Day 3 (120時間後・18:00): チャット直通ルート（フォーム離脱者の回収）',
         delay_hours: 120,
         is_active: true,
         body: `Swim Partners事務局です！
 
-「申し込みフォームを入力するのが少し面倒だな…」
-「近くにどんなプールやコーチがいるか相談してから決めたい」
+「申し込みフォームの日程入力が少し手間に感じる…」
+「どのプールを選べばいいか分からず迷っている」
 という方へ💡
 
-フォームを開かなくても、このLINEチャットにそのまま以下の3点を返信いただくだけで、事務局が最適なコーチ・日程をお探しいたします！
+お申し込みフォームを開かなくても大丈夫です！
+このLINEチャットにそのまま、以下の2点を送っていただくだけで、事務局が最適なコーチ・空き枠をお調べいたします。
 
 -----------------------------
-① ご希望のエリア（例: ○○区、最寄りのプールなど）:
-② お子様の学年・現在のお悩み（例: 小1、水慣れから希望など）:
-③ 希望の曜日や時間帯（例: 土日の午前中など）:
+① ご希望の曜日や時間帯（例: 土曜午前、平日17時以降など）:
+② 現在のお悩みやご要望（例: 小1で顔つけから、大人のクロール改善など）:
 -----------------------------
+※ご希望のエリアや最寄り駅があれば、あわせてお教えください。
 
-メッセージをいただきましたら、事務局スタッフより折り返しご案内メッセージをお送りいたします。
+メッセージをいただきましたら、担当スタッフより折り返しご案内いたします。
 ご質問だけでも大歓迎ですので、ぜひお気軽にこのチャットへご返信くださいね😊`
     }
+}
+
+/**
+ * 友だち追加日時（followedAt）を基準に、指定ステップの目標配信日時（JST）を算出する
+ * Day 1: 追加翌日の 19:00 JST
+ * Day 2: 追加3日後の 12:00 JST
+ * Day 3: 追加5日後の 18:00 JST
+ */
+export function calculateTargetSendTime(followedAt: string, targetStage: 1 | 2 | 3): string {
+    const followedDate = new Date(followedAt)
+    // JSTでの年月日を取得
+    const jstStr = followedDate.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })
+    const jstDate = new Date(jstStr)
+    const year = jstDate.getFullYear()
+    const month = jstDate.getMonth()
+    const day = jstDate.getDate()
+
+    let addDays = 1
+    let targetHourJst = 19
+    if (targetStage === 1) {
+        addDays = 1
+        targetHourJst = 19
+    } else if (targetStage === 2) {
+        addDays = 3
+        targetHourJst = 12
+    } else if (targetStage === 3) {
+        addDays = 5
+        targetHourJst = 18
+    }
+
+    // JST基準で addDays 日後の targetHourJst:00 を作成 (UTC = JST - 9時間)
+    let targetUtc = new Date(Date.UTC(year, month, day + addDays, targetHourJst - 9, 0, 0))
+
+    // 万が一 targetUtc が followedDate 以前の場合（同日かつ指定時間を過ぎていた場合など）は翌日に繰り延べ
+    if (targetUtc.getTime() <= followedDate.getTime()) {
+        targetUtc = new Date(Date.UTC(year, month, day + addDays + 1, targetHourJst - 9, 0, 0))
+    }
+
+    return targetUtc.toISOString()
 }
 
 /**
@@ -245,8 +296,8 @@ export async function handleOfficialLineFollow(lineUserId: string, displayName?:
         return
     }
 
-    // 新規未申込リードの場合（24時間後にStep 1配信をセット）
-    const nextSendAt = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString()
+    // 新規未申込リードの場合（Day 1: 追加翌日 19:00 にStep 1配信をセット）
+    const nextSendAt = calculateTargetSendTime(followedAt, 1)
     const state: StepLeadState = {
         line_user_id: lineUserId,
         display_name: displayName || 'LINE友だち',
@@ -499,35 +550,39 @@ export async function processLineStepReminders(options: { dryRun?: boolean } = {
                 .replace(/[{｛]{1,2}\s*trial_url\s*[}｝]{1,2}/gi, trialFormUrl)
         }
 
-        // Stage 0 -> Step 1 (24時間後)
+        // Stage 0 -> Step 1 (追加翌日 19:00)
         if (state.step_stage === 0) {
             if (!templates.step1.is_active) {
                 // スキップしてStep 2へ
                 state.step_stage = 1
-                const delayH = templates.step2.delay_hours || 72
-                state.next_send_at = new Date(followedDate.getTime() + delayH * 60 * 60 * 1000).toISOString()
+                state.next_send_at = templates.step2.delay_hours === 72
+                    ? calculateTargetSendTime(state.followed_at, 2)
+                    : new Date(followedDate.getTime() + (templates.step2.delay_hours || 72) * 60 * 60 * 1000).toISOString()
                 await saveStepLeadState(state)
                 continue
             }
             messageText = renderTemplate(templates.step1)
-            const nextDelayH = templates.step2.delay_hours || 72
-            nextSendAt = new Date(followedDate.getTime() + nextDelayH * 60 * 60 * 1000).toISOString()
+            nextSendAt = templates.step2.delay_hours === 72
+                ? calculateTargetSendTime(state.followed_at, 2)
+                : new Date(followedDate.getTime() + (templates.step2.delay_hours || 72) * 60 * 60 * 1000).toISOString()
         } 
-        // Stage 1 -> Step 2 (72時間後)
+        // Stage 1 -> Step 2 (追加3日後 12:00)
         else if (state.step_stage === 1) {
             if (!templates.step2.is_active) {
                 // スキップしてStep 3へ
                 state.step_stage = 2
-                const delayH = templates.step3.delay_hours || 120
-                state.next_send_at = new Date(followedDate.getTime() + delayH * 60 * 60 * 1000).toISOString()
+                state.next_send_at = templates.step3.delay_hours === 120
+                    ? calculateTargetSendTime(state.followed_at, 3)
+                    : new Date(followedDate.getTime() + (templates.step3.delay_hours || 120) * 60 * 60 * 1000).toISOString()
                 await saveStepLeadState(state)
                 continue
             }
             messageText = renderTemplate(templates.step2)
-            const nextDelayH = templates.step3.delay_hours || 120
-            nextSendAt = new Date(followedDate.getTime() + nextDelayH * 60 * 60 * 1000).toISOString()
+            nextSendAt = templates.step3.delay_hours === 120
+                ? calculateTargetSendTime(state.followed_at, 3)
+                : new Date(followedDate.getTime() + (templates.step3.delay_hours || 120) * 60 * 60 * 1000).toISOString()
         }
-        // Stage 2 -> Step 3 (120時間後)
+        // Stage 2 -> Step 3 (追加5日後 18:00)
         else if (state.step_stage === 2) {
             if (!templates.step3.is_active) {
                 // Step 3 完了

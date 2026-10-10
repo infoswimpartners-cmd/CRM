@@ -37,12 +37,22 @@ export async function runMarketingDispatcher(options: { dryRun?: boolean } = {})
     // 3. 体験後ステップ配信の判定・実行（本入会スキップ制御付き）
     const stepResult = await processStepDeliveries({ dryRun });
 
+    // 4. 未申込者向けステップ配信（Day 1: 19:00, Day 2: 12:00, Day 3: 18:00）の判定・実行
+    let leadStepResult: any = null;
+    try {
+        const { processLineStepReminders } = await import('@/lib/line-step-reminders');
+        leadStepResult = await processLineStepReminders({ dryRun });
+    } catch (leadStepErr) {
+        console.error('[Dispatcher] Error in processLineStepReminders:', leadStepErr);
+    }
+
     return {
         dryRun,
         timestamp: nowIso,
         sync: syncResult,
         broadcast: broadcastResult,
         stepDeliveries: stepResult,
+        leadStepReminders: leadStepResult,
     };
 }
 
