@@ -1422,4 +1422,78 @@ export async function executeScheduledBroadcastsAction(options: { dryRun?: boole
     }
 }
 
+/**
+ * 全ユーザーの個別リッチメニュー固定リンクを一括解除し、
+ * LINE公式アカウント管理画面で設定したデフォルトリッチメニューを全員に強制適用するアクション
+ */
+export async function unlinkAllUserRichMenusAction(): Promise<{
+    success: boolean;
+    unlinkedCount?: number;
+    error?: string;
+}> {
+    try {
+        await assertAdminUser();
+        const { getOfficialLineAccessToken } = await import('@/lib/line-marketing-service');
+        const token = await getOfficialLineAccessToken();
+        if (!token) {
+            return { success: false, error: 'LINEアクセストークンが取得できませんでした。' };
+        }
+
+        const supabase = createAdminClient();
+        const { data: students } = await supabase
+            .from('students')
+            .select('line_user_id')
+            .not('line_user_id', 'is', null)
+            .neq('line_user_id', '');
+
+        const { data: leads } = await supabase
+            .from('leads')
+            .select('line_user_id')
+            .not('line_user_id', 'is', null)
+            .neq('line_user_id', '');
+
+        const allIds = Array.from(new Set([
+            ...(students || []).map(s => s.line_user_id),
+            ...(leads || []).map(l => l.line_user_id),
+        ].filter(Boolean)));
+
+        const validIds = allIds
+            .filter(id => id && /^U[0-9a-f]{32}$/i.test(id.trim()))
+            .map(id => id!.trim());
+
+        if (validIds.length === 0) {
+            return { success: true, unlinkedCount: 0 };
+        }
+
+        // 最大500件まで一括送信
+        const chunkSize = 500;
+        let totalUnlinked = 0;
+        for (let i = 0; i < validIds.length; i += chunkSize) {
+            const chunk = validIds.slice(i, i + chunkSize);
+            const res = await fetch('https://api.line.me/v2/bot/richmenu/bulk/unlink', {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ userIds: chunk }),
+            });
+
+            if (res.ok || res.status === 202) {
+                totalUnlinked += chunk.length;
+            } else {
+                const errText = await res.text();
+                console.error('[unlinkAllUserRichMenusAction] API Error:', res.status, errText);
+            }
+        }
+
+        safeRevalidate('/admin/line-marketing');
+        return { success: true, unlinkedCount: totalUnlinked };
+    } catch (err: any) {
+        console.error('[unlinkAllUserRichMenusAction] Error:', err);
+        return { success: false, error: err.message };
+    }
+}
+
+
 
