@@ -26,7 +26,7 @@ export interface LineUserTag {
     created_at: string;
     line_user_id: string;
     tag_name: string;             // 例: 'trial_form_viewed', 'trial_applied', 'friend_only', 'referral', 'campaign_2026'
-    tag_category: 'behavior' | 'status' | 'campaign' | 'custom';
+    tag_category: 'behavior' | 'status' | 'campaign' | 'automation' | 'audience' | 'custom';
     display_name?: string | null;
     student_id?: string | null;
     metadata?: Record<string, any>;

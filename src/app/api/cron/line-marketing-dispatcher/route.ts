@@ -20,6 +20,7 @@ import {
     processScheduledBroadcasts,
     processStepDeliveries,
     syncTrialDoneStudentsToProgress,
+    processCartAbandonmentReminders,
 } from '@/lib/line-marketing-service';
 
 export const dynamic = 'force-dynamic';
@@ -46,6 +47,14 @@ export async function runMarketingDispatcher(options: { dryRun?: boolean } = {})
         console.error('[Dispatcher] Error in processLineStepReminders:', leadStepErr);
     }
 
+    // 5. カゴ落ち自動フォロー（フォーム閲覧後2h〜24h離脱者）の判定・実行
+    let cartRecoveryResult: any = null;
+    try {
+        cartRecoveryResult = await processCartAbandonmentReminders({ dryRun });
+    } catch (cartRecoveryErr) {
+        console.error('[Dispatcher] Error in processCartAbandonmentReminders:', cartRecoveryErr);
+    }
+
     return {
         dryRun,
         timestamp: nowIso,
@@ -53,6 +62,7 @@ export async function runMarketingDispatcher(options: { dryRun?: boolean } = {})
         broadcast: broadcastResult,
         stepDeliveries: stepResult,
         leadStepReminders: leadStepResult,
+        cartRecovery: cartRecoveryResult,
     };
 }
 

@@ -72,7 +72,7 @@ export interface SyncTrialDoneResult {
 export interface LineDeliveryLog {
     id: string;
     created_at: string;
-    delivery_type: 'broadcast' | 'step_message' | 'test_preview';
+    delivery_type: 'broadcast' | 'step_message' | 'test_preview' | 'cart_recovery';
     campaign_id: string | null;
     step_id: string | null;
     step_name: string | null;
@@ -101,7 +101,7 @@ export interface SendMessageOptions {
     lineUserId: string;
     rawMessage: string;
     variables?: Record<string, string | null | undefined>;
-    deliveryType: 'broadcast' | 'step_message' | 'test_preview';
+    deliveryType: 'broadcast' | 'step_message' | 'test_preview' | 'cart_recovery';
     campaignId?: string;
     stepId?: string;
     stepName?: string;
@@ -192,7 +192,7 @@ export interface CreateBroadcastParams {
 export interface GetDeliveryLogsParams {
     page?: number;
     pageSize?: number;
-    deliveryType?: 'broadcast' | 'step_message' | 'test_preview' | 'all';
+    deliveryType?: 'broadcast' | 'step_message' | 'test_preview' | 'cart_recovery' | 'all';
     status?: 'success' | 'sent' | 'failed' | 'skipped' | 'all';
     searchQuery?: string;
     startDate?: string;
@@ -219,5 +219,28 @@ export interface LineMarketingKpiSummary {
     skippedCount: number;
     successRate: number; // 例: 98.5
     inProgressStudentsCount: number;
+}
+
+export interface ProcessCartAbandonmentOptions {
+    dryRun?: boolean;
+    nowDate?: Date;
+}
+
+export interface CartAbandonmentDetail {
+    lineUserId: string;
+    studentName?: string;
+    action: 'sent' | 'skipped' | 'dry_run' | 'failed';
+    reason?: string;
+    elapsedHours?: number;
+}
+
+export interface ProcessCartAbandonmentResult {
+    processedCount: number;
+    successCount: number;
+    skippedCount: number;
+    failedCount: number;
+    isOutsideHours?: boolean;
+    mode?: string;
+    details?: CartAbandonmentDetail[];
 }
 

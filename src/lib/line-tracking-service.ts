@@ -24,6 +24,9 @@ export const STANDARD_TAGS = {
     FORM_APPLIED: 'trial_applied',         // 体験申込完了
     FRIEND_ONLY: 'friend_only',            // 友だち追加のみ
     REFERRAL: 'referral_lead',             // お友達紹介キャンペーン経由
+    CART_RECOVERY_SENT: 'cart_recovery_sent', // カゴ落ちフォロー送信済
+    AUDIENCE_KIDS: 'audience:kids',        // 対象: キッズ/ジュニア
+    AUDIENCE_ADULT: 'audience:adult',      // 対象: 大人/マスターズ
 } as const;
 
 export const TAG_LABELS: Record<string, { label: string; category: string; description: string }> = {
@@ -51,6 +54,21 @@ export const TAG_LABELS: Record<string, { label: string; category: string; descr
         label: '友だち追加のみ',
         category: 'status',
         description: '公式LINEを追加したがまだ申込をしていないユーザー'
+    },
+    [STANDARD_TAGS.CART_RECOVERY_SENT]: {
+        label: 'カゴ落ちフォロー送信済',
+        category: 'automation',
+        description: 'フォーム閲覧後未完了者への自動リマインドを送信完了したユーザー'
+    },
+    [STANDARD_TAGS.AUDIENCE_KIDS]: {
+        label: '対象: キッズ/ジュニア',
+        category: 'audience',
+        description: 'お子様向けのレッスンを希望・受講されているユーザー'
+    },
+    [STANDARD_TAGS.AUDIENCE_ADULT]: {
+        label: '対象: 大人/マスターズ',
+        category: 'audience',
+        description: '大人向けのレッスンやフォーム改善を希望・受講されているユーザー'
     }
 };
 
@@ -197,7 +215,7 @@ export async function addTagToUser(
     lineUserId: string,
     tagName: string,
     options?: {
-        category?: 'behavior' | 'status' | 'campaign' | 'custom';
+        category?: 'behavior' | 'status' | 'campaign' | 'automation' | 'audience' | 'custom';
         displayName?: string;
         studentId?: string;
         metadata?: Record<string, any>;
@@ -482,6 +500,27 @@ export async function getAllUserTagsMap(): Promise<Map<string, string[]>> {
             tagMap.set(t.line_user_id, list);
         });
         return tagMap;
+    }
+}
+
+/**
+ * 全てのLINEユーザータグレコード一覧を取得（DB + フォールバック）
+ */
+export async function getAllUserTags(): Promise<LineUserTag[]> {
+    const supabase = createAdminClient();
+    try {
+        const { data, error } = await supabase
+            .from('line_user_tags')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(2000);
+
+        if (error || !data) {
+            return await fallbackGetAllUserTags();
+        }
+        return data as LineUserTag[];
+    } catch {
+        return await fallbackGetAllUserTags();
     }
 }
 

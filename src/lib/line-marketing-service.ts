@@ -18,10 +18,25 @@ import {
     LineStepRule,
     SegmentFilterConditions,
     SyncTrialDoneResult,
+    ProcessCartAbandonmentOptions,
+    ProcessCartAbandonmentResult,
 } from '@/types/line-marketing';
-import { getAllUserTagsMap, filterStudentsWithTags } from '@/lib/line-tracking-service';
+import {
+    getAllUserTagsMap,
+    filterStudentsWithTags,
+    STANDARD_TAGS,
+    addTagToUser,
+    getAllUserTags,
+} from '@/lib/line-tracking-service';
+import { getStepLeadState, saveStepLeadState } from '@/lib/line-step-reminders';
 
-export type { SendMessageOptions, SendMessageResult, SyncTrialDoneResult };
+export type {
+    SendMessageOptions,
+    SendMessageResult,
+    SyncTrialDoneResult,
+    ProcessCartAbandonmentOptions,
+    ProcessCartAbandonmentResult,
+};
 
 // ==============================================================================
 // 1. 定数定義・テスト太郎安全定数
@@ -256,7 +271,7 @@ export async function writeDeliveryLog(params: {
     studentNumber?: string | null;
     studentName?: string | null;
     lineUserId: string;
-    deliveryType: 'broadcast' | 'step_message' | 'test_preview';
+    deliveryType: 'broadcast' | 'step_message' | 'test_preview' | 'cart_recovery';
     campaignId?: string | null;
     stepId?: string | null;
     stepName?: string | null;
@@ -1238,5 +1253,385 @@ export async function processStepDeliveries(options: { dryRun?: boolean } = {}):
         successCount,
         skippedCount,
         failedCount,
+    };
+}
+
+// ==============================================================================
+// 12. カゴ落ち自動フォロー判定エンジン (Cart Abandonment Reminders)
+// ==============================================================================
+
+export const DEFAULT_CART_RECOVERY_TEMPLATE = `{{name}} 様
+
+Swim Partners事務局です😊
+体験レッスンのご案内フォームをご覧いただき、ありがとうございます！
+
+「日程や場所の選び方が分からない…」
+「まずは相談してから体験を決めたい」
+など、ご不明な点やお困りごとはございませんでしょうか？🏊‍♂️
+
+どんな些細なことでも、このLINEチャットに直接ご返信いただければ、専任スタッフが丁寧にお答えいたします✨
+
+▼体験レッスンの空き状況・お申し込みはこちらから再開できます
+{{trial_url}}
+
+※すでにお申し込み済みの場合や、行き違いの際はご容赦ください。`;
+
+/**
+ * カゴ落ち（フォーム離脱者）の自動フォロー判定エンジン
+ * 
+ * 判定条件:
+ *   1. フォーム閲覧（trial_form_viewed）保有
+ *   2. 未申込（trial_applied 未保有）
+ *   3. 未フォロー（cart_recovery_sent 未保有）
+ *   4. フォーム閲覧から2時間以上24時間以内
+ *   5. 配信時間帯ガード: JST 09:00〜21:00 の間のみ配信
+ * 
+ * スパム防止調停:
+ *   既存のステップ配信ステート（line_step:{lineUserId}）が存在する場合、
+ *   次回ステップ配信予定を24時間後ろ倒しにして二重送信を防止
+ * 
+ * 【最重要安全ガード】:
+ *   app_configs: line_cart_recovery_mode のデフォルトを 'test_only' とし、
+ *   テストモード時は会員番号0035、TEST_TARO_LINE_USER_ID 以外を完全にスキップ
+ */
+export async function processCartAbandonmentReminders(
+    options: ProcessCartAbandonmentOptions = {}
+): Promise<ProcessCartAbandonmentResult> {
+    const { dryRun = false, nowDate = new Date() } = options;
+    const supabase = createAdminClient();
+
+    // 1. 配信時間帯ガード判定 (JST 09:00〜21:00)
+    // JST = UTC + 9時間
+    const jstDate = new Date(nowDate.getTime() + 9 * 60 * 60 * 1000);
+    const jstHour = jstDate.getUTCHours();
+
+    if (jstHour < 9 || jstHour >= 21) {
+        console.log(`[CartRecovery] JST時間帯ガード作動: 現在JST ${jstHour}時のため配信を停止します（配信許可: 09:00〜21:00）`);
+        return {
+            processedCount: 0,
+            successCount: 0,
+            skippedCount: 0,
+            failedCount: 0,
+            isOutsideHours: true,
+            mode: 'test_only',
+            details: [],
+        };
+    }
+
+    // 2. 稼働モードの取得（デフォルト: test_only）
+    const { data: modeConfig } = await supabase
+        .from('app_configs')
+        .select('value')
+        .eq('key', 'line_cart_recovery_mode')
+        .maybeSingle();
+
+    const rawMode = modeConfig?.value?.trim().toLowerCase();
+    const recoveryMode = rawMode === 'active' || rawMode === 'live' ? 'active' : 'test_only';
+    const isTestOnly = recoveryMode === 'test_only';
+
+    // 3. メッセージテンプレート取得
+    const { data: templateConfig } = await supabase
+        .from('app_configs')
+        .select('value')
+        .eq('key', 'line_cart_recovery_template')
+        .maybeSingle();
+
+    const templateText = templateConfig?.value?.trim() || DEFAULT_CART_RECOVERY_TEMPLATE;
+
+    // 4. 全ユーザータグの取得
+    const allUserTags = await getAllUserTags();
+
+    // ユーザー毎のタグ集合と最新閲覧日時をマッピング
+    const userCandidateMap = new Map<string, {
+        lineUserId: string;
+        tags: Set<string>;
+        viewedAt: Date | null;
+        displayName?: string;
+    }>();
+
+    for (const tag of allUserTags) {
+        if (!tag.line_user_id) continue;
+        let entry = userCandidateMap.get(tag.line_user_id);
+        if (!entry) {
+            entry = {
+                lineUserId: tag.line_user_id,
+                tags: new Set<string>(),
+                viewedAt: null,
+                displayName: tag.display_name || undefined,
+            };
+            userCandidateMap.set(tag.line_user_id, entry);
+        }
+
+        entry.tags.add(tag.tag_name);
+        if (tag.display_name && !entry.displayName) {
+            entry.displayName = tag.display_name;
+        }
+
+        // trial_form_viewed の日時取得
+        if (tag.tag_name === STANDARD_TAGS.FORM_VIEWED) {
+            const dateStr = tag.metadata?.last_viewed_at || tag.metadata?.first_viewed_at || tag.created_at;
+            if (dateStr) {
+                const parsedDate = new Date(dateStr);
+                if (!isNaN(parsedDate.getTime())) {
+                    if (!entry.viewedAt || parsedDate.getTime() > entry.viewedAt.getTime()) {
+                        entry.viewedAt = parsedDate;
+                    }
+                }
+            }
+        }
+    }
+
+    // line_access_logs からも直近のアクセス日時を補完
+    try {
+        const { data: recentLogs } = await supabase
+            .from('line_access_logs')
+            .select('line_user_id, created_at, display_name')
+            .eq('form_type', 'trial')
+            .order('created_at', { ascending: false })
+            .limit(200);
+
+        if (recentLogs) {
+            for (const log of recentLogs) {
+                if (!log.line_user_id) continue;
+                const entry = userCandidateMap.get(log.line_user_id);
+                if (entry) {
+                    const logDate = new Date(log.created_at);
+                    if (!isNaN(logDate.getTime())) {
+                        if (!entry.viewedAt || logDate.getTime() > entry.viewedAt.getTime()) {
+                            entry.viewedAt = logDate;
+                        }
+                    }
+                    if (log.display_name && !entry.displayName) {
+                        entry.displayName = log.display_name;
+                    }
+                }
+            }
+        }
+    } catch {
+        // line_access_logsテーブルが存在しない環境ではフォールバック
+    }
+
+    // 5. 候補者の判定と配信処理
+    let successCount = 0;
+    let skippedCount = 0;
+    let failedCount = 0;
+    const details: ProcessCartAbandonmentResult['details'] = [];
+
+    const candidates = Array.from(userCandidateMap.values());
+
+    for (const candidate of candidates) {
+        const { lineUserId, tags, viewedAt } = candidate;
+
+        // 条件1: フォーム閲覧タグを保有していること
+        if (!tags.has(STANDARD_TAGS.FORM_VIEWED)) {
+            continue;
+        }
+
+        // 条件2: 未申込であること（trial_applied 未保有）
+        if (tags.has(STANDARD_TAGS.FORM_APPLIED)) {
+            skippedCount++;
+            details.push({
+                lineUserId,
+                action: 'skipped',
+                reason: 'already_applied',
+            });
+            continue;
+        }
+
+        // 条件3: 未フォローであること（cart_recovery_sent 未保有）
+        if (tags.has(STANDARD_TAGS.CART_RECOVERY_SENT)) {
+            skippedCount++;
+            details.push({
+                lineUserId,
+                action: 'skipped',
+                reason: 'already_recovery_sent',
+            });
+            continue;
+        }
+
+        // 条件4: 閲覧日時の存在と経過時間（2時間以上24時間以内）
+        if (!viewedAt) {
+            skippedCount++;
+            details.push({
+                lineUserId,
+                action: 'skipped',
+                reason: 'viewed_at_missing',
+            });
+            continue;
+        }
+
+        const elapsedMs = nowDate.getTime() - viewedAt.getTime();
+        const elapsedHours = elapsedMs / (1000 * 60 * 60);
+
+        if (elapsedHours < 2 || elapsedHours > 24) {
+            skippedCount++;
+            details.push({
+                lineUserId,
+                action: 'skipped',
+                reason: `elapsed_out_of_range (${elapsedHours.toFixed(1)}h)`,
+                elapsedHours,
+            });
+            continue;
+        }
+
+        // 生徒情報の照会（連携済み生徒の確認と安全ガード）
+        let student: any = null;
+        try {
+            const { data } = await supabase
+                .from('students')
+                .select(`
+                    id,
+                    student_number,
+                    full_name,
+                    status,
+                    coach:coach_id(full_name),
+                    membership_type:membership_type_id(name)
+                `)
+                .eq('line_user_id', lineUserId)
+                .maybeSingle();
+            student = data;
+        } catch {
+            // エラー時は生徒情報なしとして継続
+        }
+
+        // 生徒が存在し、すでに本入会済（active）や申込済（applied）、退会済（withdrawn）の場合は安全スキップ
+        // ※ テスト太郎（0035）は検証実行用アカウントのため、タグ条件に基づいてテスト判定可能とする
+        if (student && student.student_number !== TEST_TARO_STUDENT_NUMBER) {
+            if (student.status === 'active' || student.status === 'applied' || student.status === 'withdrawn') {
+                skippedCount++;
+                details.push({
+                    lineUserId,
+                    studentName: student.full_name,
+                    action: 'skipped',
+                    reason: `student_already_${student.status}`,
+                    elapsedHours,
+                });
+                continue;
+            }
+        }
+
+        // 【最重要安全ガード】: test_only モード時はテスト太郎（0035）以外を完全にスキップ
+        if (isTestOnly) {
+            const isTestUserId = lineUserId === TEST_TARO_LINE_USER_ID;
+            const isTestStudentNumber = student?.student_number === TEST_TARO_STUDENT_NUMBER;
+
+            if (!isTestUserId && !isTestStudentNumber) {
+                skippedCount++;
+                details.push({
+                    lineUserId,
+                    studentName: student?.full_name || candidate.displayName,
+                    action: 'skipped',
+                    reason: 'test_only_mode_guard',
+                    elapsedHours,
+                });
+                console.log(`[CartRecovery] 安全ガード作動 (test_onlyモード): 実ユーザーへの配信をスキップしました (LINE ID: ${lineUserId})`);
+                continue;
+            }
+        }
+
+        const studentName = student?.full_name || candidate.displayName || 'お客様';
+
+        // dryRunモードの場合の処理
+        if (dryRun) {
+            successCount++;
+            details.push({
+                lineUserId,
+                studentName,
+                action: 'dry_run',
+                reason: 'simulated_send_success',
+                elapsedHours,
+            });
+            continue;
+        }
+
+        // 変数の準備
+        const variables: Record<string, string> = {
+            name: studentName,
+            student_number: student?.student_number || '',
+            coach_name: student?.coach?.full_name || '',
+            plan_name: student?.membership_type?.name || '',
+            trial_url: process.env.NEXT_PUBLIC_SITE_URL
+                ? `${process.env.NEXT_PUBLIC_SITE_URL}/trial`
+                : 'https://manager.swim-partners.com/trial',
+        };
+
+        // LINE送信処理
+        const sendResult = await sendSingleLineMessage({
+            studentId: student?.id,
+            studentNumber: student?.student_number,
+            studentName,
+            lineUserId,
+            rawMessage: templateText,
+            variables,
+            deliveryType: 'cart_recovery',
+            stepName: 'カゴ落ち自動フォロー',
+        });
+
+        if (sendResult.success) {
+            successCount++;
+
+            // 1. スパム防止調停: カゴ落ち送信成功時、既存のステップ配信ステート（line_step:{lineUserId}）が存在する場合、次回ステップ配信予定を24時間後ろ倒し
+            try {
+                const stepLeadState = await getStepLeadState(lineUserId);
+                if (stepLeadState && stepLeadState.next_send_at && stepLeadState.step_stage !== -1 && !stepLeadState.is_blocked) {
+                    const currentNextDate = new Date(stepLeadState.next_send_at);
+                    const baseTime = currentNextDate.getTime() > nowDate.getTime()
+                        ? currentNextDate.getTime()
+                        : nowDate.getTime();
+                    const delayedNextDate = new Date(baseTime + 24 * 60 * 60 * 1000);
+
+                    await saveStepLeadState({
+                        ...stepLeadState,
+                        next_send_at: delayedNextDate.toISOString(),
+                        notes: `${stepLeadState.notes ? stepLeadState.notes + ' | ' : ''}カゴ落ちフォロー送信のため次回ステップ配信を24時間後ろ倒し`,
+                    });
+                    console.log(`[CartRecovery] スパム防止調停適用: LINE ID ${lineUserId} の次回ステップ配信予定を ${delayedNextDate.toISOString()} に後ろ倒ししました`);
+                }
+            } catch (stepErr) {
+                console.error(`[CartRecovery] スパム防止調停エラー (LINE ID: ${lineUserId}):`, stepErr);
+            }
+
+            // 2. cart_recovery_sent タグを安全に付与
+            try {
+                await addTagToUser(lineUserId, STANDARD_TAGS.CART_RECOVERY_SENT, {
+                    category: 'automation',
+                    displayName: studentName,
+                    studentId: student?.id,
+                    metadata: {
+                        sent_at: nowDate.toISOString(),
+                        elapsed_hours: Math.round(elapsedHours * 10) / 10,
+                    },
+                });
+            } catch (tagErr) {
+                console.error(`[CartRecovery] cart_recovery_sent タグ付与失敗 (${lineUserId}):`, tagErr);
+            }
+
+            details.push({
+                lineUserId,
+                studentName,
+                action: 'sent',
+                elapsedHours,
+            });
+        } else {
+            failedCount++;
+            details.push({
+                lineUserId,
+                studentName,
+                action: 'failed',
+                reason: sendResult.error,
+                elapsedHours,
+            });
+        }
+
+        await new Promise(r => setTimeout(r, 50));
+    }
+
+    return {
+        processedCount: candidates.length,
+        successCount,
+        skippedCount,
+        failedCount,
+        mode: recoveryMode,
+        details,
     };
 }
