@@ -26,12 +26,15 @@ export default function BookingForm() {
     date1: "",
     time1Start: "",
     time1End: "",
+    time1Slot: "",
     date2: "",
     time2Start: "",
     time2End: "",
+    time2Slot: "",
     date3: "",
     time3Start: "",
     time3End: "",
+    time3Slot: "",
     availableTimes: "",
     skillLevel: "",
     frequency: "",
@@ -39,6 +42,13 @@ export default function BookingForm() {
     referrerName: "",
     agreed: false
   });
+
+  // 大まかな時間帯プリセットのチェックボックス選択状態
+  const [selectedTimeSlots, setSelectedTimeSlots] = useState<string[]>([]);
+  // 詳細な時間指定モード（10分刻み入力）の表示切り替えフラグ
+  const [customTimeMode1, setCustomTimeMode1] = useState(false);
+  const [customTimeMode2, setCustomTimeMode2] = useState(false);
+  const [customTimeMode3, setCustomTimeMode3] = useState(false);
   
   // 生年月日（年・月・日）の個別state
   const [dobParts, setDobParts] = useState({
@@ -162,6 +172,24 @@ export default function BookingForm() {
     fetchTerms();
   }, []);
 
+  // 大まかな時間帯プリセット
+  const TIME_SLOT_PRESETS = [
+    { label: "平日夕方 (15:00〜18:00)", value: "平日夕方（15:00〜18:00）" },
+    { label: "土日午前 (9:00〜12:00)", value: "土日午前（9:00〜12:00）" },
+    { label: "土日午後 (13:00〜18:00)", value: "土日午後（13:00〜18:00）" },
+    { label: "終日いつでも調整可", value: "終日いつでも調整可" },
+  ];
+
+  // 全体で調整可能な大まかな時間枠チェックボックス一覧
+  const GENERAL_TIME_SLOT_OPTIONS = [
+    "平日夕方（15:00〜18:00）",
+    "土日午前",
+    "土日午後",
+    "終日いつでも調整可",
+    "平日午前（9:00〜12:00）",
+    "平日夜間（18:00〜21:00）",
+  ];
+
   // 入力変更ハンドラ
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target as HTMLInputElement;
@@ -171,6 +199,42 @@ export default function BookingForm() {
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }));
+  };
+
+  // 各希望日時の大まかな時間帯プリセット選択
+  const handleSlotSelect = (target: 1 | 2 | 3, slotValue: string) => {
+    if (target === 1) {
+      setFormData(prev => ({
+        ...prev,
+        time1Slot: prev.time1Slot === slotValue ? "" : slotValue,
+        time1Start: "",
+        time1End: ""
+      }));
+      setCustomTimeMode1(false);
+    } else if (target === 2) {
+      setFormData(prev => ({
+        ...prev,
+        time2Slot: prev.time2Slot === slotValue ? "" : slotValue,
+        time2Start: "",
+        time2End: ""
+      }));
+      setCustomTimeMode2(false);
+    } else if (target === 3) {
+      setFormData(prev => ({
+        ...prev,
+        time3Slot: prev.time3Slot === slotValue ? "" : slotValue,
+        time3Start: "",
+        time3End: ""
+      }));
+      setCustomTimeMode3(false);
+    }
+  };
+
+  // 調整可能な大まかな時間枠チェックボックスのトグル
+  const handleTimeSlotCheckboxToggle = (slot: string) => {
+    setSelectedTimeSlots(prev => 
+      prev.includes(slot) ? prev.filter(s => s !== slot) : [...prev, slot]
+    );
   };
 
   // 2. 「LINEで申し込む」ボタンが押された時の処理
@@ -204,20 +268,31 @@ export default function BookingForm() {
       return;
     }
 
-    // Makeへ送信するデータ
-    const formatDateTime = (date: string, start: string, end: string) => {
-      if (!date) return "";
-      if (start && end) return `${date} ${start}〜${end}`;
-      if (start) return `${date} ${start}〜`;
-      return date;
+    // 日時文字列のフォーマット（大まかな時間帯プリセットまたは詳細時間のいずれにも対応）
+    const formatDateTime = (date: string, start: string, end: string, slot?: string) => {
+      if (!date && !slot) return "";
+      if (date && slot && slot !== "custom") {
+        return `${date} ${slot}`;
+      }
+      if (date && start && end) return `${date} ${start}〜${end}`;
+      if (date && start) return `${date} ${start}〜`;
+      if (date) return date;
+      return slot || "";
     };
+
+    // 調整可能な時間帯（チェックボックス選択と自由記述の合成）
+    const combinedAvailableTimes = [
+      selectedTimeSlots.length > 0 ? `【希望時間帯】${selectedTimeSlots.join("、")}` : "",
+      formData.availableTimes.trim()
+    ].filter(Boolean).join("\n");
 
     const payload = {
       userId: userId,
       ...formData,
-      datetime1: formatDateTime(formData.date1, formData.time1Start, formData.time1End),
-      datetime2: formatDateTime(formData.date2, formData.time2Start, formData.time2End),
-      datetime3: formatDateTime(formData.date3, formData.time3Start, formData.time3End),
+      availableTimes: combinedAvailableTimes,
+      datetime1: formatDateTime(formData.date1, formData.time1Start, formData.time1End, formData.time1Slot),
+      datetime2: formatDateTime(formData.date2, formData.time2Start, formData.time2End, formData.time2Slot),
+      datetime3: formatDateTime(formData.date3, formData.time3Start, formData.time3End, formData.time3Slot),
       source: "体験予約フォーム"
     };
 
@@ -454,40 +529,287 @@ export default function BookingForm() {
         <label style={labelStyle}>
           最寄駅もしくは希望のエリア:
           <input type="text" name="station" value={formData.station} onChange={handleChange} required placeholder="例：恵比寿駅、渋谷区周辺" style={inputStyle} />
+          <span style={{
+            fontSize: "12px",
+            color: "#065f46",
+            marginTop: "6px",
+            lineHeight: "1.6",
+            fontWeight: "normal",
+            backgroundColor: "#ECFDF5",
+            border: "1px solid #A7F3D0",
+            padding: "8px 12px",
+            borderRadius: "6px"
+          }}>
+            ※具体的なプールが決まっていなくても大丈夫です。ご自宅の最寄り駅を教えていただければ、利用可能な近隣プールを事務局からご提案します
+          </span>
         </label>
 
-        <div style={sectionTitleStyle}>希望日時（第3希望まで）</div>
-        <p style={{ fontSize: "12px", color: "#666", marginBottom: "15px", marginTop: "-10px" }}>時間帯は10分刻みで選択できます（例：13:00〜15:00）</p>
+        <div style={sectionTitleStyle}>希望日時（第1希望のみ必須）</div>
+        <p style={{ fontSize: "13px", color: "#666", marginBottom: "12px", marginTop: "-8px", lineHeight: "1.5" }}>
+          ※第1希望は必須です。第2・第3希望は「空いていれば早く確定しやすい」ため、可能であればご指定ください（任意入力）。
+        </p>
 
-        <label style={labelStyle}>
-          第1希望日時:
-          <div style={{ display: "flex", gap: "5px", alignItems: "center", marginTop: "6px" }}>
-            <input type="date" name="date1" value={formData.date1} onChange={handleChange} required style={{ ...inputStyle, marginTop: 0, flex: 1, padding: "10px 5px" }} />
-            <input type="time" name="time1Start" value={formData.time1Start} onChange={handleChange} step="600" required style={{ ...inputStyle, marginTop: 0, flex: 1, padding: "10px 5px" }} />
-            <span>〜</span>
-            <input type="time" name="time1End" value={formData.time1End} onChange={handleChange} step="600" required style={{ ...inputStyle, marginTop: 0, flex: 1, padding: "10px 5px" }} />
+        {/* ざっくり調整可能な時間帯（チェックボックス複数選択） */}
+        <div style={{
+          backgroundColor: "#F0FDF4",
+          border: "1px solid #BBF7D0",
+          borderRadius: "8px",
+          padding: "12px 14px",
+          marginBottom: "16px"
+        }}>
+          <div style={{ fontSize: "13px", fontWeight: "bold", color: "#166534", marginBottom: "4px" }}>
+            ⏰ 調整しやすい大まかな時間帯（複数選択可・任意）
           </div>
-        </label>
-
-        <label style={labelStyle}>
-          第2希望日時:
-          <div style={{ display: "flex", gap: "5px", alignItems: "center", marginTop: "6px" }}>
-            <input type="date" name="date2" value={formData.date2} onChange={handleChange} style={{ ...inputStyle, marginTop: 0, flex: 1, padding: "10px 5px" }} />
-            <input type="time" name="time2Start" value={formData.time2Start} onChange={handleChange} step="600" style={{ ...inputStyle, marginTop: 0, flex: 1, padding: "10px 5px" }} />
-            <span>〜</span>
-            <input type="time" name="time2End" value={formData.time2End} onChange={handleChange} step="600" style={{ ...inputStyle, marginTop: 0, flex: 1, padding: "10px 5px" }} />
+          <p style={{ fontSize: "11px", color: "#15803D", margin: "0 0 10px 0" }}>
+            特定の時間にこだわらず、幅広く対応可能な時間帯があればチェックしてください。
+          </p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+            {GENERAL_TIME_SLOT_OPTIONS.map((slot) => {
+              const isChecked = selectedTimeSlots.includes(slot);
+              return (
+                <label
+                  key={slot}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    fontSize: "12.5px",
+                    color: isChecked ? "#166534" : "#374151",
+                    fontWeight: isChecked ? "bold" : "normal",
+                    backgroundColor: isChecked ? "#DCFCE7" : "#FFFFFF",
+                    padding: "7px 10px",
+                    borderRadius: "6px",
+                    border: `1px solid ${isChecked ? "#86EFAC" : "#E5E7EB"}`,
+                    cursor: "pointer",
+                    userSelect: "none",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={() => handleTimeSlotCheckboxToggle(slot)}
+                    style={{ width: "16px", height: "16px", accentColor: "#00B900" }}
+                  />
+                  <span>{slot}</span>
+                </label>
+              );
+            })}
           </div>
-        </label>
+        </div>
 
-        <label style={labelStyle}>
-          第3希望日時:
-          <div style={{ display: "flex", gap: "5px", alignItems: "center", marginTop: "6px" }}>
-            <input type="date" name="date3" value={formData.date3} onChange={handleChange} style={{ ...inputStyle, marginTop: 0, flex: 1, padding: "10px 5px" }} />
-            <input type="time" name="time3Start" value={formData.time3Start} onChange={handleChange} step="600" style={{ ...inputStyle, marginTop: 0, flex: 1, padding: "10px 5px" }} />
-            <span>〜</span>
-            <input type="time" name="time3End" value={formData.time3End} onChange={handleChange} step="600" style={{ ...inputStyle, marginTop: 0, flex: 1, padding: "10px 5px" }} />
+        {/* 第1希望日時（必須） */}
+        <div style={{ backgroundColor: "#FFFFFF", border: "1.5px solid #E5E7EB", borderRadius: "8px", padding: "14px", marginBottom: "10px" }}>
+          <div style={{ ...labelStyle, marginBottom: "8px" }}>
+            <span>第1希望日時: <span style={{ color: "red", fontSize: "12px" }}>※必須</span></span>
           </div>
-        </label>
+          <input
+            type="date"
+            name="date1"
+            value={formData.date1}
+            onChange={handleChange}
+            required
+            style={{ ...inputStyle, width: "100%", boxSizing: "border-box", marginTop: 0, marginBottom: "8px" }}
+          />
+          <div style={{ fontSize: "12px", color: "#555", marginBottom: "6px", fontWeight: "bold" }}>
+            時間帯をざっくり選択:
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+            {TIME_SLOT_PRESETS.map((p) => {
+              const isSelected = formData.time1Slot === p.value;
+              return (
+                <button
+                  key={p.value}
+                  type="button"
+                  onClick={() => handleSlotSelect(1, p.value)}
+                  style={{
+                    fontSize: "12px",
+                    padding: "6px 10px",
+                    borderRadius: "6px",
+                    border: isSelected ? "1.5px solid #00B900" : "1px solid #D1D5DB",
+                    backgroundColor: isSelected ? "#ECFDF5" : "#F9FAFB",
+                    color: isSelected ? "#065F46" : "#374151",
+                    fontWeight: isSelected ? "bold" : "normal",
+                    cursor: "pointer",
+                  }}
+                >
+                  {isSelected ? `✓ ${p.label}` : p.label}
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              onClick={() => {
+                setCustomTimeMode1(!customTimeMode1);
+                if (!customTimeMode1) {
+                  setFormData(prev => ({ ...prev, time1Slot: "" }));
+                }
+              }}
+              style={{
+                fontSize: "12px",
+                padding: "6px 10px",
+                borderRadius: "6px",
+                border: customTimeMode1 ? "1.5px solid #3B82F6" : "1px dashed #9CA3AF",
+                backgroundColor: customTimeMode1 ? "#EFF6FF" : "#FFFFFF",
+                color: customTimeMode1 ? "#1D4ED8" : "#4B5563",
+                fontWeight: customTimeMode1 ? "bold" : "normal",
+                cursor: "pointer",
+              }}
+            >
+              ⏱ 時間を細かく指定
+            </button>
+          </div>
+          {customTimeMode1 && (
+            <div style={{ display: "flex", gap: "5px", alignItems: "center", marginTop: "8px" }}>
+              <input type="time" name="time1Start" value={formData.time1Start} onChange={handleChange} step="600" style={{ ...inputStyle, marginTop: 0, flex: 1, padding: "10px 5px" }} />
+              <span>〜</span>
+              <input type="time" name="time1End" value={formData.time1End} onChange={handleChange} step="600" style={{ ...inputStyle, marginTop: 0, flex: 1, padding: "10px 5px" }} />
+            </div>
+          )}
+        </div>
+
+        {/* 第2希望日時（任意） */}
+        <div style={{ backgroundColor: "#FFFFFF", border: "1px solid #E5E7EB", borderRadius: "8px", padding: "14px", marginBottom: "10px" }}>
+          <div style={{ ...labelStyle, marginBottom: "8px" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span>第2希望日時 <span style={{ color: "#6B7280", fontSize: "12px", fontWeight: "normal" }}>（任意）</span></span>
+              <span style={{ fontSize: "11px", color: "#059669", backgroundColor: "#ECFDF5", padding: "2px 6px", borderRadius: "4px" }}>空いていれば早く確定しやすい</span>
+            </div>
+          </div>
+          <input
+            type="date"
+            name="date2"
+            value={formData.date2}
+            onChange={handleChange}
+            style={{ ...inputStyle, width: "100%", boxSizing: "border-box", marginTop: 0, marginBottom: "8px" }}
+          />
+          <div style={{ fontSize: "12px", color: "#555", marginBottom: "6px", fontWeight: "bold" }}>
+            時間帯をざっくり選択:
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+            {TIME_SLOT_PRESETS.map((p) => {
+              const isSelected = formData.time2Slot === p.value;
+              return (
+                <button
+                  key={p.value}
+                  type="button"
+                  onClick={() => handleSlotSelect(2, p.value)}
+                  style={{
+                    fontSize: "12px",
+                    padding: "6px 10px",
+                    borderRadius: "6px",
+                    border: isSelected ? "1.5px solid #00B900" : "1px solid #D1D5DB",
+                    backgroundColor: isSelected ? "#ECFDF5" : "#F9FAFB",
+                    color: isSelected ? "#065F46" : "#374151",
+                    fontWeight: isSelected ? "bold" : "normal",
+                    cursor: "pointer",
+                  }}
+                >
+                  {isSelected ? `✓ ${p.label}` : p.label}
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              onClick={() => {
+                setCustomTimeMode2(!customTimeMode2);
+                if (!customTimeMode2) {
+                  setFormData(prev => ({ ...prev, time2Slot: "" }));
+                }
+              }}
+              style={{
+                fontSize: "12px",
+                padding: "6px 10px",
+                borderRadius: "6px",
+                border: customTimeMode2 ? "1.5px solid #3B82F6" : "1px dashed #9CA3AF",
+                backgroundColor: customTimeMode2 ? "#EFF6FF" : "#FFFFFF",
+                color: customTimeMode2 ? "#1D4ED8" : "#4B5563",
+                fontWeight: customTimeMode2 ? "bold" : "normal",
+                cursor: "pointer",
+              }}
+            >
+              ⏱ 時間を細かく指定
+            </button>
+          </div>
+          {customTimeMode2 && (
+            <div style={{ display: "flex", gap: "5px", alignItems: "center", marginTop: "8px" }}>
+              <input type="time" name="time2Start" value={formData.time2Start} onChange={handleChange} step="600" style={{ ...inputStyle, marginTop: 0, flex: 1, padding: "10px 5px" }} />
+              <span>〜</span>
+              <input type="time" name="time2End" value={formData.time2End} onChange={handleChange} step="600" style={{ ...inputStyle, marginTop: 0, flex: 1, padding: "10px 5px" }} />
+            </div>
+          )}
+        </div>
+
+        {/* 第3希望日時（任意） */}
+        <div style={{ backgroundColor: "#FFFFFF", border: "1px solid #E5E7EB", borderRadius: "8px", padding: "14px", marginBottom: "10px" }}>
+          <div style={{ ...labelStyle, marginBottom: "8px" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span>第3希望日時 <span style={{ color: "#6B7280", fontSize: "12px", fontWeight: "normal" }}>（任意）</span></span>
+              <span style={{ fontSize: "11px", color: "#059669", backgroundColor: "#ECFDF5", padding: "2px 6px", borderRadius: "4px" }}>空いていれば早く確定しやすい</span>
+            </div>
+          </div>
+          <input
+            type="date"
+            name="date3"
+            value={formData.date3}
+            onChange={handleChange}
+            style={{ ...inputStyle, width: "100%", boxSizing: "border-box", marginTop: 0, marginBottom: "8px" }}
+          />
+          <div style={{ fontSize: "12px", color: "#555", marginBottom: "6px", fontWeight: "bold" }}>
+            時間帯をざっくり選択:
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+            {TIME_SLOT_PRESETS.map((p) => {
+              const isSelected = formData.time3Slot === p.value;
+              return (
+                <button
+                  key={p.value}
+                  type="button"
+                  onClick={() => handleSlotSelect(3, p.value)}
+                  style={{
+                    fontSize: "12px",
+                    padding: "6px 10px",
+                    borderRadius: "6px",
+                    border: isSelected ? "1.5px solid #00B900" : "1px solid #D1D5DB",
+                    backgroundColor: isSelected ? "#ECFDF5" : "#F9FAFB",
+                    color: isSelected ? "#065F46" : "#374151",
+                    fontWeight: isSelected ? "bold" : "normal",
+                    cursor: "pointer",
+                  }}
+                >
+                  {isSelected ? `✓ ${p.label}` : p.label}
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              onClick={() => {
+                setCustomTimeMode3(!customTimeMode3);
+                if (!customTimeMode3) {
+                  setFormData(prev => ({ ...prev, time3Slot: "" }));
+                }
+              }}
+              style={{
+                fontSize: "12px",
+                padding: "6px 10px",
+                borderRadius: "6px",
+                border: customTimeMode3 ? "1.5px solid #3B82F6" : "1px dashed #9CA3AF",
+                backgroundColor: customTimeMode3 ? "#EFF6FF" : "#FFFFFF",
+                color: customTimeMode3 ? "#1D4ED8" : "#4B5563",
+                fontWeight: customTimeMode3 ? "bold" : "normal",
+                cursor: "pointer",
+              }}
+            >
+              ⏱ 時間を細かく指定
+            </button>
+          </div>
+          {customTimeMode3 && (
+            <div style={{ display: "flex", gap: "5px", alignItems: "center", marginTop: "8px" }}>
+              <input type="time" name="time3Start" value={formData.time3Start} onChange={handleChange} step="600" style={{ ...inputStyle, marginTop: 0, flex: 1, padding: "10px 5px" }} />
+              <span>〜</span>
+              <input type="time" name="time3End" value={formData.time3End} onChange={handleChange} step="600" style={{ ...inputStyle, marginTop: 0, flex: 1, padding: "10px 5px" }} />
+            </div>
+          )}
+        </div>
 
         <div style={sectionTitleStyle}>泳力・目標</div>
 
