@@ -8,9 +8,9 @@ import { ja } from 'date-fns/locale'
 
 
 export async function cancelSchedule(scheduleId: string) {
-    const supabaseAdmin = createAdminClient()
-
     try {
+        const supabaseAdmin = createAdminClient()
+
         // 1. Fetch Schedule to check for Stripe ID and Google Event ID
         const { data: schedule, error: fetchError } = await supabaseAdmin
             .from('lesson_schedules')
@@ -84,9 +84,9 @@ interface UpdateScheduleParams {
 }
 
 export async function updateScheduleWithCalendar(params: UpdateScheduleParams) {
-    const supabaseAdmin = createAdminClient()
-
     try {
+        const supabaseAdmin = createAdminClient()
+
         // 1. 既存スケジュール（google_event_id）を取得
         const { data: existing, error: fetchError } = await supabaseAdmin
             .from('lesson_schedules')
@@ -164,9 +164,9 @@ export async function updateScheduleWithCalendar(params: UpdateScheduleParams) {
 
 
 export async function getStudentsForCoach(coachId: string) {
-    const supabaseAdmin = createAdminClient()
-
     try {
+        const supabaseAdmin = createAdminClient()
+
         let studentIds: string[] = []
         if (coachId && coachId !== 'all') {
             const { data: assigned } = await supabaseAdmin
@@ -228,9 +228,9 @@ export async function getStudentsForCoach(coachId: string) {
 }
 
 export async function getLessonMasters() {
-    const supabaseAdmin = createAdminClient()
-
     try {
+        const supabaseAdmin = createAdminClient()
+
         const { data, error } = await supabaseAdmin
             .from('lesson_masters')
             .select('id, name')
@@ -241,14 +241,14 @@ export async function getLessonMasters() {
         return { success: true, data }
     } catch (error: any) {
         console.error('getLessonMasters Error:', error)
-        return { success: false, error: error.message }
+        return { success: false, error: error?.message || 'レッスンマスタの取得に失敗しました' }
     }
 }
 
 export async function approveSchedule(scheduleId: string) {
-    const supabaseAdmin = createAdminClient()
-
     try {
+        const supabaseAdmin = createAdminClient()
+
         // 1. Get Schedule Details
         const { data: schedule, error: fetchError } = await supabaseAdmin
             .from('lesson_schedules')
@@ -348,9 +348,8 @@ export async function approveSchedule(scheduleId: string) {
 }
 
 export async function getPendingSchedulesAction(coachId: string) {
-    const supabaseAdmin = createAdminClient()
-
     try {
+        const supabaseAdmin = createAdminClient()
         // 日本時間 (JST) での「当月1日の00:00:00」を取得し、前月以前の予定を除外する
         const nowUtc = new Date()
         const nowJst = new Date(nowUtc.getTime() + 9 * 60 * 60 * 1000)
@@ -373,7 +372,23 @@ export async function getPendingSchedulesAction(coachId: string) {
                     full_name,
                     second_student_name,
                     is_two_person_lesson,
-                    is_default_distant_option
+                    is_default_distant_option,
+                    status,
+                    membership_type_id,
+                    apply_pair_pricing,
+                    membership_types!students_membership_type_id_fkey (
+                        id,
+                        name,
+                        default_lesson_master_id,
+                        membership_type_lessons (lesson_master_id, reward_price)
+                    )
+                ),
+                lesson_master:lesson_masters (
+                    id,
+                    name,
+                    unit_price,
+                    pair_unit_price,
+                    is_trial
                 )
             `)
             .eq('coach_id', coachId)

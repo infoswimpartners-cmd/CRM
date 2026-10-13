@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
@@ -65,6 +65,66 @@ interface LessonMaster {
     is_trial: boolean
 }
 
+// 体験レッスンの最適なlesson_master_idを自動判定するヘルパー
+function determineTrialMasterId(
+    scheduleOrDuration: { 
+        lesson_master_id?: string | null, 
+        start_time?: string, 
+        end_time?: string, 
+        title?: string, 
+        notes?: string,
+        lesson_master?: { id: string, name: string, is_trial?: boolean, unit_price?: number } | null 
+    } | null,
+    masters: LessonMaster[]
+): string {
+    const trialMasters = masters.filter(m => m.is_trial)
+    if (trialMasters.length === 0) return ''
+
+    // 1. スケジュールに紐づくマスタ情報の取得
+    const linkedMaster = scheduleOrDuration?.lesson_master || 
+        (scheduleOrDuration?.lesson_master_id ? masters.find(m => m.id === scheduleOrDuration.lesson_master_id) : null)
+
+    // 2. 90分判定（所要時間 >= 80分、またはタイトル/備考/紐づくマスタ名に「90」が含まれるか）
+    let is90Min = false
+    if (scheduleOrDuration?.start_time && scheduleOrDuration?.end_time) {
+        const start = new Date(scheduleOrDuration.start_time).getTime()
+        const end = new Date(scheduleOrDuration.end_time).getTime()
+        const duration = Math.round((end - start) / 60000)
+        if (duration >= 80) is90Min = true
+    }
+    if (scheduleOrDuration?.title?.includes('90') || scheduleOrDuration?.notes?.includes('90')) {
+        is90Min = true
+    }
+    if (linkedMaster?.name?.includes('90') || (linkedMaster?.unit_price && linkedMaster.unit_price >= 9000 && !linkedMaster.name?.includes('2名'))) {
+        is90Min = true
+    }
+
+    const master90 = trialMasters.find(m => m.name.includes('90') || (m.unit_price && m.unit_price >= 9000 && !m.name.includes('2名')))
+    const master60 = trialMasters.find(m => !m.name.includes('90') && m.name.includes('初回') && !m.name.includes('2名'))
+        || trialMasters.find(m => !m.name.includes('90') && !m.name.includes('2名'))
+        || trialMasters[0]
+
+    if (is90Min) {
+        // 90分の場合は90分マスタを優先
+        if (scheduleOrDuration?.lesson_master_id) {
+            const matched = trialMasters.find(m => m.id === scheduleOrDuration.lesson_master_id)
+            if (matched && (matched.name.includes('90') || matched.unit_price >= 9000)) {
+                return matched.id
+            }
+        }
+        return master90?.id || master60?.id || ''
+    } else {
+        // 60分の場合は60分マスタを優先（スケジュールに既に有効な60分体験マスタが紐づいていればそれを使用）
+        if (scheduleOrDuration?.lesson_master_id) {
+            const matched = trialMasters.find(m => m.id === scheduleOrDuration.lesson_master_id)
+            if (matched && !matched.name.includes('90') && matched.id !== '9e4e15a8-38f0-47b5-b548-831377bdf427') {
+                return matched.id
+            }
+        }
+        return master60?.id || ''
+    }
+}
+
 // Define the form values type explicitly
 type FormValues = z.infer<typeof formSchema>
 
@@ -88,6 +148,7 @@ export function LessonReportForm() {
     const [pendingSchedules, setPendingSchedules] = useState<any[]>([])
     const searchParams = useSearchParams()
     const scheduleIdFromUrl = searchParams.get('scheduleId')
+    const isFillingFromScheduleRef = useRef(false)
 
     // Load lesson masters and current user on mount
     useEffect(() => {
@@ -99,6 +160,7 @@ export function LessonReportForm() {
                 .from('lesson_masters')
                 .select('id, name, unit_price, pair_unit_price, is_trial')
                 .eq('active', true)
+                .order('display_order', { ascending: true })
 
             if (masters) setLessonMasters(masters as any)
 
@@ -163,6 +225,8 @@ export function LessonReportForm() {
     const fillFormFromSchedule = (schedule: any) => {
         if (!schedule) return
 
+        isFillingFromScheduleRef.current = true
+
         const studentsData: any = schedule.students
         const student = Array.isArray(studentsData) ? studentsData[0] : studentsData
 
@@ -178,7 +242,6 @@ export function LessonReportForm() {
         form.setValue('schedule_id', schedule.id)
         if (studentId) form.setValue('student_id', studentId)
         if (studentName) form.setValue('student_name', studentName)
-        if (schedule.lesson_master_id) form.setValue('lesson_master_id', schedule.lesson_master_id)
         if (schedule.start_time) form.setValue('lesson_date', new Date(schedule.start_time))
         if (schedule.location) {
             form.setValue('location', schedule.location)
@@ -190,11 +253,60 @@ export function LessonReportForm() {
         setIsTwoPersonLesson(!!student?.is_two_person_lesson)
         setIsDefaultDistantOption(!!student?.is_default_distant_option)
         setStudent(student)
+
+        // 体験レッスンおよびレッスン種別の即座自動選択ロジック
+        const membership = Array.isArray(student?.membership_types)
+            ? student.membership_types[0]
+            : student?.membership_types
+
+        const isTrialStudent = ['trial_pending', 'trial_confirmed', 'trial_billed', 'trial_done', 'applied', 'inquired'].includes(student?.status) ||
+            (!student?.membership_type_id && !membership?.id && student?.status !== 'active' && student?.status !== 'withdrawn')
+
+        const isTrial = 
+            schedule.lesson_master?.is_trial === true ||
+            (schedule.lesson_master_id && lessonMasters.find(m => m.id === schedule.lesson_master_id)?.is_trial) ||
+            schedule.title?.includes('体験') ||
+            schedule.notes?.includes('体験') ||
+            isTrialStudent
+
+        if (isTrial) {
+            const trialMasters = lessonMasters.filter(m => m.is_trial)
+            const trialIds = trialMasters.map(m => m.id)
+            setRestrictedLessonIds(trialIds)
+
+            const targetMasterId = determineTrialMasterId(schedule, lessonMasters)
+            if (targetMasterId) {
+                form.setValue('lesson_master_id', targetMasterId)
+            }
+        } else if (membership?.id) {
+            const allowed = membership.membership_type_lessons || []
+            const ids = allowed.map((a: any) => a.lesson_master_id)
+            if (ids.length > 0) {
+                setRestrictedLessonIds(ids)
+                if (schedule.lesson_master_id && ids.includes(schedule.lesson_master_id)) {
+                    form.setValue('lesson_master_id', schedule.lesson_master_id)
+                } else if (membership.default_lesson_master_id && ids.includes(membership.default_lesson_master_id)) {
+                    form.setValue('lesson_master_id', membership.default_lesson_master_id)
+                } else {
+                    form.setValue('lesson_master_id', ids[0])
+                }
+            } else {
+                setRestrictedLessonIds(null)
+                if (schedule.lesson_master_id) {
+                    form.setValue('lesson_master_id', schedule.lesson_master_id)
+                }
+            }
+        } else {
+            setRestrictedLessonIds(null)
+            if (schedule.lesson_master_id) {
+                form.setValue('lesson_master_id', schedule.lesson_master_id)
+            }
+        }
     }
 
     // Load schedule data if scheduleIdFromUrl is provided
     useEffect(() => {
-        if (!scheduleIdFromUrl || !coachId) return
+        if (!scheduleIdFromUrl || !coachId || lessonMasters.length === 0) return
 
         const fetchSchedule = async () => {
             const supabase = createClient()
@@ -208,11 +320,22 @@ export function LessonReportForm() {
                         second_student_name,
                         is_two_person_lesson,
                         is_default_distant_option,
+                        status,
                         membership_type_id,
+                        apply_pair_pricing,
                         membership_types!students_membership_type_id_fkey (
                             id,
+                            name,
+                            default_lesson_master_id,
                             membership_type_lessons (lesson_master_id, reward_price)
                         )
+                    ),
+                    lesson_master:lesson_masters (
+                        id,
+                        name,
+                        unit_price,
+                        pair_unit_price,
+                        is_trial
                     )
                 `)
                 .eq('id', scheduleIdFromUrl)
@@ -223,7 +346,7 @@ export function LessonReportForm() {
             }
         }
         fetchSchedule()
-    }, [scheduleIdFromUrl, coachId])
+    }, [scheduleIdFromUrl, coachId, lessonMasters])
 
     // Watch lesson_master_id and student to auto-update price
     const selectedMasterId = form.watch('lesson_master_id')
@@ -267,9 +390,15 @@ export function LessonReportForm() {
                 return
             }
 
+            // スケジュール選択直後で既に一括反映されている場合は二重フェッチ・上書きをスキップ
+            if (isFillingFromScheduleRef.current) {
+                isFillingFromScheduleRef.current = false
+                return
+            }
+
             const supabase = createClient()
 
-            // 1. Get Student's Membership Type ID and Pair flag
+            // 1. Get Student's Membership Type ID, Status and Pair flag
             const { data: studentData } = await supabase
                 .from('students')
                 .select(`
@@ -279,8 +408,10 @@ export function LessonReportForm() {
                     full_name, 
                     second_student_name, 
                     apply_pair_pricing,
+                    status,
                     membership_types!students_membership_type_id_fkey (
                         id,
+                        default_lesson_master_id,
                         membership_type_lessons (lesson_master_id, reward_price)
                     )
                 `)
@@ -296,6 +427,27 @@ export function LessonReportForm() {
             const membership = Array.isArray(studentData?.membership_types)
                 ? studentData.membership_types[0]
                 : studentData?.membership_types
+
+            // 体験生徒の判定
+            const isTrialStudent = 
+                ['trial_pending', 'trial_confirmed', 'trial_billed', 'trial_done', 'applied', 'inquired'].includes(studentData?.status) ||
+                (!studentData?.membership_type_id && !membership?.id && studentData?.status !== 'active' && studentData?.status !== 'withdrawn')
+
+            if (isTrialStudent) {
+                const trialMasters = lessonMasters.filter(m => m.is_trial)
+                const trialIds = trialMasters.map(m => m.id)
+                setRestrictedLessonIds(trialIds)
+
+                const currentMasterId = form.getValues('lesson_master_id')
+                // 既に有効な体験レッスンが選択されている場合は維持し、そうでなければ即座に自動選択
+                if (!currentMasterId || !trialIds.includes(currentMasterId)) {
+                    const targetMasterId = determineTrialMasterId(null, lessonMasters)
+                    if (targetMasterId) {
+                        form.setValue('lesson_master_id', targetMasterId)
+                    }
+                }
+                return
+            }
 
             if (!membership?.id) {
                 setRestrictedLessonIds(null)
@@ -315,12 +467,13 @@ export function LessonReportForm() {
                 // IMPORTANT: Only reset if the current selection is NOT allowed for this student
                 const currentMasterId = form.getValues('lesson_master_id')
                 if (!currentMasterId || !ids.includes(currentMasterId)) {
-                    // Auto-select if only one option, otherwise clear
-                    if (ids.length === 1) {
+                    // Auto-select if default lesson exists or fallback
+                    if (membership.default_lesson_master_id && ids.includes(membership.default_lesson_master_id)) {
+                        form.setValue('lesson_master_id', membership.default_lesson_master_id)
+                    } else if (ids.length === 1) {
                         form.setValue('lesson_master_id', ids[0])
                     } else {
-                        form.setValue('lesson_master_id', '')
-                        form.setValue('price', 0)
+                        form.setValue('lesson_master_id', ids[0])
                     }
                 }
             } else {
@@ -330,7 +483,7 @@ export function LessonReportForm() {
             }
         }
         fetchAllowedLessons()
-    }, [selectedStudentId, form])
+    }, [selectedStudentId, form, lessonMasters])
 
     // Watch location to update facility fee flag
     const selectedLocation = form.watch('location')
@@ -434,6 +587,7 @@ export function LessonReportForm() {
                     ...currentValues,
                     student_id: '',
                     student_name: '',
+                    schedule_id: '',
                 }, { keepDefaultValues: false }) // Reset to these as new defaults
 
                 // Clear scheduleId from URL to prevent unwanted re-fills while staying on page
@@ -502,6 +656,7 @@ export function LessonReportForm() {
                             <FormControl>
                                 <StudentSelect
                                     onSelect={(id, name) => {
+                                        form.setValue('schedule_id', '')
                                         form.setValue('student_id', id || '')
                                         form.setValue('student_name', name)
                                     }}
