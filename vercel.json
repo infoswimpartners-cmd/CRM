@@ -22,7 +22,7 @@
         },
         {
             "path": "/api/cron/line-marketing-dispatcher",
-            "schedule": "*/10 * * * *"
+            "schedule": "0 10 * * *"
         }
     ]
 }
