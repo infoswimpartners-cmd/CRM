@@ -234,11 +234,49 @@ export const DEFAULT_LESSON_REPORT_SPREADSHEET_ID = '1DLMYid10VpYGPoHWkpqXcIku92
 
 /**
  * レッスン報告データをGoogleスプレッドシートに自動追記する
+ * （GAS Webhook または Google Sheets API の両方に対応）
  */
 export async function appendLessonReportToSpreadsheet(
     data: LessonReportSpreadsheetRow,
     explicitSpreadsheetId?: string
 ): Promise<{ success: boolean; error?: string }> {
+    const gasWebhookUrl = process.env.LESSON_REPORT_GAS_WEBHOOK_URL;
+
+    // 1. GAS Webhook が設定されている場合は優先して送信（組織ポリシーの影響を受けない確実な連携）
+    if (gasWebhookUrl) {
+        try {
+            const dateStr = data.lessonDate.includes('T')
+                ? data.lessonDate.split('T')[0]
+                : data.lessonDate;
+
+            const payload = {
+                ...data,
+                lessonDate: dateStr,
+                createdAt: data.createdAt || new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }),
+            };
+
+            const response = await fetch(gasWebhookUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+                redirect: 'follow',
+            });
+
+            if (response.ok) {
+                console.log(`🏊‍♂️ [GAS Webhook] レッスン報告をスプレッドシートに追記しました: ${data.studentName} (${dateStr})`);
+                return { success: true };
+            } else {
+                const text = await response.text();
+                console.warn(`⚠️ [GAS Webhook] 応答エラー (${response.status}):`, text);
+                return { success: false, error: `GAS Webhook Error: ${response.status}` };
+            }
+        } catch (gasErr: any) {
+            console.error('⚠️ [GAS Webhook] 通信エラー:', gasErr.message);
+            return { success: false, error: gasErr.message };
+        }
+    }
+
+    // 2. GAS Webhook が未設定の場合は Google Sheets API 経由で追記
     const spreadsheetId = explicitSpreadsheetId 
         || process.env.LESSON_REPORT_SPREADSHEET_ID 
         || DEFAULT_LESSON_REPORT_SPREADSHEET_ID;

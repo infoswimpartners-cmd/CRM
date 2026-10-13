@@ -30,7 +30,7 @@ export function getTemplateMeta(key: string) {
             channels: ['メール']
         }
     }
-    if (key === 'lesson_reminder_coach') {
+    if (key === 'lesson_reminder_coach' || key === 'lesson_report_request_coach') {
         return {
             category: 'lesson' as const,
             categoryLabel: 'レッスン',
