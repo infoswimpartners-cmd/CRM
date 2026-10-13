@@ -1183,7 +1183,25 @@ export async function getLineMarketingMasterData(): Promise<{
         supabaseAdmin.from('student_statuses').select('id, name').order('display_order'),
     ]);
 
-    const areas = ['東京都', '千葉県', '神奈川県', '目黒区', '港区', '品川区', '世田谷区'];
+    const areas = [
+        '東京都',
+        '港区・品川区',
+        '渋谷・目黒',
+        '世田谷・杉並',
+        '新宿区',
+        '江東区・江戸川区',
+        '東京市部',
+        '神奈川県',
+        '横浜市',
+        '川崎市',
+        '千葉県',
+        '船橋市',
+        '市川市',
+        '柏市',
+        '埼玉県',
+        'さいたま市',
+        '川口市',
+    ];
 
     return {
         coaches: (coaches || []).map((c: any) => ({

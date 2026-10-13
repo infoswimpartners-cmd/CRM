@@ -32,6 +32,7 @@ import {
     Loader2,
     Tag,
     Calendar,
+    MapPin,
 } from 'lucide-react';
 import {
     SegmentFilterConditions,
@@ -386,6 +387,46 @@ export const SegmentBroadcastTab: React.FC<SegmentBroadcastTabProps> = ({
         },
     };
 
+    // 📍 エリア別おすすめ配信テンプレート定義
+    const AREA_PRESETS: Record<string, { title: string; body: string }> = {
+        '東京都': {
+            title: '【東京都エリア】都内温水プールでの個別レッスンのご案内',
+            body: '{{name}} 様\n\nスイムパートナーズです。\n\n東京都内の各施設（港区・品川区・渋谷区・目黒区・世田谷区など）にて、冬でも快適に泳げる温水プールでのマンツーマン個別指導を実施しております。\n\nお近くのプールでご希望の日時に合わせてコーチを派遣可能です。\nぜひお気軽に体験レッスン・継続レッスンをご相談ください！\n\n▼ 体験レッスンの詳細・お申し込みはこちら\n{{trial_url}}'
+        },
+        '神奈川県': {
+            title: '【神奈川・横浜・川崎エリア】近隣プールでの個別レッスンのご案内',
+            body: '{{name}} 様\n\nスイムパートナーズです。\n\n神奈川県内（横浜市・川崎市など）の温水プール施設にて、専属コーチによるマンツーマン個別水泳レッスンをご案内しております。\n\nお子様の泳力アップから大人のフォーム改善まで、お客様の目的に合わせて丁寧にサポートいたします。\n\n▼ レッスンの詳細・お申し込みはこちら\n{{trial_url}}'
+        },
+        '千葉県': {
+            title: '【千葉・船橋・市川・柏エリア】近隣プールでの個別レッスンのご案内',
+            body: '{{name}} 様\n\nスイムパートナーズです。\n\n千葉エリア（船橋市・市川市・柏市など）の温水プールにて、個人指導水泳レッスンの枠を受付中です。\n\nご自宅近くの使い慣れたプールや公営プールで集中して上達していただけます。\n\n▼ 詳細・体験お申し込みはこちら\n{{trial_url}}'
+        },
+        '埼玉県': {
+            title: '【埼玉エリア】温水プールでの個別レッスンのご案内',
+            body: '{{name}} 様\n\nスイムパートナーズです。\n\n埼玉エリア（さいたま市・川口市など）の温水プールにて、プロコーチによる個別レッスンのご案内です。\n\n初心者の方からタイム向上を目指す方まで、マンツーマンで着実にステップアップできます。\n\n▼ 詳細・お申し込みはこちら\n{{trial_url}}'
+        },
+        '港区・品川区': {
+            title: '【港区・品川区エリア】近隣温水プールでの個別レッスンのご案内',
+            body: '{{name}} 様\n\nスイムパートナーズです。\n\n港区・品川区エリア周辺のプールにて、個別水泳レッスンを実施しております。\n\n施設選定や日時もお気軽にご相談いただけます。\n\n▼ 詳細・お申し込みはこちら\n{{trial_url}}'
+        },
+        '渋谷・目黒': {
+            title: '【渋谷・目黒エリア】近隣温水プールでの個別レッスンのご案内',
+            body: '{{name}} 様\n\nスイムパートナーズです。\n\n渋谷・目黒エリア周辺の温水プールにて、マンツーマン個別指導レッスンを受け付けております。\n\n▼ 詳細・お申し込みはこちら\n{{trial_url}}'
+        },
+        '世田谷・杉並': {
+            title: '【世田谷・杉並エリア】近隣温水プールでの個別レッスンのご案内',
+            body: '{{name}} 様\n\nスイムパートナーズです。\n\n世田谷・杉並エリアの温水プールにて、個別水泳レッスンのご案内です。\n\n▼ 詳細・お申し込みはこちら\n{{trial_url}}'
+        },
+        '横浜市': {
+            title: '【横浜エリア】横浜市内プールでのマンツーマンレッスンのご案内',
+            body: '{{name}} 様\n\nスイムパートナーズです。\n\n横浜市内の温水プールにて、個別指導水泳レッスンを実施しております。\n\n▼ 詳細・お申し込みはこちら\n{{trial_url}}'
+        },
+        '船橋市': {
+            title: '【船橋エリア】船橋市内プールでのマンツーマンレッスンのご案内',
+            body: '{{name}} 様\n\nスイムパートナーズです。\n\n船橋市内の温水プール（船橋アリーナやメグスパ等）にて、個別指導水泳レッスンを受け付けております。\n\n▼ 詳細・お申し込みはこちら\n{{trial_url}}'
+        },
+    };
+
     const handleSelectQuickTag = (tag: string) => {
         setSelectedTag(tag);
         if (tag === 'trial_form_viewed') {
@@ -397,6 +438,15 @@ export const SegmentBroadcastTab: React.FC<SegmentBroadcastTabProps> = ({
             setCampaignTitle(TAG_PRESETS[tag].title);
             setMessageTemplate(TAG_PRESETS[tag].body);
             toast.info(`タグ別一斉配信テンプレートを反映しました`);
+        }
+    };
+
+    const handleSelectQuickArea = (area: string) => {
+        setSelectedArea(area);
+        if (AREA_PRESETS[area]) {
+            setCampaignTitle(AREA_PRESETS[area].title);
+            setMessageTemplate(AREA_PRESETS[area].body);
+            toast.info(`【${area}】エリア別配信テンプレートを反映しました`);
         }
     };
 
@@ -497,6 +547,124 @@ export const SegmentBroadcastTab: React.FC<SegmentBroadcastTabProps> = ({
                                 }`}
                             >
                                 🎁 お友達紹介
+                            </button>
+                        </div>
+
+                        {/* 📍 エリア別クイック一斉配信セレクターバー */}
+                        <div className="flex flex-wrap items-center gap-1.5 mt-2.5 pt-2 border-t border-slate-100/70 dark:border-slate-800/70">
+                            <span className="text-[11px] font-bold text-slate-600 dark:text-slate-400 mr-1 flex items-center gap-1">
+                                <MapPin className="h-3 w-3 text-emerald-600" />
+                                エリア別クイック一斉配信:
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => handleSelectQuickArea('all')}
+                                className={`text-xs px-2.5 py-1 rounded-full font-medium transition-all ${
+                                    selectedArea === 'all'
+                                        ? 'bg-slate-900 text-white shadow-xs font-bold'
+                                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                }`}
+                            >
+                                全エリア
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleSelectQuickArea('東京都')}
+                                className={`text-xs px-2.5 py-1 rounded-full font-medium transition-all flex items-center gap-1 ${
+                                    selectedArea === '東京都'
+                                        ? 'bg-emerald-700 text-white shadow-xs font-bold'
+                                        : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200/60'
+                                }`}
+                            >
+                                🗼 東京都全域
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleSelectQuickArea('港区・品川区')}
+                                className={`text-xs px-2.5 py-1 rounded-full font-medium transition-all flex items-center gap-1 ${
+                                    selectedArea === '港区・品川区'
+                                        ? 'bg-emerald-700 text-white shadow-xs font-bold'
+                                        : 'bg-emerald-50/70 text-emerald-800 hover:bg-emerald-100 border border-emerald-200/60'
+                                }`}
+                            >
+                                🏢 港区・品川区
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleSelectQuickArea('渋谷・目黒')}
+                                className={`text-xs px-2.5 py-1 rounded-full font-medium transition-all flex items-center gap-1 ${
+                                    selectedArea === '渋谷・目黒'
+                                        ? 'bg-emerald-700 text-white shadow-xs font-bold'
+                                        : 'bg-emerald-50/70 text-emerald-800 hover:bg-emerald-100 border border-emerald-200/60'
+                                }`}
+                            >
+                                ☕ 渋谷・目黒
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleSelectQuickArea('世田谷・杉並')}
+                                className={`text-xs px-2.5 py-1 rounded-full font-medium transition-all flex items-center gap-1 ${
+                                    selectedArea === '世田谷・杉並'
+                                        ? 'bg-emerald-700 text-white shadow-xs font-bold'
+                                        : 'bg-emerald-50/70 text-emerald-800 hover:bg-emerald-100 border border-emerald-200/60'
+                                }`}
+                            >
+                                🏡 世田谷・杉並
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleSelectQuickArea('神奈川県')}
+                                className={`text-xs px-2.5 py-1 rounded-full font-medium transition-all flex items-center gap-1 ${
+                                    selectedArea === '神奈川県'
+                                        ? 'bg-teal-700 text-white shadow-xs font-bold'
+                                        : 'bg-teal-50 text-teal-800 hover:bg-teal-100 border border-teal-200/60'
+                                }`}
+                            >
+                                🌊 神奈川県全域
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleSelectQuickArea('横浜市')}
+                                className={`text-xs px-2.5 py-1 rounded-full font-medium transition-all flex items-center gap-1 ${
+                                    selectedArea === '横浜市'
+                                        ? 'bg-teal-700 text-white shadow-xs font-bold'
+                                        : 'bg-teal-50/70 text-teal-800 hover:bg-teal-100 border border-teal-200/60'
+                                }`}
+                            >
+                                ⚓ 横浜市
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleSelectQuickArea('千葉県')}
+                                className={`text-xs px-2.5 py-1 rounded-full font-medium transition-all flex items-center gap-1 ${
+                                    selectedArea === '千葉県'
+                                        ? 'bg-sky-700 text-white shadow-xs font-bold'
+                                        : 'bg-sky-50 text-sky-800 hover:bg-sky-100 border border-sky-200/60'
+                                }`}
+                            >
+                                🥜 千葉県全域
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleSelectQuickArea('船橋市')}
+                                className={`text-xs px-2.5 py-1 rounded-full font-medium transition-all flex items-center gap-1 ${
+                                    selectedArea === '船橋市'
+                                        ? 'bg-sky-700 text-white shadow-xs font-bold'
+                                        : 'bg-sky-50/70 text-sky-800 hover:bg-sky-100 border border-sky-200/60'
+                                }`}
+                            >
+                                🐬 船橋市
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleSelectQuickArea('埼玉県')}
+                                className={`text-xs px-2.5 py-1 rounded-full font-medium transition-all flex items-center gap-1 ${
+                                    selectedArea === '埼玉県'
+                                        ? 'bg-green-700 text-white shadow-xs font-bold'
+                                        : 'bg-green-50 text-green-800 hover:bg-green-100 border border-green-200/60'
+                                }`}
+                            >
+                                🌲 埼玉県全域
                             </button>
                         </div>
                     </div>
@@ -783,7 +951,10 @@ export const SegmentBroadcastTab: React.FC<SegmentBroadcastTabProps> = ({
                                                         </Badge>
                                                     </TableCell>
                                                     <TableCell className="text-xs text-slate-600">
-                                                        {student.area}
+                                                        <span className="inline-flex items-center gap-1 font-medium">
+                                                            <MapPin className="h-3 w-3 text-emerald-600 shrink-0" />
+                                                            {student.area}
+                                                        </span>
                                                     </TableCell>
                                                     <TableCell className="text-xs text-slate-600">
                                                         {student.coachName || '-'}

@@ -543,6 +543,20 @@ export async function fetchAndFilterMarketingStudents(
     // 全ユーザーのタグマップを取得
     const userTagsMap = await getAllUserTagsMap();
 
+    // リード情報（体験申込・問合せ時の希望エリア・プール情報）を取得してマッピング
+    const { data: rawLeads } = await supabase
+        .from('leads')
+        .select('name, area, lesson_location, confirmed_location, line_user_id');
+
+    const leadMapByLineId = new Map<string, any>();
+    const leadMapByName = new Map<string, any>();
+    if (rawLeads) {
+        for (const l of rawLeads) {
+            if (l.line_user_id) leadMapByLineId.set(l.line_user_id, l);
+            if (l.name) leadMapByName.set(l.name.replace(/\s+/g, ''), l);
+        }
+    }
+
     const lineLinkedOnly = filter.lineLinkedOnly !== false && filter.line_linked_only !== false;
     const targetStatuses = filter.statuses;
     const targetCoachIds = filter.coachIds || filter.coach_ids;
@@ -559,29 +573,107 @@ export async function fetchAndFilterMarketingStudents(
         if (targetCoachIds && targetCoachIds.length > 0 && (!s.coach_id || !targetCoachIds.includes(s.coach_id))) continue;
         if (targetMembershipTypeIds && targetMembershipTypeIds.length > 0 && (!s.membership_type_id || !targetMembershipTypeIds.includes(s.membership_type_id))) continue;
 
-        // エリア判定ロジック
-        let areaName = '東京都';
-        const lessonLocations = (s.lessons || []).map((l: any) => l.location || '').join(' ');
+        // エリア判定ロジック（leads情報、レッスン受講場所、担当コーチの活動拠点を総合評価）
+        const matchedLead = (s.line_user_id && leadMapByLineId.get(s.line_user_id)) ||
+            (s.full_name && leadMapByName.get(s.full_name.replace(/\s+/g, '')));
+        const leadAreaText = [matchedLead?.area, matchedLead?.lesson_location, matchedLead?.confirmed_location]
+            .filter(Boolean)
+            .join(' ');
+        const lessonLocations = (s.lessons || []).map((l: any) => l.location || '').filter(Boolean).join(' ');
         const coachArea = (s.coach as any)?.base_area || '';
-        const combinedLoc = `${lessonLocations} ${coachArea}`;
+        const combinedLoc = `${leadAreaText} ${lessonLocations} ${coachArea}`.trim();
 
-        if (combinedLoc.includes('千葉') || combinedLoc.includes('船橋') || combinedLoc.includes('市川')) {
+        let areaName = '東京都';
+        let subAreaName = '';
+
+        // 千葉県判定
+        if (combinedLoc.includes('千葉') || combinedLoc.includes('船橋') || combinedLoc.includes('市川') ||
+            combinedLoc.includes('柏') || combinedLoc.includes('浦安') || combinedLoc.includes('松戸') ||
+            combinedLoc.includes('習志野') || combinedLoc.includes('メグスパ')) {
             areaName = '千葉県';
-        } else if (combinedLoc.includes('横浜') || combinedLoc.includes('川崎') || combinedLoc.includes('神奈川')) {
+            if (combinedLoc.includes('船橋')) subAreaName = '船橋市';
+            else if (combinedLoc.includes('市川')) subAreaName = '市川市';
+            else if (combinedLoc.includes('柏')) subAreaName = '柏市';
+            else if (combinedLoc.includes('浦安')) subAreaName = '浦安市';
+        }
+        // 神奈川県判定
+        else if (combinedLoc.includes('横浜') || combinedLoc.includes('川崎') || combinedLoc.includes('神奈川') ||
+            combinedLoc.includes('久地') || combinedLoc.includes('都筑') || combinedLoc.includes('相模原') ||
+            combinedLoc.includes('藤沢') || combinedLoc.includes('湘南')) {
             areaName = '神奈川県';
-        } else if (combinedLoc.includes('目黒')) {
-            areaName = '目黒区';
-        } else if (combinedLoc.includes('港区') || combinedLoc.includes('三田') || combinedLoc.includes('御成門')) {
-            areaName = '港区';
-        } else if (combinedLoc.includes('品川')) {
-            areaName = '品川区';
-        } else if (combinedLoc.includes('世田谷')) {
-            areaName = '世田谷区';
+            if (combinedLoc.includes('横浜')) subAreaName = '横浜市';
+            else if (combinedLoc.includes('川崎')) subAreaName = '川崎市';
+        }
+        // 埼玉県判定
+        else if (combinedLoc.includes('埼玉') || combinedLoc.includes('さいたま') || combinedLoc.includes('大宮') ||
+            combinedLoc.includes('浦和') || combinedLoc.includes('川口') || combinedLoc.includes('所沢')) {
+            areaName = '埼玉県';
+            if (combinedLoc.includes('川口')) subAreaName = '川口市';
+            else subAreaName = 'さいたま市';
+        }
+        // 東京都（区・市部判定）
+        else {
+            areaName = '東京都';
+            if (combinedLoc.includes('港区') || combinedLoc.includes('三田') || combinedLoc.includes('御成門') ||
+                combinedLoc.includes('田町') || combinedLoc.includes('麻布') || combinedLoc.includes('白金')) {
+                subAreaName = '港区';
+            } else if (combinedLoc.includes('品川') || combinedLoc.includes('日野学園') || combinedLoc.includes('五反田') ||
+                combinedLoc.includes('大崎') || combinedLoc.includes('ワールドシティ')) {
+                subAreaName = '品川区';
+            } else if (combinedLoc.includes('渋谷') || combinedLoc.includes('恵比寿') || combinedLoc.includes('代官山') ||
+                combinedLoc.includes('ひがし健康プラザ') || combinedLoc.includes('上原')) {
+                subAreaName = '渋谷区';
+            } else if (combinedLoc.includes('目黒') || combinedLoc.includes('五本木') || combinedLoc.includes('自由が丘') ||
+                combinedLoc.includes('西部地区プール')) {
+                subAreaName = '目黒区';
+            } else if (combinedLoc.includes('世田谷') || combinedLoc.includes('等々力') || combinedLoc.includes('二子玉川') ||
+                combinedLoc.includes('成城') || combinedLoc.includes('千歳温水') || combinedLoc.includes('総合運動場')) {
+                subAreaName = '世田谷区';
+            } else if (combinedLoc.includes('新宿') || combinedLoc.includes('四谷') || combinedLoc.includes('東新宿') ||
+                combinedLoc.includes('東京体育館') || combinedLoc.includes('高田馬場') || combinedLoc.includes('目白') ||
+                combinedLoc.includes('麹町')) {
+                subAreaName = '新宿区';
+            } else if (combinedLoc.includes('杉並') || combinedLoc.includes('高井戸') || combinedLoc.includes('上北沢') ||
+                combinedLoc.includes('荻窪')) {
+                subAreaName = '杉並区';
+            } else if (combinedLoc.includes('江東') || combinedLoc.includes('深川') || combinedLoc.includes('有明') ||
+                combinedLoc.includes('東陽町')) {
+                subAreaName = '江東区';
+            } else if (combinedLoc.includes('中央区') || combinedLoc.includes('日本橋') || combinedLoc.includes('水天宮') ||
+                combinedLoc.includes('銀座')) {
+                subAreaName = '中央区';
+            } else if (combinedLoc.includes('江戸川') || combinedLoc.includes('葛西') || combinedLoc.includes('小岩')) {
+                subAreaName = '江戸川区';
+            } else if (combinedLoc.includes('墨田') || combinedLoc.includes('錦糸町') || combinedLoc.includes('ひがしんアリーナ')) {
+                subAreaName = '墨田区';
+            } else if (combinedLoc.includes('武蔵野') || combinedLoc.includes('吉祥寺') || combinedLoc.includes('三鷹') ||
+                combinedLoc.includes('調布') || combinedLoc.includes('府中') || combinedLoc.includes('町田')) {
+                subAreaName = '東京市部';
+            }
         }
 
+        const displayArea = subAreaName ? `${areaName} (${subAreaName})` : areaName;
+
+        // フィルターによるエリア絞り込み判定（都道府県・区市町村・複合キーワードの柔軟マッチング）
         if (targetAreas && targetAreas.length > 0) {
-            const matchArea = targetAreas.some((a: string) => areaName.includes(a) || combinedLoc.includes(a));
-            if (!matchArea) continue;
+            const isMatched = targetAreas.some((target: string) => {
+                if (target === 'all' || target === '全エリア') return true;
+                // 完全一致または前方一致・含有判定
+                if (areaName === target || subAreaName === target || displayArea.includes(target)) return true;
+                if (combinedLoc.includes(target)) return true;
+                // 都道府県指定の場合、その配下の区市町村もマッチ
+                if (target === '東京都' && areaName === '東京都') return true;
+                if (target === '神奈川県' && areaName === '神奈川県') return true;
+                if (target === '千葉県' && areaName === '千葉県') return true;
+                if (target === '埼玉県' && areaName === '埼玉県') return true;
+                // スラッシュ/中黒区切りの複合エリア指定（例: 港区・品川区）
+                if (target.includes('・')) {
+                    const parts = target.split('・');
+                    return parts.some(p => areaName.includes(p) || subAreaName.includes(p) || combinedLoc.includes(p));
+                }
+                return false;
+            });
+            if (!isMatched) continue;
         }
 
         if (searchQuery !== '') {
@@ -613,7 +705,7 @@ export async function fetchAndFilterMarketingStudents(
             fullName: s.full_name || '',
             fullNameKana: s.full_name_kana || null,
             status: s.status,
-            area: areaName,
+            area: displayArea,
             coachId: s.coach_id || null,
             coachName: (s.coach as any)?.full_name || null,
             membershipTypeId: s.membership_type_id || null,
