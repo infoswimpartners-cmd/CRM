@@ -54,6 +54,17 @@ export interface AreaSeoAuditItem {
         label: string;
         suggestedSlug: string;
     };
+
+    // ⚡ 登録URL & リアルタイム実測検証拡張フィールド
+    customUrl?: string | null;         // ユーザーが登録・変更したURLパスまたはフルURL
+    lastAuditedAt?: string | null;     // 最終再検証日時（例: "2026/10/13 23:25 JST"）
+    auditStatus?: 'success' | 'not_found' | 'error' | 'pending'; // 検証ステータス
+    detectedTitle?: string | null;     // 検出されたページタイトル
+    detectedH1?: string | null;        // 検出されたH1
+    detectedH2List?: string[];         // 検出されたH2見出しリスト
+    hasLdJson?: boolean;               // 構造化データの有無
+    httpStatus?: number | null;        // HTTPステータス（200, 404等）
+    auditFeedback?: string[];          // 発見された長所・改善点リスト
 }
 
 export interface AreaRegionGroup {
@@ -459,9 +470,10 @@ export const AREA_SEO_AUDIT_DATA: AreaSeoAuditItem[] = [
 ];
 
 /**
- * 地域グループ別の集計データを算出
+ * 地域グループ別の集計データを算出（引数でカスタムリストも受付可能）
  */
-export function getAreaRegionGroups(): AreaRegionGroup[] {
+export function getAreaRegionGroups(customList?: AreaSeoAuditItem[]): AreaRegionGroup[] {
+    const list = customList || AREA_SEO_AUDIT_DATA;
     const groupMap: Record<string, { label: string; areas: AreaSeoAuditItem[] }> = {
         'tokyo_23': { label: '東京都23区（都心・城南・城西）', areas: [] },
         'kanagawa': { label: '神奈川エリア（横浜・八景・川崎）', areas: [] },
@@ -470,7 +482,7 @@ export function getAreaRegionGroups(): AreaRegionGroup[] {
         'saitama': { label: '提案エリア（さいたま・川口）', areas: [] },
     };
 
-    for (const item of AREA_SEO_AUDIT_DATA) {
+    for (const item of list) {
         if (item.areaKey === 'hachioji_machida') {
             groupMap['tokyo_tama'].areas.push(item);
         } else if (item.prefecture === 'tokyo') {
@@ -495,3 +507,112 @@ export function getAreaRegionGroups(): AreaRegionGroup[] {
         };
     });
 }
+
+/**
+ * 登録URLのLiveAudit実測データ（最新HTML）からAreaSeoAuditItemを再診断・更新
+ */
+export function evaluateAreaItemWithLiveAudit(
+    baseItem: AreaSeoAuditItem,
+    targetUrl: string,
+    auditData: {
+        httpStatus?: number;
+        liveTitle?: string;
+        liveDescription?: string;
+        h1?: string;
+        h2List?: string[];
+        hasLdJson?: boolean;
+        isDeletedPage?: boolean;
+        fetchedAt?: string;
+    }
+): AreaSeoAuditItem {
+    const updated = { ...baseItem };
+    const nowJst = auditData.fetchedAt || new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
+    updated.lastAuditedAt = nowJst;
+    updated.customUrl = targetUrl;
+    updated.httpStatus = auditData.httpStatus || 200;
+    updated.detectedTitle = auditData.liveTitle || null;
+    updated.detectedH1 = auditData.h1 || null;
+    updated.detectedH2List = auditData.h2List || [];
+    updated.hasLdJson = Boolean(auditData.hasLdJson);
+
+    const feedback: string[] = [];
+
+    // 1. ページ未検出（404）の場合の判定
+    if (auditData.httpStatus === 404 || auditData.isDeletedPage) {
+        updated.hasDedicatedLp = false;
+        updated.auditStatus = 'not_found';
+        updated.seoScore = Math.min(baseItem.seoScore, 35);
+        updated.status = baseItem.monthlySearchVolume > 500 ? 'needs_lp' : 'untapped_opportunity';
+        updated.statusLabel = '要改善（登録URLが404未検出）';
+        updated.diagnosisSummary = `登録URL「${targetUrl}」を検証した結果、HTTP 404（ページ未検出）でした。STUDIOまたはCMSでページを公開するか、正しいURLを登録してください。`;
+        updated.actionAdvice = `登録URL「${targetUrl}」が存在しません。新規にエリア専用LPを作成するか、既存ページのURLを登録してください。`;
+        updated.auditFeedback = ['⚠️ HTTP 404: 登録されたURLが存在しません'];
+        return updated;
+    }
+
+    // 2. 正常取得（HTTP 200）時の精密スコアリング
+    updated.hasDedicatedLp = true;
+    updated.dedicatedLpPath = targetUrl.startsWith('http') ? new URL(targetUrl).pathname : targetUrl;
+    updated.auditStatus = 'success';
+
+    let calculatedScore = 50; // ベース点（公開ページあり）
+
+    const title = (auditData.liveTitle || '').toLowerCase();
+    const h1 = (auditData.h1 || '').toLowerCase();
+    const allH2 = (auditData.h2List || []).join(' ').toLowerCase();
+    const combinedContent = `${title} ${h1} ${allH2}`;
+
+    // エリア名の出現確認
+    const areaKeywords = [
+        baseItem.areaName.split('（')[0],
+        ...baseItem.primaryKeyword.split(/[\s　]+/)
+    ].filter(w => w.length >= 2);
+
+    const matchedAreaKw = areaKeywords.filter(kw => title.includes(kw.toLowerCase()) || combinedContent.includes(kw.toLowerCase()));
+    if (matchedAreaKw.length > 0) {
+        calculatedScore += 25;
+        feedback.push(`✅ エリア・キーワード適合（${matchedAreaKw.slice(0, 3).join('・')}が含まれています）`);
+    } else {
+        feedback.push(`⚠️ タイトルまたは見出しに対象エリア名「${baseItem.areaName}」が明記されていません`);
+    }
+
+    // 主要プール名の言及確認
+    const matchedFacilities = baseItem.majorFacilities.filter(f => 
+        combinedContent.includes(f.name.toLowerCase().replace(/（.*?）/g, ''))
+    );
+    if (matchedFacilities.length > 0) {
+        calculatedScore += 15;
+        feedback.push(`✅ 出張対応公営プール（${matchedFacilities.map(f => f.name).slice(0, 2).join('、')}）の言及を確認`);
+    } else {
+        feedback.push(`💡 公営プール名（${baseItem.majorFacilities[0]?.name}等）を見出しに追記すると成約率が大幅向上します`);
+    }
+
+    // 構造化データの有無
+    if (auditData.hasLdJson) {
+        calculatedScore += 10;
+        feedback.push('✅ FAQ/Article等の構造化データ（JSON-LD）が検出されました');
+    } else {
+        feedback.push('💡 FAQ等の構造化データ（JSON-LD）を追加することでGoogleリッチリザルト獲得が期待できます');
+    }
+
+    updated.seoScore = Math.min(100, Math.max(calculatedScore, 40));
+    updated.auditFeedback = feedback;
+
+    // ステータス判定
+    if (updated.seoScore >= 85) {
+        updated.status = 'completed';
+        updated.statusLabel = '対策完了（高適合・上位獲得体制）';
+        updated.diagnosisSummary = `登録URL「${targetUrl}」を検証完了（HTTP 200）。タイトル「${auditData.liveTitle || ''}」に地域名および主要公営プールが網羅され、最高水準のSEO対策が確認されました。`;
+    } else if (updated.seoScore >= 60) {
+        updated.status = 'in_progress';
+        updated.statusLabel = '対策進行中（専用ページ確認済み）';
+        updated.diagnosisSummary = `登録URL「${targetUrl}」を検証完了（HTTP 200）。専用ページが稼働中ですが、見出しへのプール名記載や構造化データの追加で1位奪取が狙えます。`;
+    } else {
+        updated.status = 'needs_lp';
+        updated.statusLabel = '要強化（コンテンツ適合度向上推奨）';
+        updated.diagnosisSummary = `登録URL「${targetUrl}」を検証完了（HTTP 200）。ページは存在しますが、対象エリア「${baseItem.areaName}」に特化した見出し・内容への強化が推奨されます。`;
+    }
+
+    return updated;
+}
+

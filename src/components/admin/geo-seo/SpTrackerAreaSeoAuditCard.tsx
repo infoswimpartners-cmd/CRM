@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     MapPin,
     ShieldCheck,
@@ -18,13 +18,27 @@ import {
     Flame,
     ArrowUpRight,
     HelpCircle,
+    RefreshCw,
+    Edit3,
+    Check,
+    X,
+    Link2,
+    Globe,
+    Clock,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import {
     AREA_SEO_AUDIT_DATA,
     getAreaRegionGroups,
     AreaSeoAuditItem,
     AreaSeoStatus,
 } from '@/lib/area-seo-audit';
+import {
+    getAreaSeoAuditsAction,
+    saveAreaCustomUrlAction,
+    auditAreaSeoAction,
+    auditAllAreasSeoAction,
+} from '@/actions/area-seo-actions';
 import { ArticleType } from '@/lib/generated-articles-storage';
 
 interface SpTrackerAreaSeoAuditCardProps {
@@ -39,14 +53,40 @@ interface SpTrackerAreaSeoAuditCardProps {
 export function SpTrackerAreaSeoAuditCard({
     onOpenGenerator,
 }: SpTrackerAreaSeoAuditCardProps) {
-    const [selectedGroup, setSelectedGroup] = useState<string>('all');
-    const [statusFilter, setStatusFilter] = useState<string>('all');
-    const [expandedAreaId, setExpandedAreaId] = useState<string | null>(null);
+    const [areas, setAreas] = useState<AreaSeoAuditItem[]>(AREA_SEO_AUDIT_DATA);
+    const [isLoading, setIsLoading] = useState(false);
+    const [isAuditingAll, setIsAuditingAll] = useState(false);
+    const [auditingAreaId, setAuditingAreaId] = useState<string | null>(null);
 
-    const regionGroups = getAreaRegionGroups();
+    // インラインURL編集用の状態管理
+    const [editingAreaId, setEditingAreaId] = useState<string | null>(null);
+    const [editingUrlValue, setEditingUrlValue] = useState<string>('');
+    const [isSavingUrl, setIsSavingUrl] = useState(false);
 
     // フィルタリング
-    const filteredAreas = AREA_SEO_AUDIT_DATA.filter((item) => {
+    const [selectedGroup, setSelectedGroup] = useState<string>('all');
+    const [statusFilter, setStatusFilter] = useState<string>('all');
+
+    // 初期ロード: Supabaseに保存された最新の登録URL & 検証結果を復元
+    useEffect(() => {
+        const loadSavedData = async () => {
+            setIsLoading(true);
+            try {
+                const res = await getAreaSeoAuditsAction();
+                if (res.success && res.data && res.data.length > 0) {
+                    setAreas(res.data);
+                }
+            } catch (err) {
+                console.warn('Failed to load saved area SEO audits:', err);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        loadSavedData();
+    }, []);
+
+    // フィルタリング後のエリア一覧
+    const filteredAreas = areas.filter((item) => {
         if (selectedGroup === 'tokyo_23' && !(item.prefecture === 'tokyo' && item.areaKey !== 'hachioji_machida')) return false;
         if (selectedGroup === 'kanagawa' && item.prefecture !== 'kanagawa') return false;
         if (selectedGroup === 'chiba' && item.prefecture !== 'chiba') return false;
@@ -59,13 +99,88 @@ export function SpTrackerAreaSeoAuditCard({
     });
 
     // サマリー集計
-    const totalAreas = AREA_SEO_AUDIT_DATA.length;
-    const avgScore = Math.round(
-        AREA_SEO_AUDIT_DATA.reduce((acc, c) => acc + c.seoScore, 0) / totalAreas
-    );
-    const completedCount = AREA_SEO_AUDIT_DATA.filter((a) => a.status === 'completed').length;
-    const needsLpCount = AREA_SEO_AUDIT_DATA.filter((a) => a.status === 'needs_lp').length;
-    const untappedCount = AREA_SEO_AUDIT_DATA.filter((a) => a.status === 'untapped_opportunity').length;
+    const totalAreas = areas.length;
+    const avgScore = totalAreas > 0
+        ? Math.round(areas.reduce((acc, c) => acc + c.seoScore, 0) / totalAreas)
+        : 0;
+    const completedCount = areas.filter((a) => a.status === 'completed').length;
+    const needsLpCount = areas.filter((a) => a.status === 'needs_lp').length;
+    const untappedCount = areas.filter((a) => a.status === 'untapped_opportunity').length;
+
+    // 単一エリアの再検証（最新実測フェッチ）
+    const handleAuditSingle = async (area: AreaSeoAuditItem) => {
+        const targetUrl = (area.customUrl || area.dedicatedLpPath || '').trim();
+        if (!targetUrl) {
+            toast.error(`「${area.areaName}」には検証対象のURLが登録されていません。「URL登録/変更」から入力してください。`);
+            setEditingAreaId(area.id);
+            setEditingUrlValue(area.recommendedAction.suggestedSlug || '/personal_swim');
+            return;
+        }
+
+        setAuditingAreaId(area.id);
+        try {
+            const res = await auditAreaSeoAction(area.id, targetUrl);
+            if (res.success && res.data) {
+                setAreas((prev) => prev.map((a) => (a.id === area.id ? res.data! : a)));
+                if (res.data.httpStatus === 404) {
+                    toast.warning(`「${area.areaName}」の登録URL（${targetUrl}）は404（未公開・存在しないページ）でした。`);
+                } else {
+                    toast.success(`「${area.areaName}」の最新HTMLを再検証しました（SEOスコア: ${res.data.seoScore}点）`);
+                }
+            } else {
+                toast.error(res.error || '再検証に失敗しました。');
+            }
+        } catch (err: any) {
+            toast.error(err?.message || '再検証処理中に通信エラーが発生しました。');
+        } finally {
+            setAuditingAreaId(null);
+        }
+    };
+
+    // 全エリアの一括再検証
+    const handleAuditAll = async () => {
+        if (isAuditingAll) return;
+        setIsAuditingAll(true);
+        toast.info('全商圏エリアの登録URLを順次フェッチ・再検証しています...');
+
+        try {
+            const res = await auditAllAreasSeoAction();
+            if (res.success && res.data && res.data.length > 0) {
+                setAreas(res.data);
+                toast.success(`全エリアの一括再検証が完了しました（検証対象: ${res.updatedCount}エリア）`);
+            } else {
+                toast.error(res.error || '一括再検証に失敗しました。');
+            }
+        } catch (err: any) {
+            toast.error(err?.message || '一括再検証中にエラーが発生しました。');
+        } finally {
+            setIsAuditingAll(false);
+        }
+    };
+
+    // URL編集の保存＆即時検証
+    const handleSaveCustomUrl = async (areaId: string) => {
+        setIsSavingUrl(true);
+        try {
+            const res = await saveAreaCustomUrlAction(areaId, editingUrlValue.trim());
+            if (res.success && res.data) {
+                setAreas((prev) => prev.map((a) => (a.id === areaId ? res.data! : a)));
+                setEditingAreaId(null);
+                setEditingUrlValue('');
+                if (res.data.httpStatus === 404) {
+                    toast.warning(`登録URLを保存しましたが、指定ページ（${editingUrlValue}）は404エラー（未公開）です。`);
+                } else {
+                    toast.success(`専用LP URLを登録し、最新実測検証を完了しました（SEOスコア: ${res.data.seoScore}点）`);
+                }
+            } else {
+                toast.error(res.error || 'URLの保存に失敗しました。');
+            }
+        } catch (err: any) {
+            toast.error(err?.message || 'URL保存中にエラーが発生しました。');
+        } finally {
+            setIsSavingUrl(false);
+        }
+    };
 
     const getStatusStyle = (status: AreaSeoStatus) => {
         switch (status) {
@@ -105,9 +220,9 @@ export function SpTrackerAreaSeoAuditCard({
     return (
         <div className="bg-white rounded-2xl border border-zinc-200/90 p-5 sm:p-7 shadow-[0_8px_30px_rgb(0,0,0,0.04)] space-y-6">
             {/* ヘッダーセクション */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-5 border-b border-zinc-100 gap-4">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between pb-5 border-b border-zinc-100 gap-4">
                 <div className="space-y-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                         <span className="p-1.5 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-xs">
                             <Compass className="w-5 h-5" />
                         </span>
@@ -115,18 +230,29 @@ export function SpTrackerAreaSeoAuditCard({
                             商圏エリア別 SEO対策状況・診断ダッシュボード
                         </h3>
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                            東京23区・神奈川・多摩・千葉・埼玉
+                            登録URLリアルタイム再検証対応
                         </span>
                     </div>
                     <p className="text-xs text-zinc-500">
-                        「各エリアでSEO対策がしっかりできているか」を専用LPの有無・順位・公営プール拠点・需要から診断
+                        登録された各エリア専用LP（実公開URL）のHTMLを直接フェッチ・診断。タイトル・見出し・公営プール言及・構造化データからSEOスコアを客観判定します。
                     </p>
                 </div>
 
-                <div className="flex items-center gap-2 self-start sm:self-auto">
-                    <span className="text-xs font-mono font-bold text-slate-700 bg-zinc-100 px-3 py-1.5 rounded-xl">
-                        エリア平均SEOスコア: <span className="text-sm font-black text-indigo-600">{avgScore}点</span>
+                <div className="flex flex-wrap items-center gap-2.5 self-start lg:self-auto">
+                    <span className="text-xs font-mono font-bold text-slate-700 bg-zinc-100 px-3 py-1.5 rounded-xl border border-zinc-200/60">
+                        エリア平均スコア: <span className="text-sm font-black text-indigo-600">{avgScore}点</span>
                     </span>
+
+                    {/* 全エリア一括再検証ボタン */}
+                    <button
+                        onClick={handleAuditAll}
+                        disabled={isAuditingAll || isLoading}
+                        className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:bg-slate-400 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                        title="登録されているすべてのエリアのURLの最新HTMLを再取得して一括診断します"
+                    >
+                        <RefreshCw className={`w-3.5 h-3.5 text-amber-300 ${isAuditingAll ? 'animate-spin' : ''}`} />
+                        {isAuditingAll ? '全エリア再検証中...' : '🔄 全商圏を一括再検証'}
+                    </button>
                 </div>
             </div>
 
@@ -151,7 +277,7 @@ export function SpTrackerAreaSeoAuditCard({
                     <div className="text-xl sm:text-2xl font-black text-emerald-700 font-mono">
                         {completedCount} <span className="text-xs font-normal text-emerald-600">エリア</span>
                     </div>
-                    <span className="text-[10px] text-emerald-700">目黒・港区、千葉市（1〜2位）</span>
+                    <span className="text-[10px] text-emerald-700">目黒・港区、千葉市（高スコア）</span>
                 </div>
 
                 <div className="p-4 rounded-xl bg-rose-50/60 border border-rose-200 space-y-1">
@@ -162,7 +288,7 @@ export function SpTrackerAreaSeoAuditCard({
                     <div className="text-xl sm:text-2xl font-black text-rose-700 font-mono">
                         {needsLpCount} <span className="text-xs font-normal text-rose-600">エリア</span>
                     </div>
-                    <span className="text-[10px] text-rose-700">横浜、世田谷、川崎（アクセス大）</span>
+                    <span className="text-[10px] text-rose-700">横浜、世田谷、川崎（需要大）</span>
                 </div>
 
                 <div className="p-4 rounded-xl bg-indigo-50/60 border border-indigo-200 space-y-1">
@@ -264,7 +390,9 @@ export function SpTrackerAreaSeoAuditCard({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {filteredAreas.map((area) => {
                     const statusInfo = getStatusStyle(area.status);
-                    const isExpanded = expandedAreaId === area.id;
+                    const isAuditingThis = auditingAreaId === area.id;
+                    const isEditingThisUrl = editingAreaId === area.id;
+                    const currentTargetUrl = (area.customUrl || area.dedicatedLpPath || '').trim();
 
                     return (
                         <div
@@ -291,7 +419,7 @@ export function SpTrackerAreaSeoAuditCard({
                                     </div>
 
                                     {/* SEO対策スコア */}
-                                    <div className={`p-2 rounded-xl border text-center min-w-[72px] ${getScoreColor(area.seoScore)}`}>
+                                    <div className={`p-2 rounded-xl border text-center min-w-[76px] ${getScoreColor(area.seoScore)}`}>
                                         <span className="text-[9px] font-bold block uppercase tracking-wider">SEOスコア</span>
                                         <span className="text-xl font-black font-mono leading-none">
                                             {area.seoScore}
@@ -300,9 +428,9 @@ export function SpTrackerAreaSeoAuditCard({
                                     </div>
                                 </div>
 
-                                {/* 主要キーワード & 専用LPの状況 */}
+                                {/* 主要キーワード & 専用LPの状況（登録・再検証コントロール） */}
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                                    <div className="p-2.5 rounded-xl bg-zinc-50 border border-zinc-200/70 space-y-0.5">
+                                    <div className="p-2.5 rounded-xl bg-zinc-50 border border-zinc-200/70 space-y-1">
                                         <span className="text-[10px] font-bold text-zinc-400 block">ターゲット主要KW</span>
                                         <div className="font-bold text-slate-900 truncate" title={area.primaryKeyword}>
                                             「{area.primaryKeyword}」
@@ -318,24 +446,121 @@ export function SpTrackerAreaSeoAuditCard({
                                         </div>
                                     </div>
 
-                                    <div className="p-2.5 rounded-xl bg-zinc-50 border border-zinc-200/70 space-y-0.5">
-                                        <span className="text-[10px] font-bold text-zinc-400 block">専用受け皿LP</span>
-                                        {area.hasDedicatedLp ? (
-                                            <div className="font-bold text-emerald-700 flex items-center gap-1 truncate">
-                                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
-                                                {area.dedicatedLpPath}
+                                    <div className="p-2.5 rounded-xl bg-zinc-50 border border-zinc-200/70 space-y-1.5">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[10px] font-bold text-zinc-400 block">専用受け皿LP / 登録URL</span>
+                                            <button
+                                                onClick={() => {
+                                                    if (isEditingThisUrl) {
+                                                        setEditingAreaId(null);
+                                                    } else {
+                                                        setEditingAreaId(area.id);
+                                                        setEditingUrlValue(area.customUrl || area.dedicatedLpPath || area.recommendedAction.suggestedSlug || '');
+                                                    }
+                                                }}
+                                                className="text-[10px] text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-0.5 underline cursor-pointer"
+                                            >
+                                                <Edit3 className="w-3 h-3" />
+                                                {isEditingThisUrl ? '閉じる' : 'URL変更/登録'}
+                                            </button>
+                                        </div>
+
+                                        {/* URLインライン編集フォーム */}
+                                        {isEditingThisUrl ? (
+                                            <div className="space-y-1.5 pt-1">
+                                                <input
+                                                    type="text"
+                                                    value={editingUrlValue}
+                                                    onChange={(e) => setEditingUrlValue(e.target.value)}
+                                                    placeholder="/personal_swim/yokohama または URL"
+                                                    className="w-full text-xs font-mono px-2 py-1 bg-white border border-indigo-300 rounded-md focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                                                />
+                                                <div className="flex items-center gap-1.5">
+                                                    <button
+                                                        onClick={() => handleSaveCustomUrl(area.id)}
+                                                        disabled={isSavingUrl}
+                                                        className="px-2 py-0.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-[10px] font-bold flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                                    >
+                                                        <Check className="w-3 h-3" />
+                                                        {isSavingUrl ? '保存中...' : '保存して検証'}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setEditingAreaId(null)}
+                                                        className="px-2 py-0.5 bg-zinc-200 hover:bg-zinc-300 text-zinc-700 rounded text-[10px] cursor-pointer"
+                                                    >
+                                                        キャンセル
+                                                    </button>
+                                                </div>
                                             </div>
                                         ) : (
-                                            <div className="font-bold text-rose-700 flex items-center gap-1">
-                                                <AlertTriangle className="w-3.5 h-3.5 text-rose-500 flex-shrink-0" />
-                                                専用LPなし（汎用トップ）
-                                            </div>
+                                            <>
+                                                {currentTargetUrl ? (
+                                                    <div className="font-bold text-emerald-700 flex items-center gap-1 truncate" title={currentTargetUrl}>
+                                                        {area.httpStatus === 404 ? (
+                                                            <AlertTriangle className="w-3.5 h-3.5 text-rose-500 flex-shrink-0" />
+                                                        ) : (
+                                                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                                                        )}
+                                                        <span className={area.httpStatus === 404 ? 'text-rose-600 line-through' : ''}>
+                                                            {currentTargetUrl}
+                                                        </span>
+                                                        <a
+                                                            href={currentTargetUrl.startsWith('http') ? currentTargetUrl : `https://swim-partners.com${currentTargetUrl}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="text-zinc-400 hover:text-zinc-600 ml-0.5"
+                                                            title="実際のページを開く"
+                                                        >
+                                                            <ExternalLink className="w-3 h-3" />
+                                                        </a>
+                                                    </div>
+                                                ) : (
+                                                    <div className="font-bold text-rose-700 flex items-center gap-1">
+                                                        <AlertTriangle className="w-3.5 h-3.5 text-rose-500 flex-shrink-0" />
+                                                        専用LP未登録（汎用トップ）
+                                                    </div>
+                                                )}
+
+                                                {/* 再検証ボタン & 最終検証日時 */}
+                                                <div className="flex items-center justify-between pt-0.5">
+                                                    <button
+                                                        onClick={() => handleAuditSingle(area)}
+                                                        disabled={isAuditingThis}
+                                                        className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 flex items-center gap-1 transition-all cursor-pointer"
+                                                        title="登録URLの最新HTMLを即座に再取得して再診断します"
+                                                    >
+                                                        <RefreshCw className={`w-3 h-3 ${isAuditingThis ? 'animate-spin' : ''}`} />
+                                                        {isAuditingThis ? '再検証中...' : '⚡ 再検証'}
+                                                    </button>
+
+                                                    <span className="text-[10px] text-zinc-400 font-mono">
+                                                        {area.lastAuditedAt ? `検証: ${area.lastAuditedAt.split(' ')[0]}` : '未検証'}
+                                                    </span>
+                                                </div>
+                                            </>
                                         )}
-                                        <div className="text-[10px] text-zinc-400 font-mono">
-                                            月間検索: {area.monthlySearchVolume}回 / GA4: {area.ga4RecentSessions}回
-                                        </div>
                                     </div>
                                 </div>
+
+                                {/* 最新検証結果ステータスバッジ（タイトル検出・HTTPコード） */}
+                                {area.detectedTitle && (
+                                    <div className="p-2.5 rounded-xl bg-slate-50/80 border border-slate-200/60 text-[11px] space-y-1">
+                                        <div className="flex items-center justify-between text-[10px] font-mono text-zinc-400">
+                                            <span className="flex items-center gap-1 font-bold text-slate-700">
+                                                <Globe className="w-3 h-3 text-indigo-600" />
+                                                検出タイトル（実測HTTP {area.httpStatus || 200}）
+                                            </span>
+                                            {area.hasLdJson && (
+                                                <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200 font-sans">
+                                                    構造化データあり
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className="text-slate-800 font-medium truncate" title={area.detectedTitle}>
+                                            {area.detectedTitle}
+                                        </p>
+                                    </div>
+                                )}
 
                                 {/* 出張対応の主要公営プール一覧 */}
                                 <div className="space-y-1.5">
@@ -361,14 +586,30 @@ export function SpTrackerAreaSeoAuditCard({
 
                                 {/* 診断インサイト & アクションアドバイス */}
                                 <div className="space-y-1.5 text-xs bg-indigo-50/50 p-3 rounded-xl border border-indigo-100">
-                                    <div className="font-bold text-indigo-950 flex items-center gap-1 text-[11px]">
-                                        <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                                        診断サマリー:
+                                    <div className="font-bold text-indigo-950 flex items-center justify-between text-[11px]">
+                                        <span className="flex items-center gap-1">
+                                            <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                                            最新診断サマリー:
+                                        </span>
+                                        {area.lastAuditedAt && (
+                                            <span className="text-[9px] font-mono font-normal text-zinc-500">
+                                                {area.lastAuditedAt}
+                                            </span>
+                                        )}
                                     </div>
                                     <p className="text-zinc-700 text-[11px] leading-relaxed">
                                         {area.diagnosisSummary}
                                     </p>
-                                    <p className="text-indigo-900 font-bold text-[11px] pt-1 border-t border-indigo-100/80">
+                                    {area.auditFeedback && area.auditFeedback.length > 0 && (
+                                        <div className="pt-1 border-t border-indigo-100/80 space-y-0.5">
+                                            {area.auditFeedback.map((fb, fbIdx) => (
+                                                <p key={fbIdx} className="text-[10px] text-indigo-900 font-medium">
+                                                    {fb}
+                                                </p>
+                                            ))}
+                                        </div>
+                                    )}
+                                    <p className="text-indigo-950 font-bold text-[11px] pt-1 border-t border-indigo-100/80">
                                         💡 {area.actionAdvice}
                                     </p>
                                 </div>
@@ -384,10 +625,11 @@ export function SpTrackerAreaSeoAuditCard({
                                     onClick={() => {
                                         if (onOpenGenerator) {
                                             const poolNames = area.majorFacilities.map((f) => f.name).join('、');
+                                            const targetPathForContent = area.customUrl || area.dedicatedLpPath || area.recommendedAction.suggestedSlug;
                                             onOpenGenerator(
                                                 area.primaryKeyword,
                                                 'seo',
-                                                area.recommendedAction.suggestedSlug,
+                                                targetPathForContent,
                                                 `【エリア特化コンテンツ制作リクエスト】\n対象エリア: ${area.areaName}（${area.parentRegionLabel}）\n出張対応公営プール: ${poolNames}\n課題・改善アドバイス: ${area.actionAdvice}`
                                             );
                                         }
