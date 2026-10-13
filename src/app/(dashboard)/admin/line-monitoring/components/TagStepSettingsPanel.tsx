@@ -73,7 +73,7 @@ export function TagStepSettingsPanel() {
             description: '体験レッスン受講完了日を起点として、お礼・フィードバック・入会特典を順次自動配信します。',
             targetLead: '体験レッスン受講済（trial_done）の生徒',
             safetyNotice: '本会員へ入会（active）または退会した生徒には自動スキップされます。',
-            recommendedTiming: '1日後 19:00 / 3日後 12:00 / 7日後 19:00',
+            recommendedTiming: '1日後 18:00 / 3日後 18:00 / 7日後 18:00',
         },
         {
             tag: 'trial_form_viewed',
@@ -83,7 +83,7 @@ export function TagStepSettingsPanel() {
             description: '公式LINEから体験予約フォーム（LIFF）を開いたものの、申込に至らなかった見込み客へフォローメッセージを自動配信します。',
             targetLead: '体験フォームを開いたが未申込のLINEユーザー',
             safetyNotice: '正式に申込が完了（trial_applied）した時点で自動的に除外・停止されます。',
-            recommendedTiming: '1日後 18:00 / 3日後 19:00',
+            recommendedTiming: '1日後 18:00 / 3日後 18:00',
         },
         {
             tag: 'friend_only',

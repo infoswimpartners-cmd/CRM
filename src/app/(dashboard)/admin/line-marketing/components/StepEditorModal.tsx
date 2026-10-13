@@ -54,7 +54,7 @@ export function StepEditorModal({
 }: StepEditorModalProps) {
     const [title, setTitle] = useState('');
     const [delayDays, setDelayDays] = useState(1);
-    const [sendTime, setSendTime] = useState('19:00');
+    const [sendTime, setSendTime] = useState('18:00');
     const [messageText, setMessageText] = useState('');
     const [targetTag, setTargetTag] = useState(defaultTag);
     const [isActive, setIsActive] = useState(true);
@@ -74,7 +74,7 @@ export function StepEditorModal({
         } else {
             setTitle('');
             setDelayDays(1);
-            setSendTime('19:00');
+            setSendTime('18:00');
             setMessageText('');
             setTargetTag(defaultTag);
             setIsActive(true);

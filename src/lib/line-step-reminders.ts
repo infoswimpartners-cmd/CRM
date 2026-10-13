@@ -32,7 +32,7 @@ export interface StepTemplatesConfig {
 
 export const DEFAULT_STEP_TEMPLATES: StepTemplatesConfig = {
     step1: {
-        title: 'Day 1 (24時間後・19:00): 場所と日程の不安解消',
+        title: 'Day 1 (24時間後・18:00): 場所と日程の不安解消',
         delay_hours: 24,
         is_active: true,
         body: `{name} 様、昨日はSwim Partners公式LINEへのご登録ありがとうございます！事務局です😊
@@ -51,7 +51,7 @@ export const DEFAULT_STEP_TEMPLATES: StepTemplatesConfig = {
 {trial_url}`
     },
     step2: {
-        title: 'Day 2 (72時間後・12:00): 悩みへの共感と安心感（大人・子ども両対応）',
+        title: 'Day 2 (72時間後・18:00): 悩みへの共感と安心感（大人・子ども両対応）',
         delay_hours: 72,
         is_active: true,
         body: `こんにちは！Swim Partners事務局です✨
@@ -101,8 +101,8 @@ Swim Partnersのマンツーマン個人指導なら、お子様から大人の�
 
 /**
  * 友だち追加日時（followedAt）を基準に、指定ステップの目標配信日時（JST）を算出する
- * Day 1: 追加翌日の 19:00 JST
- * Day 2: 追加3日後の 12:00 JST
+ * Day 1: 追加翌日の 18:00 JST
+ * Day 2: 追加3日後の 18:00 JST
  * Day 3: 追加5日後の 18:00 JST
  */
 export function calculateTargetSendTime(followedAt: string, targetStage: 1 | 2 | 3): string {
@@ -115,13 +115,13 @@ export function calculateTargetSendTime(followedAt: string, targetStage: 1 | 2 |
     const day = jstDate.getDate()
 
     let addDays = 1
-    let targetHourJst = 19
+    let targetHourJst = 18
     if (targetStage === 1) {
         addDays = 1
-        targetHourJst = 19
+        targetHourJst = 18
     } else if (targetStage === 2) {
         addDays = 3
-        targetHourJst = 12
+        targetHourJst = 18
     } else if (targetStage === 3) {
         addDays = 5
         targetHourJst = 18
@@ -550,7 +550,7 @@ export async function processLineStepReminders(options: { dryRun?: boolean } = {
                 .replace(/[{｛]{1,2}\s*trial_url\s*[}｝]{1,2}/gi, trialFormUrl)
         }
 
-        // Stage 0 -> Step 1 (追加翌日 19:00)
+        // Stage 0 -> Step 1 (追加翌日 18:00)
         if (state.step_stage === 0) {
             if (!templates.step1.is_active) {
                 // スキップしてStep 2へ
@@ -566,7 +566,7 @@ export async function processLineStepReminders(options: { dryRun?: boolean } = {
                 ? calculateTargetSendTime(state.followed_at, 2)
                 : new Date(followedDate.getTime() + (templates.step2.delay_hours || 72) * 60 * 60 * 1000).toISOString()
         } 
-        // Stage 1 -> Step 2 (追加3日後 12:00)
+        // Stage 1 -> Step 2 (追加3日後 18:00)
         else if (state.step_stage === 1) {
             if (!templates.step2.is_active) {
                 // スキップしてStep 3へ

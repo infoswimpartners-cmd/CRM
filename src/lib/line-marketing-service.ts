@@ -988,7 +988,7 @@ export function calculateStepScheduledAt(baseDate: Date | string, delayDays: num
         day = jstDate.getUTCDate();
     }
 
-    const [hours, minutes] = (sendTime || '19:00').split(':').map(Number);
+    const [hours, minutes] = (sendTime || '18:00').split(':').map(Number);
     // JSTから9時間引いてUTCエポックを計算
     const targetUtcTimestamp = Date.UTC(year, month, day + delayDays, hours - 9, minutes, 0, 0);
     return new Date(targetUtcTimestamp).toISOString();
@@ -1062,7 +1062,7 @@ export async function syncTrialDoneStudentsToProgress(options: {
 
     const firstRule = stepRules && stepRules.length > 0 ? stepRules[0] : null;
     const delayDays = firstRule ? firstRule.delay_days : 1;
-    const sendTime = firstRule ? firstRule.send_time : '19:00';
+    const sendTime = firstRule ? firstRule.send_time : '18:00';
 
     let newlyEnrolledCount = 0;
     let alreadyEnrolledCount = 0;
