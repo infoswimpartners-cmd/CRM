@@ -264,6 +264,22 @@ export async function getGeneratedArticles(): Promise<GeneratedArticle[]> {
             if (!error && data && data.length > 0) {
                 return data as GeneratedArticle[];
             }
+
+            // テーブルにデータがない場合は app_configs バックアップを確認
+            const { data: config } = await supabase
+                .from('app_configs')
+                .select('value')
+                .eq('key', 'GENERATED_ARTICLES_DATA_BACKUP')
+                .maybeSingle();
+
+            if (config?.value) {
+                try {
+                    const parsed = JSON.parse(config.value);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        return parsed;
+                    }
+                } catch {}
+            }
         }
     } catch (e) {
         console.warn('Supabase fetch failed for generated_articles, falling back to local file:', e);
@@ -302,7 +318,7 @@ export async function getGeneratedArticles(): Promise<GeneratedArticle[]> {
 export async function saveGeneratedArticle(article: GeneratedArticle): Promise<boolean> {
     let success = false;
 
-    // 1. Supabaseへ書き込み
+    // 1. Supabase テーブルへ書き込み
     try {
         const supabase = createAdminClient();
         if (supabase) {
@@ -311,13 +327,34 @@ export async function saveGeneratedArticle(article: GeneratedArticle): Promise<b
                 .upsert([article]);
             if (!error) {
                 success = true;
+            } else {
+                // テーブルが存在しない等の場合は app_configs へバックアップ保存
+                const { data: config } = await supabase
+                    .from('app_configs')
+                    .select('value')
+                    .eq('key', 'GENERATED_ARTICLES_DATA_BACKUP')
+                    .maybeSingle();
+
+                let list: GeneratedArticle[] = [];
+                if (config?.value) {
+                    try { list = JSON.parse(config.value); } catch {}
+                }
+                const idx = list.findIndex(a => a.id === article.id);
+                if (idx >= 0) list[idx] = article;
+                else list.unshift(article);
+
+                await supabase.from('app_configs').upsert({
+                    key: 'GENERATED_ARTICLES_DATA_BACKUP',
+                    value: JSON.stringify(list.slice(0, 100)),
+                }, { onConflict: 'key' });
+                success = true;
             }
         }
     } catch (e) {
-        console.warn('Supabase upsert failed for generated_articles:', e);
+        console.warn('Supabase save failed for generated_articles:', e);
     }
 
-    // 2. ローカルJSONファイルへも常に二重保存
+    // 2. ローカルJSONファイルへも常に二重保存（ローカル環境用・EROFS時は安全に無視）
     try {
         const current = await getGeneratedArticles();
         const existingIdx = current.findIndex((a) => a.id === article.id);
@@ -334,7 +371,8 @@ export async function saveGeneratedArticle(article: GeneratedArticle): Promise<b
         fs.writeFileSync(ARTICLES_FILE_PATH, JSON.stringify(current, null, 2), 'utf-8');
         success = true;
     } catch (err) {
-        console.error('Failed to save article to local file:', err);
+        // Vercel等の読み取り専用ファイルシステムでは非致命的なのでスキップ
+        console.warn('Local file write skipped (read-only environment):', err);
     }
 
     return success;

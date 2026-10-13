@@ -41,6 +41,7 @@ import {
 } from '@/actions/sp-tracker-actions';
 
 import { KeywordCompetitorIntelligence } from '@/types/competitor-benchmark';
+import { formatErrorToastMessage, sanitizeErrorMessage } from '@/lib/error-formatter';
 
 interface SpTrackerRankWatchCardProps {
     state?: SeoRankWatchState;
@@ -202,11 +203,11 @@ export function SpTrackerRankWatchCard({ state, onRefresh, onOpenGenerator }: Sp
                     toast.info(res.message);
                 }
             } else {
-                toast.error(res.message || 'AI最適化に失敗しました');
+                toast.error(sanitizeErrorMessage(res.message, 'AI最適化に失敗しました'));
             }
         } catch (err: any) {
             console.error('AI optimize error:', err);
-            toast.error(err.message || 'AI最適化中にエラーが発生しました');
+            toast.error(formatErrorToastMessage(err, 'AI最適化中にエラーが発生しました: '));
         } finally {
             setIsAiOptimizing(false);
         }
@@ -298,11 +299,11 @@ export function SpTrackerRankWatchCard({ state, onRefresh, onOpenGenerator }: Sp
                 toast.success(res.message);
                 await onRefresh();
             } else {
-                toast.error(res.message);
+                toast.error(sanitizeErrorMessage(res.message, '観察モードへの遷移に失敗しました'));
                 await onRefresh();
             }
         } catch (err: any) {
-            toast.error(err.message || 'エラーが発生しました');
+            toast.error(formatErrorToastMessage(err));
             await onRefresh();
         } finally {
             setIsSubmitting(false);
@@ -318,10 +319,10 @@ export function SpTrackerRankWatchCard({ state, onRefresh, onOpenGenerator }: Sp
                 toast.success(res.message);
                 await onRefresh();
             } else {
-                toast.error(res.message);
+                toast.error(sanitizeErrorMessage(res.message, '1位達成の更新に失敗しました'));
             }
         } catch (err: any) {
-            toast.error(err.message || 'エラーが発生しました');
+            toast.error(formatErrorToastMessage(err));
         } finally {
             setIsSubmitting(false);
         }
@@ -340,10 +341,10 @@ export function SpTrackerRankWatchCard({ state, onRefresh, onOpenGenerator }: Sp
                 toast.success(res.message);
                 await onRefresh();
             } else {
-                toast.error(res.message);
+                toast.error(sanitizeErrorMessage(res.message, '観察完了処理に失敗しました'));
             }
         } catch (err: any) {
-            toast.error(err.message || 'エラーが発生しました');
+            toast.error(formatErrorToastMessage(err));
         } finally {
             setIsSubmitting(false);
         }

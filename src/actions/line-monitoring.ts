@@ -31,19 +31,24 @@ export type LineBotConfig = {
  * 管理者権限を検証する内部ヘルパー
  */
 async function verifyAdminRole() {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { isAuthorized: false, user: null }
+    try {
+        const supabase = await createClient()
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        if (authError || !user) return { isAuthorized: false, user: null }
 
-    const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single()
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single()
 
-    return {
-        isAuthorized: profile?.role === 'admin',
-        user
+        return {
+            isAuthorized: profile?.role === 'admin' || profile?.role === 'owner',
+            user
+        }
+    } catch (e) {
+        console.warn('[verifyAdminRole] error:', e)
+        return { isAuthorized: false, user: null }
     }
 }
 
@@ -478,18 +483,18 @@ export async function getStudentsSimpleListAction() {
  * 前日連絡Cronを手動実行・テスト実行します（管理者のみ）
  */
 export async function executeLessonReminderCronAction(options?: { dryRun?: boolean; targetDate?: string }) {
-    const { isAuthorized } = await verifyAdminRole()
-    if (!isAuthorized) {
-        return { success: false, error: 'Unauthorized' }
-    }
-
     try {
+        const { isAuthorized } = await verifyAdminRole()
+        if (!isAuthorized) {
+            return { success: false, error: 'Unauthorized' }
+        }
+
         const { processLessonReminders } = await import('@/lib/reminders')
         const result = await processLessonReminders(options)
         return result
     } catch (e: any) {
         console.error('executeLessonReminderCronAction Error:', e)
-        return { success: false, error: e.message }
+        return { success: false, error: e?.message || '前日連絡の実行中にエラーが発生しました' }
     }
 }
 
@@ -593,17 +598,17 @@ export async function testScheduleMonitoringWebhookAction(webhookUrl: string) {
  * ※生徒へのメッセージ送信は一切行わず、LINEサーバーに対するボット情報の読み取り確認のみを行います。
  */
 export async function verifyCoachLineTokenAction(token: string) {
-    const { isAuthorized } = await verifyAdminRole()
-    if (!isAuthorized) {
-        return { success: false, error: 'Unauthorized' }
-    }
-
-    const cleanToken = token?.trim()
-    if (!cleanToken) {
-        return { success: false, error: 'チャネルアクセストークンが入力されていません' }
-    }
-
     try {
+        const { isAuthorized } = await verifyAdminRole()
+        if (!isAuthorized) {
+            return { success: false, error: 'Unauthorized' }
+        }
+
+        const cleanToken = token?.trim()
+        if (!cleanToken) {
+            return { success: false, error: 'チャネルアクセストークンが入力されていません' }
+        }
+
         const res = await fetch('https://api.line.me/v2/bot/info', {
             headers: {
                 Authorization: `Bearer ${cleanToken}`
@@ -634,7 +639,7 @@ export async function verifyCoachLineTokenAction(token: string) {
         }
     } catch (e: any) {
         console.error('verifyCoachLineTokenAction Error:', e)
-        return { success: false, error: 'LINEサーバーとの通信中にエラーが発生しました: ' + e.message }
+        return { success: false, error: 'LINEサーバーとの通信中にエラーが発生しました: ' + (e?.message || '') }
     }
 }
 

@@ -19,6 +19,7 @@ import { DeliveryLogsTab } from './components/DeliveryLogsTab';
 import { LiffTrackingTab } from './components/LiffTrackingTab';
 import { getMarketingKpiSummaryAction, syncTrialDoneStudentsAction } from '@/actions/line-marketing';
 import { Tag } from 'lucide-react';
+import { formatErrorToastMessage, sanitizeErrorMessage } from '@/lib/error-formatter';
 
 export default function LineMarketingPage() {
     const [activeTab, setActiveTab] = useState<'broadcast' | 'steps' | 'tracking' | 'logs'>('broadcast');
@@ -75,10 +76,10 @@ export default function LineMarketingPage() {
                 toast.success(`体験完了生徒の同期が完了しました (新規エンロール: ${res.newlyEnrolledCount}名 / 対象: ${res.totalEligibleCount}名)`);
                 await fetchKpi();
             } else {
-                toast.error('同期に失敗しました: ' + (res.error || '不明なエラー'));
+                toast.error('同期に失敗しました: ' + sanitizeErrorMessage(res.error, '不明なエラー'));
             }
         } catch (e: any) {
-            toast.error('エラーが発生しました: ' + e.message);
+            toast.error(formatErrorToastMessage(e));
         } finally {
             setIsSyncing(false);
         }

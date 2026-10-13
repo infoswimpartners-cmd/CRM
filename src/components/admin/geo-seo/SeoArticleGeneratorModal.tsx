@@ -21,6 +21,7 @@ import { toast } from 'sonner';
 import { GeneratedArticle, ArticleType } from '@/lib/generated-articles-storage';
 import { generateArticleAction } from '@/actions/seo-content-actions';
 import { KeywordCompetitorIntelligence } from '@/types/competitor-benchmark';
+import { formatErrorToastMessage, sanitizeErrorMessage } from '@/lib/error-formatter';
 
 interface SeoArticleGeneratorModalProps {
     isOpen: boolean;
@@ -92,10 +93,10 @@ export function SeoArticleGeneratorModal({
                     onArticleSaved(res.data);
                 }
             } else {
-                toast.error(res.error || '記事生成に失敗しました');
+                toast.error(sanitizeErrorMessage(res.error, '記事生成に失敗しました'));
             }
         } catch (err: any) {
-            toast.error('エラーが発生しました: ' + err.message);
+            toast.error(formatErrorToastMessage(err));
         } finally {
             setIsGenerating(false);
         }

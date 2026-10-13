@@ -38,6 +38,7 @@ import {
 } from '@/actions/competitor-benchmark-actions';
 import { optimizeKitWithGeminiAction } from '@/actions/sp-tracker-actions';
 import { ArticleType } from '@/lib/generated-articles-storage';
+import { formatErrorToastMessage, sanitizeErrorMessage } from '@/lib/error-formatter';
 
 // 代表クイックキーワード定義
 const QUICK_KEYWORDS = [
@@ -144,11 +145,11 @@ export function BenchmarkCompetitorPanel({
                     toast.info(`「${targetKw}」の高精度ベンチマーク分析を生成しました`);
                 }
             } else {
-                toast.error(res.error || '競合分析の取得に失敗しました');
+                toast.error(sanitizeErrorMessage(res.error, '競合分析の取得に失敗しました'));
             }
         } catch (err: any) {
             console.error('分析実行エラー:', err);
-            toast.error('分析実行中にエラーが発生しました: ' + (err.message || ''));
+            toast.error(formatErrorToastMessage(err, '分析実行中にエラーが発生しました: '));
         } finally {
             setIsAnalyzing(false);
         }

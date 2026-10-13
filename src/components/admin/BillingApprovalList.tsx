@@ -27,6 +27,7 @@ import { approveLessonSchedule, rejectLessonSchedule, approveLessonScheduleManua
 import { formatCurrency } from '@/lib/utils'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { RefundDialog } from './RefundDialog'
+import { formatErrorToastMessage, sanitizeErrorMessage } from '@/lib/error-formatter'
 
 interface BillingSchedule {
     id: string
@@ -89,10 +90,10 @@ export function BillingApprovalList({
                 toast.success('予約をキャンセルしました')
                 router.refresh()
             } else {
-                toast.error('キャンセルに失敗しました: ' + result.error)
+                toast.error('キャンセルに失敗しました: ' + sanitizeErrorMessage(result.error))
             }
         } catch (error) {
-            toast.error('エラーが発生しました')
+            toast.error(formatErrorToastMessage(error))
         } finally {
             setProcessingId(null)
         }
@@ -108,10 +109,10 @@ export function BillingApprovalList({
                 toast.success('決済完了としてマークしました')
                 router.refresh()
             } else {
-                toast.error('エラーが発生しました: ' + (result as any).error)
+                toast.error(formatErrorToastMessage((result as any)?.error))
             }
         } catch (error) {
-            toast.error('通信エラーが発生しました')
+            toast.error(formatErrorToastMessage(error))
         } finally {
             setProcessingId(null)
         }
@@ -138,10 +139,10 @@ export function BillingApprovalList({
                 toast.success('承認し、請求書を発行しました')
                 router.refresh()
             } else {
-                toast.error('承認に失敗しました: ' + (result as any).error)
+                toast.error('承認に失敗しました: ' + sanitizeErrorMessage((result as any).error))
             }
         } catch (error) {
-            toast.error('エラーが発生しました')
+            toast.error(formatErrorToastMessage(error))
         } finally {
             setProcessingId(null)
         }

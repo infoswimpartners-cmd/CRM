@@ -50,6 +50,7 @@ import {
     deleteBroadcastCampaign,
     executeScheduledBroadcastsAction,
 } from '@/actions/line-marketing';
+import { formatErrorToastMessage, sanitizeErrorMessage } from '@/lib/error-formatter';
 
 interface ScheduledCampaignsModalProps {
     isOpen: boolean;
@@ -86,10 +87,10 @@ export const ScheduledCampaignsModal: React.FC<ScheduledCampaignsModalProps> = (
             if (res.success) {
                 setCampaigns(res.campaigns);
             } else {
-                toast.error('配信一覧の取得に失敗しました: ' + (res.error || ''));
+                toast.error('配信一覧の取得に失敗しました: ' + sanitizeErrorMessage(res.error));
             }
         } catch (e: any) {
-            toast.error('エラーが発生しました: ' + e.message);
+            toast.error(formatErrorToastMessage(e));
         } finally {
             setIsLoading(false);
         }
@@ -143,10 +144,10 @@ export const ScheduledCampaignsModal: React.FC<ScheduledCampaignsModalProps> = (
                 await loadCampaigns();
                 if (onCampaignUpdated) onCampaignUpdated();
             } else {
-                toast.error('更新に失敗しました: ' + (res.error || ''));
+                toast.error('更新に失敗しました: ' + sanitizeErrorMessage(res.error));
             }
         } catch (err: any) {
-            toast.error('エラーが発生しました: ' + err.message);
+            toast.error(formatErrorToastMessage(err));
         } finally {
             setIsSaving(false);
         }
@@ -166,10 +167,10 @@ export const ScheduledCampaignsModal: React.FC<ScheduledCampaignsModalProps> = (
                 await loadCampaigns();
                 if (onCampaignUpdated) onCampaignUpdated();
             } else {
-                toast.error('配信実行に失敗しました: ' + (res.error || ''));
+                toast.error('配信実行に失敗しました: ' + sanitizeErrorMessage(res.error));
             }
         } catch (err: any) {
-            toast.error('配信エラー: ' + err.message);
+            toast.error(formatErrorToastMessage(err, '配信エラー: '));
         } finally {
             setIsExecutingId(null);
         }
@@ -189,10 +190,10 @@ export const ScheduledCampaignsModal: React.FC<ScheduledCampaignsModalProps> = (
                 await loadCampaigns();
                 if (onCampaignUpdated) onCampaignUpdated();
             } else {
-                toast.error('一括実行に失敗しました: ' + (res.error || ''));
+                toast.error('一括実行に失敗しました: ' + sanitizeErrorMessage(res.error));
             }
         } catch (err: any) {
-            toast.error('一括実行エラー: ' + err.message);
+            toast.error(formatErrorToastMessage(err, '一括実行エラー: '));
         } finally {
             setIsBatchExecuting(false);
         }
@@ -211,10 +212,10 @@ export const ScheduledCampaignsModal: React.FC<ScheduledCampaignsModalProps> = (
                 await loadCampaigns();
                 if (onCampaignUpdated) onCampaignUpdated();
             } else {
-                toast.error('キャンセルに失敗しました: ' + (res.error || ''));
+                toast.error('キャンセルに失敗しました: ' + sanitizeErrorMessage(res.error));
             }
         } catch (err: any) {
-            toast.error('エラー: ' + err.message);
+            toast.error(formatErrorToastMessage(err));
         }
     };
 
@@ -231,10 +232,10 @@ export const ScheduledCampaignsModal: React.FC<ScheduledCampaignsModalProps> = (
                 await loadCampaigns();
                 if (onCampaignUpdated) onCampaignUpdated();
             } else {
-                toast.error('削除に失敗しました: ' + (res.error || ''));
+                toast.error('削除に失敗しました: ' + sanitizeErrorMessage(res.error));
             }
         } catch (err: any) {
-            toast.error('エラー: ' + err.message);
+            toast.error(formatErrorToastMessage(err));
         }
     };
 

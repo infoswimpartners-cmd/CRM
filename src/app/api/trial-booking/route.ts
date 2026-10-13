@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { stopStepReminderForUser } from "@/lib/line-step-reminders";
 import { sendGoogleChatMessage } from "@/lib/google-chat";
 import { markConversionForUser } from "@/lib/line-tracking-service";
+import { appendTrialBookingToSpreadsheet } from "@/lib/google-sheets";
 
 export async function POST(req: Request) {
   try {
@@ -232,6 +233,24 @@ export async function POST(req: Request) {
       } catch (webhookError) {
         console.error("Make Webhook Fetch Error:", webhookError);
       }
+    }
+
+    // 6. Googleスプレッドシート（分析用ファネルシート）への自動追記
+    try {
+      await appendTrialBookingToSpreadsheet({
+        customerName: payload.name || '未入力',
+        channel: referrer ? 'ご紹介' : (payload.channel || 'WEB申込'),
+        searchIntent: payload.notes || '',
+        targetCategory: payload.gender || '小学生',
+        concernPurpose: payload.skillLevel || '',
+        preferredArea: payload.station || '',
+        trialStatus: '申込済',
+        trialDate: payload.datetime1 || '',
+        enrollmentStatus: '検討中',
+        notes: combinedNotes || '',
+      });
+    } catch (sheetErr) {
+      console.warn('[Trial Booking] Google Sheets append failed (non-blocking):', sheetErr);
     }
 
     return NextResponse.json({ success: true });

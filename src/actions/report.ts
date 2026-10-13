@@ -432,6 +432,21 @@ export async function submitLessonReport(values: FormValues) {
             }
         }
 
+        // 6. Googleスプレッドシートへのレッスン報告記録（非ブロッキング）
+        await recordLessonReportToSpreadsheetAsync({
+            lessonId: newLessonId,
+            lessonDate: data.lesson_date,
+            coachId: user.id,
+            studentId: data.student_id,
+            studentName: data.student_name,
+            lessonMasterId: data.lesson_master_id,
+            location: data.location,
+            price: data.price,
+            billingPrice: billingPrice,
+            attendanceType: data.attendance_type || 'both',
+            menuDescription: data.menu_description || '',
+        })
+
         revalidatePath('/coach')
         return { success: true, lessonId: newLessonId }
 
@@ -799,6 +814,21 @@ export async function submitPublicLessonReport(values: PublicFormValues) {
             console.error('Error sending coach report notification in public report:', coachChatError)
         }
 
+        // 6. Googleスプレッドシートへのレッスン報告記録（非ブロッキング）
+        await recordLessonReportToSpreadsheetAsync({
+            lessonId: newId,
+            lessonDate: data.lesson_date,
+            coachId: data.coach_id,
+            studentId: data.student_id,
+            studentName: data.student_name,
+            lessonMasterId: data.lesson_master_id,
+            location: data.location,
+            price: data.price,
+            billingPrice: billingPrice,
+            attendanceType: 'both',
+            menuDescription: data.menu_description || '',
+        })
+
         return { success: true }
     } catch (error: any) {
         console.error('Public Submission Error:', error)
@@ -982,7 +1012,7 @@ export async function submitAdminProxyReport(values: AdminProxyValues) {
             )
 
         // 7. Admin Client で RLS バイパスして INSERT
-        const { error } = await supabaseAdmin.from('lessons').insert({
+        const { data: insertedLesson, error } = await supabaseAdmin.from('lessons').insert({
             coach_id: data.coach_id,
             student_id: data.student_id || null,
             student_name: data.student_name,
@@ -998,7 +1028,7 @@ export async function submitAdminProxyReport(values: AdminProxyValues) {
             base_reward,
             facility_id,
             is_actual_distant_option
-        })
+        }).select('id').maybeSingle()
 
         if (error) throw new Error(error.message)
 
@@ -1029,11 +1059,95 @@ export async function submitAdminProxyReport(values: AdminProxyValues) {
             }
         }
 
+        // 9. Googleスプレッドシートへのレッスン報告記録（非ブロッキング）
+        await recordLessonReportToSpreadsheetAsync({
+            lessonId: insertedLesson?.id,
+            lessonDate: data.lesson_date,
+            coachId: data.coach_id,
+            studentId: data.student_id,
+            studentName: data.student_name,
+            lessonMasterId: data.lesson_master_id,
+            location: data.location,
+            price: finalPrice,
+            billingPrice: billingPrice,
+            attendanceType: data.attendance_type || 'both',
+            menuDescription: data.menu_description || '',
+        })
+
         revalidatePath('/admin/reports')
         return { success: true }
     } catch (error: any) {
         console.error('[AdminProxyReport] Error:', error)
         return { success: false, error: error.message || '作成に失敗しました' }
+    }
+}
+
+/**
+ * レッスン報告データをGoogleスプレッドシートへ非同期で安全に記録するヘルパー
+ */
+async function recordLessonReportToSpreadsheetAsync(params: {
+    lessonId?: string
+    lessonDate: string
+    coachId: string
+    studentId?: string | null
+    studentName: string
+    lessonMasterId: string
+    location: string
+    price: number
+    billingPrice?: number
+    attendanceType?: string
+    menuDescription?: string
+}) {
+    try {
+        const { createAdminClient } = await import('@/lib/supabase/admin')
+        const supabaseAdmin = createAdminClient()
+
+        let coachName = 'コーチ'
+        if (params.coachId) {
+            const { data: profile } = await supabaseAdmin
+                .from('profiles')
+                .select('full_name')
+                .eq('id', params.coachId)
+                .maybeSingle()
+            if (profile?.full_name) coachName = profile.full_name
+        }
+
+        let lessonTypeName = '通常レッスン'
+        if (params.lessonMasterId) {
+            const { data: master } = await supabaseAdmin
+                .from('lesson_masters')
+                .select('name')
+                .eq('id', params.lessonMasterId)
+                .maybeSingle()
+            if (master?.name) lessonTypeName = master.name
+        }
+
+        let studentNumber = ''
+        if (params.studentId) {
+            const { data: studentRecord } = await supabaseAdmin
+                .from('students')
+                .select('student_number')
+                .eq('id', params.studentId)
+                .maybeSingle()
+            if (studentRecord?.student_number) studentNumber = studentRecord.student_number
+        }
+
+        const { appendLessonReportToSpreadsheet } = await import('@/lib/google-sheets')
+        await appendLessonReportToSpreadsheet({
+            lessonId: params.lessonId,
+            lessonDate: params.lessonDate,
+            coachName,
+            studentName: params.studentName,
+            studentNumber,
+            lessonType: lessonTypeName,
+            location: params.location,
+            price: params.price,
+            billingPrice: params.billingPrice,
+            attendanceType: params.attendanceType || '通常',
+            menuDescription: params.menuDescription || '',
+        })
+    } catch (sheetErr) {
+        console.warn('[Lesson Report] Google Sheets recording failed (non-blocking):', sheetErr)
     }
 }
 

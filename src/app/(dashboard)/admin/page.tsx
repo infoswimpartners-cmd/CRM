@@ -86,15 +86,16 @@ function AdminDashboardSkeleton() {
 }
 
 async function AdminDashboardContent({ monthParam }: { monthParam: string }) {
-    // Parse target date (default to 1st of the month)
-    const targetDate = new Date(monthParam + '-01')
+    try {
+        // Parse target date (default to 1st of the month)
+        const targetDate = new Date(monthParam + '-01')
 
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
 
-    if (!user) {
-        return <div>Access Denied</div>
-    }
+        if (!user) {
+            return <div>Access Denied</div>
+        }
 
     // 1. Fetch Coaches (Profiles)
     // Note: In a real app we might filter by role, but assuming all profiles are relevant or we filter later
@@ -253,7 +254,8 @@ async function AdminDashboardContent({ monthParam }: { monthParam: string }) {
     const monthStart = startOfMonth(targetDate)
     const monthEnd = endOfMonth(targetDate)
 
-    const thisMonthLessons = lessons.filter(l => {
+    const safeLessons = lessons || []
+    const thisMonthLessons = safeLessons.filter(l => {
         const date = new Date(l.lesson_date)
         return date >= monthStart && date <= monthEnd
     })
@@ -263,7 +265,7 @@ async function AdminDashboardContent({ monthParam }: { monthParam: string }) {
     const lastMonthStart = startOfMonth(lastMonth)
     const lastMonthEnd = endOfMonth(lastMonth)
 
-    const lastMonthLessons = lessons.filter(l => {
+    const lastMonthLessons = safeLessons.filter(l => {
         const date = new Date(l.lesson_date)
         return date >= lastMonthStart && date <= lastMonthEnd
     })
@@ -724,4 +726,13 @@ async function AdminDashboardContent({ monthParam }: { monthParam: string }) {
             </div>
         </div>
     )
+    } catch (e) {
+        console.error('AdminDashboardContent render error:', e)
+        return (
+            <div className="p-8 text-center bg-white rounded-3xl border border-slate-200 shadow-sm space-y-3">
+                <p className="text-base font-bold text-slate-800">ダッシュボードの表示中に一時的な遅延が発生しました</p>
+                <p className="text-sm text-slate-500">時間をおいて再度読み込みをお試しください。</p>
+            </div>
+        )
+    }
 }

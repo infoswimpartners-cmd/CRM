@@ -36,7 +36,7 @@ export default async function Home() {
     .eq('id', user.id)
     .single()
 
-  if (profile?.role === 'admin') {
+  if (profile?.role === 'admin' || profile?.role === 'owner') {
     redirect('/admin')
   } else if (profile?.role === 'coach') {
     redirect('/coach')
@@ -55,8 +55,12 @@ export default async function Home() {
       <p className="mb-8">あなたのユーザーには役割（Role）が割り当てられていません。管理者に連絡してください。</p>
       <Button onClick={async () => {
         'use server'
-        const supabase = await createClient()
-        await supabase.auth.signOut()
+        try {
+          const supabase = await createClient()
+          await supabase.auth.signOut()
+        } catch (e) {
+          console.error('SignOut error:', e)
+        }
         redirect('/')
       }}>
         ログアウト

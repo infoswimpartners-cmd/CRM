@@ -20,23 +20,23 @@ function debugLog(msg: string) {
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://member.swim-partners.com'
 
 export async function createStripeCustomer(studentId: string) {
-    const supabase = await createClient()
-
-    // Auth Check
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { success: false, error: 'Unauthorized' }
-
-    // Fetch Student
-    const { data: student } = await supabase
-        .from('students')
-        .select('*')
-        .eq('id', studentId)
-        .single()
-
-    if (!student) return { success: false, error: 'Student not found' }
-    if (student.stripe_customer_id) return { success: false, error: 'Already registered' }
-
     try {
+        const supabase = await createClient()
+
+        // Auth Check
+        const { data: authData, error: authError } = await supabase.auth.getUser()
+        if (authError || !authData?.user) return { success: false, error: 'Unauthorized' }
+
+        // Fetch Student
+        const { data: student } = await supabase
+            .from('students')
+            .select('*')
+            .eq('id', studentId)
+            .single()
+
+        if (!student) return { success: false, error: 'Student not found' }
+        if (student.stripe_customer_id) return { success: false, error: 'Already registered' }
+
         const customer = await stripe.customers.create({
             name: student.full_name || undefined,
             email: student.contact_email || undefined,
@@ -55,19 +55,19 @@ export async function createStripeCustomer(studentId: string) {
 
         revalidatePath(`/admin/students/${studentId}`)
         return { success: true, customerId: customer.id }
-    } catch (error) {
+    } catch (error: any) {
         console.error('Stripe Create Customer Error:', error)
-        return { success: false, error: 'Failed to create Stripe customer' }
+        return { success: false, error: error?.message || 'Failed to create Stripe customer' }
     }
 }
 
 export async function updateStudentStripeId(studentId: string, stripeCustomerId: string) {
-    const supabase = await createClient()
-
     try {
+        const supabase = await createClient()
+
         // Auth Check (Admin Only recommended, assuming user is admin/staff)
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return { success: false, error: 'Unauthorized' }
+        const { data: authData, error: authError } = await supabase.auth.getUser()
+        if (authError || !authData?.user) return { success: false, error: 'Unauthorized' }
 
         // Fetch Student
         const { data: student } = await supabase
@@ -89,23 +89,22 @@ export async function updateStudentStripeId(studentId: string, stripeCustomerId:
         return { success: true }
     } catch (error: any) {
         console.error('Update Stripe ID Error:', error)
-        return { success: false, error: error.message }
+        return { success: false, error: error?.message || 'Failed to update Stripe ID' }
     }
 }
 
 export async function createPaymentSetupLink(studentId: string) {
-    const supabase = await createClient()
-
-    // Fetch Student
-    const { data: student } = await supabase
-        .from('students')
-        .select('stripe_customer_id')
-        .eq('id', studentId)
-        .single()
-
-    if (!student?.stripe_customer_id) return { success: false, error: 'No Stripe Customer ID' }
-
     try {
+        const supabase = await createClient()
+
+        // Fetch Student
+        const { data: student } = await supabase
+            .from('students')
+            .select('stripe_customer_id')
+            .eq('id', studentId)
+            .single()
+
+        if (!student?.stripe_customer_id) return { success: false, error: 'No Stripe Customer ID' }
 
         const session = await stripe.checkout.sessions.create({
             customer: student.stripe_customer_id,
@@ -119,7 +118,7 @@ export async function createPaymentSetupLink(studentId: string) {
         return { success: true, url: session.url }
     } catch (error: any) {
         console.error('Stripe Setup Link Error:', error)
-        return { success: false, error: error.message || 'Failed to create setup link' }
+        return { success: false, error: error?.message || 'Failed to create setup link' }
     }
 }
 
@@ -161,14 +160,14 @@ export async function getStripeCustomerStatus(stripeCustomerId: string) {
 }
 
 export async function assignMembership(studentId: string, membershipTypeId: string | null, startTiming: 'immediate' | 'next' | 'next_next' = 'immediate') {
-    const supabase = await createClient()
-
-    // 1. Auth Check
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { success: false, error: 'Unauthorized' }
-
-    // --- RESERVATION MODE ---
     try {
+        const supabase = await createClient()
+
+        // 1. Auth Check
+        const { data: authData, error: authError } = await supabase.auth.getUser()
+        if (authError || !authData?.user) return { success: false, error: 'Unauthorized' }
+
+        // --- RESERVATION MODE ---
         // 2. Fetch Student with subscription info
         const { data: student } = await supabase
             .from('students')
@@ -375,9 +374,9 @@ export async function assignMembership(studentId: string, membershipTypeId: stri
 }
 
 export async function createImmediatePaymentInvoice(scheduleId: string) {
-    const supabase = await createClient()
-
     try {
+        const supabase = await createClient()
+
         // 1. Fetch Schedule & Student
         const { data: schedule } = await supabase
             .from('lesson_schedules')
@@ -453,15 +452,14 @@ export async function createImmediatePaymentInvoice(scheduleId: string) {
 
     } catch (error: any) {
         console.error('Create Immediate Invoice Error:', error)
-        return { success: false, error: error.message }
+        return { success: false, error: error?.message || '即時インボイス作成に失敗しました' }
     }
 }
 
 export async function createStripeInvoiceItemOnly(scheduleId: string) {
-    const { createAdminClient } = await import('@/lib/supabase/admin')
-    const supabase = createAdminClient()
-
     try {
+        const { createAdminClient } = await import('@/lib/supabase/admin')
+        const supabase = createAdminClient()
         // 1. Fetch Schedule, Lesson Master & Student Membership details
         const { data: schedule } = await supabase
             .from('lesson_schedules')
@@ -555,9 +553,9 @@ export async function createStripeInvoiceItemOnly(scheduleId: string) {
 
 // THE TRIO専用 チケット購入 (Checkout Session作成)
 export async function createTrioTicketCheckoutSession(studentId: string, ticketCount: number = 1) {
-    const supabase = await createClient()
-
     try {
+        const supabase = await createClient()
+
         // 1. Fetch Student
         const { data: student } = await supabase
             .from('students')
@@ -650,13 +648,13 @@ export interface GetStripeInvoicesOptions {
  * Stripeで請求を行った履歴（インボイス履歴）を取得する
  */
 export async function getStripeInvoices(options: GetStripeInvoicesOptions = {}) {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
-        return { success: false, error: 'Unauthorized', data: [], hasMore: false }
-    }
-
     try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
+            return { success: false, error: 'Unauthorized', data: [], hasMore: false }
+        }
+
         const stripeClient = process.env.STRIPE_SECRET_KEY_LIVE
             ? new Stripe(process.env.STRIPE_SECRET_KEY_LIVE, { apiVersion: '2025-12-15.clover' as any })
             : stripe
@@ -725,25 +723,28 @@ export async function getStripeInvoices(options: GetStripeInvoicesOptions = {}) 
                 invoice_pdf: inv.invoice_pdf || null,
                 lines: (inv.lines?.data || []).map(line => ({
                     id: line.id,
-                    description: line.description,
+                    description: line.description ?? null,
                     amount: line.amount,
-                    quantity: line.quantity,
-                    period_start: line.period?.start,
-                    period_end: line.period?.end,
+                    quantity: line.quantity ?? null,
+                    period_start: line.period?.start ?? null,
+                    period_end: line.period?.end ?? null,
                 })),
             }
         })
 
+        // RSC境界での非シリアライズ値防止のためJSONシリアライズ可能に整形
+        const safeData: StripeInvoiceSummary[] = JSON.parse(JSON.stringify(formattedInvoices))
+
         return {
             success: true,
-            data: formattedInvoices,
-            hasMore: invoicesList.has_more,
+            data: safeData,
+            hasMore: Boolean(invoicesList.has_more),
         }
     } catch (error: any) {
         console.error('[getStripeInvoices] Error:', error)
         return {
             success: false,
-            error: error.message || 'インボイス履歴の取得に失敗しました',
+            error: error?.message || 'インボイス履歴の取得に失敗しました',
             data: [],
             hasMore: false,
         }

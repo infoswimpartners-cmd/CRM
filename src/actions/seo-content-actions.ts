@@ -186,29 +186,64 @@ export async function generateArticleAction(params: GenerateArticleParams): Prom
 
         if (apiKey && apiKey.trim()) {
             try {
-                // Gemini API による本格執筆（モデル自動フォールバック・競合3社比較注入付き）
+                // Gemini API による本格執筆（有効モデル・6秒タイムアウト・競合3社比較注入付き）
                 article = await generateArticleWithGeminiFlash(params, apiKey.trim());
             } catch (aiErr: any) {
                 console.warn('Gemini article generation failed, falling back to local engine:', aiErr);
                 // Gemini呼び出し失敗（404/クォータ上限/ネットワークエラー等）時は高品質ローカルエンジンへ即座にフォールバック
                 article = generateSeoAioArticle(params);
                 if (params.competitorIntelligence) {
-                    article = enrichArticleWithCompetitorIntelligence(article, params.competitorIntelligence);
+                    try {
+                        article = enrichArticleWithCompetitorIntelligence(article, params.competitorIntelligence);
+                    } catch (enrichErr) {
+                        console.warn('Failed to enrich article with competitor intelligence:', enrichErr);
+                    }
                 }
             }
         } else {
             // APIキー未設定時は高品質ローカル自律執筆エンジンで生成
             article = generateSeoAioArticle(params);
             if (params.competitorIntelligence) {
-                article = enrichArticleWithCompetitorIntelligence(article, params.competitorIntelligence);
+                try {
+                    article = enrichArticleWithCompetitorIntelligence(article, params.competitorIntelligence);
+                } catch (enrichErr) {
+                    console.warn('Failed to enrich article with competitor intelligence:', enrichErr);
+                }
             }
         }
 
-        await saveGeneratedArticle(article);
-        return { success: true, data: article };
+        // 保存処理は非同期・非ブロッキングで安全に実行（Vercel EROFS等で生成自体が止まらないようガード）
+        await saveGeneratedArticle(article).catch((saveErr) => {
+            console.warn('Non-fatal save error in saveGeneratedArticle:', saveErr);
+        });
+
+        // RSCシリアライズエラーを完全防止するため、プレーンオブジェクトにサニタイズ
+        const safeArticle: GeneratedArticle = {
+            id: String(article.id || `art_${Date.now()}`),
+            keyword: String(article.keyword || params.keyword),
+            article_type: article.article_type || params.articleType || 'seo',
+            title: String(article.title || `【完全攻略】「${params.keyword}」の上達法`),
+            meta_description: String(article.meta_description || ''),
+            content_md: String(article.content_md || ''),
+            content_html: String(article.content_html || ''),
+            faq_items: Array.isArray(article.faq_items) ? article.faq_items : [],
+            json_ld: typeof article.json_ld === 'string' ? article.json_ld : undefined,
+            target_path: String(article.target_path || params.targetPath || '/articles/tips'),
+            status: article.status || 'draft',
+            created_at: String(article.created_at || new Date().toISOString()),
+            published_at: article.published_at ? String(article.published_at) : null,
+        };
+
+        return { success: true, data: safeArticle };
     } catch (err: any) {
         console.error('Failed to generate article:', err);
-        return { success: false, error: err.message || '記事生成に失敗しました' };
+        // 万が一の例外時も、ユーザーを待たせずに高品質フォールバック記事を安全に即時生成して返却
+        try {
+            const fallbackArticle = generateSeoAioArticle(params);
+            return { success: true, data: fallbackArticle };
+        } catch {
+            return { success: false, error: err?.message || '記事生成中に一時的なエラーが発生しました。' };
+        }
     }
 }
 

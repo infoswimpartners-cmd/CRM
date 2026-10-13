@@ -38,6 +38,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { toast } from 'sonner'
+import { formatErrorToastMessage, sanitizeErrorMessage } from '@/lib/error-formatter'
 import Link from 'next/link'
 import { 
     MessageSquare, 
@@ -284,10 +285,10 @@ export default function LineMonitoringPage() {
                     toast.success(`明日のレッスン ${count}件 の前日連絡を送信完了しました。`)
                 }
             } else {
-                toast.error('前日連絡の実行に失敗しました: ' + (res.error || '不明なエラー'))
+                toast.error('前日連絡の実行に失敗しました: ' + sanitizeErrorMessage(res.error, '不明なエラー'))
             }
         } catch (e: any) {
-            toast.error('エラーが発生しました: ' + e.message)
+            toast.error(formatErrorToastMessage(e))
         } finally {
             setIsTriggeringReminder(false)
         }
@@ -353,10 +354,10 @@ export default function LineMonitoringPage() {
             if (res.success) {
                 toast.success('ステップ配信テンプレート設定を保存しました')
             } else {
-                toast.error('保存に失敗しました: ' + res.error)
+                toast.error('保存に失敗しました: ' + sanitizeErrorMessage(res.error))
             }
         } catch (e: any) {
-            toast.error('エラーが発生しました: ' + e.message)
+            toast.error(formatErrorToastMessage(e))
         } finally {
             setIsSavingTemplates(false)
         }
@@ -395,10 +396,10 @@ export default function LineMonitoringPage() {
                 toast.success('ステータスを更新しました')
                 fetchStepLeads()
             } else {
-                toast.error('更新に失敗しました: ' + res.error)
+                toast.error('更新に失敗しました: ' + sanitizeErrorMessage(res.error))
             }
         } catch (e: any) {
-            toast.error('エラーが発生しました: ' + e.message)
+            toast.error(formatErrorToastMessage(e))
         }
     }
 
@@ -416,10 +417,10 @@ export default function LineMonitoringPage() {
                 }
                 fetchStepLeads()
             } else {
-                toast.error('ステップ配信の実行に失敗しました: ' + res.error)
+                toast.error('ステップ配信の実行に失敗しました: ' + sanitizeErrorMessage(res.error))
             }
         } catch (e: any) {
-            toast.error('エラーが発生しました: ' + e.message)
+            toast.error(formatErrorToastMessage(e))
         } finally {
             setIsTriggeringStepReminder(false)
         }
@@ -457,10 +458,10 @@ export default function LineMonitoringPage() {
             if (res.success) {
                 toast.success('管理者用 Google Chat 通知先を保存しました')
             } else {
-                toast.error('保存に失敗しました: ' + res.error)
+                toast.error('保存に失敗しました: ' + sanitizeErrorMessage(res.error))
             }
         } catch (e: any) {
-            toast.error('エラーが発生しました: ' + e.message)
+            toast.error(formatErrorToastMessage(e))
         } finally {
             setIsSavingAdminWebhook(false)
         }
@@ -478,10 +479,10 @@ export default function LineMonitoringPage() {
             if (res.success) {
                 toast.success('Google Chatスペースへテスト送信しました')
             } else {
-                toast.error('テスト送信失敗: ' + res.error)
+                toast.error('テスト送信失敗: ' + sanitizeErrorMessage(res.error))
             }
         } catch (e: any) {
-            toast.error('エラーが発生しました: ' + e.message)
+            toast.error(formatErrorToastMessage(e))
         } finally {
             setIsTestingAdminWebhook(false)
         }
@@ -686,11 +687,11 @@ export default function LineMonitoringPage() {
                 setIsScheduleDialogOpen(false)
                 fetchLogs() // バックグラウンドで最新データを取得
             } else {
-                toast.error('スケジュールの登録に失敗しました: ' + (res?.error || '不明なエラー'))
+                toast.error('スケジュールの登録に失敗しました: ' + sanitizeErrorMessage(res?.error, '不明なエラー'))
             }
         } catch (error: any) {
             console.error('Register schedule error:', error)
-            toast.error('スケジュール登録中にエラーが発生しました: ' + error.message)
+            toast.error(formatErrorToastMessage(error, 'スケジュール登録中にエラーが発生しました: '))
         } finally {
             setIsRegisteringSchedule(false)
         }
@@ -729,10 +730,10 @@ export default function LineMonitoringPage() {
                 resetForm()
                 fetchConfigs()
             } else {
-                toast.error('設定の保存に失敗しました: ' + res.error)
+                toast.error('設定の保存に失敗しました: ' + sanitizeErrorMessage(res.error))
             }
         } catch (err: any) {
-            toast.error(err.message || '保存に失敗しました')
+            toast.error(sanitizeErrorMessage(err, '保存に失敗しました'))
         } finally {
             setIsSaving(false)
         }
@@ -752,10 +753,10 @@ export default function LineMonitoringPage() {
                 if (!formBotId && res.botInfo.basicId) setFormBotId(res.botInfo.basicId)
                 toast.success(`LINE接続確認OK: ${res.botInfo.displayName} (${res.botInfo.basicId || ''})`)
             } else {
-                toast.error(res.error || 'LINEトークンの検証に失敗しました')
+                toast.error(sanitizeErrorMessage(res.error, 'LINEトークンの検証に失敗しました'))
             }
         } catch (e: any) {
-            toast.error('エラーが発生しました: ' + (e.message || ''))
+            toast.error(formatErrorToastMessage(e))
         } finally {
             setIsVerifyingFormToken(false)
         }

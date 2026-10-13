@@ -12,6 +12,7 @@ import { saveLineBotConfigAction, verifyCoachLineTokenAction, verifyCoachGChatWe
 import { getChatWebhooksAction } from "@/actions/gchat_webhook"
 import { WebhookFormDialog } from "@/components/admin/announcements/WebhookFormDialog"
 import Link from 'next/link'
+import { formatErrorToastMessage, sanitizeErrorMessage } from '@/lib/error-formatter'
 
 interface CoachLineSettingsFormProps {
     coachId: string
@@ -124,11 +125,11 @@ export function CoachLineSettingsForm({
                 toast.success(`LINE接続確認OK: ${res.botInfo.displayName} (${res.botInfo.basicId || ''})`)
             } else {
                 setTokenStatus('invalid')
-                toast.error(res.error || 'LINEトークンの検証に失敗しました')
+                toast.error(sanitizeErrorMessage(res.error, 'LINEトークンの検証に失敗しました'))
             }
         } catch (e: any) {
             setTokenStatus('invalid')
-            toast.error('エラーが発生しました: ' + (e.message || ''))
+            toast.error(formatErrorToastMessage(e))
         } finally {
             setVerifyingToken(false)
         }
@@ -153,12 +154,12 @@ export function CoachLineSettingsForm({
                 toast.success('Google Chatスペースへ接続確認通知を送信しました')
             } else {
                 setWebhookStatus('invalid')
-                toast.error(res.error || '送信に失敗しました')
+                toast.error(sanitizeErrorMessage(res.error, '送信に失敗しました'))
             }
         } catch (e: any) {
             setWebhookStatus('invalid')
             console.error('Test Webhook Error:', e)
-            toast.error('テスト送信中にエラーが発生しました: ' + (e.message || ''))
+            toast.error(formatErrorToastMessage(e, 'テスト送信中にエラーが発生しました: '))
         } finally {
             setTestingWebhook(false)
         }
@@ -225,7 +226,7 @@ export function CoachLineSettingsForm({
             toast.success('LINE・Google Chatの接続確認が完了し、設定を保存しました')
         } catch (error: any) {
             console.error(error)
-            toast.error(error.message || '更新に失敗しました')
+            toast.error(sanitizeErrorMessage(error, '更新に失敗しました'))
         } finally {
             setSaving(false)
         }

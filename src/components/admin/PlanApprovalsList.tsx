@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
 import { format } from 'date-fns'
+import { formatErrorToastMessage, sanitizeErrorMessage } from '@/lib/error-formatter'
 
 interface RequestItem {
     id: string
@@ -94,12 +95,16 @@ export default function PlanApprovalsList({ requests }: PlanApprovalsListProps) 
         if (!confirm(confirmMsg)) return
 
         startTransition(async () => {
-            const res = await approveMembershipChangeRequest(request.id)
-            if (res.success) {
-                toast.success('申請を承認しました。')
-                router.refresh()
-            } else {
-                toast.error(res.error || '承認に失敗しました。')
+            try {
+                const res = await approveMembershipChangeRequest(request.id)
+                if (res.success) {
+                    toast.success('申請を承認しました。')
+                    router.refresh()
+                } else {
+                    toast.error(sanitizeErrorMessage(res.error, '承認に失敗しました。'))
+                }
+            } catch (err) {
+                toast.error(formatErrorToastMessage(err))
             }
         })
     }
@@ -115,14 +120,18 @@ export default function PlanApprovalsList({ requests }: PlanApprovalsListProps) 
         if (!selectedRequestId) return
 
         startTransition(async () => {
-            const res = await rejectMembershipChangeRequest(selectedRequestId, rejectReason)
-            if (res.success) {
-                toast.success('申請を却下しました。')
-                setRejectOpen(false)
-                setSelectedRequestId(null)
-                router.refresh()
-            } else {
-                toast.error(res.error || '却下に失敗しました。')
+            try {
+                const res = await rejectMembershipChangeRequest(selectedRequestId, rejectReason)
+                if (res.success) {
+                    toast.success('申請を却下しました。')
+                    setRejectOpen(false)
+                    setSelectedRequestId(null)
+                    router.refresh()
+                } else {
+                    toast.error(sanitizeErrorMessage(res.error, '却下に失敗しました。'))
+                }
+            } catch (err) {
+                toast.error(formatErrorToastMessage(err))
             }
         })
     }

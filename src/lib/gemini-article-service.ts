@@ -125,11 +125,11 @@ ${customPrompt ? `- ユーザーからの追加リクエスト: ${customPrompt}`
 
     const userPrompt = `キーワード「${keyword}」${isRewrite ? `および対象パス「${targetPath}」のリライト記事` : ''}に関するプロ品質の記事を、指定のJSON形式で出力してください。一般的な抽象論ではなく、水泳指導のプロならではの生体力学的な理由（重心、頭の位置、浮力、脱力等）と、マンツーマン個別指導の優位性、および指定の4社徹底比較表を確実に含めて書いてください。`;
 
-    // 利用可能な高速Geminiモデルの自動フォールバック候補
+    // 利用可能な高速Geminiモデルの自動フォールバック候補（公式の有効モデル）
     const candidateModels = [
-        'gemini-flash-lite-latest',
-        'gemini-3.5-flash-lite',
-        'gemini-flash-latest',
+        'gemini-2.5-flash',
+        'gemini-2.0-flash',
+        'gemini-1.5-flash',
     ];
 
     let candidateText = '';
@@ -160,7 +160,7 @@ ${customPrompt ? `- ユーザーからの追加リクエスト: ${customPrompt}`
     for (const model of candidateModels) {
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        const timeoutId = setTimeout(() => controller.abort(), 6000);
 
         try {
             const res = await fetch(endpoint, {
@@ -333,12 +333,12 @@ ${table}
 ${blindSpotsSection}
 
 ### 🎯 スイムパートナーズの必勝アプローチ
-${intelligence.ourWinningStrategy}
+${intelligence.ourWinningStrategy || '完全明朗会計、専任プロコーチ制、毎回の動画カルテ、生体力学（重心・浮力・脱力）ピンポイント指導の4大優位性を提示'}
 
-### 🚀 【先着枠限定】${intelligence.recommendedCta.headline}
-${intelligence.recommendedCta.subheadline}
+### 🚀 【先着枠限定】${intelligence.recommendedCta?.headline || '60分で悩みを解消する出張マンツーマン体験レッスン'}
+${intelligence.recommendedCta?.subheadline || '入会金0円・交通費込み。身近な公営プールでプロコーチが専任指導'}
 
-👉 **[${intelligence.recommendedCta.buttonText}（公営プール出張・空き枠確認）](https://swim-partners.com/personal_swim)**
+👉 **[${intelligence.recommendedCta?.buttonText || '体験レッスンを予約する'}（公営プール出張・空き枠確認）](https://swim-partners.com/personal_swim)**
 
 ---
 `;

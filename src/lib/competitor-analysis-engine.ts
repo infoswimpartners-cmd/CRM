@@ -280,9 +280,9 @@ async function generateAnalysisWithGemini(
 上記キーワードにおける検索意図、各社（Swimmy、ベースプラス、スイサポ）の想定ポジショニングと盲点、自社の勝ち筋、推奨CTA、Markdown徹底比較表をJSON形式で生成してください。`;
 
   const candidateModels = [
-    'gemini-flash-lite-latest',
-    'gemini-3.5-flash-lite',
-    'gemini-flash-latest',
+    'gemini-2.5-flash',
+    'gemini-2.0-flash',
+    'gemini-1.5-flash',
   ];
 
   const responseJsonSchema = {
@@ -362,7 +362,7 @@ async function generateAnalysisWithGemini(
   for (const model of candidateModels) {
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanKey}`;
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
 
     try {
       const res = await fetch(endpoint, {

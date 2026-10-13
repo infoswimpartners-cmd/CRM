@@ -4,40 +4,41 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { startOfYear, endOfYear, format } from 'date-fns'
 
 export async function getMonthlyRevenue(year: number) {
-    const supabase = createAdminClient()
+    try {
+        const supabase = createAdminClient()
 
-    const startDate = startOfYear(new Date(year, 0, 1)).toISOString()
-    const endDate = endOfYear(new Date(year, 0, 1)).toISOString()
+        const startDate = startOfYear(new Date(year, 0, 1)).toISOString()
+        const endDate = endOfYear(new Date(year, 0, 1)).toISOString()
 
-    const now = new Date()
-    const currentYear = now.getFullYear()
-    const currentMonthIndex = now.getMonth()
+        const now = new Date()
+        const currentYear = now.getFullYear()
+        const currentMonthIndex = now.getMonth()
 
-    // 1. 実績データの取得 (lessons)
-    const { data: lessons, error: lessonsError } = await supabase
-        .from('lessons')
-        .select('lesson_date, price')
-        .gte('lesson_date', startDate)
-        .lte('lesson_date', endDate)
+        // 1. 実績データの取得 (lessons)
+        const { data: lessons, error: lessonsError } = await supabase
+            .from('lessons')
+            .select('lesson_date, price')
+            .gte('lesson_date', startDate)
+            .lte('lesson_date', endDate)
 
-    // 2. 将来の予定データの取得 (lesson_schedules)
-    const { data: schedules, error: schedulesError } = await supabase
-        .from('lesson_schedules')
-        .select(`
-            start_time, 
-            price,
-            lesson_masters ( unit_price )
-        `)
-        .gte('start_time', now.toISOString())
-        .lte('start_time', endDate)
+        // 2. 将来の予定データの取得 (lesson_schedules)
+        const { data: schedules, error: schedulesError } = await supabase
+            .from('lesson_schedules')
+            .select(`
+                start_time, 
+                price,
+                lesson_masters ( unit_price )
+            `)
+            .gte('start_time', now.toISOString())
+            .lte('start_time', endDate)
 
-    if (lessonsError || schedulesError) {
-        console.error('Error fetching data:', lessonsError || schedulesError)
-        return []
-    }
+        if (lessonsError || schedulesError) {
+            console.error('Error fetching data:', lessonsError || schedulesError)
+            return []
+        }
 
-    // 12ヶ月分を初期化
-    const monthlyData = Array.from({ length: 12 }, (_, i) => {
+        // 12ヶ月分を初期化
+        const monthlyData = Array.from({ length: 12 }, (_, i) => {
         const isFuture = year > currentYear || (year === currentYear && i >= currentMonthIndex)
         return {
             month: i + 1,
@@ -90,5 +91,9 @@ export async function getMonthlyRevenue(year: number) {
         return idx >= firstDataIndex
     })
 
-    return result
+        return result
+    } catch (err) {
+        console.error('getMonthlyRevenue error:', err)
+        return []
+    }
 }

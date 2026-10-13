@@ -19,6 +19,7 @@ import { Loader2, Undo2 } from 'lucide-react'
 import { processRefund } from '@/actions/refund'
 import { toast } from 'sonner'
 import { formatCurrency } from '@/lib/utils'
+import { formatErrorToastMessage, sanitizeErrorMessage } from '@/lib/error-formatter'
 
 interface RefundDialogProps {
     scheduleId: string
@@ -57,10 +58,10 @@ export function RefundDialog({ scheduleId, title, amount, studentName, onRefundC
                 setOpen(false)
                 if (onRefundComplete) onRefundComplete()
             } else {
-                toast.error('返金に失敗しました: ' + result.error)
+                toast.error('返金に失敗しました: ' + sanitizeErrorMessage(result.error))
             }
         } catch (error) {
-            toast.error('エラーが発生しました')
+            toast.error(formatErrorToastMessage(error))
         } finally {
             setLoading(false)
         }

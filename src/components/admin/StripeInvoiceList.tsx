@@ -41,6 +41,7 @@ import {
 } from '@/components/ui/table'
 import { formatCurrency } from '@/lib/utils'
 import { getStripeInvoices, StripeInvoiceSummary } from '@/actions/stripe'
+import { formatErrorToastMessage, sanitizeErrorMessage } from '@/lib/error-formatter'
 
 interface StripeInvoiceListProps {
     initialInvoices: StripeInvoiceSummary[]
@@ -73,10 +74,10 @@ export function StripeInvoiceList({
                     setHasMore(res.hasMore)
                     toast.success('Stripe請求履歴を最新に更新しました')
                 } else {
-                    toast.error('請求履歴の更新に失敗しました: ' + res.error)
+                    toast.error('請求履歴の更新に失敗しました: ' + sanitizeErrorMessage(res.error))
                 }
             } catch (error: any) {
-                toast.error('エラーが発生しました: ' + error.message)
+                toast.error(formatErrorToastMessage(error))
             }
         })
     }
@@ -101,10 +102,10 @@ export function StripeInvoiceList({
                 setHasMore(res.hasMore)
                 toast.success(`${res.data.length}件の請求履歴を追加取得しました`)
             } else {
-                toast.error('追加取得に失敗しました: ' + res.error)
+                toast.error('追加取得に失敗しました: ' + sanitizeErrorMessage(res.error))
             }
         } catch (error: any) {
-            toast.error('エラーが発生しました: ' + error.message)
+            toast.error(formatErrorToastMessage(error))
         } finally {
             setIsLoadingMore(false)
         }

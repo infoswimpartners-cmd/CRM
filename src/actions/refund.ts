@@ -13,19 +13,19 @@ interface RefundParams {
 }
 
 export async function processRefund({ scheduleId, amount, reason, isFullRefund = true }: RefundParams) {
-    const supabase = await createClient()
-    const supabaseAdmin = createAdminClient()
-
-    // 1. Auth & Admin Check
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return { success: false, error: 'Unauthorized' }
-
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-    if (profile?.role !== 'admin' && profile?.role !== 'owner') {
-        return { success: false, error: 'Permission denied' }
-    }
-
     try {
+        const supabase = await createClient()
+        const supabaseAdmin = createAdminClient()
+
+        // 1. Auth & Admin Check
+        const { data: authData, error: authError } = await supabase.auth.getUser()
+        if (authError || !authData?.user) return { success: false, error: 'Unauthorized' }
+        const user = authData.user
+
+        const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+        if (profile?.role !== 'admin' && profile?.role !== 'owner') {
+            return { success: false, error: 'Permission denied' }
+        }
         // 2. Fetch Schedule
         const { data: schedule } = await supabaseAdmin
             .from('lesson_schedules')

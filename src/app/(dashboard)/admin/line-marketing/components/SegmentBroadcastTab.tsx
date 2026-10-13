@@ -47,6 +47,7 @@ import {
 import { PhonePreviewModal } from './PhonePreviewModal';
 import { SafetyConfirmDialog } from './SafetyConfirmDialog';
 import { ScheduledCampaignsModal } from './ScheduledCampaignsModal';
+import { formatErrorToastMessage, sanitizeErrorMessage } from '@/lib/error-formatter';
 
 export interface MasterDataProps {
     coaches: Array<{ id: string; fullName: string; baseArea: string | null }>;
@@ -181,10 +182,10 @@ export const SegmentBroadcastTab: React.FC<SegmentBroadcastTabProps> = ({
                     return next;
                 });
             } else {
-                toast.error('対象生徒の抽出プレビューに失敗しました: ' + (result.error || ''));
+                toast.error('対象生徒の抽出プレビューに失敗しました: ' + sanitizeErrorMessage(result.error));
             }
         } catch (err: any) {
-            toast.error('エラーが発生しました: ' + err.message);
+            toast.error(formatErrorToastMessage(err));
         } finally {
             setIsLoadingPreview(false);
         }
@@ -275,10 +276,10 @@ export const SegmentBroadcastTab: React.FC<SegmentBroadcastTabProps> = ({
                 toast.success('テスト太郎（会員番号0035）宛てにテスト送信が完了しました！LINEアプリをご確認ください。');
                 if (onDeliveryDone) onDeliveryDone();
             } else {
-                toast.error('テスト送信に失敗しました: ' + (res.error || '不明なエラー'));
+                toast.error('テスト送信に失敗しました: ' + sanitizeErrorMessage(res.error, '不明なエラー'));
             }
         } catch (err: any) {
-            toast.error('テスト送信エラー: ' + err.message);
+            toast.error(formatErrorToastMessage(err, 'テスト送信エラー: '));
         } finally {
             setIsSendingTest(false);
         }
@@ -356,10 +357,10 @@ export const SegmentBroadcastTab: React.FC<SegmentBroadcastTabProps> = ({
                 // 送信完了後に一覧を再フェッチ
                 fetchStudentsPreview();
             } else {
-                toast.error('一括配信の登録に失敗しました: ' + (res.error || ''));
+                toast.error('一括配信の登録に失敗しました: ' + sanitizeErrorMessage(res.error));
             }
         } catch (err: any) {
-            toast.error('配信実行エラー: ' + err.message);
+            toast.error(formatErrorToastMessage(err, '配信実行エラー: '));
         } finally {
             setIsSubmittingBroadcast(false);
         }

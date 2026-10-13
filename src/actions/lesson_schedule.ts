@@ -224,24 +224,23 @@ async function calculateMonthlyUsage(
 }
 
 export async function createLessonSchedule(params: CreateLessonScheduleParams) {
-    const supabase = await createClient()
-    const supabaseAdmin = createAdminClient()
-
-    // 1. Auth Check (Admin or Coach)
-    const { data: authData } = await supabase.auth.getUser()
-    const user = authData?.user
-    if (!user) return { success: false, error: 'Unauthorized' }
-
-    let isOverage = false
-    let billingStatus = 'pending'
-    let billingScheduledAt: string | null = null
-    let notificationSentAt: string | null = null
-    let stripeInvoiceItemId: string | null = null
-    let overagePrice = 0
-    let studentNameForEmail = ''
-    let priceReasonForEmail = ''
-
     try {
+        const supabase = await createClient()
+        const supabaseAdmin = createAdminClient()
+
+        // 1. Auth Check (Admin or Coach)
+        const { data: authData, error: authError } = await supabase.auth.getUser()
+        if (authError || !authData?.user) return { success: false, error: 'Unauthorized' }
+        const user = authData.user
+
+        let isOverage = false
+        let billingStatus = 'pending'
+        let billingScheduledAt: string | null = null
+        let notificationSentAt: string | null = null
+        let stripeInvoiceItemId: string | null = null
+        let overagePrice = 0
+        let studentNameForEmail = ''
+        let priceReasonForEmail = ''
         // 2. Check Monthly Limit (Only if student is assigned)
         if (params.student_id) {
             const studentId = params.student_id
@@ -535,21 +534,20 @@ export async function createLessonSchedule(params: CreateLessonScheduleParams) {
 }
 
 export async function approveLessonSchedule(scheduleId: string, forceManualEmail: boolean = false) {
-    const supabase = await createClient()
-    const supabaseAdmin = createAdminClient()
-
-    // Auth Check
-    const { data: authData } = await supabase.auth.getUser()
-    const user = authData?.user
-    if (!user) return { success: false, error: 'Unauthorized' }
-
-    // Admin Check
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-    if (profile?.role !== 'admin' && profile?.role !== 'owner') {
-        return { success: false, error: 'Permission denied' }
-    }
-
     try {
+        const supabase = await createClient()
+        const supabaseAdmin = createAdminClient()
+
+        // Auth Check
+        const { data: authData, error: authError } = await supabase.auth.getUser()
+        if (authError || !authData?.user) return { success: false, error: 'Unauthorized' }
+        const user = authData.user
+
+        // Admin Check
+        const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+        if (profile?.role !== 'admin' && profile?.role !== 'owner') {
+            return { success: false, error: 'Permission denied' }
+        }
 
 
         console.log('[ApproveLesson] Starting approval for:', scheduleId)
@@ -664,21 +662,20 @@ export async function approveLessonSchedule(scheduleId: string, forceManualEmail
 }
 
 export async function rejectLessonSchedule(scheduleId: string) {
-    const supabase = await createClient()
-    const supabaseAdmin = createAdminClient()
-
-    // Auth Check
-    const { data: authData } = await supabase.auth.getUser()
-    const user = authData?.user
-    if (!user) return { success: false, error: 'Unauthorized' }
-
-    // Admin Check
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-    if (profile?.role !== 'admin' && profile?.role !== 'owner') {
-        return { success: false, error: 'Permission denied' }
-    }
-
     try {
+        const supabase = await createClient()
+        const supabaseAdmin = createAdminClient()
+
+        // Auth Check
+        const { data: authData, error: authError } = await supabase.auth.getUser()
+        if (authError || !authData?.user) return { success: false, error: 'Unauthorized' }
+        const user = authData.user
+
+        // Admin Check
+        const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+        if (profile?.role !== 'admin' && profile?.role !== 'owner') {
+            return { success: false, error: 'Permission denied' }
+        }
         // [MODIFIED] Delete from Google Calendar first
         const { data: existing } = await supabaseAdmin
             .from('lesson_schedules')
@@ -726,13 +723,12 @@ export async function rejectLessonSchedule(scheduleId: string) {
 }
 
 export async function checkStudentLessonStatus(studentId: string, dateStr: string, attendanceType?: string) {
-    const supabase = await createClient()
-    const supabaseAdmin = createAdminClient()
-    const { data: authData } = await supabase.auth.getUser()
-    const user = authData?.user
-    if (!user) return { success: false, error: 'Unauthorized' }
-
     try {
+        const supabase = await createClient()
+        const supabaseAdmin = createAdminClient()
+        const { data: authData, error: authError } = await supabase.auth.getUser()
+        if (authError || !authData?.user) return { success: false, error: 'Unauthorized' }
+        const user = authData.user
         const date = new Date(dateStr)
         const start = startOfMonth(date).toISOString()
         const end = endOfMonth(date).toISOString()
@@ -939,21 +935,21 @@ export async function checkStudentLessonStatus(studentId: string, dateStr: strin
 }
 
 export async function approveLessonScheduleManually(scheduleId: string) {
-    const supabase = await createClient()
-    const supabaseAdmin = createAdminClient()
-
-    // Auth Check
-    const { data: authData } = await supabase.auth.getUser()
-    const user = authData?.user
-    if (!user) return { success: false, error: 'Unauthorized' }
-
-    // Admin Check
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-    if (profile?.role !== 'admin' && profile?.role !== 'owner') {
-        return { success: false, error: 'Permission denied' }
-    }
-
     try {
+        const supabase = await createClient()
+        const supabaseAdmin = createAdminClient()
+
+        // Auth Check
+        const { data: authData, error: authError } = await supabase.auth.getUser()
+        if (authError || !authData?.user) return { success: false, error: 'Unauthorized' }
+        const user = authData.user
+
+        // Admin Check
+        const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+        if (profile?.role !== 'admin' && profile?.role !== 'owner') {
+            return { success: false, error: 'Permission denied' }
+        }
+
         console.log('[ApproveManually] Updating to paid status:', scheduleId)
 
         const { error } = await supabaseAdmin
@@ -967,10 +963,15 @@ export async function approveLessonScheduleManually(scheduleId: string) {
 
         if (error) throw error
 
-        revalidatePath('/admin/billing')
+        try {
+            revalidatePath('/admin/billing')
+            revalidatePath('/admin/approvals')
+        } catch {
+            // ignore revalidate errors
+        }
         return { success: true }
     } catch (error: any) {
         console.error('[ApproveManually] Error:', error)
-        return { success: false, error: error.message }
+        return { success: false, error: error?.message || '手動決済承認処理に失敗しました' }
     }
 }

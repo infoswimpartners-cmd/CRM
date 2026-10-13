@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import liff from "@line/liff";
+import { sanitizeErrorMessage } from "@/lib/error-formatter";
 
 export default function BookingForm() {
   const [isLiffReady, setIsLiffReady] = useState(false);
@@ -335,7 +336,7 @@ export default function BookingForm() {
   if (liffError) {
     return (
       <div style={{ textAlign: "center", marginTop: "50px", fontFamily: "sans-serif", color: "red", padding: "20px" }}>
-        <p>エラーが発生しました: {liffError}</p>
+        <p>{sanitizeErrorMessage(liffError, '一時的なエラーが発生しました。時間をおいて再度お試しください。')}</p>
         <p style={{ color: "#666", fontSize: "14px" }}>LINEアプリから開き直すか、設定を確認してください。</p>
       </div>
     );

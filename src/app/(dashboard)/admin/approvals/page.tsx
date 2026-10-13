@@ -15,37 +15,50 @@ export default async function ApprovalsPage({ searchParams }: ApprovalsPageProps
     const initialTab = resolvedSearchParams?.tab === 'plans' ? 'plans' : 'billing'
     const initialQuery = resolvedSearchParams?.q || ''
 
-    const supabase = createAdminClient()
+    let initialInvoices: any[] = []
+    let initialHasMore = false
+    let pendingRequests: any[] = []
 
-    // 1. Stripeで請求を行った履歴（インボイス履歴）を取得
-    const invoicesResult = await getStripeInvoices({ limit: 50 })
-    const initialInvoices = invoicesResult.success ? invoicesResult.data : []
-    const initialHasMore = invoicesResult.success ? invoicesResult.hasMore : false
+    try {
+        const supabase = createAdminClient()
 
-    // 2. プラン変更・解約申請データの取得
-    const { data: planRequests, error: planError } = await supabase
-        .from('membership_change_requests')
-        .select(`
-            *,
-            student:students (
-                id,
-                full_name,
-                student_number,
-                membership_lock_until,
-                current_membership:membership_types!membership_type_id (
-                    name
-                )
-            ),
-            requested:membership_types!requested_membership_type_id ( name )
-        `)
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false })
+        // 1. Stripeで請求を行った履歴（インボイス履歴）を取得
+        const invoicesResult = await getStripeInvoices({ limit: 50 }).catch(err => {
+            console.error('ApprovalsPage getStripeInvoices error:', err)
+            return { success: false, data: [], hasMore: false }
+        })
+        if (invoicesResult && invoicesResult.success) {
+            initialInvoices = invoicesResult.data || []
+            initialHasMore = Boolean(invoicesResult.hasMore)
+        }
 
-    if (planError) {
-        console.error('Error fetching plan approvals in approvals page:', planError)
+        // 2. プラン変更・解約申請データの取得
+        const { data: planRequests, error: planError } = await supabase
+            .from('membership_change_requests')
+            .select(`
+                *,
+                student:students (
+                    id,
+                    full_name,
+                    student_number,
+                    membership_lock_until,
+                    current_membership:membership_types!membership_type_id (
+                        name
+                    )
+                ),
+                requested:membership_types!requested_membership_type_id ( name )
+            `)
+            .eq('status', 'pending')
+            .order('created_at', { ascending: false })
+
+        if (planError) {
+            console.error('Error fetching plan approvals in approvals page:', planError)
+        } else if (planRequests) {
+            pendingRequests = planRequests
+        }
+    } catch (e) {
+        console.error('Unexpected error rendering ApprovalsPage:', e)
     }
-
-    const pendingRequests = planRequests || []
 
     return (
         <div className="space-y-6">
