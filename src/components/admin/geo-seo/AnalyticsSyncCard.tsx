@@ -95,7 +95,7 @@ export function AnalyticsSyncCard({
                             )}
                         </div>
                         <p className="text-xs text-zinc-500 font-mono">
-                            最終同期: {lastSynced} {isConfigured && `(GA4: ${ga4Connected ? '接続済' : '未設定'} / Search Console: ${searchConsoleConnected ? '接続済' : '未設定'})`}
+                            最終同期: {lastSynced} {isConfigured && `(GA4: ${ga4Connected ? '接続済' : '未設定'} / Search Console: ${searchConsoleConnected ? '接続済' : '未設定'} / Google広告: 連携中)`}
                         </p>
                     </div>
 

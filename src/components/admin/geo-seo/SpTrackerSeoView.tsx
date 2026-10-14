@@ -257,7 +257,7 @@ export function SpTrackerSeoView({
                     <table className="w-full min-w-[760px] text-left border-collapse">
                         <thead>
                             <tr className="border-b border-zinc-200 text-[11px] font-mono font-bold text-zinc-400 uppercase whitespace-nowrap">
-                                <th className="pb-3 px-3">キーワード</th>
+                                <th className="pb-3 px-3 sticky left-0 bg-white z-10 shadow-[2px_0_5px_rgba(0,0,0,0.05)]">キーワード</th>
                                 <th className="pb-3 px-3 text-center">Rank Watch</th>
                                 <th className="pb-3 px-3">エリア軸</th>
                                 <th className="pb-3 px-3">セグメント軸</th>
@@ -272,8 +272,8 @@ export function SpTrackerSeoView({
                             {filteredKeywords.map((kw) => {
                                 const gscPerf: any = gscPerformanceMap.get(kw.keyword);
                                 return (
-                                    <tr key={kw.id} className="hover:bg-zinc-50/80 transition-colors">
-                                        <td className="py-4 px-3 font-bold text-slate-900">
+                                    <tr key={kw.id} className="hover:bg-zinc-50/80 transition-colors group">
+                                        <td className="py-4 px-3 font-bold text-slate-900 sticky left-0 bg-white group-hover:bg-zinc-50/90 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.05)]">
                                             {kw.keyword}
                                         </td>
                                         <td className="py-4 px-3 text-center">

@@ -515,7 +515,7 @@ export function GeoPageTrafficAnalysisCard({
                     </div>
 
                     <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs border border-zinc-200 rounded-xl overflow-hidden">
+                        <table className="w-full min-w-[640px] text-left text-xs border border-zinc-200 rounded-xl overflow-hidden">
                             <thead className="bg-zinc-100 text-zinc-700 font-bold border-b border-zinc-200">
                                 <tr>
                                     <th className="p-3">対象地域</th>

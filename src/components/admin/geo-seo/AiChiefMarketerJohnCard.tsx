@@ -7,7 +7,6 @@ import {
     CheckCircle2,
     TrendingUp,
     Target,
-    ArrowRight,
     MessageSquare,
     DollarSign,
     Lightbulb,
@@ -17,32 +16,30 @@ import {
 import { SeoRankWatchState } from '@/lib/seo-rank-watch';
 import { SpreadsheetAnalyticsData } from '@/lib/spreadsheet-types';
 import { generateJohnDailyBriefing, JohnBriefing } from '@/lib/ai-marketer-john';
-import { JohnMarketingConsultDrawer } from './JohnMarketingConsultDrawer';
 
 interface AiChiefMarketerJohnCardProps {
     rankWatchState?: SeoRankWatchState;
     spreadsheetData?: SpreadsheetAnalyticsData;
-    onOpenConsult?: () => void;
+    onOpenConsult?: (question?: string) => void;
 }
 
 export function AiChiefMarketerJohnCard({
     rankWatchState,
     spreadsheetData,
+    onOpenConsult,
 }: AiChiefMarketerJohnCardProps) {
-    const [isConsultOpen, setIsConsultOpen] = useState(false);
-    const [selectedQuestion, setSelectedQuestion] = useState<string | undefined>(undefined);
     const [isExpanded, setIsExpanded] = useState(true);
 
     const briefing: JohnBriefing = generateJohnDailyBriefing(rankWatchState, spreadsheetData);
 
     const handleQuickConsult = (question: string) => {
-        setSelectedQuestion(question);
-        setIsConsultOpen(true);
+        if (onOpenConsult) {
+            onOpenConsult(question);
+        }
     };
 
     return (
-        <>
-            <div className="relative overflow-hidden rounded-2xl bg-white text-slate-900 p-4 sm:p-7 md:p-8 border border-amber-200/90 shadow-[0_8px_30px_rgba(245,158,11,0.06)] transition-all">
+        <div className="relative overflow-hidden rounded-2xl bg-white text-slate-900 p-4 sm:p-7 md:p-8 border border-amber-200/90 shadow-[0_8px_30px_rgba(245,158,11,0.06)] transition-all">
                 {/* アンビエント発光（明るいアンバー & ライトブルー） */}
                 <div className="absolute -top-24 -right-24 w-80 h-80 bg-amber-400/10 rounded-full blur-[90px] pointer-events-none" />
                 <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-indigo-500/5 rounded-full blur-[90px] pointer-events-none" />
@@ -78,8 +75,9 @@ export function AiChiefMarketerJohnCard({
                         <div className="w-full sm:w-auto flex items-center justify-between sm:justify-end gap-2.5">
                             <button
                                 onClick={() => {
-                                    setSelectedQuestion(undefined);
-                                    setIsConsultOpen(true);
+                                    if (onOpenConsult) {
+                                        onOpenConsult();
+                                    }
                                 }}
                                 className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-zinc-950 text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2"
                             >
@@ -204,13 +202,5 @@ export function AiChiefMarketerJohnCard({
                     )}
                 </div>
             </div>
-
-            {/* チャット相談ドロワー */}
-            <JohnMarketingConsultDrawer
-                isOpen={isConsultOpen}
-                onClose={() => setIsConsultOpen(false)}
-                initialQuestion={selectedQuestion}
-            />
-        </>
     );
 }

@@ -1,10 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { SpTrackerRankWatchCard } from '@/components/admin/geo-seo/SpTrackerRankWatchCard';
-import { SpTrackerHeroActions } from '@/components/admin/geo-seo/SpTrackerHeroActions';
 import { SpTrackerStatusMeters } from '@/components/admin/geo-seo/SpTrackerStatusMeters';
 import { SpTrackerSeoView } from '@/components/admin/geo-seo/SpTrackerSeoView';
 import { SpTrackerGeoView } from '@/components/admin/geo-seo/SpTrackerGeoView';
@@ -20,25 +17,39 @@ import {
     SpTrackerDashboardData,
 } from '@/actions/sp-tracker-actions';
 import { syncMarketingAnalytics } from '@/actions/marketing';
-import { RefreshCw, MessageSquare, Briefcase } from 'lucide-react';
-import { AiChiefMarketerJohnCard } from '@/components/admin/geo-seo/AiChiefMarketerJohnCard';
+import { RefreshCw, Briefcase } from 'lucide-react';
 import { JohnMarketingConsultDrawer } from '@/components/admin/geo-seo/JohnMarketingConsultDrawer';
-import { WeeklyArticleSuggestionsWidget } from '@/components/admin/geo-seo/WeeklyArticleSuggestionsWidget';
-import { GeneratedArticlesListView } from '@/components/admin/geo-seo/GeneratedArticlesListView';
 import { SeoArticleGeneratorModal } from '@/components/admin/geo-seo/SeoArticleGeneratorModal';
 import { GeoPageTrafficAnalysisCard } from '@/components/admin/geo-seo/GeoPageTrafficAnalysisCard';
+import { GoogleAdsPerformanceCard } from '@/components/admin/geo-seo/GoogleAdsPerformanceCard';
 import { ArticleType } from '@/lib/generated-articles-storage';
 import { BenchmarkCompetitorPanel } from '@/components/admin/geo-seo/BenchmarkCompetitorPanel';
 import { KeywordCompetitorIntelligence } from '@/types/competitor-benchmark';
 
-function SpTrackerContent() {
-    const searchParams = useSearchParams();
-    const tabParam = searchParams.get('tab');
+// 2層ナビゲーションコンポーネントおよびフック
+import { GeoSeoTwoTierNav } from '@/components/admin/geo-seo/GeoSeoTwoTierNav';
+import { useGeoSeoNav } from '@/hooks/useGeoSeoNav';
+import { AiCockpitExecutiveBar } from '@/components/admin/geo-seo/AiCockpitExecutiveBar';
+import { AiCockpitUnifiedHub } from '@/components/admin/geo-seo/AiCockpitUnifiedHub';
 
-    const [activeTab, setActiveTab] = useState<'seo' | 'competitors' | 'articles' | 'geo' | 'citation_gap' | 'conversion' | 'analytics' | 'settings'>('seo');
-    const [loading, setLoading] = useState(true);
+function SpTrackerContent() {
+    // 2層ナビゲーションの双方向URL同期フック
+    const {
+        activeGroup,
+        activeTab,
+        setActiveGroup,
+        setActiveTab,
+    } = useGeoSeoNav();
+
+    const [, setLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
-    const [isFloatingConsultOpen, setIsFloatingConsultOpen] = useState(false);
+    const [isConsultOpen, setIsConsultOpen] = useState(false);
+    const [consultInitialQuestion, setConsultInitialQuestion] = useState<string | undefined>(undefined);
+
+    const handleOpenConsult = (question?: string) => {
+        setConsultInitialQuestion(question);
+        setIsConsultOpen(true);
+    };
 
     // 競合分析パネル選択キーワード
     const [selectedCompetitorKeyword, setSelectedCompetitorKeyword] = useState<string>('水泳 息継ぎ コツ 大人');
@@ -66,16 +77,11 @@ function SpTrackerContent() {
         setIsArticleModalOpen(true);
     };
 
+    // 競合キーワード選択時は自動的にdiagnosticsグループのcompetitorsタブへ遷移
     const handleSelectCompetitorKeyword = (keyword: string) => {
         setSelectedCompetitorKeyword(keyword);
         setActiveTab('competitors');
     };
-
-    useEffect(() => {
-        if (tabParam && ['seo', 'competitors', 'articles', 'geo', 'citation_gap', 'conversion', 'analytics', 'settings'].includes(tabParam)) {
-            setActiveTab(tabParam as any);
-        }
-    }, [tabParam]);
 
     const [data, setData] = useState<SpTrackerDashboardData>({
         statusMeters: {
@@ -147,7 +153,7 @@ function SpTrackerContent() {
             ]);
             await loadDashboard();
             toast.success('最新のSEO/GEOデータおよびWebページ情報を再取得・同期しました');
-        } catch (err) {
+        } catch {
             toast.error('同期に失敗しました');
         } finally {
             setIsRefreshing(false);
@@ -156,7 +162,7 @@ function SpTrackerContent() {
 
     return (
         <div className="min-h-screen bg-[#fafafa] text-slate-900 p-3.5 sm:p-6 md:p-10 space-y-6 sm:space-y-8 max-w-7xl mx-auto">
-            {/* ページタイトル (SP-Tracker ヘッダー) */}
+            {/* 1. ページヘッダー (SP-Tracker ヘッダー) */}
             <div className="flex flex-col sm:flex-row sm:items-end justify-between border-b border-zinc-200/80 pb-5 gap-4">
                 <div className="space-y-1">
                     <div className="flex flex-wrap items-center gap-2 mb-1">
@@ -184,31 +190,30 @@ function SpTrackerContent() {
                 </div>
             </div>
 
-            {/* 0. 専属AIチーフマーケター「ジョン」常駐デスク（最重要戦略司令塔） */}
-            <AiChiefMarketerJohnCard
+            {/* 2. 常駐エグゼクティブHUDバー (AI司令塔) */}
+            <AiCockpitExecutiveBar
                 rankWatchState={data.rankWatchState}
                 spreadsheetData={data.spreadsheetAnalytics}
+                onOpenConsult={handleOpenConsult}
+                onOpenActionKit={() => {
+                    setActiveGroup('ai_cockpit');
+                    setActiveTab('ai_hub');
+                }}
+                onSwitchToContentStudio={() => {
+                    setActiveGroup('ai_cockpit');
+                    setActiveTab('content_studio');
+                }}
+                onSwitchToRankSniper={() => {
+                    setActiveGroup('ai_cockpit');
+                    setActiveTab('rank_sniper');
+                }}
+                onSwitchToAiHub={() => {
+                    setActiveGroup('ai_cockpit');
+                    setActiveTab('ai_hub');
+                }}
             />
 
-            {/* 1. 最上部: SEO Rank Watch（1位狙撃 ✕ 7日間検証サイクル）カード */}
-            <SpTrackerRankWatchCard
-                state={data.rankWatchState}
-                onRefresh={loadDashboard}
-                onOpenGenerator={handleOpenGenerator}
-            />
-
-            {/* 1.5. 今週の内製化コンテンツ計画（SEO/AIO記事自動提案ウィジェット） */}
-            <WeeklyArticleSuggestionsWidget
-                onOpenGenerator={handleOpenGenerator}
-            />
-
-            {/* 2. 週次最優先アクション（Today's / Weekly Action）カード */}
-            <SpTrackerHeroActions
-                actions={data.actionRecommendations}
-                onResolveToggle={handleResolveToggle}
-            />
-
-            {/* 3. ステータスメーター（4つの主要診断指標） */}
+            {/* 3. ステータスメーター（4つの主要診断指標: 常駐スリムHUD） */}
             <SpTrackerStatusMeters
                 seoTopRate={data.statusMeters.seoTopRate}
                 geoSovRate={data.statusMeters.geoSovRate}
@@ -216,77 +221,31 @@ function SpTrackerContent() {
                 internalHealthScore={data.statusMeters.internalHealthScore}
             />
 
-            {/* 4. 詳細ビュー タブ切り替え */}
-            <div className="w-full overflow-x-auto no-scrollbar pb-1">
-                <div className="flex items-center gap-1.5 p-1 bg-zinc-200/60 rounded-xl min-w-max">
-                    {[
-                        { id: 'seo', label: '📍 SEO推移 ＆ 商圏エリア別SEO診断' },
-                        { id: 'competitors', label: '⚔️ 競合3社分析' },
-                        { id: 'articles', label: '📝 記事作成・内製化 (AIO/SEO)' },
-                        { id: 'conversion', label: 'CV・顧客分析（スプレッドシート連携）' },
-                        { id: 'geo', label: 'GEO分析（AI回答原文 & SOV）' },
-                        { id: 'citation_gap', label: '引用元ギャップリスト' },
-                        { id: 'analytics', label: '📊 GA4 / GSC（地域✕閲覧ページ分析）' },
-                        { id: 'settings', label: '設定（KW・プロンプト・Webhook）' },
-                    ].map((tab) => {
-                        const isActive = activeTab === tab.id;
-                        return (
-                            <button
-                                key={tab.id}
-                                onClick={() => setActiveTab(tab.id as any)}
-                                className={`px-3.5 sm:px-4 py-2 rounded-lg text-xs font-semibold tracking-wide transition-all duration-150 whitespace-nowrap ${
-                                    isActive
-                                        ? 'bg-white text-slate-900 shadow-[0_2px_8px_rgba(0,0,0,0.06)] font-bold'
-                                        : 'text-zinc-600 hover:text-slate-900 hover:bg-zinc-100/50'
-                                }`}
-                            >
-                                {tab.label}
-                            </button>
-                        );
-                    })}
-                </div>
-            </div>
+            {/* 3. 2層ナビゲーションバー（Apple HIGスタイル） */}
+            <GeoSeoTwoTierNav
+                activeGroup={activeGroup}
+                activeTab={activeTab}
+                onGroupChange={setActiveGroup}
+                onTabChange={setActiveTab}
+                badgeCounts={{
+                    citationGapCount: data.statusMeters.citationGapCount,
+                }}
+            />
 
-            {/* 5. タブコンテンツ表示 */}
-            <div className="pt-2">
-                {activeTab === 'seo' && (
-                    <SpTrackerSeoView
-                        keywords={data.keywords}
-                        searchConsoleData={data.searchConsoleData}
-                        rankWatchState={data.rankWatchState}
-                        onRefresh={loadDashboard}
-                        onOpenGenerator={handleOpenGenerator}
-                        onSelectCompetitorKeyword={handleSelectCompetitorKeyword}
-                    />
+            {/* 4. タブコンテンツ表示 */}
+            <div className="pt-2 min-h-[400px]">
+                {/* ===== グループ 1: 流入・広告分析 (traffic) ===== */}
+                {activeGroup === 'traffic' && activeTab === 'google_ads' && (
+                    <div className="space-y-6">
+                        <GoogleAdsPerformanceCard
+                            googleAdsData={data.googleAdsData || data.ga4Data?.googleAdsAnalytics}
+                            isConfigured={data.config.ga4Configured}
+                            onRefresh={loadDashboard}
+                        />
+                    </div>
                 )}
 
-                {activeTab === 'competitors' && (
-                    <BenchmarkCompetitorPanel
-                        initialKeyword={selectedCompetitorKeyword}
-                        onOpenGenerator={handleOpenGenerator}
-                    />
-                )}
-
-                {activeTab === 'articles' && (
-                    <GeneratedArticlesListView />
-                )}
-
-                {activeTab === 'conversion' && (
-                    <SpTrackerConversionCustomerView
-                        analyticsData={data.spreadsheetAnalytics || DEFAULT_SPREADSHEET_ANALYTICS}
-                        onRefresh={loadDashboard}
-                    />
-                )}
-
-                {activeTab === 'geo' && (
-                    <SpTrackerGeoView prompts={data.geoPrompts} />
-                )}
-
-                {activeTab === 'citation_gap' && (
-                    <SpTrackerCitationGapView citationGaps={data.citationGaps} />
-                )}
-
-                {activeTab === 'analytics' && (
+                {activeGroup === 'traffic' && activeTab === 'ga4_gsc' && (
                     <div className="space-y-6">
                         <GeoPageTrafficAnalysisCard
                             geoPageAnalytics={data.ga4Data?.geoPageAnalytics}
@@ -304,7 +263,57 @@ function SpTrackerContent() {
                     </div>
                 )}
 
-                {activeTab === 'settings' && (
+                {activeGroup === 'traffic' && activeTab === 'conversion' && (
+                    <SpTrackerConversionCustomerView
+                        analyticsData={data.spreadsheetAnalytics || DEFAULT_SPREADSHEET_ANALYTICS}
+                        onRefresh={loadDashboard}
+                    />
+                )}
+
+                {/* ===== グループ 2: 競合・SEO診断 (diagnostics) ===== */}
+                {activeGroup === 'diagnostics' && activeTab === 'seo_rank' && (
+                    <SpTrackerSeoView
+                        keywords={data.keywords}
+                        searchConsoleData={data.searchConsoleData}
+                        rankWatchState={data.rankWatchState}
+                        onRefresh={loadDashboard}
+                        onOpenGenerator={handleOpenGenerator}
+                        onSelectCompetitorKeyword={handleSelectCompetitorKeyword}
+                    />
+                )}
+
+                {activeGroup === 'diagnostics' && activeTab === 'competitors' && (
+                    <BenchmarkCompetitorPanel
+                        initialKeyword={selectedCompetitorKeyword}
+                        onOpenGenerator={handleOpenGenerator}
+                    />
+                )}
+
+                {activeGroup === 'diagnostics' && activeTab === 'geo_ai' && (
+                    <SpTrackerGeoView prompts={data.geoPrompts} />
+                )}
+
+                {activeGroup === 'diagnostics' && activeTab === 'citation_gap' && (
+                    <SpTrackerCitationGapView citationGaps={data.citationGaps} />
+                )}
+
+                {/* ===== グループ 3: AI施策コックピット (ai_cockpit) ===== */}
+                {activeGroup === 'ai_cockpit' && (
+                    <AiCockpitUnifiedHub
+                        activeTab={activeTab as 'ai_hub' | 'rank_sniper' | 'content_studio'}
+                        onTabChange={(tab) => setActiveTab(tab)}
+                        rankWatchState={data.rankWatchState}
+                        spreadsheetData={data.spreadsheetAnalytics}
+                        actionRecommendations={data.actionRecommendations}
+                        onResolveToggle={handleResolveToggle}
+                        onOpenGenerator={handleOpenGenerator}
+                        onOpenConsult={handleOpenConsult}
+                        onRefresh={loadDashboard}
+                    />
+                )}
+
+                {/* ===== グループ 4: 設定・連携 (settings) ===== */}
+                {activeGroup === 'settings' && activeTab === 'settings_master' && (
                     <SpTrackerSettingsView
                         webhookConfigured={data.config.googleChatWebhookConfigured}
                         currentWebhookUrl={data.config.googleChatWebhookUrl}
@@ -312,9 +321,23 @@ function SpTrackerContent() {
                         onRefresh={loadDashboard}
                     />
                 )}
+
+                {activeGroup === 'settings' && activeTab === 'api_status' && (
+                    <div className="space-y-6">
+                        <AnalyticsSyncCard
+                            isConfigured={data.config.ga4Configured}
+                            ga4Connected={data.config.ga4Configured}
+                            searchConsoleConnected={data.config.searchConsoleConfigured}
+                            lastSynced="接続稼働中"
+                            ga4Data={data.ga4Data}
+                            searchConsoleData={data.searchConsoleData}
+                            onSync={handleRefreshAll}
+                        />
+                    </div>
+                )}
             </div>
 
-            {/* 記事自動生成モーダル */}
+            {/* 5. 記事自動生成モーダル (画面共通) */}
             <SeoArticleGeneratorModal
                 isOpen={isArticleModalOpen}
                 onClose={() => {
@@ -328,9 +351,9 @@ function SpTrackerContent() {
                 competitorIntelligence={modalCompetitorIntelligence}
             />
 
-            {/* 画面右下フローティング: ジョンに相談するFABボタン */}
+            {/* 6. 画面右下フローティング: ジョンに相談するFABボタン */}
             <button
-                onClick={() => setIsFloatingConsultOpen(true)}
+                onClick={() => handleOpenConsult()}
                 className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-40 px-3.5 sm:px-4 py-2.5 sm:py-3.5 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 text-zinc-950 font-black text-xs shadow-[0_10px_30px_rgba(245,158,11,0.4)] flex items-center gap-2 sm:gap-2.5 hover:scale-105 active:scale-95 transition-all border border-amber-300"
             >
                 <div className="w-2 sm:w-2.5 h-2 sm:h-2.5 rounded-full bg-emerald-950 animate-ping" />
@@ -338,10 +361,11 @@ function SpTrackerContent() {
                 <span>CMOジョンに相談</span>
             </button>
 
-            {/* ジョンとのチャット相談ドロワー */}
+            {/* 7. ジョンとのチャット相談ドロワー */}
             <JohnMarketingConsultDrawer
-                isOpen={isFloatingConsultOpen}
-                onClose={() => setIsFloatingConsultOpen(false)}
+                isOpen={isConsultOpen}
+                onClose={() => setIsConsultOpen(false)}
+                initialQuestion={consultInitialQuestion}
             />
         </div>
     );

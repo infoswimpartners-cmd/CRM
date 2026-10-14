@@ -342,7 +342,7 @@ export function SpTrackerConversionCustomerView({
                 </div>
 
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
+                    <table className="w-full min-w-[760px] text-left border-collapse">
                         <thead>
                             <tr className="border-b border-zinc-200 text-[11px] font-mono font-bold text-zinc-400 uppercase">
                                 <th className="pb-3 px-3">流入経路（GA4実測チャネル）</th>
@@ -615,7 +615,7 @@ export function SpTrackerConversionCustomerView({
                     </div>
 
                     <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
+                        <table className="w-full min-w-[760px] text-left border-collapse">
                             <thead>
                                 <tr className="border-b border-zinc-200 text-[11px] font-mono font-bold text-zinc-400 uppercase">
                                     <th className="pb-3 px-3">会員コード</th>

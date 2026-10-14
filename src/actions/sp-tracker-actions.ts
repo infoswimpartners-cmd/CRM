@@ -13,7 +13,7 @@ import {
     SEED_CITATION_GAPS,
     SEED_ACTION_RECOMMENDATIONS,
 } from '@/lib/sp-tracker-seed';
-import { fetchGA4Analytics } from '@/lib/google-analytics';
+import { fetchGA4Analytics, GoogleAdsAnalytics } from '@/lib/google-analytics';
 import { fetchSearchConsoleAnalytics } from '@/lib/google-search-console';
 import { sendSpTrackerWeeklyReport } from '@/lib/sp-tracker-notifier';
 
@@ -54,12 +54,14 @@ export interface SpTrackerDashboardData {
     rankWatchState?: SeoRankWatchState;
     searchConsoleData?: any;
     ga4Data?: any;
+    googleAdsData?: GoogleAdsAnalytics;
     spreadsheetAnalytics?: SpreadsheetAnalyticsData;
     config: {
         googleChatWebhookConfigured: boolean;
         googleChatWebhookUrl?: string;
         ga4Configured: boolean;
         searchConsoleConfigured: boolean;
+        googleAdsConfigured?: boolean;
     };
 }
 
@@ -274,12 +276,14 @@ export async function getSpTrackerDashboard(): Promise<SpTrackerDashboardData> {
             rankWatchState,
             searchConsoleData,
             ga4Data,
+            googleAdsData: ga4Data?.googleAdsAnalytics || undefined,
             spreadsheetAnalytics,
             config: {
                 googleChatWebhookConfigured: Boolean(googleChatWebhookUrl),
                 googleChatWebhookUrl: googleChatWebhookUrl || undefined,
                 ga4Configured: Boolean(googleCreds.ga4Id && googleCreds.serviceAccountKey),
                 searchConsoleConfigured: Boolean(googleCreds.siteUrl && googleCreds.serviceAccountKey),
+                googleAdsConfigured: Boolean(googleCreds.ga4Id && ga4Data?.googleAdsAnalytics?.linked),
             },
         };
     } catch (error) {

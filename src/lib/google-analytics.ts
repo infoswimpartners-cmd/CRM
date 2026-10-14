@@ -77,6 +77,56 @@ export interface GA4GeoPageAnalytics {
     totalTrackedSessions: number;
 }
 
+export interface GoogleAdsCampaignItem {
+    campaignName: string;
+    adCost: number; // 広告費用 (円)
+    adClicks: number; // クリック数
+    adImpressions: number; // 表示回数
+    sessions: number; // セッション数
+    conversions: number; // GA4コンバージョン数
+    ctr: number; // クリック率 (%)
+    cpc: number; // 平均クリック単価 (円)
+    cpa: number; // 推定獲得単価 (円)
+    cvr: number; // 成約率 (%)
+}
+
+export interface GoogleAdsKeywordItem {
+    keyword: string;
+    adCost: number;
+    adClicks: number;
+    sessions: number;
+    conversions: number;
+    cpc: number;
+    cpa: number;
+    cvr: number;
+}
+
+export interface GoogleAdsDailyTrend {
+    date: string; // YYYY-MM-DD
+    formattedDate: string; // MM/DD
+    adCost: number;
+    adClicks: number;
+    adImpressions: number;
+    conversions: number;
+    sessions: number;
+}
+
+export interface GoogleAdsAnalytics {
+    linked: boolean;
+    totalCost: number; // 累計広告費用 (円)
+    totalClicks: number; // 累計クリック数
+    totalImpressions: number; // 累計表示回数
+    totalSessions: number; // 累計セッション数
+    totalConversions: number; // 累計コンバージョン数
+    averageCpc: number; // 平均クリック単価 (円)
+    averageCpa: number; // 平均獲得単価 (円/CV)
+    averageCtr: number; // 平均CTR (%)
+    conversionRate: number; // 平均CVR (%)
+    campaigns: GoogleAdsCampaignItem[];
+    keywords: GoogleAdsKeywordItem[];
+    dailyTrends: GoogleAdsDailyTrend[];
+}
+
 export interface GA4TrafficSummary {
     totalSessions: number;
     organicSearchSessions: number;
@@ -92,6 +142,7 @@ export interface GA4TrafficSummary {
     };
     aiSources: Array<{ source: string; sessions: number }>;
     geoPageAnalytics?: GA4GeoPageAnalytics;
+    googleAdsAnalytics?: GoogleAdsAnalytics;
 }
 
 /**
@@ -165,8 +216,11 @@ export async function fetchGA4Analytics(): Promise<GA4TrafficSummary | null> {
         const safeTotal = Math.max(totalSessions, 1);
         const formatShare = (val: number) => `${Math.round((val / safeTotal) * 100)}%`;
 
-        // 地域 ✕ ページ閲覧データの同時取得
-        const geoPageAnalytics = await fetchGA4GeoPageAnalytics();
+        // 地域 ✕ ページ閲覧データ および Google広告パフォーマンス実データの並行取得
+        const [geoPageAnalytics, googleAdsAnalytics] = await Promise.all([
+            fetchGA4GeoPageAnalytics(),
+            fetchGA4GoogleAdsAnalytics(),
+        ]);
 
         return {
             totalSessions,
@@ -183,6 +237,7 @@ export async function fetchGA4Analytics(): Promise<GA4TrafficSummary | null> {
             },
             aiSources: Object.entries(aiSourcesMap).map(([source, sessions]) => ({ source, sessions })),
             geoPageAnalytics: geoPageAnalytics || undefined,
+            googleAdsAnalytics: googleAdsAnalytics || undefined,
         };
     } catch (err) {
         console.error('Error fetching GA4 analytics:', err);
@@ -424,3 +479,220 @@ export async function fetchGA4GeoPageAnalytics(): Promise<GA4GeoPageAnalytics | 
         return null;
     }
 }
+
+/**
+ * GA4 Data API経由でリンクされたGoogle広告のパフォーマンスデータ
+ * （広告費用、クリック数、表示回数、キャンペーン、キーワード、日別推移）を取得
+ */
+export async function fetchGA4GoogleAdsAnalytics(): Promise<GoogleAdsAnalytics | null> {
+    const creds = await getGoogleCredentials();
+    const propertyId = creds.ga4Id || process.env.GA4_PROPERTY_ID || '439617010';
+    if (!propertyId) return null;
+
+    const auth = await getGoogleAuthClientAsync(['https://www.googleapis.com/auth/analytics.readonly']);
+    if (!auth) return null;
+
+    try {
+        const analyticsData = google.analyticsdata({
+            version: 'v1beta',
+            auth,
+        });
+
+        // 1. キャンペーン別実績の取得 (advertiserAdCost, advertiserAdClicks, advertiserAdImpressions, sessions, conversions)
+        const campaignReport = await analyticsData.properties.runReport({
+            property: `properties/${propertyId}`,
+            requestBody: {
+                dateRanges: [{ startDate: '30daysAgo', endDate: 'today' }],
+                dimensions: [{ name: 'sessionGoogleAdsCampaignName' }],
+                metrics: [
+                    { name: 'advertiserAdCost' },
+                    { name: 'advertiserAdClicks' },
+                    { name: 'advertiserAdImpressions' },
+                    { name: 'sessions' },
+                    { name: 'conversions' },
+                ],
+            },
+        });
+
+        // 2. キーワード別実績の取得
+        const keywordReport = await analyticsData.properties.runReport({
+            property: `properties/${propertyId}`,
+            requestBody: {
+                dateRanges: [{ startDate: '30daysAgo', endDate: 'today' }],
+                dimensions: [{ name: 'sessionGoogleAdsKeyword' }],
+                metrics: [
+                    { name: 'advertiserAdCost' },
+                    { name: 'advertiserAdClicks' },
+                    { name: 'sessions' },
+                    { name: 'conversions' },
+                ],
+                limit: '25',
+            },
+        });
+
+        // 3. 日別推移の取得
+        const dailyReport = await analyticsData.properties.runReport({
+            property: `properties/${propertyId}`,
+            requestBody: {
+                dateRanges: [{ startDate: '30daysAgo', endDate: 'today' }],
+                dimensions: [
+                    { name: 'date' },
+                    { name: 'sessionGoogleAdsCampaignName' },
+                ],
+                metrics: [
+                    { name: 'advertiserAdCost' },
+                    { name: 'advertiserAdClicks' },
+                    { name: 'advertiserAdImpressions' },
+                    { name: 'conversions' },
+                    { name: 'sessions' },
+                ],
+                orderBys: [{ dimension: { dimensionName: 'date' } }],
+            },
+        });
+
+        const campaignRows = campaignReport.data.rows || [];
+        const campaigns: GoogleAdsCampaignItem[] = [];
+        let totalCost = 0;
+        let totalClicks = 0;
+        let totalImpressions = 0;
+        let totalSessions = 0;
+        let totalConversions = 0;
+
+        for (const row of campaignRows) {
+            const rawName = row.dimensionValues?.[0]?.value || '';
+            const cost = parseFloat(row.metricValues?.[0]?.value || '0');
+            const clicks = parseInt(row.metricValues?.[1]?.value || '0', 10);
+            const impressions = parseInt(row.metricValues?.[2]?.value || '0', 10);
+            const sessions = parseInt(row.metricValues?.[3]?.value || '0', 10);
+            const conversions = parseInt(row.metricValues?.[4]?.value || '0', 10);
+
+            // Google広告経由以外の (not set) 行でコスト・クリックが0のものは除外
+            if (rawName === '(not set)' && cost === 0 && clicks === 0) continue;
+
+            totalCost += cost;
+            totalClicks += clicks;
+            totalImpressions += impressions;
+            totalSessions += sessions;
+            totalConversions += conversions;
+
+            const ctr = impressions > 0 ? parseFloat(((clicks / impressions) * 100).toFixed(2)) : 0;
+            const cpc = clicks > 0 ? Math.round(cost / clicks) : 0;
+            const cpa = conversions > 0 ? Math.round(cost / conversions) : 0;
+            const cvr = sessions > 0 ? parseFloat(((conversions / sessions) * 100).toFixed(2)) : 0;
+
+            campaigns.push({
+                campaignName: rawName === '(not set)' ? '未分類キャンペーン' : rawName,
+                adCost: Math.round(cost),
+                adClicks: clicks,
+                adImpressions: impressions,
+                sessions,
+                conversions,
+                ctr,
+                cpc,
+                cpa,
+                cvr,
+            });
+        }
+
+        // キーワード別集計
+        const keywordRows = keywordReport.data.rows || [];
+        const keywords: GoogleAdsKeywordItem[] = [];
+
+        for (const row of keywordRows) {
+            const rawKw = row.dimensionValues?.[0]?.value || '';
+            const cost = parseFloat(row.metricValues?.[0]?.value || '0');
+            const clicks = parseInt(row.metricValues?.[1]?.value || '0', 10);
+            const sessions = parseInt(row.metricValues?.[2]?.value || '0', 10);
+            const conversions = parseInt(row.metricValues?.[3]?.value || '0', 10);
+
+            if (rawKw === '(not set)' || (cost === 0 && clicks === 0)) continue;
+
+            const cpc = clicks > 0 ? Math.round(cost / clicks) : 0;
+            const cpa = conversions > 0 ? Math.round(cost / conversions) : 0;
+            const cvr = sessions > 0 ? parseFloat(((conversions / sessions) * 100).toFixed(2)) : 0;
+
+            keywords.push({
+                keyword: rawKw,
+                adCost: Math.round(cost),
+                adClicks: clicks,
+                sessions,
+                conversions,
+                cpc,
+                cpa,
+                cvr,
+            });
+        }
+
+        // 広告費順にソート
+        keywords.sort((a, b) => b.adCost - a.adCost);
+
+        // 日別推移集計
+        const dailyRows = dailyReport.data.rows || [];
+        const dailyMap: Record<string, { cost: number; clicks: number; impressions: number; conv: number; sess: number }> = {};
+
+        for (const row of dailyRows) {
+            const dateStr = row.dimensionValues?.[0]?.value || '';
+            const campName = row.dimensionValues?.[1]?.value || '';
+            const cost = parseFloat(row.metricValues?.[0]?.value || '0');
+            const clicks = parseInt(row.metricValues?.[1]?.value || '0', 10);
+            const impressions = parseInt(row.metricValues?.[2]?.value || '0', 10);
+            const conv = parseInt(row.metricValues?.[3]?.value || '0', 10);
+            const sess = parseInt(row.metricValues?.[4]?.value || '0', 10);
+
+            if (campName === '(not set)' && cost === 0 && clicks === 0) continue;
+
+            if (!dailyMap[dateStr]) {
+                dailyMap[dateStr] = { cost: 0, clicks: 0, impressions: 0, conv: 0, sess: 0 };
+            }
+            dailyMap[dateStr].cost += cost;
+            dailyMap[dateStr].clicks += clicks;
+            dailyMap[dateStr].impressions += impressions;
+            dailyMap[dateStr].conv += conv;
+            dailyMap[dateStr].sess += sess;
+        }
+
+        const dailyTrends: GoogleAdsDailyTrend[] = Object.entries(dailyMap)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([dateRaw, vals]) => {
+                const year = dateRaw.substring(0, 4);
+                const month = dateRaw.substring(4, 6);
+                const day = dateRaw.substring(6, 8);
+                const formattedDate = `${month}/${day}`;
+                const isoDate = `${year}-${month}-${day}`;
+
+                return {
+                    date: isoDate,
+                    formattedDate,
+                    adCost: Math.round(vals.cost),
+                    adClicks: vals.clicks,
+                    adImpressions: vals.impressions,
+                    conversions: vals.conv,
+                    sessions: vals.sess,
+                };
+            });
+
+        const safeClicks = Math.max(totalClicks, 1);
+        const safeImpressions = Math.max(totalImpressions, 1);
+        const safeSessions = Math.max(totalSessions, 1);
+
+        return {
+            linked: totalClicks > 0 || totalCost > 0,
+            totalCost: Math.round(totalCost),
+            totalClicks,
+            totalImpressions,
+            totalSessions,
+            totalConversions,
+            averageCpc: Math.round(totalCost / safeClicks),
+            averageCpa: totalConversions > 0 ? Math.round(totalCost / totalConversions) : 0,
+            averageCtr: parseFloat(((totalClicks / safeImpressions) * 100).toFixed(2)),
+            conversionRate: parseFloat(((totalConversions / safeSessions) * 100).toFixed(2)),
+            campaigns,
+            keywords,
+            dailyTrends,
+        };
+    } catch (err) {
+        console.error('Error fetching GA4 Google Ads analytics:', err);
+        return null;
+    }
+}
+

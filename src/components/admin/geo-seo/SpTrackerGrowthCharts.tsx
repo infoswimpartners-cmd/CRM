@@ -301,7 +301,7 @@ export function SpTrackerGrowthCharts({ dailyPerformance, keywords }: SpTrackerG
             <div className="h-72 sm:h-80 w-full pt-2">
                 {activeChartTab === 'exposure' && (
                     <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                        <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                             <defs>
                                 <linearGradient id="clicksGrad" x1="0" y1="0" x2="0" y2="1">
                                     <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.4} />
@@ -387,7 +387,7 @@ export function SpTrackerGrowthCharts({ dailyPerformance, keywords }: SpTrackerG
                 {activeChartTab === 'ranks' && (
                     <ResponsiveContainer width="100%" height="100%">
                         {/* Y軸反転（1位が一番上） */}
-                        <LineChart data={keywordRankTrends} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                        <LineChart data={keywordRankTrends} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                             <XAxis
                                 dataKey="period"
@@ -463,7 +463,7 @@ export function SpTrackerGrowthCharts({ dailyPerformance, keywords }: SpTrackerG
 
                 {activeChartTab === 'segments' && (
                     <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={segmentData} layout="vertical" margin={{ top: 10, right: 10, left: -5, bottom: 0 }}>
+                        <BarChart data={segmentData} layout="vertical" margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                             <XAxis type="number" stroke="#94a3b8" fontSize={11} tickLine={false} unit="回" />
                             <YAxis
@@ -472,7 +472,7 @@ export function SpTrackerGrowthCharts({ dailyPerformance, keywords }: SpTrackerG
                                 stroke="#475569"
                                 fontSize={10}
                                 tickLine={false}
-                                width={88}
+                                width={100}
                             />
                             <Tooltip
                                 contentStyle={{

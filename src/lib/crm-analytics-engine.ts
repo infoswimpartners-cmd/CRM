@@ -7,7 +7,7 @@ import {
     CustomerPlanDistribution,
     CustomerDetailItem,
 } from './spreadsheet-types';
-import { getGoogleAuthClientAsync } from './google-analytics';
+import { getGoogleAuthClientAsync, fetchGA4GoogleAdsAnalytics } from './google-analytics';
 import { getGoogleCredentials } from './google-credentials';
 import { google } from 'googleapis';
 
@@ -92,12 +92,14 @@ export async function calculateRealCrmAnalytics(supabase: any): Promise<Spreadsh
         { data: leads },
         { data: membershipTypes },
         realGa4Channels,
+        googleAdsData,
     ] = await Promise.all([
         supabase.from('students').select('*'),
         supabase.from('lessons').select('id, student_id, price, location, lesson_date, status, lesson_masters(id, is_trial, name)'),
         supabase.from('leads').select('*'),
         supabase.from('membership_types').select('*'),
         fetchRealGa4Channels(),
+        fetchGA4GoogleAdsAnalytics().catch(() => null),
     ]);
 
     const studentList: any[] = students || [];
@@ -444,14 +446,17 @@ export async function calculateRealCrmAnalytics(supabase: any): Promise<Spreadsh
         {
             channel: 'paid_search',
             label: 'Googleリスティング広告',
-            sessions: realGa4Channels.paid,
-            inquiries: Math.round(totalInquiriesCount * (realGa4Channels.paid / totalGaSessions)),
-            trials: Math.round(totalTrialsCount * (realGa4Channels.paid / totalGaSessions)),
-            enrollments: Math.round(activeMembersCount * (realGa4Channels.paid / totalGaSessions)),
-            inquiryCvr: `${((Math.round(totalInquiriesCount * (realGa4Channels.paid / totalGaSessions)) / realGa4Channels.paid) * 100).toFixed(1)}%`,
+            sessions: googleAdsData?.totalSessions || realGa4Channels.paid,
+            inquiries: Math.round(totalInquiriesCount * ((googleAdsData?.totalSessions || realGa4Channels.paid) / totalGaSessions)),
+            trials: Math.round(totalTrialsCount * ((googleAdsData?.totalSessions || realGa4Channels.paid) / totalGaSessions)),
+            enrollments: Math.round(activeMembersCount * ((googleAdsData?.totalSessions || realGa4Channels.paid) / totalGaSessions)),
+            inquiryCvr: `${((Math.round(totalInquiriesCount * ((googleAdsData?.totalSessions || realGa4Channels.paid) / totalGaSessions)) / (googleAdsData?.totalSessions || realGa4Channels.paid)) * 100).toFixed(1)}%`,
             enrollmentCvr: '54.2%',
-            cpaStatus: 'untracked',
-            cpaLabel: '未計測 (広告アカウント連携待ち)',
+            cpa: googleAdsData?.averageCpa || undefined,
+            cpaStatus: googleAdsData?.linked ? 'measured' : 'untracked',
+            cpaLabel: googleAdsData?.linked
+                ? `¥${googleAdsData.averageCpa.toLocaleString()} (Google広告実測)`
+                : '未計測 (広告アカウント連携待ち)',
         },
         {
             channel: 'direct',
