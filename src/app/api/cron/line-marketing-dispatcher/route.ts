@@ -25,7 +25,7 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-export async function runMarketingDispatcher(options: { dryRun?: boolean } = {}) {
+async function runMarketingDispatcher(options: { dryRun?: boolean } = {}) {
     const { dryRun = false } = options;
     const nowIso = new Date().toISOString();
 
