@@ -28,6 +28,8 @@ import { StudentMembershipAssigner } from '@/components/admin/StudentMembershipA
 import { checkStudentLessonStatus } from '@/actions/lesson_schedule'
 import { UsageStatusCard } from '@/components/customers/UsageStatusCard'
 import MembershipChangeRequestApproval from '@/components/admin/MembershipChangeRequestApproval'
+import { StudentLeaveCard } from '@/components/customers/StudentLeaveCard'
+import { getStudentLeaveSetting } from '@/actions/leave'
 
 export const dynamic = 'force-dynamic'
 
@@ -70,7 +72,8 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
         studentStatusMastersRes,
         assignedCoachesRes,
         schedulesRes,
-        changeRequestRes
+        changeRequestRes,
+        leaveSettingRes
     ] = await Promise.all([
         // Fetch Lesson History via RPC (Bypasses RLS)
         supabase.rpc('get_student_lesson_history_public', {
@@ -121,7 +124,9 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
             .select('*, requested:membership_types!requested_membership_type_id(name)')
             .eq('student_id', student.id)
             .eq('status', 'pending')
-            .limit(1)
+            .limit(1),
+        // Fetch Student Leave Setting
+        getStudentLeaveSetting(student.id)
     ])
 
     const lessons = lessonsRes.data
@@ -138,6 +143,7 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
     const assignedCoaches = assignedCoachesRes.data
     const schedules = schedulesRes.data
     const changeRequest = changeRequestRes.data && changeRequestRes.data.length > 0 ? changeRequestRes.data[0] : null
+    const leaveSetting = leaveSettingRes
 
     // 担当コーチ情報のフォールバック：student_coachesテーブルが空でstudents.coach_idがある場合
     let finalAssignedCoaches: any[] = assignedCoaches || []
@@ -405,6 +411,16 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
                         studentId={student.id}
                         initialAssignedCoaches={finalAssignedCoaches}
                         coaches={coaches || []}
+                        isAdmin={isAdmin}
+                    />
+
+                    {/* Student Leave Card (休会管理) */}
+                    <StudentLeaveCard
+                        studentId={student.id}
+                        studentName={student.full_name}
+                        initialSetting={leaveSetting}
+                        currentStatus={student.status || ''}
+                        hasStripeSubscription={!!student.stripe_subscription_id}
                         isAdmin={isAdmin}
                     />
 

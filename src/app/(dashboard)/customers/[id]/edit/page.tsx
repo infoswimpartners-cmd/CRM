@@ -411,6 +411,11 @@ export default function EditStudentPage({ params }: { params: Promise<{ id: stri
                                         <SelectItem value="withdrawn">退会</SelectItem>
                                     </SelectContent>
                                 </Select>
+                                {formData.status === 'resting' && (
+                                    <p className="text-xs text-amber-700 bg-amber-50 p-2 rounded border border-amber-200 mt-1">
+                                        ※休会期間（最大1年）および定期課金の一時停止・自動再開、前月5日の再開案内は、顧客詳細画面の「休会・一時停止管理」カードから設定できます。
+                                    </p>
+                                )}
                             </div>
                         </div>
 

@@ -1354,19 +1354,27 @@ export async function processStepDeliveries(options: { dryRun?: boolean } = {}):
 
 export const DEFAULT_CART_RECOVERY_TEMPLATE = `{{name}} 様
 
-Swim Partners事務局です😊
-体験レッスンのご案内フォームをご覧いただき、ありがとうございます！
+スイムパートナーズ事務局です😊
+先ほどは体験レッスンのご案内ページをご覧いただき、ありがとうございます！
 
-「日程や場所の選び方が分からない…」
-「まずは相談してから体験を決めたい」
-など、ご不明な点やお困りごとはございませんでしょうか？🏊‍♂️
+「日程の入力が少し手間に感じた…」
+「近くに通えるプールがあるか分からない」
+など、もし迷われている点がございましたらご安心ください🏊‍♂️✨
 
-どんな些細なことでも、このLINEチャットに直接ご返信いただければ、専任スタッフが丁寧にお答えいたします✨
+お申し込みフォームを全て入力しなくても大丈夫です！
+このLINEチャットに直接、以下の2点を送っていただくだけで、事務局が最適なコーチ・空き枠をお調べいたします💡
 
-▼体験レッスンの空き状況・お申し込みはこちらから再開できます
+-----------------------------
+① ご希望の曜日や時間帯（例: 土日の午前、平日夕方など）:
+② 最寄り駅またはご希望のエリア:
+-----------------------------
+
+もちろん「水が怖くて顔つけから始めたい」「クロールの息継ぎを直したい」といったご相談だけでも大歓迎です。
+
+▼ もう一度フォームから申し込む場合はこちら
 {{trial_url}}
 
-※すでにお申し込み済みの場合や、行き違いの際はご容赦ください。`;
+※すでにお申し込み済みの場合や行き違いの際はご容赦ください。`;
 
 /**
  * カゴ落ち（フォーム離脱者）の自動フォロー判定エンジン
@@ -1375,8 +1383,8 @@ Swim Partners事務局です😊
  *   1. フォーム閲覧（trial_form_viewed）保有
  *   2. 未申込（trial_applied 未保有）
  *   3. 未フォロー（cart_recovery_sent 未保有）
- *   4. フォーム閲覧から2時間以上24時間以内
- *   5. 配信時間帯ガード: JST 09:00〜21:00 の間のみ配信
+ *   4. フォーム閲覧から1時間以上24時間以内（熱量の高い1〜2時間をカバー）
+ *   5. 配信時間帯ガード: JST 10:00〜20:30 の間のみ配信（落ち着いて検討できるゴールデンタイム）
  * 
  * スパム防止調停:
  *   既存のステップ配信ステート（line_step:{lineUserId}）が存在する場合、
@@ -1392,13 +1400,16 @@ export async function processCartAbandonmentReminders(
     const { dryRun = false, nowDate = new Date() } = options;
     const supabase = createAdminClient();
 
-    // 1. 配信時間帯ガード判定 (JST 09:00〜21:00)
+    // 1. 配信時間帯ガード判定 (JST 10:00〜20:30: 落ち着いてスケジュール確認・返信ができる時間帯)
     // JST = UTC + 9時間
     const jstDate = new Date(nowDate.getTime() + 9 * 60 * 60 * 1000);
     const jstHour = jstDate.getUTCHours();
+    const jstMinute = jstDate.getUTCMinutes();
+    const jstMinutesOfDay = jstHour * 60 + jstMinute;
 
-    if (jstHour < 9 || jstHour >= 21) {
-        console.log(`[CartRecovery] JST時間帯ガード作動: 現在JST ${jstHour}時のため配信を停止します（配信許可: 09:00〜21:00）`);
+    // 10:00 = 600分, 20:30 = 1230分
+    if (jstMinutesOfDay < 600 || jstMinutesOfDay > 1230) {
+        console.log(`[CartRecovery] JST時間帯ガード作動: 現在JST ${jstHour}:${String(jstMinute).padStart(2, '0')}のため配信を停止します（配信許可: 10:00〜20:30）`);
         return {
             processedCount: 0,
             successCount: 0,
@@ -1541,7 +1552,7 @@ export async function processCartAbandonmentReminders(
             continue;
         }
 
-        // 条件4: 閲覧日時の存在と経過時間（2時間以上24時間以内）
+        // 条件4: 閲覧日時の存在と経過時間（1時間以上24時間以内: 熱量の高いタイミングを逃さずカバー）
         if (!viewedAt) {
             skippedCount++;
             details.push({
@@ -1555,7 +1566,7 @@ export async function processCartAbandonmentReminders(
         const elapsedMs = nowDate.getTime() - viewedAt.getTime();
         const elapsedHours = elapsedMs / (1000 * 60 * 60);
 
-        if (elapsedHours < 2 || elapsedHours > 24) {
+        if (elapsedHours < 1 || elapsedHours > 24) {
             skippedCount++;
             details.push({
                 lineUserId,

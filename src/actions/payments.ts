@@ -98,7 +98,7 @@ export async function fetchPaymentDashboardData(month: string): Promise<PaymentD
         let trialPaymentOk: boolean | null = null
         let paymentMethod: PaymentMethod = 'unregistered'
         let planName = student.membership ? (student.membership as any).name : '未契約'
-        let customerStatus: PaymentCustomerStatus = student.status === '休会' ? 'paused' : student.membership_type_id ? 'active' : 'unregistered'
+        let customerStatus: PaymentCustomerStatus = (student.status === '休会' || student.status === 'resting') ? 'paused' : student.membership_type_id ? 'active' : 'unregistered'
 
         // --- 1. Subscriptions Check ---
         if (student.stripe_customer_id) {
@@ -112,7 +112,7 @@ export async function fetchPaymentDashboardData(month: string): Promise<PaymentD
                         nextBillingDate = new Date(current_period_end * 1000).toISOString().split('T')[0]
                     }
 
-                    if (sub.items.data.length > 0) {
+                    if (sub.items.data.length > 0 && customerStatus !== 'paused' && !sub.pause_collection) {
                         expectedMonthlyLanding += sub.items.data[0].price.unit_amount || 0
                     }
 

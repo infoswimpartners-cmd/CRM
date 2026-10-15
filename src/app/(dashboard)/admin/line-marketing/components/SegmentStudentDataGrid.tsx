@@ -43,7 +43,7 @@ const getStatusBadgeStyle = (status: string, statusLabel: string) => {
     if (s.includes('applied') || l.includes('申込')) {
         return 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800';
     }
-    if (s.includes('dormant') || l.includes('休会')) {
+    if (s.includes('dormant') || s.includes('resting') || l.includes('休会')) {
         return 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/50 dark:text-orange-300 dark:border-orange-800';
     }
     if (s.includes('withdrawn') || l.includes('退会')) {

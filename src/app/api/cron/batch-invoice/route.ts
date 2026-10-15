@@ -58,6 +58,11 @@ export async function GET(req: NextRequest) {
             const student = s.student as any
             if (!student || !student.stripe_customer_id) continue
             
+            // Skip if student is resting (休会中)
+            if (student.status === 'resting' || student.status === '休会') {
+                continue
+            }
+
             // Skip if they have a subscription (Stripe's subscription renewal will pick up pending items)
             if (student.stripe_subscription_id) {
                 // Double check if subscription is actually active in Stripe (optional but safer)

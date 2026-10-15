@@ -615,31 +615,49 @@ export function SpTrackerAreaSeoAuditCard({
                                 </div>
                             </div>
 
-                            {/* フッターアクションバー */}
-                            <div className="pt-3 border-t border-zinc-100 flex items-center justify-between gap-2">
-                                <span className="text-[10px] font-mono font-bold text-zinc-400">
+                            {/* フッターアクションバー: 公開ページ確認および最新状態再検証 */}
+                            <div className="pt-3 border-t border-zinc-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+                                <span className="text-[10px] font-mono font-bold text-zinc-500">
                                     CVR期待度: ★{area.cvrPotential.toFixed(1)} / 競合: {area.competitorDensity}
                                 </span>
 
-                                <button
-                                    onClick={() => {
-                                        if (onOpenGenerator) {
-                                            const poolNames = area.majorFacilities.map((f) => f.name).join('、');
-                                            const targetPathForContent = area.customUrl || area.dedicatedLpPath || area.recommendedAction.suggestedSlug;
-                                            onOpenGenerator(
-                                                area.primaryKeyword,
-                                                'seo',
-                                                targetPathForContent,
-                                                `【エリア特化コンテンツ制作リクエスト】\n対象エリア: ${area.areaName}（${area.parentRegionLabel}）\n出張対応公営プール: ${poolNames}\n課題・改善アドバイス: ${area.actionAdvice}`
-                                            );
-                                        }
-                                    }}
-                                    className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs hover:scale-[1.02] cursor-pointer"
-                                >
-                                    <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                                    {area.recommendedAction.label}
-                                    <ArrowUpRight className="w-3.5 h-3.5" />
-                                </button>
+                                <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                                    {currentTargetUrl ? (
+                                        <a
+                                            href={currentTargetUrl.startsWith('http') ? currentTargetUrl : `https://swim-partners.com${currentTargetUrl}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex-1 sm:flex-initial px-3 py-1.5 rounded-xl border border-zinc-200 bg-zinc-50 hover:bg-zinc-100 text-slate-700 text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-xs"
+                                            title="公開中の専用ページを別タブで確認します"
+                                        >
+                                            <Globe className="w-3.5 h-3.5 text-blue-600" />
+                                            <span>🔗 公開ページを確認</span>
+                                            <ExternalLink className="w-3 h-3 text-zinc-400" />
+                                        </a>
+                                    ) : (
+                                        <button
+                                            onClick={() => {
+                                                setEditingAreaId(area.id);
+                                                setEditingUrlValue(area.recommendedAction.suggestedSlug || `/personal_swim/${area.areaKey}`);
+                                            }}
+                                            className="flex-1 sm:flex-initial px-3 py-1.5 rounded-xl border border-indigo-200 bg-indigo-50/70 hover:bg-indigo-100 text-indigo-700 text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                                            title="検証対象の専用LPのURLを登録します"
+                                        >
+                                            <Link2 className="w-3.5 h-3.5 text-indigo-600" />
+                                            <span>🔗 URLを登録</span>
+                                        </button>
+                                    )}
+
+                                    <button
+                                        onClick={() => handleAuditSingle(area)}
+                                        disabled={isAuditingThis}
+                                        className="flex-1 sm:flex-initial px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-xs hover:scale-[1.02] cursor-pointer"
+                                        title="最新HTMLをフェッチしてSEOスコア・実測ステータスを即座に再検証します"
+                                    >
+                                        <RefreshCw className={`w-3.5 h-3.5 text-amber-300 ${isAuditingThis ? 'animate-spin' : ''}`} />
+                                        <span>{isAuditingThis ? '再検証中...' : '⚡ 最新状態を再検証'}</span>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     );

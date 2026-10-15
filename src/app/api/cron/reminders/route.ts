@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { processLessonReminders, processLessonReportRequests } from '@/lib/reminders'
+import { processLeaveManagement } from '@/actions/leave'
 
 // キャッシュを無効化
 export const dynamic = 'force-dynamic'
@@ -25,7 +26,19 @@ export async function GET(request: NextRequest) {
             reportRequests = { success: false, error: e.message }
         }
 
-        return NextResponse.json({ ...result, report_requests: reportRequests }, { status: result.success ? 200 : 500 })
+        // 休会管理（前月5日の再開案内、休会期間終了後の自動再開、休会開始の自動反映）
+        let leaveManagement: any = null
+        try {
+            leaveManagement = await processLeaveManagement({
+                dryRun,
+                targetDate: targetDateParam
+            })
+        } catch (e: any) {
+            console.error('[Cron Reminders Route] Leave management error:', e)
+            leaveManagement = { success: false, error: e.message }
+        }
+
+        return NextResponse.json({ ...result, report_requests: reportRequests, leave_management: leaveManagement }, { status: result.success ? 200 : 500 })
     } catch (e: any) {
         console.error('[Cron Reminders Route] Error:', e)
         return NextResponse.json({ success: false, error: e.message }, { status: 500 })
