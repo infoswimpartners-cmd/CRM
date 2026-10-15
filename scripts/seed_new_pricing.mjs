@@ -79,13 +79,16 @@ async function run() {
       pairPriceId = pairPrice.id;
     }
 
+    const isTwoTimes = m.name.includes('月2回');
     const { data, error } = await supabase.from('membership_types').insert({
       name: m.name, fee: m.fee, pair_fee: m.pair_fee,
       pricing_group: pricingGroup, show_in_enroll: true,
       default_lesson_master_id: createdLessons[m.lesson_name],
       stripe_product_id: product.id, stripe_price_id: price.id,
       stripe_pair_product_id: pairProductId, stripe_pair_price_id: pairPriceId,
-      min_contract_months: 2, lock_period_months: 2
+      min_contract_months: 2, lock_period_months: 2,
+      monthly_lesson_limit: isTwoTimes ? 2 : 4,
+      max_rollover_limit: isTwoTimes ? 1 : 2
     }).select().single();
 
     if (error) throw error;
@@ -109,7 +112,9 @@ async function run() {
   const { data: singleBase, error: singleBaseErr } = await supabase.from('membership_types').insert({
       name: '単発', fee: 0, pricing_group: pricingGroup, show_in_enroll: true,
       stripe_product_id: singleProduct.id, stripe_price_id: singlePrice.id,
-      min_contract_months: 0, lock_period_months: 0
+      min_contract_months: 0, lock_period_months: 0,
+      monthly_lesson_limit: 0,
+      max_rollover_limit: 0
   }).select().single();
   if (singleBaseErr) throw singleBaseErr;
 

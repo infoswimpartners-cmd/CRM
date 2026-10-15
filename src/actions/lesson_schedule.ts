@@ -10,6 +10,7 @@ import { processLessonBilling } from '@/actions/billing'
 import { createStripeInvoiceItemOnly } from '@/actions/stripe'
 
 import { formatStudentNames, calculateLessonPrice } from '@/lib/utils'
+import { normalizeMembershipLimits } from '@/lib/membership-utils'
 
 
 interface CreateLessonScheduleParams {
@@ -98,12 +99,12 @@ async function calculateMonthlyUsage(
 
     // 3. Previous Month Rollover calculation
     let rollover = 0
-    // [NEW] Custom Rollover Limit Logic
+    // 繰越枠上限の計算（月2回プランは最大1回、月4回プランは最大2回）
     let appliedMaxRollover = maxRollover
     if (monthlyLimit === 4) {
-        appliedMaxRollover = 2
+        appliedMaxRollover = maxRollover > 0 ? Math.min(maxRollover, 2) : 2
     } else if (monthlyLimit === 2) {
-        appliedMaxRollover = 1
+        appliedMaxRollover = maxRollover > 0 ? Math.min(maxRollover, 1) : 1
     }
 
     if (monthlyLimit > 0 && appliedMaxRollover > 0) {
@@ -183,8 +184,8 @@ async function calculateMonthlyUsage(
             // Extract primary lesson_master_id in the previous month to find the previous plan limit
             let prevLessonMasterId: string | null = null
             const lmIds = [
-                ...(prevSchedulesList || []).map((s: any) => s.lesson_master_id),
-                ...(prevLessonsList || []).map((l: any) => l.lesson_master_id)
+                ...(prevNonTrialScheduled || []).map((s: any) => s.lesson_master_id),
+                ...(prevNonTrialLessons || []).map((l: any) => l.lesson_master_id)
             ].filter(Boolean) as string[]
 
             if (lmIds.length > 0) {
@@ -199,12 +200,17 @@ async function calculateMonthlyUsage(
             if (prevLessonMasterId) {
                 const { data: mt } = await supabaseAdmin
                     .from('membership_types')
-                    .select('monthly_lesson_limit')
+                    .select('monthly_lesson_limit, max_rollover_limit, name, is_package')
                     .eq('default_lesson_master_id', prevLessonMasterId)
                     .maybeSingle()
                 
-                if (mt && mt.monthly_lesson_limit !== null && mt.monthly_lesson_limit !== undefined) {
-                    prevMonthlyLimit = mt.monthly_lesson_limit
+                if (mt) {
+                    const { limit: normLimit } = normalizeMembershipLimits(mt)
+                    if (normLimit > 0) {
+                        prevMonthlyLimit = normLimit
+                    } else if (mt.monthly_lesson_limit !== null && mt.monthly_lesson_limit !== undefined) {
+                        prevMonthlyLimit = mt.monthly_lesson_limit
+                    }
                 }
             }
 
@@ -289,8 +295,7 @@ export async function createLessonSchedule(params: CreateLessonScheduleParams) {
                 // @ts-ignore
                 const membershipSource = student.membership || student.next_membership
                 const membership = Array.isArray(membershipSource) ? membershipSource[0] : membershipSource
-                const limit = membership?.monthly_lesson_limit
-                const maxRollover = membership?.max_rollover_limit || 0
+                const { limit, maxRollover } = normalizeMembershipLimits(membership)
                 const membershipName = membership?.name
 
                 // Logic: 
@@ -778,8 +783,7 @@ export async function checkStudentLessonStatus(studentId: string, dateStr: strin
 
         // @ts-ignore
         const membership = Array.isArray(student.membership_types) ? student.membership_types[0] : student.membership_types
-        const limit = membership?.monthly_lesson_limit || 0
-        const maxRollover = membership?.max_rollover_limit || 0
+        const { limit, maxRollover } = normalizeMembershipLimits(membership)
         let membershipName = membership?.name
 
         // Count

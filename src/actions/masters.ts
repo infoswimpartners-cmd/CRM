@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { stripe } from '@/lib/stripe'
+import { inferMembershipLimits } from '@/lib/membership-utils'
 
 export async function updateLessonMasterOrder(items: { id: string, display_order: number }[]) {
     const supabase = await createClient()
@@ -48,6 +49,7 @@ export async function updateMembershipTypeOrder(items: { id: string, display_ord
 // ---------------------------------------------------------
 // NEW: Actions with Stripe Integration
 // ---------------------------------------------------------
+
 
 export async function createMembershipTypeAction(data: {
     name: string
@@ -99,6 +101,7 @@ export async function createMembershipTypeAction(data: {
         }
 
         // 2. Insert into DB
+        const { monthlyLessonLimit, maxRolloverLimit } = inferMembershipLimits(data.name, false)
         const { data: typeData, error: typeError } = await supabase
             .from('membership_types')
             .insert({
@@ -117,6 +120,8 @@ export async function createMembershipTypeAction(data: {
                 lock_period_months: data.lockPeriodMonths ?? 2,
                 pricing_group: data.pricingGroup || null,
                 show_in_enroll: data.showInEnroll ?? true,
+                monthly_lesson_limit: monthlyLessonLimit,
+                max_rollover_limit: maxRolloverLimit,
             })
             .select()
             .single()
@@ -244,7 +249,7 @@ export async function updateMembershipTypeAction(data: {
         // 0. 既存レコードを取得して商品ID・価格IDの変更を検知
         const { data: existingType } = await supabase
             .from('membership_types')
-            .select('stripe_product_id, stripe_price_id, stripe_pair_product_id, stripe_pair_price_id')
+            .select('stripe_product_id, stripe_price_id, stripe_pair_product_id, stripe_pair_price_id, monthly_lesson_limit, max_rollover_limit')
             .eq('id', data.id)
             .single()
 
@@ -375,6 +380,12 @@ export async function updateMembershipTypeAction(data: {
         }
 
         // 3. DBの更新（membership_types テーブル）
+        const { monthlyLessonLimit, maxRolloverLimit } = inferMembershipLimits(
+            data.name,
+            false,
+            existingType?.monthly_lesson_limit,
+            existingType?.max_rollover_limit
+        )
         const { error: baseError } = await supabase
             .from('membership_types')
             .update({
@@ -392,6 +403,8 @@ export async function updateMembershipTypeAction(data: {
                 lock_period_months: data.lockPeriodMonths ?? 2,
                 pricing_group: data.pricingGroup || null,
                 show_in_enroll: data.showInEnroll ?? true,
+                monthly_lesson_limit: monthlyLessonLimit,
+                max_rollover_limit: maxRolloverLimit,
             })
             .eq('id', data.id)
 
@@ -493,6 +506,8 @@ export async function createPackageTypeAction(data: {
                 rules: data.rules || null,
                 pricing_group: data.pricingGroup || null,
                 show_in_enroll: data.showInEnroll ?? true,
+                monthly_lesson_limit: 0,
+                max_rollover_limit: 0,
             })
             .select()
             .single()
@@ -607,6 +622,8 @@ export async function updatePackageTypeAction(data: {
                 rules: data.rules || null,
                 pricing_group: data.pricingGroup || null,
                 show_in_enroll: data.showInEnroll ?? true,
+                monthly_lesson_limit: 0,
+                max_rollover_limit: 0,
             })
             .eq('id', data.id)
 

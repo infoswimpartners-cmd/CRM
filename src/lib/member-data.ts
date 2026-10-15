@@ -30,7 +30,7 @@ export const getCachedMemberData = cache(async () => {
         .select(`
             *,
             membership_types!students_membership_type_id_fkey(
-                id, name, monthly_lesson_limit, fee
+                id, name, monthly_lesson_limit, max_rollover_limit, fee
             )
         `);
 

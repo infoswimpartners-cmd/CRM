@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { stripe } from '@/lib/stripe'
 import { NextResponse } from 'next/server'
 import { startOfDay, addDays, endOfDay, differenceInDays } from 'date-fns'
+import { normalizeMembershipLimits } from '@/lib/membership-utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -63,7 +64,7 @@ export async function GET(request: Request) {
             // @ts-ignore
             const membership = Array.isArray(student.membership_types) ? student.membership_types[0] : student.membership_types
             const fee = membership?.fee || 0
-            const limit = membership?.monthly_lesson_limit || 0
+            const { limit } = normalizeMembershipLimits(membership)
 
             let amount = 8800
             if (fee && limit > 0) {
