@@ -16,7 +16,7 @@ import { MarketingKpiCards, MarketingKpiData } from './components/MarketingKpiCa
 import { SegmentBroadcastTab } from './components/SegmentBroadcastTab';
 import { StepScenarioEditorTab } from './components/StepScenarioEditorTab';
 import { DeliveryLogsTab } from './components/DeliveryLogsTab';
-import { LiffTrackingTab } from './components/LiffTrackingTab';
+import { LiffTrackingTab, preloadLiffTrackingData } from './components/LiffTrackingTab';
 import { getMarketingKpiSummaryAction, syncTrialDoneStudentsAction } from '@/actions/line-marketing';
 import { Tag } from 'lucide-react';
 import { formatErrorToastMessage, sanitizeErrorMessage } from '@/lib/error-formatter';
@@ -54,6 +54,9 @@ export default function LineMarketingPage() {
 
     useEffect(() => {
         fetchKpi();
+        // LIFFアクセス分析・タグデータを裏で事前ロード（タブを開いた瞬間に即時表示するため）
+        preloadLiffTrackingData();
+
         if (typeof window !== 'undefined') {
             const params = new URLSearchParams(window.location.search);
             const tabParam = params.get('tab');
@@ -139,7 +142,7 @@ export default function LineMarketingPage() {
                 </TabsList>
 
                 {/* タブ1: セグメント一括配信 */}
-                <TabsContent value="broadcast" className="focus-visible:outline-none">
+                <TabsContent value="broadcast" forceMount className="data-[state=inactive]:hidden focus-visible:outline-none">
                     <SegmentBroadcastTab
                         initialTag={selectedTagForBroadcast}
                         onBroadcastSuccess={fetchKpi}
@@ -148,17 +151,17 @@ export default function LineMarketingPage() {
                 </TabsContent>
 
                 {/* タブ2: カード型ステップ配信シナリオエディタ */}
-                <TabsContent value="steps" className="focus-visible:outline-none">
+                <TabsContent value="steps" forceMount className="data-[state=inactive]:hidden focus-visible:outline-none">
                     <StepScenarioEditorTab onUpdate={fetchKpi} />
                 </TabsContent>
 
                 {/* タブ3: LIFFアクセス分析・タグ管理 */}
-                <TabsContent value="tracking" className="focus-visible:outline-none">
+                <TabsContent value="tracking" forceMount className="data-[state=inactive]:hidden focus-visible:outline-none">
                     <LiffTrackingTab onSelectTagForBroadcast={handleSelectTagForBroadcast} />
                 </TabsContent>
 
                 {/* タブ4: 配信ログ・トラッキング */}
-                <TabsContent value="logs" className="focus-visible:outline-none">
+                <TabsContent value="logs" forceMount className="data-[state=inactive]:hidden focus-visible:outline-none">
                     <DeliveryLogsTab />
                 </TabsContent>
             </Tabs>

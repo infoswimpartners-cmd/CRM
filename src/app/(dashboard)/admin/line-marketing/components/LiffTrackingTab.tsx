@@ -33,21 +33,57 @@ import { toast } from 'sonner';
 import { getTrackingSummaryAction, getTagsSummaryAction, assignTagToUserAction, removeTagFromUserAction } from '@/actions/line-marketing';
 import { TrackingKpiSummary, TagSummaryItem, LineAccessLog } from '@/types/line-tracking';
 
+// インメモリキャッシュ＆プリフェッチ管理（タブ切り替えを瞬時にするため）
+let cachedTrackingSummary: TrackingKpiSummary | null = null;
+let cachedTagsSummary: TagSummaryItem[] | null = null;
+let prefetchPromise: Promise<void> | null = null;
+
+/**
+ * LIFFトラッキング＆タグデータの事前ロード関数
+ * ページマウント時やバックグラウンドで先読みすることで、タブを開いた瞬間に0秒表示を実現します。
+ */
+export async function preloadLiffTrackingData(): Promise<void> {
+    if (cachedTrackingSummary && cachedTagsSummary) return;
+    if (prefetchPromise) return prefetchPromise;
+
+    prefetchPromise = (async () => {
+        try {
+            const [summaryRes, tagsRes] = await Promise.all([
+                getTrackingSummaryAction(100),
+                getTagsSummaryAction()
+            ]);
+            if (summaryRes.success && summaryRes.data) {
+                cachedTrackingSummary = summaryRes.data;
+            }
+            if (tagsRes.success && tagsRes.tags) {
+                cachedTagsSummary = tagsRes.tags;
+            }
+        } catch (e) {
+            console.error('[preloadLiffTrackingData] error:', e);
+        } finally {
+            prefetchPromise = null;
+        }
+    })();
+
+    return prefetchPromise;
+}
+
 interface LiffTrackingTabProps {
     onSelectTagForBroadcast?: (tagName: string) => void;
 }
 
 export function LiffTrackingTab({ onSelectTagForBroadcast }: LiffTrackingTabProps) {
-    const [summary, setSummary] = useState<TrackingKpiSummary | null>(null);
-    const [tags, setTags] = useState<TagSummaryItem[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    // キャッシュが存在する場合は初回から即時表示（isLoading: false）
+    const [summary, setSummary] = useState<TrackingKpiSummary | null>(cachedTrackingSummary);
+    const [tags, setTags] = useState<TagSummaryItem[]>(cachedTagsSummary || []);
+    const [isLoading, setIsLoading] = useState(!cachedTrackingSummary);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
-    // データ取得
-    const fetchData = useCallback(async () => {
-        setIsRefreshing(true);
+    // データ取得（SWR: キャッシュ表示時はバックグラウンドでサイレント更新）
+    const fetchData = useCallback(async (isSilent = false) => {
+        if (!isSilent) setIsRefreshing(true);
         try {
             const [summaryRes, tagsRes] = await Promise.all([
                 getTrackingSummaryAction(100),
@@ -55,22 +91,31 @@ export function LiffTrackingTab({ onSelectTagForBroadcast }: LiffTrackingTabProp
             ]);
 
             if (summaryRes.success && summaryRes.data) {
+                cachedTrackingSummary = summaryRes.data;
                 setSummary(summaryRes.data);
             }
             if (tagsRes.success && tagsRes.tags) {
+                cachedTagsSummary = tagsRes.tags;
                 setTags(tagsRes.tags);
             }
         } catch (err: any) {
             console.error('[LiffTrackingTab] Fetch error:', err);
-            toast.error('トラッキングデータの取得に失敗しました');
+            if (!isSilent) {
+                toast.error('トラッキングデータの取得に失敗しました');
+            }
         } finally {
             setIsLoading(false);
-            setIsRefreshing(false);
+            if (!isSilent) setIsRefreshing(false);
         }
     }, []);
 
     useEffect(() => {
-        fetchData();
+        if (cachedTrackingSummary) {
+            // すでにキャッシュがある場合は画面を即時表示しつつ、裏で最新情報を取得
+            fetchData(true);
+        } else {
+            fetchData(false);
+        }
     }, [fetchData]);
 
     // フィルタリングされたアクセスログ
@@ -184,7 +229,7 @@ export function LiffTrackingTab({ onSelectTagForBroadcast }: LiffTrackingTabProp
                             <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={fetchData}
+                                onClick={() => fetchData(false)}
                                 disabled={isRefreshing}
                                 className="h-8 text-xs gap-1.5"
                             >
