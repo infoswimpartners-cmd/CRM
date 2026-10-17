@@ -245,14 +245,41 @@ export interface MasterBookingSpreadsheetRow {
 }
 
 export const MASTER_TRIAL_BOOKING_SPREADSHEET_ID = '1cfAzrIV_cHBU0r5Usxs2lHubEh2BuJJ6cKw5mn0JQwM';
+export const DEFAULT_TRIAL_BOOKING_GAS_WEBHOOK_URL = 'https://script.google.com/a/macros/swim-partners.com/s/AKfycbwFhzHrhq6SZgP8ngVjKJwCs6c-rJlDZ_LrHX6Ttld0Bk2FuTsI5QD8nk0jf5gMXpuu/exec';
 
 /**
  * 体験申込マスターシート（Make移行先スプレッドシート）に直接1行追記する
+ * （GAS Webhook または Google Sheets API の両方に対応）
  */
 export async function appendTrialBookingToMasterSpreadsheet(
     data: MasterBookingSpreadsheetRow,
     explicitSpreadsheetId?: string
 ): Promise<{ success: boolean; error?: string }> {
+    const gasWebhookUrl = process.env.TRIAL_BOOKING_GAS_WEBHOOK_URL || DEFAULT_TRIAL_BOOKING_GAS_WEBHOOK_URL;
+
+    // 1. GAS Webhook を優先（組織ポリシーの影響を受けず確実にスプレッドシートへ追記可能）
+    if (gasWebhookUrl) {
+        try {
+            const response = await fetch(gasWebhookUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+                redirect: 'follow',
+            });
+
+            if (response.ok) {
+                console.log(`📋 [GAS Webhook] 申込マスターシートへ追記成功: ${data.name}`);
+                return { success: true };
+            } else {
+                const text = await response.text();
+                console.warn(`⚠️ [GAS Webhook] 応答エラー (${response.status}):`, text);
+            }
+        } catch (gasErr: any) {
+            console.error('⚠️ [GAS Webhook] 通信エラー:', gasErr.message);
+        }
+    }
+
+    // 2. GAS Webhook が失敗または未設定の場合は Google Sheets API で試行
     const spreadsheetId = explicitSpreadsheetId || MASTER_TRIAL_BOOKING_SPREADSHEET_ID;
     const cleanId = extractSpreadsheetId(spreadsheetId);
 
