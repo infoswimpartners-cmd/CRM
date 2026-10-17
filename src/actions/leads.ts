@@ -786,14 +786,15 @@ export async function assignLeadAction(leadId: string, confirmedDate: string, co
 
         // LINE ID での生徒検索
         if (lead.line_user_id) {
-            const { data: stdByLine } = await supabaseAdmin
+            const { data: studentsByLine } = await supabaseAdmin
                 .from('students')
-                .select('id, contact_email, stripe_customer_id, full_name')
+                .select('id, contact_email, stripe_customer_id, full_name, status')
                 .eq('line_user_id', lead.line_user_id)
-                .maybeSingle()
-            if (stdByLine) {
-                studentId = stdByLine.id
-                if (stdByLine.contact_email) studentEmail = stdByLine.contact_email
+                .order('created_at', { ascending: false })
+            if (studentsByLine && studentsByLine.length > 0) {
+                const matchStd = studentsByLine.find(s => s.status === 'friend_only') || studentsByLine[0]
+                studentId = matchStd.id
+                if (matchStd.contact_email) studentEmail = matchStd.contact_email
             }
         }
 
@@ -868,8 +869,8 @@ export async function assignLeadAction(leadId: string, confirmedDate: string, co
                 try {
                     const { stripe } = await import('@/lib/stripe')
                     const customer = await stripe.customers.create({
-                        email: currentStd?.contact_email || lead.email || undefined,
-                        name: currentStd?.full_name || lead.name || undefined,
+                        email: lead.email || currentStd?.contact_email || undefined,
+                        name: lead.name || currentStd?.full_name || undefined,
                         metadata: { studentId: studentId }
                     })
                     stripeCustomerId = customer.id
@@ -878,14 +879,26 @@ export async function assignLeadAction(leadId: string, confirmedDate: string, co
                 }
             }
 
-            // students テーブルの coach_id, status, stripe_customer_id を更新
+            // students テーブルの coach_id, status, stripe_customer_id, 氏名・連絡先を更新
+            const updatePayload: any = {
+                coach_id: profile.id,
+                status: 'trial_billed',
+                stripe_customer_id: stripeCustomerId || null
+            }
+            if (lead.name && lead.name.trim()) updatePayload.full_name = lead.name.trim()
+            if (lead.full_name_kana && lead.full_name_kana.trim()) updatePayload.full_name_kana = lead.full_name_kana.trim()
+            if (lead.email && lead.email.trim()) updatePayload.contact_email = lead.email.trim()
+            if (lead.phone && lead.phone.trim()) updatePayload.contact_phone = lead.phone.trim()
+            if (lead.birth_date) updatePayload.birth_date = lead.birth_date
+            if (lead.gender) updatePayload.gender = lead.gender
+            if (lead.second_student_name) updatePayload.second_student_name = lead.second_student_name
+            if (lead.second_student_kana) updatePayload.second_student_name_kana = lead.second_student_kana
+            if (lead.second_student_birth_date) updatePayload.second_student_birth_date = lead.second_student_birth_date
+            if (lead.second_student_gender) updatePayload.second_student_gender = lead.second_student_gender
+
             const { error: studentUpdateError } = await supabaseAdmin
                 .from('students')
-                .update({
-                    coach_id: profile.id,
-                    status: 'trial_billed',
-                    stripe_customer_id: stripeCustomerId || null
-                })
+                .update(updatePayload)
                 .eq('id', studentId)
 
             if (studentUpdateError) {
@@ -1258,14 +1271,15 @@ export async function adminAssignLeadAction(
 
         // LINE ID での生徒検索
         if (lead.line_user_id) {
-            const { data: stdByLine } = await supabaseAdmin
+            const { data: studentsByLine } = await supabaseAdmin
                 .from('students')
-                .select('id, contact_email, stripe_customer_id, full_name')
+                .select('id, contact_email, stripe_customer_id, full_name, status')
                 .eq('line_user_id', lead.line_user_id)
-                .maybeSingle()
-            if (stdByLine) {
-                studentId = stdByLine.id
-                if (stdByLine.contact_email) studentEmail = stdByLine.contact_email
+                .order('created_at', { ascending: false })
+            if (studentsByLine && studentsByLine.length > 0) {
+                const matchStd = studentsByLine.find(s => s.status === 'friend_only') || studentsByLine[0]
+                studentId = matchStd.id
+                if (matchStd.contact_email) studentEmail = matchStd.contact_email
             }
         }
 
@@ -1340,8 +1354,8 @@ export async function adminAssignLeadAction(
                 try {
                     const { stripe } = await import('@/lib/stripe')
                     const customer = await stripe.customers.create({
-                        email: currentStd?.contact_email || lead.email || undefined,
-                        name: currentStd?.full_name || lead.name || undefined,
+                        email: lead.email || currentStd?.contact_email || undefined,
+                        name: lead.name || currentStd?.full_name || undefined,
                         metadata: { studentId: studentId }
                     })
                     stripeCustomerId = customer.id
@@ -1350,14 +1364,26 @@ export async function adminAssignLeadAction(
                 }
             }
 
-            // students テーブルの coach_id, status, stripe_customer_id を更新
+            // students テーブルの coach_id, status, stripe_customer_id, 氏名・連絡先を更新
+            const updatePayload: any = {
+                coach_id: targetCoach.id,
+                status: 'trial_billed',
+                stripe_customer_id: stripeCustomerId || null
+            }
+            if (lead.name && lead.name.trim()) updatePayload.full_name = lead.name.trim()
+            if (lead.full_name_kana && lead.full_name_kana.trim()) updatePayload.full_name_kana = lead.full_name_kana.trim()
+            if (lead.email && lead.email.trim()) updatePayload.contact_email = lead.email.trim()
+            if (lead.phone && lead.phone.trim()) updatePayload.contact_phone = lead.phone.trim()
+            if (lead.birth_date) updatePayload.birth_date = lead.birth_date
+            if (lead.gender) updatePayload.gender = lead.gender
+            if (lead.second_student_name) updatePayload.second_student_name = lead.second_student_name
+            if (lead.second_student_kana) updatePayload.second_student_name_kana = lead.second_student_kana
+            if (lead.second_student_birth_date) updatePayload.second_student_birth_date = lead.second_student_birth_date
+            if (lead.second_student_gender) updatePayload.second_student_gender = lead.second_student_gender
+
             const { error: studentUpdateError } = await supabaseAdmin
                 .from('students')
-                .update({
-                    coach_id: targetCoach.id,
-                    status: 'trial_billed',
-                    stripe_customer_id: stripeCustomerId || null
-                })
+                .update(updatePayload)
                 .eq('id', studentId)
 
             if (studentUpdateError) {
@@ -2700,8 +2726,14 @@ export async function getOrCreateTrialPaymentUrlAction(leadId: string): Promise<
         // 4. 生徒マスタの検索・自動作成
         let studentId: string | null = null
         if (lead.line_user_id) {
-            const { data: s } = await supabaseAdmin.from('students').select('id').eq('line_user_id', lead.line_user_id).maybeSingle()
-            if (s) studentId = s.id
+            const { data: studentsByLine } = await supabaseAdmin
+                .from('students')
+                .select('id, status')
+                .eq('line_user_id', lead.line_user_id)
+                .order('created_at', { ascending: false })
+            if (studentsByLine && studentsByLine.length > 0) {
+                studentId = (studentsByLine.find(s => s.status === 'friend_only') || studentsByLine[0]).id
+            }
         }
         if (!studentId && lead.email) {
             const { data: s } = await supabaseAdmin.from('students').select('id').ilike('contact_email', lead.email.trim()).maybeSingle()
@@ -2739,6 +2771,24 @@ export async function getOrCreateTrialPaymentUrlAction(leadId: string): Promise<
             if (!createStudentErr && newStudent) {
                 studentId = newStudent.id
             }
+        } else {
+            // 既存生徒の氏名・フリガナ・連絡先を申し込み情報で確実に更新
+            const updatePayload: any = {
+                coach_id: coachId,
+                status: 'trial_billed'
+            }
+            if (lead.name && lead.name.trim()) updatePayload.full_name = lead.name.trim()
+            if (lead.full_name_kana && lead.full_name_kana.trim()) updatePayload.full_name_kana = lead.full_name_kana.trim()
+            if (lead.email && lead.email.trim()) updatePayload.contact_email = lead.email.trim()
+            if (lead.phone && lead.phone.trim()) updatePayload.contact_phone = lead.phone.trim()
+            if (lead.birth_date) updatePayload.birth_date = lead.birth_date
+            if (lead.gender) updatePayload.gender = lead.gender
+            if (lead.second_student_name) updatePayload.second_student_name = lead.second_student_name
+            if (lead.second_student_kana) updatePayload.second_student_name_kana = lead.second_student_kana
+            if (lead.second_student_birth_date) updatePayload.second_student_birth_date = lead.second_student_birth_date
+            if (lead.second_student_gender) updatePayload.second_student_gender = lead.second_student_gender
+
+            await supabaseAdmin.from('students').update(updatePayload).eq('id', studentId)
         }
 
         // 5. 体験レッスンスケジュールを作成

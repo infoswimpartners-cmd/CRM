@@ -462,6 +462,10 @@ ${slotsListText}
 
                         const nowStr = new Date().toISOString()
 
+                        const checkoutName = (session.customer_details?.name || (session.metadata as any)?.name || '').trim()
+                        const checkoutEmail = (session.customer_details?.email || (session.metadata as any)?.email || '').trim()
+                        const checkoutPhone = (session.customer_details?.phone || (session.metadata as any)?.phone || '').trim()
+
                         const updateData: any = {
                             status: 'active',
                             membership_type_id: planId,  // 月次・パッケージ共通でDBのIDを設定
@@ -473,6 +477,17 @@ ${slotsListText}
 
                         if (student) {
                             console.log(`[Stripe Webhook] Found existing student: ${student.id} (${student.full_name}). Updating to active...`)
+
+                            // 既存生徒の名前が '公式LINE友だち' や '新規LINEユーザー' や friend_only だった場合、またはチェックアウト名がある場合は正式氏名に更新
+                            if (checkoutName && (student.status === 'friend_only' || student.full_name === '公式LINE友だち' || student.full_name === '新規LINEユーザー' || !student.full_name)) {
+                                updateData.full_name = checkoutName
+                            }
+                            if (checkoutEmail && !student.contact_email) {
+                                updateData.contact_email = checkoutEmail
+                            }
+                            if (checkoutPhone && !student.contact_phone) {
+                                updateData.contact_phone = checkoutPhone
+                            }
 
                             // パッケージの場合はチケットも付与
                             if (isPackage && ticketCount > 0) {

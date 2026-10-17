@@ -56,59 +56,120 @@ export async function POST(req: Request) {
 
     // 2. students テーブルとの連動（status: 'applied' へ更新または作成）
     try {
-      if (payload.userId) {
-        const { data: existingStudent } = await supabase
-          .from('students')
-          .select('id, status')
-          .eq('line_user_id', payload.userId)
-          .maybeSingle();
+      let targetStudent: any = null;
 
-        if (existingStudent) {
-          await supabase
-            .from('students')
-            .update({
-              status: 'applied',
-              full_name: payload.name || undefined,
-              full_name_kana: payload.kana || undefined,
-              contact_email: payload.email || undefined,
-              contact_phone: payload.phone || undefined,
-              birth_date: payload.dob || undefined,
-              gender: payload.gender || undefined,
-              second_student_name: payload.name2 || undefined,
-              second_student_name_kana: payload.kana2 || undefined,
-              second_student_birth_date: payload.dob2 || undefined,
-              second_student_gender: payload.gender2 || undefined,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', existingStudent.id);
+      // 2.1. LINE ID での既存生徒検索（複数レコード存在時も最新かつfriend_only優先で取得）
+      if (payload.userId) {
+        const { data: studentsByLine } = await supabase
+          .from('students')
+          .select('id, status, full_name, contact_email, contact_phone')
+          .eq('line_user_id', payload.userId)
+          .order('created_at', { ascending: false });
+
+        if (studentsByLine && studentsByLine.length > 0) {
+          targetStudent = studentsByLine.find(s => s.status === 'friend_only') || studentsByLine[0];
+        }
+      }
+
+      // 2.2. LINE IDで見つからない場合、メールアドレスで検索
+      if (!targetStudent && payload.email) {
+        const { data: studentsByEmail } = await supabase
+          .from('students')
+          .select('id, status, full_name, contact_email, contact_phone')
+          .ilike('contact_email', payload.email.trim())
+          .order('created_at', { ascending: false });
+
+        if (studentsByEmail && studentsByEmail.length > 0) {
+          targetStudent = studentsByEmail[0];
+        }
+      }
+
+      // 2.3. メールアドレスでも見つからない場合、電話番号で検索
+      if (!targetStudent && payload.phone) {
+        const cleanPhone = payload.phone.replace(/[-]/g, '').trim();
+        const { data: studentsByPhone } = await supabase
+          .from('students')
+          .select('id, status, full_name, contact_phone')
+          .order('created_at', { ascending: false });
+
+        if (studentsByPhone && studentsByPhone.length > 0) {
+          targetStudent = studentsByPhone.find(s => {
+            const sp = (s.contact_phone || '').replace(/[-]/g, '').trim();
+            return sp && (sp === cleanPhone || sp.endsWith(cleanPhone) || cleanPhone.endsWith(sp));
+          });
+        }
+      }
+
+      const applicantName = (payload.name || '').trim();
+      const applicantKana = (payload.kana || '').trim();
+
+      if (targetStudent) {
+        // 既存生徒が存在する場合、氏名や連絡先、ステータスを確実に更新
+        const updateData: any = {
+          status: 'applied',
+        };
+
+        // 申し込み氏名を最優先で顧客名に反映（空でなければ上書き）
+        if (applicantName) {
+          updateData.full_name = applicantName;
+        }
+        if (applicantKana) {
+          updateData.full_name_kana = applicantKana;
+        }
+        if (payload.email) updateData.contact_email = payload.email.trim();
+        if (payload.phone) updateData.contact_phone = payload.phone.trim();
+        if (payload.dob) updateData.birth_date = payload.dob;
+        if (payload.gender) updateData.gender = payload.gender;
+        if (payload.name2) updateData.second_student_name = payload.name2.trim();
+        if (payload.kana2) updateData.second_student_name_kana = payload.kana2.trim();
+        if (payload.dob2) updateData.second_student_birth_date = payload.dob2;
+        if (payload.gender2) updateData.second_student_gender = payload.gender2;
+        if (payload.userId) updateData.line_user_id = payload.userId;
+
+        const { error: updateErr } = await supabase
+          .from('students')
+          .update(updateData)
+          .eq('id', targetStudent.id);
+
+        if (updateErr) {
+          console.error('[Trial Booking] Failed to update existing student:', updateErr);
         } else {
-          await supabase
-            .from('students')
-            .insert({
-              full_name: payload.name || '未入力',
-              full_name_kana: payload.kana || null,
-              line_user_id: payload.userId,
-              contact_email: payload.email || null,
-              contact_phone: payload.phone || null,
-              birth_date: payload.dob || null,
-              gender: payload.gender || null,
-              second_student_name: payload.name2 || null,
-              second_student_name_kana: payload.kana2 || null,
-              second_student_birth_date: payload.dob2 || null,
-              second_student_gender: payload.gender2 || null,
-              status: 'applied',
-              created_at: new Date().toISOString()
-            });
+          console.log(`[Trial Booking] Successfully updated student (${targetStudent.id}) name to "${applicantName || targetStudent.full_name}"`);
+        }
+      } else {
+        // 新規作成
+        const { error: insertErr } = await supabase
+          .from('students')
+          .insert({
+            full_name: applicantName || '未入力',
+            full_name_kana: applicantKana || null,
+            line_user_id: payload.userId || null,
+            contact_email: payload.email ? payload.email.trim() : null,
+            contact_phone: payload.phone ? payload.phone.trim() : null,
+            birth_date: payload.dob || null,
+            gender: payload.gender || null,
+            second_student_name: payload.name2 ? payload.name2.trim() : null,
+            second_student_name_kana: payload.kana2 ? payload.kana2.trim() : null,
+            second_student_birth_date: payload.dob2 || null,
+            second_student_gender: payload.gender2 || null,
+            status: 'applied',
+            created_at: new Date().toISOString()
+          });
+
+        if (insertErr) {
+          console.error('[Trial Booking] Failed to insert student record:', insertErr);
+        } else {
+          console.log(`[Trial Booking] Registered new student record for "${applicantName}"`);
         }
       }
     } catch (studentErr) {
       console.error('[Trial Booking] Exception updating student record:', studentErr);
     }
 
-    // 3. 公式LINEステップ配信を停止（申込済ステータスへ移行）
+    // 3. 公式LINEステップ配信を停止（申込済ステータスへ移行＆表示名を申込氏名に更新）
     if (payload.userId) {
       try {
-        await stopStepReminderForUser(payload.userId, 'applied');
+        await stopStepReminderForUser(payload.userId, 'applied', payload.name || undefined);
       } catch (stepErr) {
         console.error('[Trial Booking] Failed to stop step reminder:', stepErr);
       }

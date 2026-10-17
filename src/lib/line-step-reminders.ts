@@ -475,14 +475,17 @@ export async function handleOfficialLineMessage(lineUserId: string, messageText:
 /**
  * ステップ配信を外部から即時停止するヘルパー（体験申込時やCRMでの手動変更時）
  */
-export async function stopStepReminderForUser(lineUserId: string, newStatus: string = 'applied'): Promise<void> {
+export async function stopStepReminderForUser(lineUserId: string, newStatus: string = 'applied', newDisplayName?: string): Promise<void> {
     const state = await getStepLeadState(lineUserId)
     if (state) {
         state.status = newStatus as any
+        if (newDisplayName && newDisplayName.trim()) {
+            state.display_name = newDisplayName.trim()
+        }
         state.step_stage = -1
         state.next_send_at = null
         await saveStepLeadState(state)
-        console.log(`[Official LINE Step] Stopped step reminder for ${lineUserId}. New status: ${newStatus}`)
+        console.log(`[Official LINE Step] Stopped step reminder for ${lineUserId}. New status: ${newStatus}, Name: ${state.display_name}`)
     }
 }
 

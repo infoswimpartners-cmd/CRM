@@ -172,6 +172,13 @@ export default function BookingForm() {
         } else {
           // LIFF環境下かつ未ログインの場合、LINE内ブラウザであればログイン遷移可能だが、
           // 通常のWebブラウザからのアクセスを遮断しないため、Webモードとして続行
+          // URLパラメータからのuserId取得フォールバック
+          const urlParams = new URLSearchParams(window.location.search);
+          const fallbackUid = urlParams.get("userId") || urlParams.get("line_user_id") || urlParams.get("uid");
+          if (fallbackUid) {
+            setUserId(fallbackUid);
+          }
+
           if (liff.isInClient()) {
             const redirectUri = window.location.origin + window.location.pathname;
             liff.login({ redirectUri });
@@ -181,6 +188,14 @@ export default function BookingForm() {
         }
       } catch (error: any) {
         console.warn("LIFF初期化スキップ（Web直接予約モードで動作します）:", error);
+        // LIFFの初期化失敗時もURLパラメータからuserIdを取得
+        try {
+          const urlParams = new URLSearchParams(window.location.search);
+          const fallbackUid = urlParams.get("userId") || urlParams.get("line_user_id") || urlParams.get("uid");
+          if (fallbackUid) {
+            setUserId(fallbackUid);
+          }
+        } catch (_) {}
         // LIFFの初期化失敗時もWebブラウザとしてフォーム送信可能にする
         setIsLiffEnvironment(false);
       } finally {
