@@ -756,6 +756,7 @@ export async function checkStudentLessonStatus(studentId: string, dateStr: strin
                     monthly_lesson_limit,
                     max_rollover_limit,
                     is_package,
+                    ticket_count,
                     default_lesson: lesson_masters!default_lesson_master_id (
                         id,
                         name,
@@ -918,6 +919,44 @@ export async function checkStudentLessonStatus(studentId: string, dateStr: strin
         const isPackage = !!membership?.is_package
         const isSinglePlan = !membership || !limit || limit === 0 || (membershipName && membershipName.includes('単発')) || isPackage
 
+        // パッケージ受講回数・残回数の集計
+        let packageTotalCount = 0
+        let packageUsedCount = 0
+        let packageRemainingCount = 0
+
+        if (isPackage) {
+            // パッケージの総レッスン回数（ticket_count または プラン名から推論）
+            const ticketCountFromPlan = (membership as any)?.ticket_count || 0
+            if (ticketCountFromPlan > 0) {
+                packageTotalCount = ticketCountFromPlan
+            } else {
+                const match = membershipName?.match(/全?(\d+)回/)
+                if (match) {
+                    packageTotalCount = parseInt(match[1], 10)
+                } else {
+                    packageTotalCount = 12
+                }
+            }
+
+            // 体験レッスン（is_trial: true や 体験レッスン自動登録）を除外した全スケジュールを集計
+            const { data: allStudentSchedules } = await supabaseAdmin
+                .from('lesson_schedules')
+                .select(`
+                    id, start_time, notes, lesson_master_id,
+                    lesson_masters ( is_trial )
+                `)
+                .eq('student_id', studentId)
+
+            const nonTrialSchedules = (allStudentSchedules || []).filter((s: any) => {
+                const isTrialMaster = s.lesson_masters?.is_trial === true
+                const isTrialNote = (s.notes || '').includes('体験レッスン') || (s.notes || '').includes('体験予約')
+                return !isTrialMaster && !isTrialNote
+            })
+
+            packageUsedCount = nonTrialSchedules.length
+            packageRemainingCount = Math.max(0, packageTotalCount - packageUsedCount)
+        }
+
         return {
             success: true,
             isOverage,
@@ -929,7 +968,10 @@ export async function checkStudentLessonStatus(studentId: string, dateStr: strin
             membershipName,
             defaultLessonId: membership?.default_lesson_master_id,
             availableLessons,
-            isPackage
+            isPackage,
+            packageTotalCount,
+            packageUsedCount,
+            packageRemainingCount
         }
 
     } catch (error: any) {

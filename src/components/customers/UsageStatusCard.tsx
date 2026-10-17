@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Calendar, Ticket, ChevronLeft, ChevronRight, RefreshCcw } from 'lucide-react'
+import { Calendar, Ticket, ChevronLeft, ChevronRight, RefreshCcw, Package } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -79,6 +79,7 @@ export function UsageStatusCard({ studentId, initialUsageData, currentTickets }:
                 </Button>
             </div>
 
+            {/* 月謝会員向け：月次予約枠状況 */}
             {usageData && !usageData.isPackage && (
                 <div className={cn("space-y-2 transition-opacity", loading ? "opacity-50" : "opacity-100")}>
                     <div className="flex flex-col p-3 rounded-lg border border-indigo-100 bg-indigo-50/50">
@@ -122,19 +123,78 @@ export function UsageStatusCard({ studentId, initialUsageData, currentTickets }:
                 </div>
             )}
 
-            {/* Transfer Ticket (振替) - 月を切り替えても共通（現在の残り） */}
+            {/* パッケージプラン会員向け：全体受講状況・残り回数 */}
+            {usageData && usageData.isPackage && (
+                <div className={cn("space-y-2 transition-opacity", loading ? "opacity-50" : "opacity-100")}>
+                    <div className="flex flex-col p-3 rounded-lg border border-indigo-100 bg-indigo-50/50 space-y-2.5">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-indigo-800 flex items-center gap-1.5">
+                                <Package className="h-4 w-4 text-indigo-600" /> パッケージ受講状況
+                            </span>
+                            <Badge variant="outline" className="border-indigo-300 text-indigo-700 bg-white text-[10px] font-semibold">
+                                全 {usageData.packageTotalCount || 12} 回
+                            </Badge>
+                        </div>
+
+                        <div className="text-[11px] text-indigo-700 font-medium truncate">
+                            {usageData.membershipName || 'パッケージプラン'}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 pt-0.5">
+                            <div className="bg-white/90 p-2.5 rounded-lg border border-indigo-100 shadow-xs">
+                                <div className="text-[10px] text-slate-500 font-semibold">これまでの消化</div>
+                                <div className="text-xl font-black text-indigo-900 leading-none mt-1">
+                                    {usageData.packageUsedCount ?? 0} <span className="text-xs font-bold text-slate-500">/ {usageData.packageTotalCount || 12} 回</span>
+                                </div>
+                            </div>
+
+                            <div className="bg-white/90 p-2.5 rounded-lg border border-emerald-100 shadow-xs">
+                                <div className="text-[10px] text-emerald-700 font-semibold">残りレッスン</div>
+                                <div className="text-xl font-black text-emerald-700 leading-none mt-1">
+                                    {usageData.packageRemainingCount ?? 0} <span className="text-xs font-bold text-emerald-600">回</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 進捗プログレスバー */}
+                        {typeof usageData.packageTotalCount === 'number' && usageData.packageTotalCount > 0 && (
+                            <div className="space-y-1 pt-1">
+                                <div className="flex justify-between text-[10px] text-slate-500">
+                                    <span>消化進捗率</span>
+                                    <span className="font-semibold text-slate-700">{Math.round(((usageData.packageUsedCount ?? 0) / usageData.packageTotalCount) * 100)}%</span>
+                                </div>
+                                <div className="w-full bg-indigo-100 rounded-full h-2 overflow-hidden">
+                                    <div
+                                        className={cn(
+                                            "h-full rounded-full transition-all",
+                                            (usageData.packageUsedCount ?? 0) >= usageData.packageTotalCount ? "bg-emerald-600" : "bg-indigo-600"
+                                        )}
+                                        style={{ width: `${Math.min(100, (((usageData.packageUsedCount ?? 0) / usageData.packageTotalCount) * 100))}%` }}
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* チケット・残枠状況 */}
             <div className="flex items-center justify-between p-3 rounded-lg border border-emerald-100 bg-emerald-50/50">
                 <div className="flex items-center gap-2">
                     <div className="p-1.5 bg-emerald-100 rounded-md text-emerald-700">
                         <Ticket className="h-4 w-4" />
                     </div>
                     <div>
-                        <div className="text-xs font-bold text-emerald-800">振替残数</div>
-                        <div className="text-[10px] text-emerald-600">現在保持している未消化分</div>
+                        <div className="text-xs font-bold text-emerald-800">
+                            {usageData?.isPackage ? "パッケージ残り枠" : "振替残数"}
+                        </div>
+                        <div className="text-[10px] text-emerald-600">
+                            {usageData?.isPackage ? "受講可能な残りレッスン枠" : "現在保持している未消化分"}
+                        </div>
                     </div>
                 </div>
                 <div className="text-xl font-black text-emerald-900">
-                    {currentTickets} <span className="text-xs font-bold text-emerald-700">枚</span>
+                    {usageData?.isPackage ? (usageData.packageRemainingCount ?? currentTickets) : currentTickets} <span className="text-xs font-bold text-emerald-700">回</span>
                 </div>
             </div>
         </div>
