@@ -380,6 +380,15 @@ export default function BookingForm() {
       datetime1: formatDateTime(formData.date1, formData.time1Start, formData.time1End, formData.time1Slot),
       datetime2: formatDateTime(formData.date2, formData.time2Start, formData.time2End, formData.time2Slot),
       datetime3: formatDateTime(formData.date3, formData.time3Start, formData.time3End, formData.time3Slot),
+      date1: formData.date1,
+      time1Start: formData.time1Start || (formData.time1Slot ? formData.time1Slot : ""),
+      time1End: formData.time1End,
+      date2: formData.date2,
+      time2Start: formData.time2Start || (formData.time2Slot ? formData.time2Slot : ""),
+      time2End: formData.time2End,
+      date3: formData.date3,
+      time3Start: formData.time3Start || (formData.time3Slot ? formData.time3Slot : ""),
+      time3End: formData.time3End,
       source: isLiffEnvironment ? "LINE/LIFF体験予約フォーム" : "Web体験予約フォーム"
     };
 

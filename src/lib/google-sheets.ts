@@ -214,6 +214,115 @@ export async function appendTrialBookingToSpreadsheet(
     }
 }
 
+/**
+ * 体験申込マスターシート（Makeから移行した本番スプレッドシート）への直接追記用データ型
+ */
+export interface MasterBookingSpreadsheetRow {
+    conversionDateTime: string;
+    name: string;
+    kana: string;
+    birthDate: string;
+    name2?: string;
+    kana2?: string;
+    birthDate2?: string;
+    station: string;
+    date1: string;
+    time1Start: string;
+    time1End: string;
+    date2?: string;
+    time2Start?: string;
+    time2End?: string;
+    date3?: string;
+    time3Start?: string;
+    time3End?: string;
+    skillLevel: string;
+    notes: string;
+    frequency: string;
+    availableTimes: string;
+    email: string;
+    phone: string;
+    transactionId?: string;
+}
+
+export const MASTER_TRIAL_BOOKING_SPREADSHEET_ID = '1cfAzrIV_cHBU0r5Usxs2lHubEh2BuJJ6cKw5mn0JQwM';
+
+/**
+ * 体験申込マスターシート（Make移行先スプレッドシート）に直接1行追記する
+ */
+export async function appendTrialBookingToMasterSpreadsheet(
+    data: MasterBookingSpreadsheetRow,
+    explicitSpreadsheetId?: string
+): Promise<{ success: boolean; error?: string }> {
+    const spreadsheetId = explicitSpreadsheetId || MASTER_TRIAL_BOOKING_SPREADSHEET_ID;
+    const cleanId = extractSpreadsheetId(spreadsheetId);
+
+    if (!cleanId) {
+        return { success: false, error: 'マスター申込スプレッドシートIDが設定されていません。' };
+    }
+
+    const auth = getGoogleAuthClient(['https://www.googleapis.com/auth/spreadsheets']);
+    if (!auth) {
+        return { success: false, error: 'Google認証クライアントの作成に失敗しました。' };
+    }
+
+    try {
+        const sheets = google.sheets({ version: 'v4', auth });
+
+        // シート一覧を取得
+        const spreadsheetMeta = await sheets.spreadsheets.get({ spreadsheetId: cleanId });
+        const sheetList = spreadsheetMeta.data.sheets || [];
+        const targetSheet = sheetList[0]?.properties?.title || 'Sheet1';
+
+        // カラム順:
+        // conversion_date_time, name, フリガナ, birth_date, name2, フリガナ②, birth_date2,
+        // 最寄駅（エリア）, 希望日①, ①スタート, ①エンド, 希望日②, ②スタート, ②エンド,
+        // 希望日③, ③スタート, ③エンド, レベル・目標, ノート, レッスン希望頻度, 可能曜日,
+        // emailadress, 電話番号, transaction_ID
+        const rowValues = [
+            data.conversionDateTime || new Date().toISOString(),
+            data.name || '',
+            data.kana || '',
+            data.birthDate || '',
+            data.name2 || '',
+            data.kana2 || '',
+            data.birthDate2 || '',
+            data.station || '',
+            data.date1 || '',
+            data.time1Start || '',
+            data.time1End || '',
+            data.date2 || '',
+            data.time2Start || '',
+            data.time2End || '',
+            data.date3 || '',
+            data.time3Start || '',
+            data.time3End || '',
+            data.skillLevel || '',
+            data.notes || '',
+            data.frequency || '',
+            data.availableTimes || '',
+            data.email || '',
+            data.phone || '',
+            data.transactionId || '',
+        ];
+
+        await sheets.spreadsheets.values.append({
+            spreadsheetId: cleanId,
+            range: `${targetSheet}!A:X`,
+            valueInputOption: 'USER_ENTERED',
+            insertDataOption: 'INSERT_ROWS',
+            requestBody: {
+                values: [rowValues],
+            },
+        });
+
+        console.log(`📋 申込マスターシート [${targetSheet}] へ追記成功: ${data.name}`);
+        return { success: true };
+    } catch (err: any) {
+        console.error('⚠️ 申込マスターシート追記エラー:', err.message);
+        return { success: false, error: err.message };
+    }
+}
+
 export interface LessonReportSpreadsheetRow {
     lessonId?: string;
     lessonDate: string;

@@ -4,8 +4,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { stopStepReminderForUser } from "@/lib/line-step-reminders";
 import { sendGoogleChatMessage } from "@/lib/google-chat";
 import { markConversionForUser } from "@/lib/line-tracking-service";
-import { appendTrialBookingToSpreadsheet } from "@/lib/google-sheets";
+import { appendTrialBookingToSpreadsheet, appendTrialBookingToMasterSpreadsheet } from "@/lib/google-sheets";
 import { emailService } from "@/lib/email";
+import { lineService } from "@/lib/line";
 
 export async function POST(req: Request) {
   try {
@@ -139,7 +140,7 @@ export async function POST(req: Request) {
         }
       } else {
         // 新規作成
-        const { error: insertErr } = await supabase
+        const { data: newStudentData, error: insertErr } = await supabase
           .from('students')
           .insert({
             full_name: applicantName || '未入力',
@@ -155,12 +156,39 @@ export async function POST(req: Request) {
             second_student_gender: payload.gender2 || null,
             status: 'applied',
             created_at: new Date().toISOString()
-          });
+          })
+          .select('id')
+          .single();
 
         if (insertErr) {
           console.error('[Trial Booking] Failed to insert student record:', insertErr);
         } else {
-          console.log(`[Trial Booking] Registered new student record for "${applicantName}"`);
+          targetStudent = newStudentData;
+          console.log(`[Trial Booking] Registered new student record for "${applicantName}" (${newStudentData?.id})`);
+        }
+      }
+
+      // 2.4. counseling_sheets テーブルへ泳力・お悩み・目標を保存
+      const finalStudentId = targetStudent?.id;
+      if (finalStudentId && payload.skillLevel) {
+        try {
+          const { error: csError } = await supabase
+            .from('counseling_sheets')
+            .insert({
+              student_id: finalStudentId,
+              goals: payload.skillLevel,
+              swimming_experience: null,
+              health_conditions: null,
+              created_at: new Date().toISOString()
+            });
+
+          if (csError) {
+            console.error('[Trial Booking] Failed to save counseling sheet:', csError);
+          } else {
+            console.log(`[Trial Booking] Saved counseling sheet for student: ${finalStudentId}`);
+          }
+        } catch (csEx) {
+          console.error('[Trial Booking] Exception saving counseling sheet:', csEx);
         }
       }
     } catch (studentErr) {
@@ -180,6 +208,45 @@ export async function POST(req: Request) {
         await markConversionForUser(payload.userId, undefined, referrer);
       } catch (convErr) {
         console.error('[Trial Booking] Failed to mark tracking conversion:', convErr);
+      }
+
+      // 3.3. 公式LINEへ申し込み受付完了メッセージを直接送信（Makeから完全移行）
+      try {
+        const applicantName = (payload.name || 'お客様').trim();
+        const lineMessage = `${applicantName}様
+
+この度は、スイムパートナーズの体験レッスンにお申し込みいただき、誠にありがとうございます。
+
+お客様のお申し込み内容と、ご希望の日程を確認いたしました。
+────────────────
+
+【ご希望日程として承った日程】
+ ・第1希望: ${payload.datetime1 || '未指定'}
+ ・第2希望: ${payload.datetime2 || '未指定'}
+ ・第3希望: ${payload.datetime3 || '未指定'}
+
+お送りいただいたご希望日をもとに、専任コーチの調整と正式な日程調整を進めさせていただきます。なお、コーチの調整には最大3日程度お時間をいただいております。あらかじめご了承ください。
+
+【今後の流れ】
+ ・事務局よりLINEにてご連絡（コーチ調整状況のご報告と日程調整）
+ ・担当コーチの決定
+ ・お客様へ担当コーチのLINEアカウントをご案内
+ ・お客様とコーチ間で直接連絡開始（体験レッスン詳細確認）
+ ・体験レッスン実施！
+
+ご不明な点がございましたら、お気軽にお問い合わせください。
+あなたと一緒にプールでお会いできることを心より楽しみにしております！
+────────────────
+SWIM PARTNERS/スイムパートナーズ事務局`;
+
+        const lineSent = await lineService.pushMessage(payload.userId, lineMessage);
+        if (lineSent) {
+          console.log(`[Trial Booking] Successfully sent reception LINE message to user: ${payload.userId}`);
+        } else {
+          console.error(`[Trial Booking] Failed to send reception LINE message to user: ${payload.userId}`);
+        }
+      } catch (lineErr) {
+        console.error('[Trial Booking] Exception sending reception LINE message:', lineErr);
       }
     }
 
@@ -313,6 +380,38 @@ export async function POST(req: Request) {
       });
     } catch (sheetErr) {
       console.warn('[Trial Booking] Google Sheets append failed (non-blocking):', sheetErr);
+    }
+
+    // 6.2. 申し込みマスターシート（Make移行先スプレッドシート）への直接自動追記
+    try {
+      await appendTrialBookingToMasterSpreadsheet({
+        conversionDateTime: new Date().toISOString(),
+        name: payload.name || '',
+        kana: payload.kana || '',
+        birthDate: payload.dob || '',
+        name2: payload.name2 || '',
+        kana2: payload.kana2 || '',
+        birthDate2: payload.dob2 || '',
+        station: payload.station || '',
+        date1: payload.date1 || (payload.datetime1 ? payload.datetime1.split(' ')[0] : ''),
+        time1Start: payload.time1Start || '',
+        time1End: payload.time1End || '',
+        date2: payload.date2 || (payload.datetime2 ? payload.datetime2.split(' ')[0] : ''),
+        time2Start: payload.time2Start || '',
+        time2End: payload.time2End || '',
+        date3: payload.date3 || (payload.datetime3 ? payload.datetime3.split(' ')[0] : ''),
+        time3Start: payload.time3Start || '',
+        time3End: payload.time3End || '',
+        skillLevel: payload.skillLevel || '',
+        notes: combinedNotes || '',
+        frequency: payload.frequency || '',
+        availableTimes: payload.availableTimes || '',
+        email: payload.email || '',
+        phone: payload.phone || '',
+        transactionId: payload.userId || '',
+      });
+    } catch (masterSheetErr) {
+      console.warn('[Trial Booking] Master Booking Spreadsheet append failed (non-blocking):', masterSheetErr);
     }
 
     // 7. 顧客への自動返信メール（reception_completed）送信
