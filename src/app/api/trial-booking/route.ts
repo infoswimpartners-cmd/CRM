@@ -5,6 +5,7 @@ import { stopStepReminderForUser } from "@/lib/line-step-reminders";
 import { sendGoogleChatMessage } from "@/lib/google-chat";
 import { markConversionForUser } from "@/lib/line-tracking-service";
 import { appendTrialBookingToSpreadsheet } from "@/lib/google-sheets";
+import { emailService } from "@/lib/email";
 
 export async function POST(req: Request) {
   try {
@@ -312,6 +313,30 @@ export async function POST(req: Request) {
       });
     } catch (sheetErr) {
       console.warn('[Trial Booking] Google Sheets append failed (non-blocking):', sheetErr);
+    }
+
+    // 7. 顧客への自動返信メール（reception_completed）送信
+    if (payload.email) {
+      try {
+        const formattedName = payload.name2 ? `${payload.name}・${payload.name2}` : (payload.name || 'お客様');
+        await emailService.sendTriggerEmail('reception_completed', payload.email, {
+          name: formattedName,
+          email: payload.email,
+          phone: payload.phone || '',
+          area: payload.station || '',
+          datetime1: payload.datetime1 || '',
+          datetime2: payload.datetime2 || '',
+          datetime3: payload.datetime3 || '',
+          第一希望: payload.datetime1 || '未指定',
+          第二希望: payload.datetime2 || '未指定',
+          第三希望: payload.datetime3 || '未指定',
+          skill_level: payload.skillLevel || '',
+          notes: combinedNotes || '',
+        }, undefined, { forceEmail: true });
+        console.log(`[Trial Booking] Successfully sent reception_completed email to: ${payload.email}`);
+      } catch (emailErr) {
+        console.error('[Trial Booking] Failed to send reception email to customer:', emailErr);
+      }
     }
 
     return NextResponse.json({ success: true });
