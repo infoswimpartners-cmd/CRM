@@ -28,7 +28,7 @@ export default function RootLayout({
   return (
     <html lang="ja" suppressHydrationWarning>
       <body
-        className="antialiased font-sans relative min-h-screen bg-white text-slate-900 selection:bg-blue-100"
+        className="antialiased font-sans relative min-h-screen bg-background text-foreground selection:bg-sky-100"
         suppressHydrationWarning
       >
         <AuthProvider>

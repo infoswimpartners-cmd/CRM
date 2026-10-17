@@ -61,29 +61,29 @@ interface ScheduleCalendarProps {
 }
 
 const getStatusColor = (schedule: Schedule) => {
-    // 体験レッスン
+    // 体験レッスン (SchoolHub ゴールド/アンバー)
     const isTrial = schedule.lesson_master?.is_trial === true
     if (isTrial) {
-        return 'bg-orange-500' // オレンジ
+        return 'bg-amber-500' // ゴールド/アンバー
     }
 
-    // 単発レッスン (枠外超過、または会員プラン名に「単発」が含まれる、またはパッケージプラン)
+    // 単発レッスン (枠外超過、または会員プラン名に「単発」が含まれる、またはパッケージプラン: SchoolHub ペリウィンクル)
     const isSinglePlan = schedule.students?.membership_types?.name?.includes('単発') || 
                          schedule.students?.membership_types?.is_package === true
     const isSingle = schedule.is_overage === true || isSinglePlan
 
     if (isSingle) {
-        return 'bg-purple-500' // パープル
+        return 'bg-indigo-500' // ペリウィンクル/インディゴ
     }
 
-    // 定期レッスン (それ以外)
-    return 'bg-blue-600' // ブルー
+    // 定期レッスン (それ以外: SchoolHub スカイブルー)
+    return 'bg-sky-600' // スカイブルー
 }
 
 const getStatusBorder = (schedule: Schedule) => {
     const isTrial = schedule.lesson_master?.is_trial === true
     if (isTrial) {
-        return 'border-l-4 border-l-orange-500 bg-orange-50/10'
+        return 'border-l-4 border-l-amber-400 bg-amber-50/20'
     }
 
     const isSinglePlan = schedule.students?.membership_types?.name?.includes('単発') || 
@@ -91,11 +91,12 @@ const getStatusBorder = (schedule: Schedule) => {
     const isSingle = schedule.is_overage === true || isSinglePlan
 
     if (isSingle) {
-        return 'border-l-4 border-l-purple-500 bg-purple-50/10'
+        return 'border-l-4 border-l-indigo-400 bg-indigo-50/20'
     }
 
-    return 'border-l-4 border-l-blue-600'
+    return 'border-l-4 border-l-sky-500 bg-sky-50/15'
 }
+
 
 /** Googleカレンダーのイベント事前入力URLを生成（APIキー不要） */
 function buildGoogleCalendarUrl(schedule: Schedule) {
@@ -488,7 +489,7 @@ export function ScheduleCalendar({ adminView = false }: ScheduleCalendarProps) {
                                 <h2 className="text-xl font-bold">
                                     {format(currentMonth, 'yyyy年 M月', { locale: ja })}
                                 </h2>
-                                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-bold px-3 py-1 rounded-full text-sm">
+                                <Badge variant="outline" className="bg-sky-50 text-sky-700 border-sky-200/80 font-bold px-3 py-1 rounded-full text-sm shadow-2xs">
                                     月間登録: {monthLessonsCount}本
                                 </Badge>
                             </div>
@@ -511,6 +512,7 @@ export function ScheduleCalendar({ adminView = false }: ScheduleCalendarProps) {
                                     i === 0 && "text-red-500",
                                     i === 6 && "text-blue-500"
                                 )}>
+
                                     {day}
                                 </div>
                             ))}
@@ -526,16 +528,17 @@ export function ScheduleCalendar({ adminView = false }: ScheduleCalendarProps) {
                                         className={cn(
                                             "relative bg-white min-h-[50px] md:min-h-[60px] p-0.5 md:p-1 flex flex-col items-center justify-start hover:bg-gray-50 transition-colors",
                                             !isCurrentMonth && "bg-gray-50/50 text-gray-400",
-                                            isSelected && "ring-2 ring-inset ring-blue-500 z-10"
+                                            isSelected && "ring-2 ring-inset ring-sky-500 z-10"
                                         )}
                                     >
                                         <span className={cn(
                                             "text-xs md:text-sm w-6 h-6 md:w-7 md:h-7 flex items-center justify-center rounded-full",
-                                            isSameDay(day, new Date()) && "bg-blue-600 text-white font-bold",
-                                            !isSameDay(day, new Date()) && isSelected && "bg-blue-100 text-blue-700 font-bold"
+                                            isSameDay(day, new Date()) && "bg-sky-600 text-white font-bold",
+                                            !isSameDay(day, new Date()) && isSelected && "bg-sky-100 text-sky-700 font-bold"
                                         )}>
                                             {format(day, 'd')}
                                         </span>
+
 
                                         <div className="mt-0.5 md:mt-1 flex flex-wrap gap-0.5 justify-center">
                                             {/* Dots for events */}

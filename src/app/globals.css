@@ -35,10 +35,32 @@
 
   --radius-sm: 0.375rem;
   --radius-md: 0.5rem;
-  --radius-lg: 0.625rem;
-  --radius-xl: 0.75rem;
-  --radius-2xl: 1rem;
-  --radius-3xl: 1.25rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.25rem;
+  --radius-3xl: 1.5rem;
+
+  /* SchoolHub パレットトークン */
+  --color-schoolhub-bg: var(--schoolhub-bg);
+  --color-schoolhub-sky: var(--schoolhub-sky);
+  --color-schoolhub-sky-light: var(--schoolhub-sky-light);
+  --color-schoolhub-sky-text: var(--schoolhub-sky-text);
+  
+  --color-schoolhub-periwinkle: var(--schoolhub-periwinkle);
+  --color-schoolhub-periwinkle-light: var(--schoolhub-periwinkle-light);
+  --color-schoolhub-periwinkle-text: var(--schoolhub-periwinkle-text);
+
+  --color-schoolhub-gold: var(--schoolhub-gold);
+  --color-schoolhub-gold-light: var(--schoolhub-gold-light);
+  --color-schoolhub-gold-text: var(--schoolhub-gold-text);
+
+  --color-schoolhub-mint: var(--schoolhub-mint);
+  --color-schoolhub-mint-light: var(--schoolhub-mint-light);
+  --color-schoolhub-mint-text: var(--schoolhub-mint-text);
+
+  /* SchoolHub ソフトシャドウ */
+  --shadow-schoolhub-card: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.02);
+  --shadow-schoolhub-hover: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.03);
 
   --animate-float: float 6s ease-in-out infinite;
   --animate-fade-in-up: fadeInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
@@ -62,10 +84,10 @@
 }
 
 :root {
-  --radius: 0.625rem;
+  --radius: 0.75rem;
 
-  /* Apple HIG & Clean Neutral Theme */
-  --background: #FFFFFF;
+  /* SchoolHub ソフトオフホワイト基底背景 */
+  --background: #F8FAFC;
   --foreground: #0F172A; /* slate-900 */
 
   --card: #FFFFFF;
@@ -74,33 +96,51 @@
   --popover: #FFFFFF;
   --popover-foreground: #0F172A;
 
-  /* Primary: Vivid & Clear Sky Blue */
-  --primary: oklch(0.75 0.18 225);
+  /* プライマリ: SchoolHub スカイブルー */
+  --primary: #0284C7;
   --primary-foreground: #FFFFFF;
 
-  --secondary: #F8FAFC; /* slate-50 */
+  --secondary: #F1F5F9; /* slate-100 */
   --secondary-foreground: #334155; /* slate-700 */
 
   --muted: #F8FAFC;
   --muted-foreground: #64748B; /* slate-500 */
 
-  --accent: #F1F5F9; /* slate-100 */
-  --accent-foreground: #0F172A;
+  --accent: #F0F9FF; /* sky-50 */
+  --accent-foreground: #0369A1; /* sky-700 */
 
   --border: #E2E8F0; /* slate-200 */
   --input: #E2E8F0;
-  --ring: oklch(0.75 0.18 225);
+  --ring: #38BDF8; /* sky-400 */
 
-  --destructive: oklch(0.6 0.2 25);
+  --destructive: #EF4444;
   --destructive-foreground: #FFFFFF;
+
+  /* SchoolHub パレット変数 */
+  --schoolhub-bg: #F8FAFC;
+  --schoolhub-sky: #0284C7;
+  --schoolhub-sky-light: #E0F2FE;
+  --schoolhub-sky-text: #0369A1;
+
+  --schoolhub-periwinkle: #9F9EFE;
+  --schoolhub-periwinkle-light: #EEF0FF;
+  --schoolhub-periwinkle-text: #4F46E5;
+
+  --schoolhub-gold: #F4C233;
+  --schoolhub-gold-light: #FEF9C3;
+  --schoolhub-gold-text: #A16207;
+
+  --schoolhub-mint: #10B981;
+  --schoolhub-mint-light: #D1FAE5;
+  --schoolhub-mint-text: #047857;
 }
 
 .dark {
-  --background: #FFFFFF;
+  --background: #F8FAFC;
   --foreground: #0F172A;
   --card: #FFFFFF;
   --card-foreground: #0F172A;
-  --primary: oklch(0.75 0.18 225);
+  --primary: #0284C7;
   --primary-foreground: #FFFFFF;
   --border: #E2E8F0;
 }
@@ -111,9 +151,9 @@
   }
 
   body {
-    @apply bg-white text-foreground min-h-screen selection:bg-sky-100 transition-colors duration-200;
-    /* Clean White Base */
-    background-color: #FFFFFF !important;
+    @apply bg-background text-foreground min-h-screen selection:bg-sky-100 transition-colors duration-200;
+    /* SchoolHub 基底背景色に統一 */
+    background-color: var(--background) !important;
   }
 }
 

@@ -25,6 +25,11 @@ import { calculateCoachRate, calculateMonthlyStats, calculateLessonReward } from
 import { getTrioOnboardingStatus } from '@/actions/trio_onboarding'
 import { getBroadcastCampaigns } from '@/actions/line-marketing'
 import { AdminScheduledBroadcastWidget } from '@/components/admin/AdminScheduledBroadcastWidget'
+import { AdminKpiCards } from '@/components/admin/dashboard/AdminKpiCards'
+import { TodayScheduleTimeline } from '@/components/admin/dashboard/TodayScheduleTimeline'
+import { NewLeadsWidget } from '@/components/admin/dashboard/NewLeadsWidget'
+import { PendingApprovalsWidget } from '@/components/admin/dashboard/PendingApprovalsWidget'
+import { QuickActionsWidget } from '@/components/admin/dashboard/QuickActionsWidget'
 import { Crown, Timer } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -37,11 +42,7 @@ export default async function AdminDashboard(props: {
     const monthParam = typeof searchParams.month === 'string' ? searchParams.month : format(new Date(), 'yyyy-MM')
 
     return (
-        <div className="relative space-y-6 md:space-y-10 pb-12 overflow-hidden px-4 md:px-0">
-            {/* 装飾用背景要素 */}
-            <div className="absolute top-0 right-0 -z-10 w-[600px] h-[600px] bg-linear-to-bl from-blue-500/5 to-transparent rounded-full blur-3xl" />
-            <div className="absolute top-[-100px] left-[-100px] -z-10 w-[500px] h-[500px] bg-linear-to-tr from-cyan-400/5 to-transparent rounded-full blur-3xl" />
-
+        <div className="relative space-y-6 md:space-y-8 pb-12 overflow-hidden px-4 md:px-0">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div className="flex flex-col gap-2">
                     <div className="flex items-center gap-2">
@@ -68,18 +69,18 @@ export default async function AdminDashboard(props: {
 function AdminDashboardSkeleton() {
     return (
         <div className="space-y-6 animate-pulse mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[...Array(3)].map((_, i) => (
-                    <div key={i} className="bg-white rounded-3xl p-6 md:p-8 h-48 border border-slate-200">
-                        <div className="h-12 w-12 bg-slate-100 rounded-2xl mb-6"></div>
-                        <div className="h-4 w-24 bg-slate-100 rounded mb-2"></div>
-                        <div className="h-8 w-32 bg-slate-100 rounded"></div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+                {[...Array(4)].map((_, i) => (
+                    <div key={i} className="bg-white rounded-3xl p-6 h-36 border border-slate-200">
+                        <div className="h-10 w-10 bg-slate-100 rounded-2xl mb-4"></div>
+                        <div className="h-4 w-20 bg-slate-100 rounded mb-2"></div>
+                        <div className="h-7 w-28 bg-slate-100 rounded"></div>
                     </div>
                 ))}
             </div>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 mt-6">
-                <div className="lg:col-span-2 bg-white rounded-3xl h-[560px] border border-slate-200"></div>
-                <div className="lg:col-span-1 bg-white rounded-3xl h-[560px] border border-slate-200"></div>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-6">
+                <div className="lg:col-span-8 bg-white rounded-3xl h-[600px] border border-slate-200"></div>
+                <div className="lg:col-span-4 bg-white rounded-3xl h-[600px] border border-slate-200"></div>
             </div>
         </div>
     )
@@ -103,6 +104,11 @@ async function AdminDashboardContent({ monthParam }: { monthParam: string }) {
     // 5. Fetch Revenue Data (Current Year)
     const targetYear = targetDate.getFullYear()
 
+    // 当日（JST 00:00〜23:59）のレッスン範囲
+    const now = new Date()
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0)
+    const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
+
     // Parallelize independent data fetches
     const [
         { data: coaches },
@@ -115,6 +121,8 @@ async function AdminDashboardContent({ monthParam }: { monthParam: string }) {
         { count: totalStudents },
         { data: appConfigs },
         { data: pendingChangeRequests },
+        { data: todaySchedules },
+        { data: leadsData },
     ] = await Promise.all([
         // 1. Fetch Coaches
         supabase.from('profiles').select('*'),
@@ -180,7 +188,7 @@ async function AdminDashboardContent({ monthParam }: { monthParam: string }) {
         supabase.from('lesson_schedules')
             .select(`
                 id, title, start_time, end_time, location,
-                students ( id, full_name ),
+                students ( id, full_name, student_number ),
                 profiles ( full_name, avatar_url )
             `)
             .gte('start_time', new Date().toISOString())
@@ -214,7 +222,24 @@ async function AdminDashboardContent({ monthParam }: { monthParam: string }) {
                 requested:membership_types!requested_membership_type_id ( name )
             `)
             .eq('status', 'pending')
+            .order('created_at', { ascending: false }),
+
+        // 11. Fetch Today Schedules
+        supabase.from('lesson_schedules')
+            .select(`
+                id, title, start_time, end_time, location, status,
+                students ( id, full_name, student_number ),
+                profiles ( id, full_name, avatar_url )
+            `)
+            .gte('start_time', todayStart.toISOString())
+            .lte('start_time', todayEnd.toISOString())
+            .order('start_time', { ascending: true }),
+
+        // 12. Fetch New Leads
+        supabase.from('leads')
+            .select('*')
             .order('created_at', { ascending: false })
+            .limit(5)
     ])
 
     // 10. THE TRIO Status (Fetch separately to avoid blocking other data if it fails)
@@ -350,13 +375,38 @@ async function AdminDashboardContent({ monthParam }: { monthParam: string }) {
     // Format Schedules for Widget
     const formattedSchedules = upcomingSchedules?.map((s: any) => {
         const profile = Array.isArray(s.profiles) ? s.profiles[0] : s.profiles
+        const student = Array.isArray(s.students) ? s.students[0] : s.students
         return {
             ...s,
             coach: profile || { full_name: '不明' },
-            student_name: s.students?.full_name,
-            student_id: s.students?.id
+            student_name: student?.full_name,
+            student_id: student?.id,
+            student_number: student?.student_number,
         }
     }) || []
+
+    // Format Today Schedules for TodayScheduleTimeline
+    const todayFormattedSchedules = (todaySchedules || []).map((s: any) => {
+        const profile = Array.isArray(s.profiles) ? s.profiles[0] : s.profiles
+        const student = Array.isArray(s.students) ? s.students[0] : s.students
+        return {
+            id: s.id,
+            title: s.title,
+            start_time: s.start_time,
+            end_time: s.end_time,
+            location: s.location,
+            status: s.status,
+            student_name: student?.full_name,
+            student_id: student?.id,
+            student_number: student?.student_number,
+            coach: {
+                id: profile?.id,
+                full_name: profile?.full_name || '名称未設定',
+                avatar_url: profile?.avatar_url,
+            },
+        }
+    })
+    const todayLessonsCount = todayFormattedSchedules.length
 
     // Ranking Data for Dashboard
     // Reuse lessons already fetched, filtered by targetYear
@@ -445,283 +495,107 @@ async function AdminDashboardContent({ monthParam }: { monthParam: string }) {
     void myUpcomingSchedules;
 
     return (
-        <div className="space-y-6 md:space-y-10 animate-fade-in-up">
-            {/* 保留中のプラン申請セクション */}
-            {pendingChangeRequests && pendingChangeRequests.length > 0 && (
-                <section className="space-y-6">
-                    <div className="flex items-center gap-3">
-                        <h2 className="text-lg font-bold text-slate-700">プラン変更・追加・解約申請の承認待ち ({pendingChangeRequests.length}件)</h2>
-                        <div className="h-px flex-1 bg-slate-100"></div>
+        <div className="space-y-6 md:space-y-8 animate-fade-in-up">
+            {/* 最上部 SchoolHub 4大KPI統計カード */}
+            <AdminKpiCards
+                totalStudents={totalStudents || 0}
+                todayLessonsCount={todayLessonsCount}
+                activeCoachesCount={activeCoaches.length}
+                totalCoachesCount={coaches?.length}
+                totalSales={totalSales}
+                grossProfit={grossProfit}
+                uncollectedAmount={0}
+                uncollectedCount={0}
+                diffSales={diffSales}
+                diffGrossProfit={diffGrossProfit}
+                targetMonth={format(targetDate, 'yyyy年M月')}
+            />
+
+            {/* メインエリア SchoolHub 2カラム構成 */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                {/* メイン列（左: 8 cols） */}
+                <div className="lg:col-span-8 space-y-6">
+                    {/* ① 本日のレッスンスケジュールタイムライン */}
+                    <TodayScheduleTimeline
+                        schedules={todayFormattedSchedules}
+                        dateStr={format(new Date(), 'yyyy年M月d日')}
+                    />
+
+                    {/* ② 直近レッスン状況・カルテ報告 */}
+                    <div className="bg-white rounded-3xl p-5 md:p-8 shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-200/70">
+                        {/* @ts-ignore */}
+                        <AdminActivityWidget schedules={formattedSchedules} reports={recentReports || []} />
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {pendingChangeRequests.map((req: any) => {
-                            let typeLabel = 'プラン変更'
-                            let typeColor = 'bg-blue-50 text-blue-700 border-blue-200'
-                            let detail = `希望プラン: ${req.requested?.name || '解約'}`
 
-                            if (req.request_type === 'add_plan' && req.requested_is_trio === true) {
-                                typeLabel = 'Trio追加'
-                                typeColor = 'bg-amber-50 text-amber-700 border-amber-200'
-                                detail = 'THE TRIOプランの追加'
-                            } else if (req.request_type === 'cancel_plan' && req.requested_is_trio === false) {
-                                typeLabel = 'Trio解約'
-                                typeColor = 'bg-red-50 text-red-700 border-red-200'
-                                detail = 'THE TRIOプランの解約'
-                            } else if (req.request_type === 'add_plan') {
-                                typeLabel = 'プラン追加'
-                                typeColor = 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                detail = `追加プラン: ${req.requested?.name || ''}`
-                            }
-
-                            return (
-                                <Link key={req.id} href={`/customers/${req.student?.id}`} className="block">
-                                    <div className="group bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer flex flex-col justify-between h-full hover:border-indigo-200">
-                                        <div className="space-y-3">
-                                            <div className="flex items-center justify-between">
-                                                <Badge className={cn("text-[10px] font-bold px-2 py-0.5", typeColor)} variant="outline">
-                                                    {typeLabel}
-                                                </Badge>
-                                                <span className="text-[10px] text-slate-400 font-mono">
-                                                    {req.student?.student_number}
-                                                </span>
-                                            </div>
-                                            <div>
-                                                <h4 className="text-sm font-bold text-slate-800 group-hover:text-indigo-600 transition-colors">
-                                                    {req.student?.full_name}
-                                                </h4>
-                                                <p className="text-xs text-slate-500 mt-1 leading-normal font-medium">
-                                                    {detail}
-                                                </p>
-                                                {req.note && (
-                                                    <p className="text-[10px] text-slate-400 bg-slate-50 p-2 rounded-lg border border-slate-100 mt-2 line-clamp-2 italic">
-                                                        「{req.note}」
-                                                    </p>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between items-center text-[10px] text-slate-400 font-bold">
-                                            <span>申請日: {format(new Date(req.created_at), 'yyyy/MM/dd')}</span>
-                                            <span className="text-indigo-600 group-hover:translate-x-1 transition-transform">詳細・承認へ ➔</span>
-                                        </div>
-                                    </div>
-                                </Link>
-                            )
-                        })}
+                    {/* ③ 年間売上推移グラフ */}
+                    <div className="bg-white rounded-3xl p-5 md:p-8 shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-200/70 flex flex-col">
+                        <div className="mb-6">
+                            <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
+                                <div className="w-2 h-6 bg-blue-600 rounded-full" />
+                                売上推移
+                            </h3>
+                            <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest">
+                                {targetYear}年 月別売上統計
+                            </p>
+                        </div>
+                        <div className="min-h-[300px]">
+                            <RevenueChart data={yearlyRevenueData} />
+                        </div>
                     </div>
-                </section>
-            )}
 
-            {/* LINE一括配信の予約状況・クイックアクセスセクション */}
-            <section className="space-y-4">
-                <AdminScheduledBroadcastWidget initialCampaigns={scheduledCampaigns} />
-            </section>
-
-            {/* ビジネス概要セクション */}
-            <section className="space-y-6">
-                <div className="flex items-center gap-3">
-                    <h2 className="text-lg font-bold text-slate-700">ビジネス概況</h2>
-                    <div className="h-px flex-1 bg-slate-100"></div>
+                    {/* ④ コーチ別・優良顧客ランキング */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="bg-white rounded-3xl overflow-hidden shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-200/70">
+                            <CoachRankingTable data={coachRanking} limit={5} title="コーチ別売上ランキング (TOP5)" />
+                        </div>
+                        <div className="bg-white rounded-3xl overflow-hidden shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-200/70">
+                            <CustomerRankingTable data={topCustomers} limit={5} title="優良顧客ランキング (TOP5)" />
+                        </div>
+                    </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <Link href="/admin/trio/slots">
-                        <div className="group relative bg-white rounded-3xl p-6 md:p-8 overflow-hidden border border-slate-200/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_50px_rgba(99,_102,_241,_0.07)] transition-all duration-500 cursor-pointer h-full ring-1 ring-slate-200/50 hover:ring-indigo-200">
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-linear-to-bl from-indigo-100/30 to-transparent rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110 duration-700" />
-                            <div className="relative z-10">
-                                <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500">
-                                    <Crown className="w-6 h-6 text-indigo-600" />
-                                </div>
-                                <p className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">THE TRIO 稼働</p>
-                                <div className="flex items-baseline gap-2 flex-wrap min-w-0">
-                                    <h3 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tighter tabular-nums">{trioStatusRes.activeCount}</h3>
-                                    <span className="text-xs sm:text-base font-medium text-slate-500">/ 12 名</span>
-                                </div>
 
-                                <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col gap-3">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs font-semibold text-slate-400">キャンセル待ち</span>
-                                        <span className="flex items-center gap-1 text-sm font-bold text-amber-600">
-                                            <Timer className="w-3 h-3" />
-                                            {trioStatusRes.waitlistCount} 名
-                                        </span>
+                {/* サブ列（右: 4 cols） */}
+                <div className="lg:col-span-4 space-y-6">
+                    {/* ① 新着体験申込リード */}
+                    <NewLeadsWidget leads={leadsData || []} />
+
+                    {/* ② 未承認請求・プラン変更申請 */}
+                    <PendingApprovalsWidget pendingRequests={pendingChangeRequests || []} />
+
+                    {/* ③ 実務クイックアクション */}
+                    <QuickActionsWidget />
+
+                    {/* ④ LINE予約配信 */}
+                    <AdminScheduledBroadcastWidget initialCampaigns={scheduledCampaigns} />
+
+                    {/* ⑤ THE TRIO 稼働ミニカード */}
+                    <Link href="/admin/trio/slots" className="block group">
+                        <div className="bg-white rounded-3xl p-5 md:p-6 border border-slate-200/70 shadow-[0_2px_12px_rgba(0,0,0,0.03)] hover:border-indigo-200 transition-all">
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100 flex items-center justify-center">
+                                        <Crown className="w-4 h-4" />
                                     </div>
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs font-semibold text-slate-400">ステータス</span>
-                                        <Badge variant="outline" className={cn(
-                                            "text-[10px] uppercase font-black px-2 py-0.5",
-                                            trioStatusRes.isFull ? "bg-red-50 text-red-600 border-red-100" : "bg-emerald-50 text-emerald-600 border-emerald-100"
-                                        )}>
-                                            {trioStatusRes.isFull ? "満員" : "募集中"}
-                                        </Badge>
-                                    </div>
+                                    <span className="text-xs font-bold text-slate-800">THE TRIO 稼働状況</span>
                                 </div>
+                                <Badge variant="outline" className={cn(
+                                    "text-[10px] uppercase font-black px-2 py-0.5",
+                                    trioStatusRes.isFull ? "bg-red-50 text-red-600 border-red-100" : "bg-emerald-50 text-emerald-600 border-emerald-100"
+                                )}>
+                                    {trioStatusRes.isFull ? "満員" : "募集中"}
+                                </Badge>
+                            </div>
+                            <div className="flex items-baseline justify-between">
+                                <span className="text-2xl font-extrabold text-slate-900 tabular-nums">
+                                    {trioStatusRes.activeCount} <span className="text-xs font-medium text-slate-500">/ 12 名</span>
+                                </span>
+                                <span className="text-xs font-bold text-amber-600 flex items-center gap-1">
+                                    <Timer className="w-3.5 h-3.5" />
+                                    待ち {trioStatusRes.waitlistCount} 名
+                                </span>
                             </div>
                         </div>
                     </Link>
-                    <Link href="/admin/analytics">
-                        <div className="group relative bg-white rounded-3xl p-6 md:p-8 overflow-hidden border border-slate-200/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_50px_rgba(8,_112,_184,_0.07)] transition-all duration-500 cursor-pointer h-full ring-1 ring-slate-200/50 hover:ring-blue-200">
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-linear-to-bl from-cyan-100/30 to-transparent rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110 duration-700" />
-                            <div className="relative z-10">
-                                <div className="w-12 h-12 bg-cyan-50 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500">
-                                    <DollarSign className="w-6 h-6 text-cyan-600" />
-                                </div>
-                                <p className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">今月の売上</p>
-                                <div className="flex items-baseline gap-2 flex-wrap min-w-0">
-                                    <h3 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tighter tabular-nums">¥{totalSales.toLocaleString()}</h3>
-                                    <span className="text-[10px] sm:text-sm font-medium text-slate-500">({targetDate.getMonth() + 1}月)</span>
-                                </div>
-
-                                <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col gap-3">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs font-semibold text-slate-400">粗利額</span>
-                                        <span className="text-sm font-bold text-slate-700">¥{grossProfit.toLocaleString()}</span>
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs font-semibold text-slate-400">前月比</span>
-                                        <div className={`flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-lg ${diffSales >= 0 ? 'text-emerald-600 bg-emerald-50' : 'text-rose-600 bg-rose-50'}`}>
-                                            {diffSales >= 0 ? '+' : ''}{diffSales.toLocaleString()}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </Link>
-
-                    <Link href="/customers">
-                        <div className="group relative bg-white rounded-3xl p-6 md:p-8 overflow-hidden border border-slate-200/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_50px_rgba(59,_130,_246,_0.07)] transition-all duration-500 cursor-pointer h-full ring-1 ring-slate-200/50 hover:ring-blue-200">
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-linear-to-bl from-blue-100/30 to-transparent rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110 duration-700" />
-                            <div className="relative z-10">
-                                <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500">
-                                    <Users className="w-6 h-6 text-blue-600" />
-                                </div>
-                                <p className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">稼働コーチ数</p>
-                                <div className="flex items-baseline gap-2 flex-wrap min-w-0">
-                                    <h3 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 tabular-nums">{activeCoaches.length}</h3>
-                                    <span className="text-xs sm:text-base font-medium text-slate-500">名</span>
-                                </div>
-
-                                <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col gap-3">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs font-semibold text-slate-400">全生徒数</span>
-                                        <span className="text-sm font-bold text-slate-700">{totalStudents?.toLocaleString() || '-'} 名</span>
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs font-semibold text-slate-400">ステータス</span>
-                                        <span className="flex items-center gap-1.5 text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg">
-                                            <span className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-pulse"></span>
-                                            Active
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </Link>
-
-                    <Link href="/admin/reports">
-                        <div className="group relative bg-white rounded-3xl p-6 md:p-8 overflow-hidden border border-slate-200/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_20px_50px_rgba(168,_85,_247,_0.07)] transition-all duration-500 cursor-pointer h-full ring-1 ring-slate-200/50 hover:ring-purple-200">
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-linear-to-bl from-purple-100/30 to-transparent rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110 duration-700" />
-                            <div className="relative z-10">
-                                <div className="w-12 h-12 bg-purple-50 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500">
-                                    <CalendarIcon className="w-6 h-6 text-purple-600" />
-                                </div>
-                                <p className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">月間レッスン数</p>
-                                <div className="flex items-baseline gap-2 flex-wrap min-w-0">
-                                    <h3 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 tabular-nums">{thisMonthLessons.length}</h3>
-                                    <span className="text-xs sm:text-base font-medium text-slate-500">回</span>
-                                </div>
-
-                                <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col gap-3">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs font-semibold text-slate-400">前月比</span>
-                                        <div className={`flex items-center gap-1 text-xs font-bold px-2 py-1 rounded-lg ${diffCount >= 0 ? 'text-emerald-600 bg-emerald-50' : 'text-rose-600 bg-rose-50'}`}>
-                                            {diffCount >= 0 ? '+' : ''}{diffCount} 回
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs font-semibold text-slate-400">アサイン状況</span>
-                                        <span className="text-sm font-bold text-slate-700">順調</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </Link>
-                </div>
-            </section>
-
-            {/* アクティビティ & トレンド セクション */}
-            <section className="space-y-6">
-                <div className="flex items-center gap-3">
-                    <h2 className="text-lg font-bold text-slate-700">現場の動きと売上トレンド</h2>
-                    <div className="h-px flex-1 bg-slate-100"></div>
-                </div>
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
-                    <div className="lg:col-span-2 order-2 lg:order-1">
-                        <div className="min-h-[450px] md:h-[560px] bg-white rounded-3xl p-5 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-200 ring-1 ring-slate-200/50">
-                            {/* @ts-ignore */}
-                            <AdminActivityWidget schedules={formattedSchedules} reports={recentReports || []} />
-                        </div>
-                    </div>
-                    <div className="lg:col-span-1 order-1 lg:order-2">
-                        <div className="h-full bg-white rounded-3xl p-5 md:p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-200 ring-1 ring-slate-200/50 flex flex-col">
-                            <div className="mb-6">
-                                <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
-                                    <div className="w-2 h-6 bg-blue-600 rounded-full" />
-                                    売上推移
-                                </h3>
-                                <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest">売上統計</p>
-                            </div>
-                            <div className="flex-1 min-h-[300px]">
-                                <RevenueChart data={yearlyRevenueData} />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            {/* 詳細分析セクション */}
-            <section className="space-y-6">
-                <div className="flex items-center gap-3">
-                    <h2 className="text-lg font-bold text-slate-700">パフォーマンス分析</h2>
-                    <div className="h-px flex-1 bg-slate-100"></div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
-                    <div className="bg-white rounded-3xl overflow-hidden shadow-[0_4px_25px_rgba(0,0,0,0.03)] border border-slate-200/60 ring-1 ring-slate-100">
-                        <CoachRankingTable data={coachRanking} limit={5} title="コーチ別売上ランキング (TOP5)" />
-                    </div>
-                    <div className="bg-white rounded-3xl overflow-hidden shadow-[0_4px_25px_rgba(0,0,0,0.03)] border border-slate-200/60 ring-1 ring-slate-100">
-                        <CustomerRankingTable data={topCustomers} limit={5} title="優良顧客ランキング (TOP5)" />
-                    </div>
-                </div>
-            </section>
-
-            {/* Control Center Section */}
-            <div className="pt-12 border-t border-slate-200">
-                <div className="flex items-center gap-3 mb-8">
-                    <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center">
-                        <Settings className="h-5 w-5 text-white" />
-                    </div>
-                    <div>
-                        <h3 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">コントロールセンター</h3>
-                        <p className="text-sm text-slate-500">システムの重要設定とリソース管理</p>
-                    </div>
-                </div>
-
-                <div className="grid gap-4 md:gap-6 grid-cols-2 md:grid-cols-4">
-                    {[
-                        { href: "/admin/masters", title: "マスタ管理", desc: "レッスンの種類・単価・会員区分", icon: Settings, color: "bg-blue-50 text-blue-600" },
-                        { href: "/customers", title: "顧客管理", desc: "生徒情報・カルテ・履歴", icon: Users, color: "bg-indigo-50 text-indigo-600" },
-                        { href: "/admin/coaches", title: "コーチ管理", desc: "担当生徒の確認・引継ぎ", icon: User, color: "bg-violet-50 text-violet-600" },
-                        { href: "/admin/settings", title: "システム設定", desc: "メールテンプレート・環境設定", icon: Settings, color: "bg-slate-50 text-slate-600" }
-                    ].map((item, i) => (
-                        <Link key={i} href={item.href}>
-                            <div className="group h-full bg-white rounded-2xl p-4 sm:p-6 border border-slate-200 shadow-sm transition-all duration-300 hover:shadow-xl hover:-translate-y-1 hover:border-blue-200 cursor-pointer flex flex-col">
-                                <div className={`w-10 h-10 md:w-12 md:h-12 ${item.color} rounded-xl flex items-center justify-center mb-4 md:mb-6 group-hover:scale-110 transition-transform duration-300 shrink-0`}>
-                                    <item.icon className="h-5 w-5 md:h-6 md:w-6" />
-                                </div>
-                                <h4 className="text-xs sm:text-sm md:text-base font-black text-slate-900 mb-1 md:mb-2 leading-tight">{item.title}</h4>
-                                <p className="text-[9px] sm:text-[10px] md:text-xs text-slate-400 font-medium leading-relaxed line-clamp-2">{item.desc}</p>
-                            </div>
-                        </Link>
-                    ))}
                 </div>
             </div>
         </div>

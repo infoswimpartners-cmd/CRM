@@ -5,6 +5,8 @@ import Image from 'next/image'
 import { LogOut } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 import { navigationConfig, type NavItem as NavItemType } from '@/config/navigation'
+// ナビゲーション集約リンク参照: /customers, /admin/masters (マスタ管理)
+
 
 interface DesktopSidebarProps {
     role: string

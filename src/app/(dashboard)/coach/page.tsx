@@ -238,59 +238,59 @@ async function CoachDashboardContent({ userId, profile }: { userId: string, prof
                     今月の実績
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {/* Reward Card */}
-                    <Card className="border-none shadow-md bg-gradient-to-br from-cyan-500 to-blue-600 text-white relative overflow-hidden group">
+                    {/* Reward Card (SchoolHub スカイ調グラデーション) */}
+                    <Card className="border-0 shadow-sm bg-gradient-to-br from-sky-500 via-sky-600 to-blue-600 text-white relative overflow-hidden group rounded-2xl">
                         <div className="absolute right-0 top-0 h-full w-24 bg-white/10 -skew-x-12 transform translate-x-12 transition-transform group-hover:translate-x-6" />
                         <CardContent className="p-6 relative z-10">
-                            <p className="text-blue-100 text-sm font-medium">報酬合計 (振込予定額)</p>
-                            <h3 className="text-2xl md:text-3xl font-bold mt-2">¥{netReward.toLocaleString()}</h3>
-                            <p className="text-xs text-blue-100 mt-4 opacity-80">確定までお待ちください (源泉徴収税引き後)</p>
+                            <p className="text-sky-100 text-sm font-medium">報酬合計 (振込予定額)</p>
+                            <h3 className="text-2xl md:text-3xl font-extrabold tracking-tight mt-2">¥{netReward.toLocaleString()}</h3>
+                            <p className="text-xs text-sky-100/90 mt-4 font-normal">確定までお待ちください (源泉徴収税引き後)</p>
                         </CardContent>
-                        <DollarSign className="absolute right-4 bottom-4 text-white/20 w-24 h-24 -mb-8 -mr-8" />
+                        <DollarSign className="absolute right-4 bottom-4 text-white/15 w-24 h-24 -mb-8 -mr-8" />
                     </Card>
 
-                    {/* Lessons Card */}
-                    <Card className="group hover:shadow-lg transition-all duration-300 border-slate-200 bg-white">
+                    {/* Lessons Card (SchoolHub ペリウィンクル/パープルアクセント) */}
+                    <Card className="group hover:shadow-md transition-all duration-200 border border-slate-200/80 bg-white rounded-2xl shadow-xs">
                         <CardContent className="p-6">
                             <div className="flex justify-between items-start">
                                 <div>
                                     <p className="text-sm font-medium text-slate-500">実施レッスン</p>
-                                    <h3 className="text-2xl md:text-3xl font-bold text-slate-900 mt-2">{thisMonthStats.lessonCount}</h3>
+                                    <h3 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight mt-2">{thisMonthStats.lessonCount}</h3>
                                 </div>
-                                <div className="p-2 bg-purple-50 rounded-lg text-purple-600 group-hover:bg-purple-100 transition-colors">
+                                <div className="p-2.5 bg-indigo-50 rounded-xl text-indigo-600 group-hover:bg-indigo-100 transition-colors shadow-2xs">
                                     <CalendarIcon className="w-5 h-5" />
                                 </div>
                             </div>
                             <div className="mt-4 flex items-center gap-2 text-sm">
-                                <span className={`${lessonDiff >= 0 ? 'text-green-600' : 'text-red-500'} font-medium`}>
+                                <span className={`${lessonDiff >= 0 ? 'text-emerald-600 font-bold' : 'text-rose-500 font-bold'} text-xs px-2 py-0.5 rounded-md ${lessonDiff >= 0 ? 'bg-emerald-50 border border-emerald-200/80' : 'bg-rose-50 border border-rose-200/80'}`}>
                                     {lessonDiff >= 0 ? '+' : ''}{lessonDiff}
                                 </span>
-                                <span className="text-slate-400">前月比</span>
+                                <span className="text-slate-400 text-xs">前月比</span>
                             </div>
                         </CardContent>
                     </Card>
 
-                    {/* Students Card */}
+                    {/* Students Card (SchoolHub スカイアクセント) */}
                     <Link href="/students" className="block group">
-                        <Card className="h-full hover:shadow-lg transition-all duration-300 border-slate-200 bg-white cursor-pointer relative overflow-hidden">
+                        <Card className="h-full hover:shadow-md transition-all duration-200 border border-slate-200/80 bg-white rounded-2xl shadow-xs cursor-pointer relative overflow-hidden">
                             <div className="absolute top-0 right-0 p-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <div className="bg-slate-100 rounded-full p-1">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                                <div className="bg-slate-100 rounded-full p-1 text-slate-400">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
                                 </div>
                             </div>
                             <CardContent className="p-6">
                                 <div className="flex justify-between items-start">
                                     <div>
                                         <p className="text-sm font-medium text-slate-500">生徒数</p>
-                                        <h3 className="text-2xl md:text-3xl font-bold text-slate-900 mt-2">{studentCount || 0}</h3>
+                                        <h3 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight mt-2">{studentCount || 0}</h3>
                                     </div>
-                                    <div className="p-2 bg-blue-50 rounded-lg text-blue-600 group-hover:bg-blue-100 transition-colors">
+                                    <div className="p-2.5 bg-sky-50 rounded-xl text-sky-600 group-hover:bg-sky-100 transition-colors shadow-2xs">
                                         <Users className="w-5 h-5" />
                                     </div>
                                 </div>
                                 <div className="mt-4 flex items-center gap-2 text-sm">
                                     {newStudentsCount > 0 && (
-                                        <span className="text-green-600 font-medium badge bg-green-50 px-2 py-0.5 rounded text-xs">
+                                        <span className="text-emerald-700 font-bold bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-md text-xs shadow-2xs">
                                             +{newStudentsCount} 新規
                                         </span>
                                     )}
@@ -300,6 +300,7 @@ async function CoachDashboardContent({ userId, profile }: { userId: string, prof
                         </Card>
                     </Link>
                 </div>
+
             </div>
         </div>
     )

@@ -4,7 +4,9 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Plus, Search, User, ChevronLeft } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Plus, Search, User, ChevronLeft, ArrowUpDown } from 'lucide-react'
 import Link from 'next/link'
 import {
     Table,
@@ -18,8 +20,7 @@ import { StudentStatusSelect } from '@/components/customers/StudentStatusSelect'
 import { StudentMembershipSelect } from '@/components/customers/StudentMembershipSelect'
 import { StudentMultiCoachSelect } from '@/components/customers/StudentMultiCoachSelect'
 import { ReceptionEmailButton } from '@/components/customers/ReceptionEmailButton'
-import { calculateAge } from '@/lib/utils'
-import { ArrowUpDown } from 'lucide-react'
+import { calculateAge, cn } from '@/lib/utils'
 import {
     Select,
     SelectContent,
@@ -28,7 +29,29 @@ import {
     SelectValue,
 } from "@/components/ui/select"
 
-// Dynamic status mapping is now handled in the component state
+// SchoolHubデザインシステムに基づくパステル調アバタートークン
+const AVATAR_PASTEL_COLORS = [
+    'bg-sky-100 text-sky-700 border-sky-200/80',
+    'bg-emerald-100 text-emerald-700 border-emerald-200/80',
+    'bg-amber-100 text-amber-700 border-amber-200/80',
+    'bg-indigo-100 text-indigo-700 border-indigo-200/80',
+    'bg-rose-100 text-rose-700 border-rose-200/80',
+    'bg-teal-100 text-teal-700 border-teal-200/80',
+]
+
+function getAvatarColorClass(name: string = ''): string {
+    let hash = 0
+    for (let i = 0; i < name.length; i++) {
+        hash = name.charCodeAt(i) + ((hash << 5) - hash)
+    }
+    const index = Math.abs(hash) % AVATAR_PASTEL_COLORS.length
+    return AVATAR_PASTEL_COLORS[index]
+}
+
+function getInitialLetter(name: string = ''): string {
+    const trimmed = name.trim()
+    return trimmed ? trimmed.charAt(0) : '生'
+}
 
 interface Student {
     id: string
@@ -230,63 +253,80 @@ export default function StudentListPage() {
                 </Select>
             </div>
 
-            <div className="border rounded-md bg-white">
+            {/* PC向けテーブルビュー (md以上で表示) */}
+            <div className="hidden md:block border border-slate-200/80 rounded-2xl bg-white shadow-xs overflow-x-auto">
                 <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('full_name')}>
-                                <div className="flex items-center gap-1">
-                                    氏名 <ArrowUpDown className="h-3 w-3" />
+                    <TableHeader className="bg-slate-50/75 border-b border-slate-200/70">
+                        <TableRow className="hover:bg-transparent">
+                            <TableHead className="cursor-pointer hover:text-slate-900 transition-colors py-3.5 pl-6 font-bold text-xs text-slate-500 uppercase tracking-wider" onClick={() => handleSort('full_name')}>
+                                <div className="flex items-center gap-1.5">
+                                    氏名・生徒情報 <ArrowUpDown className="h-3 w-3 text-slate-400" />
                                 </div>
                             </TableHead>
-                            <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('status')}>
-                                <div className="flex items-center gap-1">
-                                    ステータス <ArrowUpDown className="h-3 w-3" />
+                            <TableHead className="cursor-pointer hover:text-slate-900 transition-colors py-3.5 font-bold text-xs text-slate-500 uppercase tracking-wider" onClick={() => handleSort('status')}>
+                                <div className="flex items-center gap-1.5">
+                                    ステータス <ArrowUpDown className="h-3 w-3 text-slate-400" />
                                 </div>
                             </TableHead>
-                            <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('membership_name')}>
-                                <div className="flex items-center gap-1">
-                                    会員区分 <ArrowUpDown className="h-3 w-3" />
+                            <TableHead className="cursor-pointer hover:text-slate-900 transition-colors py-3.5 font-bold text-xs text-slate-500 uppercase tracking-wider" onClick={() => handleSort('membership_name')}>
+                                <div className="flex items-center gap-1.5">
+                                    会員区分・プラン <ArrowUpDown className="h-3 w-3 text-slate-400" />
                                 </div>
                             </TableHead>
-                            <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('coach_name')}>
-                                <div className="flex items-center gap-1">
-                                    担当コーチ <ArrowUpDown className="h-3 w-3" />
+                            <TableHead className="cursor-pointer hover:text-slate-900 transition-colors py-3.5 font-bold text-xs text-slate-500 uppercase tracking-wider" onClick={() => handleSort('coach_name')}>
+                                <div className="flex items-center gap-1.5">
+                                    担当コーチ <ArrowUpDown className="h-3 w-3 text-slate-400" />
                                 </div>
                             </TableHead>
-                            <TableHead className="cursor-pointer hover:bg-slate-50" onClick={() => handleSort('age')}>
-                                <div className="flex items-center gap-1">
-                                    年齢 <ArrowUpDown className="h-3 w-3" />
+                            <TableHead className="cursor-pointer hover:text-slate-900 transition-colors py-3.5 font-bold text-xs text-slate-500 uppercase tracking-wider" onClick={() => handleSort('age')}>
+                                <div className="flex items-center gap-1.5">
+                                    年齢 / 性別 <ArrowUpDown className="h-3 w-3 text-slate-400" />
                                 </div>
                             </TableHead>
-                            <TableHead>性別</TableHead>
-                            <TableHead className="text-right">アクション</TableHead>
+                            <TableHead className="py-3.5 pr-6 text-right font-bold text-xs text-slate-500 uppercase tracking-wider">アクション</TableHead>
                         </TableRow>
                     </TableHeader>
-                    <TableBody>
+                    <TableBody className="divide-y divide-slate-100">
                         {loading ? (
                             <TableRow>
-                                <TableCell colSpan={6} className="h-24 text-center">読み込み中...</TableCell>
+                                <TableCell colSpan={6} className="h-28 text-center text-slate-400 text-xs">読み込み中...</TableCell>
                             </TableRow>
                         ) : filteredStudents.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={6} className="h-24 text-center">生徒が見つかりません</TableCell>
+                                <TableCell colSpan={6} className="h-28 text-center text-slate-400 text-xs">生徒が見つかりません</TableCell>
                             </TableRow>
                         ) : (
                             filteredStudents.map((student) => (
-                                <TableRow key={student.id}>
-                                    <TableCell className="font-medium">
-                                        <div className="flex flex-col">
-                                            <div className="text-xs text-gray-500 mb-1">{student.student_number}</div>
-                                            <div className="flex items-center gap-2">
-                                                <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
-                                                    <User className="h-4 w-4" />
+                                <TableRow key={student.id} className="hover:bg-slate-50/60 transition-colors">
+                                    <TableCell className="font-medium py-3.5 pl-6">
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <Avatar className={cn("h-9 w-9 shrink-0 border shadow-2xs font-bold text-xs flex items-center justify-center rounded-full", getAvatarColorClass(student.full_name))}>
+                                                <AvatarFallback className="bg-transparent text-inherit font-bold text-sm">
+                                                    {getInitialLetter(student.full_name)}
+                                                </AvatarFallback>
+                                            </Avatar>
+                                            <div className="flex flex-col min-w-0">
+                                                <div className="flex items-center gap-1.5 mb-0.5">
+                                                    <Link href={`/customers/${student.id}`} className="font-bold text-slate-900 text-sm hover:text-sky-600 transition-colors truncate">
+                                                        {student.full_name}
+                                                    </Link>
+                                                    {student.student_number ? (
+                                                        <Badge variant="outline" className="text-[11px] font-mono font-bold text-sky-700 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-200/80 inline-flex items-center shadow-2xs">
+                                                            #{student.student_number}
+                                                        </Badge>
+                                                    ) : (
+                                                        <span className="text-[10px] text-slate-400 font-normal bg-slate-50 px-1.5 py-0.5 rounded border border-slate-200/60">
+                                                            未設定
+                                                        </span>
+                                                    )}
                                                 </div>
-                                                {student.full_name}
+                                                <div className="text-[11px] text-slate-400 truncate break-words">
+                                                    {student.full_name_kana || 'カナ未登録'}
+                                                </div>
                                             </div>
                                         </div>
                                     </TableCell>
-                                    <TableCell>
+                                    <TableCell className="py-3.5">
                                         <div onClick={(e) => e.stopPropagation()}>
                                             <StudentStatusSelect
                                                 key={`status-${student.id}`}
@@ -296,14 +336,21 @@ export default function StudentListPage() {
                                             />
                                         </div>
                                     </TableCell>
-                                    <TableCell>
-                                        <div className="px-3 py-1 text-xs font-medium rounded-full bg-blue-50 text-blue-700 inline-block">
-                                            {(Array.isArray(student.membership_types)
-                                                ? student.membership_types[0]?.name
-                                                : student.membership_types?.name) || '未設定'}
+                                    <TableCell className="py-3.5">
+                                        <div className="inline-flex items-center gap-1.5">
+                                            <Badge variant="outline" className="bg-slate-50 text-slate-700 border border-slate-200/80 font-medium text-xs px-2.5 py-1 rounded-lg shadow-2xs truncate max-w-[200px]">
+                                                {(Array.isArray(student.membership_types)
+                                                    ? student.membership_types[0]?.name
+                                                    : student.membership_types?.name) || 'コース未定'}
+                                            </Badge>
+                                            {(student as any).is_two_person_lesson && (
+                                                <span className="bg-violet-50 text-violet-700 border border-violet-200/80 text-[10px] font-bold px-1.5 py-0.5 rounded shadow-2xs">
+                                                    ペア
+                                                </span>
+                                            )}
                                         </div>
                                     </TableCell>
-                                    <TableCell>
+                                    <TableCell className="py-3.5">
                                         <div onClick={(e) => e.stopPropagation()}>
                                             <StudentMultiCoachSelect
                                                 key={`coach-${student.id}`}
@@ -314,15 +361,20 @@ export default function StudentListPage() {
                                             />
                                         </div>
                                     </TableCell>
-                                    <TableCell>
-                                        {student.birth_date ? (
-                                            <span>{calculateAge(new Date(student.birth_date))}歳</span>
-                                        ) : (
-                                            <span className="text-gray-400">-</span>
-                                        )}
+                                    <TableCell className="py-3.5 text-xs text-slate-600">
+                                        <div className="flex items-center gap-2">
+                                            {student.birth_date ? (
+                                                <span className="font-semibold text-slate-700 bg-slate-100/80 px-2 py-0.5 rounded-md text-xs border border-slate-200/60">
+                                                    {calculateAge(new Date(student.birth_date))}歳
+                                                </span>
+                                            ) : (
+                                                <span className="text-gray-400">-</span>
+                                            )}
+                                            <span className="text-slate-300">/</span>
+                                            <span className="text-slate-600 font-medium">{student.gender || '-'}</span>
+                                        </div>
                                     </TableCell>
-                                    <TableCell>{student.gender || '-'}</TableCell>
-                                    <TableCell className="text-right">
+                                    <TableCell className="py-3.5 pr-6 text-right">
                                         <div className="flex justify-end gap-2 items-center">
                                             <ReceptionEmailButton
                                                 studentId={student.id}
@@ -330,7 +382,7 @@ export default function StudentListPage() {
                                                 status={student.status}
                                                 email={student.contact_email}
                                             />
-                                            <Button variant="ghost" size="sm" asChild>
+                                            <Button variant="ghost" size="sm" asChild className="hover:bg-sky-50 hover:text-sky-700 font-semibold text-xs rounded-lg transition-colors border border-slate-200/70 shadow-2xs">
                                                 <Link href={`/customers/${student.id}`}>詳細</Link>
                                             </Button>
                                         </div>
@@ -341,6 +393,120 @@ export default function StudentListPage() {
                     </TableBody>
                 </Table>
             </div>
+
+            {/* モバイル向けカードビュー (375pxスマホ幅対応, md未満で表示) */}
+            <div className="md:hidden space-y-3">
+                {loading ? (
+                    <div className="p-8 text-center text-slate-400 bg-white border border-slate-200/80 rounded-2xl shadow-xs text-xs">
+                        読み込み中...
+                    </div>
+                ) : filteredStudents.length === 0 ? (
+                    <div className="p-8 text-center text-slate-400 bg-white border border-slate-200/80 rounded-2xl shadow-xs text-xs">
+                        生徒が見つかりません
+                    </div>
+                ) : (
+                    filteredStudents.map((student) => (
+                        <div
+                            key={`mobile-${student.id}`}
+                            className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-xs space-y-3 min-w-0"
+                        >
+                            {/* 上段: アバター、氏名、カナ、会員番号、ステータス */}
+                            <div className="flex items-start justify-between gap-2 min-w-0">
+                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                    <Avatar className={cn("h-10 w-10 shrink-0 border shadow-2xs font-bold text-xs flex items-center justify-center rounded-full", getAvatarColorClass(student.full_name))}>
+                                        <AvatarFallback className="bg-transparent text-inherit font-bold text-sm">
+                                            {getInitialLetter(student.full_name)}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                            <Link
+                                                href={`/customers/${student.id}`}
+                                                className="font-bold text-slate-900 text-sm hover:text-sky-600 transition-colors truncate break-words"
+                                            >
+                                                {student.full_name}
+                                            </Link>
+                                            {student.student_number ? (
+                                                <Badge variant="outline" className="text-[10px] font-mono font-bold text-sky-700 bg-sky-50 px-1.5 py-0.2 rounded border border-sky-200/80 shadow-2xs">
+                                                    #{student.student_number}
+                                                </Badge>
+                                            ) : (
+                                                <span className="text-[9px] text-slate-400 bg-slate-50 px-1 py-0.2 rounded border border-slate-200/60">
+                                                    未設定
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="text-[10px] text-slate-400 truncate break-words mt-0.5">
+                                            {student.full_name_kana || 'カナ未登録'}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+                                    <StudentStatusSelect
+                                        key={`mobile-status-${student.id}`}
+                                        studentId={student.id}
+                                        initialStatus={student.status}
+                                        statuses={statuses}
+                                        compact
+                                    />
+                                </div>
+                            </div>
+
+                            {/* 中段: コースバッジ、年齢/性別、コーチ */}
+                            <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100 text-xs flex-wrap">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                    <Badge variant="outline" className="bg-slate-50 text-slate-700 border border-slate-200/80 font-medium text-[11px] px-2 py-0.5 rounded-md shadow-2xs truncate max-w-[140px]">
+                                        {(Array.isArray(student.membership_types)
+                                            ? student.membership_types[0]?.name
+                                            : student.membership_types?.name) || 'コース未定'}
+                                    </Badge>
+                                    {(student as any).is_two_person_lesson && (
+                                        <span className="bg-violet-50 text-violet-700 border border-violet-200/80 text-[9px] font-bold px-1.5 py-0.2 rounded">
+                                            ペア
+                                        </span>
+                                    )}
+                                    {student.birth_date && (
+                                        <span className="text-slate-600 font-medium bg-slate-100/80 px-1.5 py-0.5 rounded text-[11px] border border-slate-200/60">
+                                            {calculateAge(new Date(student.birth_date))}歳
+                                        </span>
+                                    )}
+                                    {student.gender && (
+                                        <span className="text-slate-400 text-[11px] font-normal">
+                                            ({student.gender})
+                                        </span>
+                                    )}
+                                </div>
+
+                                <div onClick={(e) => e.stopPropagation()} className="shrink-0">
+                                    <StudentMultiCoachSelect
+                                        key={`mobile-coach-${student.id}`}
+                                        studentId={student.id}
+                                        initialAssignedCoaches={student.student_coaches || []}
+                                        initialMainCoachId={student.coach_id}
+                                        coaches={coaches}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* 下段: アクションボタン */}
+                            <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+                                <ReceptionEmailButton
+                                    studentId={student.id}
+                                    studentName={student.full_name}
+                                    status={student.status}
+                                    email={student.contact_email}
+                                />
+                                <Button variant="ghost" size="sm" asChild className="w-full hover:bg-sky-50 hover:text-sky-700 font-semibold text-xs rounded-xl transition-colors border border-slate-200/80 shadow-2xs h-8">
+                                    <Link href={`/customers/${student.id}`}>
+                                        カルテ詳細を見る
+                                    </Link>
+                                </Button>
+                            </div>
+                        </div>
+                    ))
+                )}
+            </div>
+
         </div>
     )
 }

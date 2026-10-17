@@ -17,6 +17,15 @@ const badgeVariants = cva(
           "border-transparent bg-destructive text-white [a&]:hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60",
         outline:
           "text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
+        // SchoolHub パステルバリアント
+        sky:
+          "border-transparent bg-schoolhub-sky-light text-schoolhub-sky-text [a&]:hover:bg-schoolhub-sky-light/80",
+        periwinkle:
+          "border-transparent bg-schoolhub-periwinkle-light text-schoolhub-periwinkle-text [a&]:hover:bg-schoolhub-periwinkle-light/80",
+        gold:
+          "border-transparent bg-schoolhub-gold-light text-schoolhub-gold-text [a&]:hover:bg-schoolhub-gold-light/80",
+        mint:
+          "border-transparent bg-schoolhub-mint-light text-schoolhub-mint-text [a&]:hover:bg-schoolhub-mint-light/80",
       },
     },
     defaultVariants: {

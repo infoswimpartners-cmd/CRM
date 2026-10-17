@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { MoreHorizontal, Filter, Search, Loader2, Check } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import {
@@ -18,6 +19,50 @@ import {
 
 import { cn, calculateSchoolGrade } from '@/lib/utils'
 import { StudentDetailModal } from '@/components/students/StudentDetailModal'
+
+// SchoolHubデザインシステムに基づくパステル調アバタートークン
+const AVATAR_PASTEL_COLORS = [
+    'bg-sky-100 text-sky-700 border-sky-200/80',
+    'bg-emerald-100 text-emerald-700 border-emerald-200/80',
+    'bg-amber-100 text-amber-700 border-amber-200/80',
+    'bg-indigo-100 text-indigo-700 border-indigo-200/80',
+    'bg-rose-100 text-rose-700 border-rose-200/80',
+    'bg-teal-100 text-teal-700 border-teal-200/80',
+]
+
+function getAvatarColorClass(name: string = ''): string {
+    let hash = 0
+    for (let i = 0; i < name.length; i++) {
+        hash = name.charCodeAt(i) + ((hash << 5) - hash)
+    }
+    const index = Math.abs(hash) % AVATAR_PASTEL_COLORS.length
+    return AVATAR_PASTEL_COLORS[index]
+}
+
+function getInitialLetter(name: string = ''): string {
+    const trimmed = name.trim()
+    return trimmed ? trimmed.charAt(0) : '生'
+}
+
+function getSchoolHubStatusColor(statusId: string | null, fallbackColor?: string): string {
+    switch (statusId) {
+        case 'active':
+            return 'bg-emerald-50 text-emerald-700 border border-emerald-200/80'
+        case 'trial_pending':
+        case 'trial_billed':
+        case 'trial_confirmed':
+        case 'trial_done':
+            return 'bg-amber-50 text-amber-700 border border-amber-200/80'
+        case 'resting':
+            return 'bg-indigo-50 text-indigo-700 border border-indigo-200/80'
+        case 'withdrawn':
+            return 'bg-slate-100 text-slate-600 border border-slate-200'
+        case 'inquiry':
+            return 'bg-sky-50 text-sky-700 border border-sky-200/80'
+        default:
+            return fallbackColor || 'bg-slate-50 text-slate-600 border border-slate-200'
+    }
+}
 
 export default function StudentsPage() {
     const router = useRouter()
@@ -151,7 +196,7 @@ export default function StudentsPage() {
                                 size="sm" 
                                 className={cn(
                                     "h-7 bg-white border-slate-200 text-slate-600 hover:bg-slate-50 shadow-sm text-xs py-1 cursor-pointer",
-                                    selectedStatus !== 'all' && "bg-cyan-50 border-cyan-300 text-cyan-700 hover:bg-cyan-100/70"
+                                    selectedStatus !== 'all' && "bg-sky-50 border-sky-300 text-sky-700 hover:bg-sky-100/70"
                                 )}
                             >
                                 <Filter className="w-3.5 h-3.5 mr-1" />
@@ -166,7 +211,7 @@ export default function StudentsPage() {
                                 className="flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 hover:bg-slate-50 rounded cursor-pointer"
                             >
                                 <span>すべて</span>
-                                {selectedStatus === 'all' && <Check className="w-3.5 h-3.5 text-cyan-600" />}
+                                {selectedStatus === 'all' && <Check className="w-3.5 h-3.5 text-sky-600" />}
                             </DropdownMenuItem>
                             {Object.entries(statusLabels).map(([id, label]) => (
                                 <DropdownMenuItem
@@ -175,10 +220,11 @@ export default function StudentsPage() {
                                     className="flex items-center justify-between px-2.5 py-1.5 text-xs text-slate-700 hover:bg-slate-50 rounded cursor-pointer"
                                 >
                                     <span>{label}</span>
-                                    {selectedStatus === id && <Check className="w-3.5 h-3.5 text-cyan-600" />}
+                                    {selectedStatus === id && <Check className="w-3.5 h-3.5 text-sky-600" />}
                                 </DropdownMenuItem>
                             ))}
                         </DropdownMenuContent>
+
                     </DropdownMenu>
                 </div>
             </div>
@@ -225,11 +271,21 @@ export default function StudentsPage() {
                                         className="group hover:bg-slate-50/70 transition-colors cursor-pointer"
                                         onClick={() => handleRowClick(student)}
                                     >
-                                        <td className="px-4 py-1.5">
-                                            <div className="flex items-center gap-2">
+                                        <td className="px-4 py-2">
+                                            <div className="flex items-center gap-2.5">
+                                                <Avatar className={cn("h-8 w-8 shrink-0 border shadow-2xs font-bold text-xs flex items-center justify-center rounded-full", getAvatarColorClass(student.full_name))}>
+                                                    <AvatarFallback className="bg-transparent text-inherit font-bold text-xs">
+                                                        {getInitialLetter(student.full_name)}
+                                                    </AvatarFallback>
+                                                </Avatar>
                                                 <div>
-                                                    <div className="font-semibold text-slate-800">
-                                                        {student.full_name}
+                                                    <div className="font-semibold text-slate-800 flex items-center gap-1.5">
+                                                        <span>{student.full_name}</span>
+                                                        {student.student_number && (
+                                                            <span className="text-[10px] font-mono font-bold text-sky-700 bg-sky-50 px-1.5 py-0.2 rounded border border-sky-200/80">
+                                                                #{student.student_number}
+                                                            </span>
+                                                        )}
                                                     </div>
                                                     <div className="text-[10px] text-slate-400">
                                                         {student.full_name_kana || '***'}
@@ -237,18 +293,18 @@ export default function StudentsPage() {
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="px-4 py-1.5">
-                                            <Badge variant="secondary" className={cn("border-0 text-[10px] px-1.5 py-0 leading-none h-4.5 font-medium", statusColors[student.status] || 'bg-gray-100 text-gray-800')}>
+                                        <td className="px-4 py-2">
+                                            <Badge variant="secondary" className={cn("text-[10px] px-2 py-0.5 leading-none h-5 font-medium rounded-md shadow-2xs", getSchoolHubStatusColor(student.status, statusColors[student.status]))}>
                                                 {statusLabels[student.status] || student.status || '不明'}
                                             </Badge>
                                         </td>
-                                        <td className="px-4 py-1.5">
+                                        <td className="px-4 py-2">
                                             <Badge variant="outline" className="bg-white text-slate-500 border-slate-200/80 font-normal text-[10px] px-1.5 py-0 leading-none h-4.5">
                                                 {/* @ts-ignore */}
                                                 {student.membership_types?.name || student.membership_types?.[0]?.name || '-'}
                                             </Badge>
                                         </td>
-                                        <td className="px-4 py-1.5">
+                                        <td className="px-4 py-2">
                                             <div className="flex items-center gap-1">
                                                 <span className="px-1.5 py-0.5 rounded bg-slate-100 text-[10px] text-slate-500 border border-slate-200/60 leading-none">
                                                     {student.birth_date ? calculateSchoolGrade(new Date(student.birth_date)) : '-'}
@@ -258,10 +314,10 @@ export default function StudentsPage() {
                                                 </span>
                                             </div>
                                         </td>
-                                        <td className="px-4 py-1.5 text-slate-400 text-xs">
+                                        <td className="px-4 py-2 text-slate-400 text-xs">
                                             {student.updated_at ? new Date(student.updated_at).toLocaleDateString('ja-JP') : '-'}
                                         </td>
-                                        <td className="px-4 py-1.5 text-right" onClick={(e) => e.stopPropagation()}>
+                                        <td className="px-4 py-2 text-right" onClick={(e) => e.stopPropagation()}>
                                             <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-400 hover:text-slate-600 hover:bg-slate-100">
                                                 <MoreHorizontal className="h-3.5 w-3.5" />
                                             </Button>
@@ -292,21 +348,32 @@ export default function StudentsPage() {
                                     className="p-2 py-2 px-2.5 active:bg-slate-50 transition-colors"
                                     onClick={() => handleRowClick(student)}
                                 >
-                                    <div className="flex items-center justify-between mb-1.5">
-                                        <div className="flex items-center gap-2">
-                                            <div>
-                                                <div className="text-xs font-bold text-slate-800 leading-tight">
-                                                    {student.full_name}
+                                    <div className="flex items-center justify-between mb-1.5 gap-2">
+                                        <div className="flex items-center gap-2.5 min-w-0">
+                                            <Avatar className={cn("h-7 w-7 shrink-0 border shadow-2xs font-bold text-[10px] flex items-center justify-center rounded-full", getAvatarColorClass(student.full_name))}>
+                                                <AvatarFallback className="bg-transparent text-inherit font-bold text-[10px]">
+                                                    {getInitialLetter(student.full_name)}
+                                                </AvatarFallback>
+                                            </Avatar>
+                                            <div className="min-w-0">
+                                                <div className="text-xs font-bold text-slate-800 leading-tight flex items-center gap-1">
+                                                    <span className="truncate">{student.full_name}</span>
+                                                    {student.student_number && (
+                                                        <span className="text-[9px] font-mono font-bold text-sky-700 bg-sky-50 px-1 py-0.2 rounded border border-sky-200/80 shrink-0">
+                                                            #{student.student_number}
+                                                        </span>
+                                                    )}
                                                 </div>
-                                                <div className="text-[9px] text-slate-400 leading-none mt-0.5">
+                                                <div className="text-[9px] text-slate-400 leading-none mt-0.5 truncate">
                                                     {student.full_name_kana || '***'}
                                                 </div>
                                             </div>
                                         </div>
-                                        <Badge variant="secondary" className={cn("border-0 text-[9px] px-1 py-0 h-4 leading-none font-medium", statusColors[student.status] || 'bg-gray-100 text-gray-800')}>
+                                        <Badge variant="secondary" className={cn("text-[9px] px-1.5 py-0.5 h-4.5 leading-none font-medium rounded shadow-2xs shrink-0", getSchoolHubStatusColor(student.status, statusColors[student.status]))}>
                                             {statusLabels[student.status] || student.status || '不明'}
                                         </Badge>
                                     </div>
+
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-1">
                                             <span className="px-1.5 py-0.5 rounded bg-slate-100 text-[9px] text-slate-500 border border-slate-200/50 leading-none">
