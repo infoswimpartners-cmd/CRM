@@ -147,12 +147,32 @@ export function StudentDetailModal({ student, isOpen, onOpenChange }: StudentDet
                                 </div>
                             </div>
                             <div className="flex flex-col items-end gap-1 shrink-0 flex-wrap">
-                                <Badge variant="secondary" className={cn(
-                                    "border-0 px-1.5 py-0.5 text-[9px] md:text-[10px] font-semibold h-fit leading-none",
-                                    statusColors[student.status] || 'bg-gray-100 text-gray-800'
-                                )}>
-                                    {statusLabels[student.status] || student.status || '不明'}
-                                </Badge>
+                                <div className="flex items-center gap-1 flex-wrap justify-end">
+                                    <Badge variant="secondary" className={cn(
+                                        "border-0 px-1.5 py-0.5 text-[9px] md:text-[10px] font-semibold h-fit leading-none",
+                                        statusColors[student.status] || 'bg-gray-100 text-gray-800'
+                                    )}>
+                                        {statusLabels[student.status] || student.status || '不明'}
+                                    </Badge>
+                                    {(() => {
+                                        const isPkg = student.membership_types?.is_package || getMembershipName().includes('パッケージ');
+                                        if (isPkg) {
+                                            return (
+                                                <Badge variant="outline" className="text-[9px] md:text-[10px] font-bold text-indigo-700 bg-indigo-50 border-indigo-200 shadow-2xs h-fit leading-none py-0.5">
+                                                    パッケージ残: {student.current_tickets ?? 0}回
+                                                </Badge>
+                                            );
+                                        }
+                                        if (student.current_tickets > 0) {
+                                            return (
+                                                <Badge variant="outline" className="text-[9px] md:text-[10px] font-bold text-emerald-700 bg-emerald-50 border-emerald-200 shadow-2xs h-fit leading-none py-0.5">
+                                                    振替残: {student.current_tickets}回
+                                                </Badge>
+                                            );
+                                        }
+                                        return null;
+                                    })()}
+                                </div>
                                 <Badge variant="outline" className="text-[9px] md:text-[10px] font-medium text-slate-600 bg-white border-slate-200 shadow-sm h-fit leading-none py-0.5">
                                     {getMembershipName()}
                                 </Badge>
@@ -174,7 +194,7 @@ export function StudentDetailModal({ student, isOpen, onOpenChange }: StudentDet
                                 <TabsTrigger value="history" className="py-1 md:py-1.5 text-[11px] md:text-xs data-[state=active]:bg-white data-[state=active]:shadow-sm">
                                     <span className="flex items-center gap-1 md:gap-1.5">
                                         <span className="w-1 md:w-1.5 h-1 md:h-1.5 rounded-full bg-indigo-500"></span>
-                                        レッスン履歴
+                                        レッスン履歴 {lessons.length > 0 && `(${lessons.length}件)`}
                                     </span>
                                 </TabsTrigger>
                             </TabsList>

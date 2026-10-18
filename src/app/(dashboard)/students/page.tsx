@@ -133,7 +133,9 @@ export default function StudentsPage() {
                 .select(`
                     *,
                     membership_types:membership_type_id (
-                        name
+                        name,
+                        is_package,
+                        ticket_count
                     )
                 `)
                 .neq('status', 'withdrawn')

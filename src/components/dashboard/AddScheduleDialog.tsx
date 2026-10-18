@@ -118,6 +118,10 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
     const [currentCount, setCurrentCount] = useState<number>(0)
     const [rolloverCount, setRolloverCount] = useState<number>(0)
     const [currentTickets, setCurrentTickets] = useState<number>(0)
+    const [isPackage, setIsPackage] = useState(false)
+    const [packageTotalCount, setPackageTotalCount] = useState(0)
+    const [packageUsedCount, setPackageUsedCount] = useState(0)
+    const [packageRemainingCount, setPackageRemainingCount] = useState(0)
     const [isGoogleLinked, setIsGoogleLinked] = useState(false)
     const [checkingStatus, setCheckingStatus] = useState(false)
     const lastCheckedRef = useRef<{ studentId: string; date: string; attendanceType: string } | null>(null)
@@ -298,6 +302,10 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
                         setCurrentCount(res.count || 0)
                         setRolloverCount(res.rollover || 0)
                         setCurrentTickets(res.currentTickets || 0)
+                        setIsPackage(!!res.isPackage)
+                        setPackageTotalCount(res.packageTotalCount || 0)
+                        setPackageUsedCount(res.packageUsedCount || 0)
+                        setPackageRemainingCount(res.packageRemainingCount || 0)
                         setAvailableLessons(res.availableLessons || [])
 
                         const lessons = res.availableLessons || []
@@ -690,19 +698,28 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
                                                 return null;
                                             })()}
 
-                                            {/* Usage Count Display */}
-                                            {monthlyLimit !== null && monthlyLimit > 0 && (!membershipName || !membershipName.includes('単発')) && (
-                                                <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs whitespace-nowrap">
-                                                    利用状況: {currentCount} / {monthlyLimit} 回
-                                                    {rolloverCount > 0 && <span className="ml-1 text-[10px]">(繰越 {rolloverCount}回含)</span>}
+                                            {/* Package Usage Display */}
+                                            {isPackage ? (
+                                                <span className="bg-indigo-100 text-indigo-800 border border-indigo-200 px-2 py-0.5 rounded text-xs whitespace-nowrap font-bold flex items-center gap-1">
+                                                    パッケージ受講: {packageUsedCount} / {packageTotalCount} 回 (残り {packageRemainingCount}回)
                                                 </span>
-                                            )}
+                                            ) : (
+                                                <>
+                                                    {/* Usage Count Display */}
+                                                    {monthlyLimit !== null && monthlyLimit > 0 && (!membershipName || !membershipName.includes('単発')) && (
+                                                        <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs whitespace-nowrap">
+                                                            利用状況: {currentCount} / {monthlyLimit} 回
+                                                            {rolloverCount > 0 && <span className="ml-1 text-[10px]">(繰越 {rolloverCount}回含)</span>}
+                                                        </span>
+                                                    )}
 
-                                            {/* Ticket (Transfer) Display */}
-                                            {currentTickets > 0 && (
-                                                <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-xs whitespace-nowrap flex items-center gap-1">
-                                                    <Ticket className="w-3 h-3" /> 振替残: {currentTickets}枚
-                                                </span>
+                                                    {/* Ticket (Transfer) Display */}
+                                                    {currentTickets > 0 && (
+                                                        <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-xs whitespace-nowrap flex items-center gap-1">
+                                                            <Ticket className="w-3 h-3" /> 振替残: {currentTickets}枚
+                                                        </span>
+                                                    )}
+                                                </>
                                             )}
 
                                             {/* Message Logic */}
