@@ -938,7 +938,7 @@ export async function checkStudentLessonStatus(studentId: string, dateStr: strin
                 }
             }
 
-            // 体験レッスン（is_trial: true や 体験レッスン自動登録）を除外した全スケジュールを集計
+            // 1. 体験レッスン（is_trial: true や 体験レッスン自動登録）を除外した全スケジュールを集計
             const { data: allStudentSchedules } = await supabaseAdmin
                 .from('lesson_schedules')
                 .select(`
@@ -953,7 +953,37 @@ export async function checkStudentLessonStatus(studentId: string, dateStr: strin
                 return !isTrialMaster && !isTrialNote
             })
 
-            packageUsedCount = nonTrialSchedules.length
+            // 2. lessons テーブル（指導報告・実績）からも体験除外のレッスンを集計
+            const { data: allStudentLessons } = await supabaseAdmin
+                .from('lessons')
+                .select(`
+                    id, lesson_date, coach_comment, menu_description, lesson_master_id,
+                    lesson_masters ( is_trial )
+                `)
+                .eq('student_id', studentId)
+
+            const nonTrialLessons = (allStudentLessons || []).filter((l: any) => {
+                const isTrialMaster = l.lesson_masters?.is_trial === true
+                const isTrialContent = (l.coach_comment || '').includes('体験') || (l.menu_description || '').includes('体験')
+                return !isTrialMaster && !isTrialContent
+            })
+
+            // 日付単位で重複排除して正確な消化回数を算出
+            const uniqueLessonDates = new Set<string>()
+            nonTrialSchedules.forEach((s: any) => {
+                if (s.start_time) {
+                    const datePart = s.start_time.split('T')[0]
+                    uniqueLessonDates.add(datePart)
+                }
+            })
+            nonTrialLessons.forEach((l: any) => {
+                if (l.lesson_date) {
+                    const datePart = l.lesson_date.split('T')[0]
+                    uniqueLessonDates.add(datePart)
+                }
+            })
+
+            packageUsedCount = uniqueLessonDates.size
             packageRemainingCount = Math.max(0, packageTotalCount - packageUsedCount)
         }
 
