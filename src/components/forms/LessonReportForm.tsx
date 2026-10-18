@@ -7,7 +7,7 @@ import { useForm } from 'react-hook-form'
 import * as z from 'zod'
 import { format } from 'date-fns'
 import { ja } from 'date-fns/locale'
-import { CalendarIcon, Loader2 } from 'lucide-react'
+import { CalendarIcon, Loader2, Package, Ticket } from 'lucide-react'
 
 import { createClient } from '@/lib/supabase/client'
 import { submitLessonReport } from '@/actions/report'
@@ -146,6 +146,19 @@ export function LessonReportForm() {
     const [rewardSettings, setRewardSettings] = useState<RewardSettings>(DEFAULT_REWARD_SETTINGS)
     const [estimatedReward, setEstimatedReward] = useState<number>(0)
     const [pendingSchedules, setPendingSchedules] = useState<any[]>([])
+    const [usageStatus, setUsageStatus] = useState<{
+        isPackage?: boolean
+        packageTotalCount?: number
+        packageUsedCount?: number
+        packageRemainingCount?: number
+        membershipName?: string | null
+        limit?: number
+        baseLimit?: number
+        rollover?: number
+        count?: number
+        currentTickets?: number
+    } | null>(null)
+    const [loadingUsage, setLoadingUsage] = useState(false)
     const searchParams = useSearchParams()
     const scheduleIdFromUrl = searchParams.get('scheduleId')
     const isFillingFromScheduleRef = useRef(false)
@@ -485,6 +498,49 @@ export function LessonReportForm() {
         fetchAllowedLessons()
     }, [selectedStudentId, form, lessonMasters])
 
+    // 生徒の受講回数・残り回数を取得
+    const lessonDateValue = form.watch('lesson_date')
+    useEffect(() => {
+        if (!selectedStudentId) {
+            setUsageStatus(null)
+            return
+        }
+
+        const fetchUsage = async () => {
+            setLoadingUsage(true)
+            try {
+                const { checkStudentLessonStatus } = await import('@/actions/lesson_schedule')
+                const dateStr = lessonDateValue 
+                    ? format(lessonDateValue, 'yyyy-MM-dd')
+                    : format(new Date(), 'yyyy-MM-dd')
+                const attType = form.getValues('attendance_type') || 'both'
+                const res = await checkStudentLessonStatus(selectedStudentId, dateStr, attType)
+                if (res.success) {
+                    setUsageStatus({
+                        isPackage: res.isPackage,
+                        packageTotalCount: res.packageTotalCount,
+                        packageUsedCount: res.packageUsedCount,
+                        packageRemainingCount: res.packageRemainingCount,
+                        membershipName: res.membershipName,
+                        limit: res.limit,
+                        baseLimit: res.baseLimit,
+                        rollover: res.rollover,
+                        count: res.count,
+                        currentTickets: res.currentTickets
+                    })
+                } else {
+                    setUsageStatus(null)
+                }
+            } catch (err) {
+                console.error('Error fetching student usage status in LessonReportForm:', err)
+                setUsageStatus(null)
+            } finally {
+                setLoadingUsage(false)
+            }
+        }
+        fetchUsage()
+    }, [selectedStudentId, lessonDateValue])
+
     // Watch location to update facility fee flag
     const selectedLocation = form.watch('location')
     useEffect(() => {
@@ -667,6 +723,66 @@ export function LessonReportForm() {
                             <FormDescription>
                                 リストから検索するか、見つからない場合は手入力してください（手入力機能は未実装のため、現在は検索のみを推奨）
                             </FormDescription>
+
+                            {/* 受講状況カード（パッケージプランまたは通常会員） */}
+                            {selectedStudentId && (
+                                <div className="mt-2">
+                                    {loadingUsage ? (
+                                        <div className="flex items-center gap-2 p-2.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-500">
+                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                            <span>利用状況を取得中...</span>
+                                        </div>
+                                    ) : usageStatus?.isPackage ? (
+                                        <div className="p-3 bg-indigo-50/80 border border-indigo-200 rounded-lg space-y-1.5 shadow-2xs">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
+                                                    <Package className="w-4 h-4 text-indigo-600" />
+                                                    パッケージ受講状況
+                                                </span>
+                                                <Badge variant="outline" className="border-indigo-300 text-indigo-700 bg-white text-[10px] font-semibold">
+                                                    全 {usageStatus.packageTotalCount || 12} 回
+                                                </Badge>
+                                            </div>
+                                            <div className="flex items-center justify-between pt-1">
+                                                <div className="text-[11px] text-indigo-700 font-medium truncate max-w-[220px]">
+                                                    {usageStatus.membershipName || 'パッケージプラン'}
+                                                </div>
+                                                <div className="flex items-center gap-3">
+                                                    <div className="text-right">
+                                                        <span className="text-[10px] text-slate-500 block leading-none font-semibold">これまでの消化</span>
+                                                        <span className="text-sm font-bold text-slate-800">
+                                                            {usageStatus.packageUsedCount} <span className="text-[10px] text-slate-500">/ {usageStatus.packageTotalCount}回</span>
+                                                        </span>
+                                                    </div>
+                                                    <div className="text-right pl-3 border-l border-indigo-200">
+                                                        <span className="text-[10px] text-emerald-700 block leading-none font-bold">残りレッスン</span>
+                                                        <span className="text-base font-black text-emerald-700">
+                                                            {usageStatus.packageRemainingCount} <span className="text-[10px] font-bold">回</span>
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : usageStatus && !usageStatus.isPackage && usageStatus.limit && usageStatus.limit > 0 ? (
+                                        <div className="p-2.5 bg-blue-50/80 border border-blue-200 rounded-lg flex items-center justify-between text-xs">
+                                            <div className="space-y-0.5">
+                                                <div className="font-bold text-blue-900 text-xs">
+                                                    {usageStatus.membershipName}
+                                                </div>
+                                                <div className="text-[11px] text-blue-700">
+                                                    利用状況: {usageStatus.count} / {usageStatus.limit} 回
+                                                    {usageStatus.rollover && usageStatus.rollover > 0 ? ` (繰越 ${usageStatus.rollover}回含)` : ''}
+                                                </div>
+                                            </div>
+                                            {usageStatus.currentTickets && usageStatus.currentTickets > 0 ? (
+                                                <Badge variant="outline" className="text-emerald-700 bg-white border-emerald-200 text-[10px] font-bold shadow-2xs">
+                                                    <Ticket className="w-3 h-3 mr-1" /> 振替残: {usageStatus.currentTickets}回
+                                                </Badge>
+                                            ) : null}
+                                        </div>
+                                    ) : null}
+                                </div>
+                            )}
                             <FormMessage />
                         </FormItem>
                     )}
