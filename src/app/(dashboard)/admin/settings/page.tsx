@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Calendar, Bell, ArrowRight } from 'lucide-react'
+import { Calendar, Bell, ArrowRight, Database, Building2 } from 'lucide-react'
 import Link from 'next/link'
 import { CompanySettingsForm } from "@/components/admin/CompanySettingsForm"
 import { PaymentSlipTemplateForm } from "@/components/admin/PaymentSlipTemplateForm"
@@ -35,6 +35,55 @@ export default async function SettingsPage() {
                 <h1 className="text-3xl font-bold tracking-tight">システム設定</h1>
                 <p className="text-gray-500">アプリケーションの環境設定</p>
             </div>
+
+            <Card className="border-blue-200 bg-blue-50/20">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-slate-800">
+                        <Database className="h-5 w-5 text-blue-600" />
+                        マスタ設定（施設・レッスン種類・会員区分・報酬設定）
+                    </CardTitle>
+                    <CardDescription>
+                        プール施設情報、レッスン種別・料金、会員種別、顧客ステータス、コーチ報酬率を一元管理できます。
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="flex items-center justify-between p-4 bg-white border border-slate-200 rounded-lg shadow-xs hover:border-blue-300 transition-colors">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                                    <Building2 className="h-5 w-5" />
+                                </div>
+                                <div>
+                                    <div className="font-semibold text-slate-900 text-sm">施設管理マスタ</div>
+                                    <div className="text-xs text-slate-500">プール施設・利用料設定・所在地</div>
+                                </div>
+                            </div>
+                            <Button asChild size="sm" className="bg-blue-600 hover:bg-blue-700">
+                                <Link href="/admin/masters/facilities">
+                                    施設を開く <ArrowRight className="h-3.5 w-3.5 ml-1" />
+                                </Link>
+                            </Button>
+                        </div>
+
+                        <div className="flex items-center justify-between p-4 bg-white border border-slate-200 rounded-lg shadow-xs hover:border-blue-300 transition-colors">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-slate-100 text-slate-600 rounded-lg">
+                                    <Database className="h-5 w-5" />
+                                </div>
+                                <div>
+                                    <div className="font-semibold text-slate-900 text-sm">マスタ管理全体</div>
+                                    <div className="text-xs text-slate-500">レッスン種類・会員区分・ステータス・報酬</div>
+                                </div>
+                            </div>
+                            <Button asChild size="sm" variant="outline">
+                                <Link href="/admin/masters">
+                                    一覧へ <ArrowRight className="h-3.5 w-3.5 ml-1" />
+                                </Link>
+                            </Button>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
 
             <Card>
                 <CardHeader>

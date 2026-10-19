@@ -16,6 +16,7 @@ import {
     PlusCircle,
     Receipt,
     Sparkles,
+    Database,
     type LucideIcon,
 } from 'lucide-react'
 
@@ -153,6 +154,12 @@ export const navigationConfig: NavigationConfig = {
             },
         ],
         footerNav: [
+            {
+                title: 'マスタ管理',
+                href: '/admin/masters',
+                icon: Database,
+                description: '施設・レッスン種類・会員区分・報酬設定',
+            },
             {
                 title: 'システム設定',
                 href: '/admin/settings',
