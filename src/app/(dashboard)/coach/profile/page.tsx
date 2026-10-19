@@ -5,6 +5,8 @@ import { ChevronLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { CoachAvailabilitySettings } from '@/components/admin/CoachAvailabilitySettings'
+import { CoachLocationPreferences } from '@/components/coach/CoachLocationPreferences'
+import { getCoachLocationsAction } from '@/actions/coach-locations'
 
 export default async function CoachProfilePage() {
     const supabase = await createClient()
@@ -30,6 +32,10 @@ export default async function CoachProfilePage() {
         .eq('coach_id', user.id)
         .order('created_at', { ascending: true })
 
+    // 最寄駅・プール・過去レッスン実績の取得
+    const locationRes = await getCoachLocationsAction(user.id)
+    const locationData = locationRes.data
+
     return (
         <div className="space-y-6 max-w-2xl mx-auto">
             <div className="flex items-center gap-4">
@@ -54,6 +60,17 @@ export default async function CoachProfilePage() {
                 description="あなたのアカウント情報を編集します"
             />
 
+            {locationData && (
+                <CoachLocationPreferences
+                    coachId={profile.id}
+                    initialStations={locationData.stations}
+                    initialFacilityIds={locationData.facilityIds}
+                    initialCustomLocations={locationData.customLocations}
+                    historicalLocations={locationData.historicalLocations}
+                    availableFacilities={locationData.availableFacilities}
+                />
+            )}
+
             <CoachAvailabilitySettings
                 coachId={profile.id}
                 initialAvailabilities={availabilities || []}
@@ -62,3 +79,4 @@ export default async function CoachProfilePage() {
         </div>
     )
 }
+

@@ -7,11 +7,14 @@ import { markConversionForUser } from "@/lib/line-tracking-service";
 import { appendTrialBookingToSpreadsheet, appendTrialBookingToMasterSpreadsheet } from "@/lib/google-sheets";
 import { emailService } from "@/lib/email";
 import { lineService } from "@/lib/line";
+import { dispatchNewLeadToMatchingCoaches } from "@/lib/coach-matching";
 
 export async function POST(req: Request) {
   try {
     const payload = await req.json();
     const supabase = createAdminClient();
+
+    let savedLeadId: string | null = null;
 
     const referrer = (payload.referrerName || "").trim();
     const referrerNote = referrer ? `【ご紹介者様】${referrer} 様（お友達紹介キャンペーン対象: 特別価格3,500円）` : "";
@@ -50,6 +53,7 @@ export async function POST(req: Request) {
       if (leadError) {
         console.error('[Trial Booking] Failed to save lead to DB:', leadError);
       } else {
+        savedLeadId = newLead?.id || null;
         console.log('[Trial Booking] Lead successfully saved to DB:', newLead?.id);
       }
     } catch (dbErr) {
@@ -300,6 +304,16 @@ SWIM PARTNERS/スイムパートナーズ事務局`;
       }
     } catch (chatErr) {
       console.error('[Trial Booking] Failed to send Google Chat notification:', chatErr);
+    }
+
+    // 4.2. 対応可能コーチの自動選定 ＆ 各コーチ個別スペースへの自動送信（パターンA ＋ 2名以下全員送信）
+    if (savedLeadId) {
+      try {
+        const dispatchResult = await dispatchNewLeadToMatchingCoaches(savedLeadId);
+        console.log(`[Trial Booking] Coach matching dispatch result:`, dispatchResult);
+      } catch (dispatchErr) {
+        console.error('[Trial Booking] Failed to dispatch lead to matching coaches:', dispatchErr);
+      }
     }
 
     // 5. Make Webhook へ転送（既存連携を完全維持）

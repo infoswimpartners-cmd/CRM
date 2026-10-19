@@ -2826,3 +2826,40 @@ export async function getOrCreateTrialPaymentUrlAction(leadId: string): Promise<
     }
 }
 
+/**
+ * 案件に対応可能なコーチの選定結果をプレビューする Server Action
+ */
+export async function previewMatchingCoachesAction(leadId: string) {
+    try {
+        const { selectMatchingCoachesForLead } = await import('@/lib/coach-matching')
+        const supabaseAdmin = createAdminClient()
+        const { data: lead } = await supabaseAdmin
+            .from('leads')
+            .select('*')
+            .eq('id', leadId)
+            .single()
+
+        if (!lead) return { success: false, error: 'リードが見つかりません' }
+
+        const result = await selectMatchingCoachesForLead(lead, supabaseAdmin)
+        return { success: true, result }
+    } catch (error: any) {
+        return { success: false, error: error.message || 'コーチ選定プレビューに失敗しました' }
+    }
+}
+
+/**
+ * 案件に対応可能なコーチの個別スペースへ手動で一括自動送信する Server Action
+ */
+export async function dispatchLeadToMatchingCoachesAction(leadId: string) {
+    try {
+        const { dispatchNewLeadToMatchingCoaches } = await import('@/lib/coach-matching')
+        const result = await dispatchNewLeadToMatchingCoaches(leadId)
+        revalidatePath('/admin/leads')
+        return result
+    } catch (error: any) {
+        return { success: false, error: error.message || 'コーチ個別スペースへの自動送信に失敗しました' }
+    }
+}
+
+
