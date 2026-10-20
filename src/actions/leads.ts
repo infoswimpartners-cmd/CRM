@@ -1089,21 +1089,19 @@ Swim Partners`
                         .eq('key', 'lead_assigned_notification_template')
                         .maybeSingle()
 
-                    const defaultTemplate = `✅ *【体験レッスンアサイン確定】*
-案件のアサインが確定いたしました。
+                    // 元案件情報の引用ブロック（Google Chat引用構文: 先頭に > ）
+                    let secondStudentText = ''
+                    if (lead.second_student_name) {
+                        secondStudentText = ` / 2人目: ${lead.second_student_name} 様`
+                    }
+                    const quoteLines = [
+                        `> 📋 *【募集案件】*`,
+                        `> ・名前： ${lead.name || '未設定'} 様${secondStudentText}`,
+                        lead.area ? `> ・希望エリア： ${lead.area}` : null,
+                        lead.datetime1 ? `> ・希望日時： ${lead.datetime1}` : null,
+                    ].filter(Boolean).join('\n')
 
-*■ アサインコーチ*
-・名前： {{coach_name}}
-・確定体験日時： {{confirmed_datetime}}
-・確定体験場所： {{confirmed_location}}
-
-*■ 確定顧客*
-・名前： {{name}} 様{{second_student_info}}
-・体験レッスン料金： {{amount}}円
-
-*■ 体験レッスン決済URL*
-{{payment_link}}`
-
+                    const defaultTemplate = `*アサイン確定のお知らせ*`
                     const bodyTemplate = templateConfig?.value || defaultTemplate
 
                     let secondStudentNameInfo = ''
@@ -1111,7 +1109,7 @@ Swim Partners`
                         secondStudentNameInfo = `\n・2人目の名前： ${lead.second_student_name} 様`
                     }
 
-                    let gchatMessage = bodyTemplate
+                    let mainBody = bodyTemplate
                         .replace(/\{\{name\}\}/g, lead.name || '未設定')
                         .replace(/\{\{coach_name\}\}/g, profile.full_name || '未設定')
                         .replace(/\{\{confirmed_datetime\}\}/g, confirmedDate || '未設定')
@@ -1121,16 +1119,14 @@ Swim Partners`
                         .replace(/\{\{payment_link\}\}/g, paymentLink)
                         .replace(/\{\{payment_url\}\}/g, paymentLink)
 
-                    // テンプレートに payment_link が含まれていない場合の自動追記フォールバック
-                    if (paymentLink && !gchatMessage.includes(paymentLink)) {
-                        gchatMessage += `\n\n*■ 体験レッスン決済URL*\n${paymentLink}`
-                    }
+                    // 本文（*アサイン確定のお知らせ*）をトップにし、その下に元案件の引用を結合
+                    const gchatMessage = `${mainBody}\n\n${quoteLines}`
 
-                    // 紐づくすべての通知先スペース（スレッド）に送信
+                    // 紐づくすべての通知先スペース（メインチャット）に送信
                     for (const wh of webhooks) {
                         if (wh.webhook_url) {
                             try {
-                                await sendGoogleChatMessage(wh.webhook_url, gchatMessage, `lead_${leadId}`)
+                                await sendGoogleChatMessage(wh.webhook_url, gchatMessage)
                             } catch (singleErr) {
                                 console.error('Failed to send assign notification to space:', singleErr)
                             }
@@ -1162,10 +1158,6 @@ Swim Partners`
                                 .replace(/\{\{amount\}\}/g, amountStr)
                                 .replace(/\{\{payment_link\}\}/g, paymentLink)
                                 .replace(/\{\{payment_url\}\}/g, paymentLink)
-
-                            if (paymentLink && !additionalMessage.includes(paymentLink)) {
-                                additionalMessage += `\n\n*■ 体験レッスン決済URL*\n${paymentLink}`
-                            }
 
                             await sendGoogleChatMessage(assignedWebhookConfig.value, additionalMessage)
                         }
@@ -1573,21 +1565,19 @@ Swim Partners`
                         .eq('key', 'lead_assigned_notification_template')
                         .maybeSingle()
 
-                    const defaultTemplate = `✅ *【体験レッスンアサイン確定】*
-案件のアサインが確定いたしました。
+                    // 元案件情報の引用ブロック（Google Chat引用構文: 先頭に > ）
+                    let secondStudentText = ''
+                    if (lead.second_student_name) {
+                        secondStudentText = ` / 2人目: ${lead.second_student_name} 様`
+                    }
+                    const quoteLines = [
+                        `> 📋 *【募集案件】*`,
+                        `> ・名前： ${lead.name || '未設定'} 様${secondStudentText}`,
+                        lead.area ? `> ・希望エリア： ${lead.area}` : null,
+                        lead.datetime1 ? `> ・希望日時： ${lead.datetime1}` : null,
+                    ].filter(Boolean).join('\n')
 
-*■ アサインコーチ*
-・名前： {{coach_name}}
-・確定体験日時： {{confirmed_datetime}}
-・確定体験場所： {{confirmed_location}}
-
-*■ 確定顧客*
-・名前： {{name}} 様{{second_student_info}}
-・体験レッスン料金： {{amount}}円
-
-*■ 体験レッスン決済URL*
-{{payment_link}}`
-
+                    const defaultTemplate = `*アサイン確定のお知らせ*`
                     const bodyTemplate = templateConfig?.value || defaultTemplate
 
                     let secondStudentNameInfo = ''
@@ -1595,7 +1585,7 @@ Swim Partners`
                         secondStudentNameInfo = `\n・2人目の名前： ${lead.second_student_name} 様`
                     }
 
-                    let gchatMessage = bodyTemplate
+                    let mainBody = bodyTemplate
                         .replace(/\{\{name\}\}/g, lead.name || '未設定')
                         .replace(/\{\{coach_name\}\}/g, targetCoach.full_name || '未設定')
                         .replace(/\{\{confirmed_datetime\}\}/g, confirmedDate || '未設定')
@@ -1605,16 +1595,14 @@ Swim Partners`
                         .replace(/\{\{payment_link\}\}/g, paymentLink)
                         .replace(/\{\{payment_url\}\}/g, paymentLink)
 
-                    // テンプレートに payment_link が含まれていない場合の自動追記フォールバック
-                    if (paymentLink && !gchatMessage.includes(paymentLink)) {
-                        gchatMessage += `\n\n*■ 体験レッスン決済URL*\n${paymentLink}`
-                    }
+                    // 本文（*アサイン確定のお知らせ*）をトップにし、その下に元案件の引用を結合
+                    const gchatMessage = `${mainBody}\n\n${quoteLines}`
 
-                    // 紐づくすべての通知先スペース（スレッド）に送信
+                    // 紐づくすべての通知先スペース（メインチャット）に送信
                     for (const wh of webhooks) {
                         if (wh.webhook_url) {
                             try {
-                                await sendGoogleChatMessage(wh.webhook_url, gchatMessage, `lead_${leadId}`)
+                                await sendGoogleChatMessage(wh.webhook_url, gchatMessage)
                             } catch (singleErr) {
                                 console.error('Failed to send admin assign notification to space:', singleErr)
                             }
@@ -1644,10 +1632,6 @@ Swim Partners`
                                 .replace(/\{\{amount\}\}/g, amountStr)
                                 .replace(/\{\{payment_link\}\}/g, paymentLink)
                                 .replace(/\{\{payment_url\}\}/g, paymentLink)
-
-                            if (paymentLink && !additionalMessage.includes(paymentLink)) {
-                                additionalMessage += `\n\n*■ 体験レッスン決済URL*\n${paymentLink}`
-                            }
 
                             await sendGoogleChatMessage(assignedWebhookConfig.value, additionalMessage)
                         }
