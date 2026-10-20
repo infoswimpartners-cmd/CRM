@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { processLeaveManagement } from '@/actions/leave';
+import { processWithdrawalManagement } from '@/actions/withdrawal';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,13 +17,23 @@ export async function GET(request: NextRequest) {
   const targetStudentId = searchParams.get('student_id') || undefined;
 
   try {
-    const result = await processLeaveManagement({
-      dryRun,
-      targetDate,
-      targetStudentId,
-    });
+    const [leaveResult, withdrawalResult] = await Promise.all([
+      processLeaveManagement({
+        dryRun,
+        targetDate,
+        targetStudentId,
+      }),
+      processWithdrawalManagement({
+        dryRun,
+        targetDate,
+        targetStudentId,
+      }),
+    ]);
 
-    return NextResponse.json(result, { status: result.success ? 200 : 500 });
+    return NextResponse.json({
+      leave: leaveResult,
+      withdrawal: withdrawalResult,
+    }, { status: (leaveResult.success && withdrawalResult.success) ? 200 : 500 });
   } catch (error: any) {
     console.error('[Cron:LeaveManagement] Error:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

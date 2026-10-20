@@ -27,7 +27,7 @@ import {
     TEST_TARO_STUDENT_NAME,
     TEST_TARO_STUDENT_ID,
 } from '@/lib/line-marketing-service';
-import { getAllUserTagsMap } from '@/lib/line-tracking-service';
+import { getAllUserTagsMap, getAllUserTags } from '@/lib/line-tracking-service';
 import { getStepLeadState, saveStepLeadState, StepLeadState } from '@/lib/line-step-reminders';
 
 const THREAD_INDEX_CONFIG_KEY = 'line_chat_threads_index_v1';
@@ -244,6 +244,35 @@ export async function recordLineChatMessage(params: {
 // 3. 1対1チャット対象ユーザー（スレッド一覧）の取得
 // ==============================================================================
 
+function resolveLatestMessageInfo(
+    idxEntry?: ChatThreadIndexEntry,
+    fbLatest?: {
+        text: string;
+        at: string;
+        direction: 'inbound' | 'outbound';
+    }
+): {
+    lastMessageText: string | null;
+    lastMessageAt: string | null;
+    lastMessageDirection: 'inbound' | 'outbound' | null;
+} {
+    let lastMessageText = idxEntry?.lastMessageText || null;
+    let lastMessageAt = idxEntry?.lastMessageAt || null;
+    let lastMessageDirection = idxEntry?.lastMessageDirection || null;
+
+    if (fbLatest && (!lastMessageText || !lastMessageAt || new Date(fbLatest.at) > new Date(lastMessageAt))) {
+        lastMessageText = fbLatest.text;
+        lastMessageAt = fbLatest.at;
+        lastMessageDirection = fbLatest.direction;
+    }
+
+    return {
+        lastMessageText,
+        lastMessageAt,
+        lastMessageDirection,
+    };
+}
+
 export async function getLineChatThreads(options: {
     searchQuery?: string;
     filterMode?: 'all' | 'unread' | 'needs_reply' | 'leads' | 'students';
@@ -260,9 +289,11 @@ export async function getLineChatThreads(options: {
     const [
         marketingStudents,
         { data: rawStudents },
+        { data: rawLeads },
         { data: stepConfigs },
         { data: statusMasters },
         userTagsMap,
+        allUserTagRecords,
         threadIndexMap,
         { data: recentDeliveryLogs },
         { data: fallbackDeliveryCfg },
@@ -274,6 +305,10 @@ export async function getLineChatThreads(options: {
             .select('id, student_number, full_name, full_name_kana, status, line_user_id, notes, created_at')
             .not('line_user_id', 'is', null),
         supabase
+            .from('leads')
+            .select('id, name, name_kana, line_user_id, status, area, lesson_location, confirmed_location, notes, created_at')
+            .not('line_user_id', 'is', null),
+        supabase
             .from('app_configs')
             .select('key, value, updated_at')
             .like('key', 'line_step:%'),
@@ -281,13 +316,15 @@ export async function getLineChatThreads(options: {
             .from('student_statuses')
             .select('id, name'),
         getAllUserTagsMap(),
+        getAllUserTags(),
         getThreadIndexMap(),
         supabase
             .from('line_delivery_logs')
             .select('line_user_id, rendered_message, message_body, sent_at, created_at, status')
             .in('status', ['success', 'sent'])
             .order('sent_at', { ascending: false })
-            .limit(300),
+            .limit(300)
+            .then(r => r, () => ({ data: null })),
         supabase
             .from('app_configs')
             .select('value')
@@ -295,9 +332,10 @@ export async function getLineChatThreads(options: {
             .maybeSingle(),
         supabase
             .from('line_monitoring_logs')
-            .select('line_user_id, line_display_name, message_text, direction, status, detected_at')
+            .select('line_user_id, line_display_name, message_text, direction, status, detected_at, coach_id, coach:profiles!coach_id(id, full_name, base_area)')
             .order('detected_at', { ascending: false })
-            .limit(200),
+            .limit(200)
+            .then(r => r, () => ({ data: null })),
     ]);
 
     const statusLabelMap = new Map<string, string>(Object.entries(STATUS_DISPLAY_LABELS));
@@ -312,6 +350,26 @@ export async function getLineChatThreads(options: {
     for (const s of rawStudents || []) {
         if (s.line_user_id && s.line_user_id.trim()) {
             rawStudentByLineId.set(s.line_user_id.trim(), s);
+        }
+    }
+
+    // リード詳細マップ (line_user_id -> raw lead)
+    const rawLeadByLineId = new Map<string, any>();
+    for (const l of rawLeads || []) {
+        const lid = l.line_user_id?.trim();
+        if (lid && /^U[0-9a-f]{32}$/i.test(lid)) {
+            if (!rawLeadByLineId.has(lid)) {
+                rawLeadByLineId.set(lid, l);
+            }
+        }
+    }
+
+    // タグレコード表示名マップ (line_user_id -> display_name)
+    const tagDisplayNameByLineId = new Map<string, string>();
+    for (const tr of allUserTagRecords || []) {
+        const lid = tr.line_user_id?.trim();
+        if (lid && /^U[0-9a-f]{32}$/i.test(lid) && tr.display_name && !tagDisplayNameByLineId.has(lid)) {
+            tagDisplayNameByLineId.set(lid, tr.display_name);
         }
     }
 
@@ -333,6 +391,9 @@ export async function getLineChatThreads(options: {
         direction: 'inbound' | 'outbound';
         isUnreadMonitoring?: boolean;
         displayName?: string | null;
+        coachId?: string | null;
+        coachName?: string | null;
+        coachBaseArea?: string | null;
     }>();
 
     // A. 配信ログ (outbound)
@@ -359,6 +420,10 @@ export async function getLineChatThreads(options: {
                 text,
                 at,
                 direction: 'outbound',
+                displayName: existing?.displayName || log.student_name || null,
+                coachId: existing?.coachId || null,
+                coachName: existing?.coachName || null,
+                coachBaseArea: existing?.coachBaseArea || null,
             });
         }
     }
@@ -373,6 +438,7 @@ export async function getLineChatThreads(options: {
         const lines = rawText.split('\n').filter(Boolean);
         const lastLine = (lines[lines.length - 1] || rawText).replace(/^\((顧客|コーチ)\):\s*/, '');
         const dir: 'inbound' | 'outbound' = mlog.direction === 'coach_to_customer' ? 'outbound' : 'inbound';
+        const coachObj = Array.isArray((mlog as any).coach) ? (mlog as any).coach[0] : (mlog as any).coach;
 
         const existing = fallbackLatestMsgMap.get(lid);
         if (!existing || new Date(at) > new Date(existing.at)) {
@@ -381,8 +447,15 @@ export async function getLineChatThreads(options: {
                 at,
                 direction: dir,
                 isUnreadMonitoring: mlog.status === 'unread' && dir === 'inbound',
-                displayName: mlog.line_display_name || null,
+                displayName: mlog.line_display_name || existing?.displayName || null,
+                coachId: mlog.coach_id || existing?.coachId || null,
+                coachName: coachObj?.full_name || existing?.coachName || null,
+                coachBaseArea: coachObj?.base_area || existing?.coachBaseArea || null,
             });
+        } else if (mlog.coach_id && !existing.coachId) {
+            existing.coachId = mlog.coach_id;
+            existing.coachName = coachObj?.full_name || null;
+            existing.coachBaseArea = coachObj?.base_area || null;
         }
     }
 
@@ -399,16 +472,7 @@ export async function getLineChatThreads(options: {
         const idxEntry = threadIndexMap[lid];
         const fbLatest = fallbackLatestMsgMap.get(lid);
 
-        // 最新メッセージの決定（threadIndex と fallbackLatest の新しい方を採用）
-        let lastMessageText = idxEntry?.lastMessageText || null;
-        let lastMessageAt = idxEntry?.lastMessageAt || null;
-        let lastMessageDirection = idxEntry?.lastMessageDirection || null;
-
-        if (fbLatest && (!lastMessageAt || new Date(fbLatest.at) > new Date(lastMessageAt))) {
-            lastMessageText = fbLatest.text;
-            lastMessageAt = fbLatest.at;
-            lastMessageDirection = fbLatest.direction;
-        }
+        const { lastMessageText, lastMessageAt, lastMessageDirection } = resolveLatestMessageInfo(idxEntry, fbLatest);
 
         const effectiveStatus = idxEntry?.customStatus || ms.status || stepState?.status || 'friend_only';
         const unreadCount = idxEntry
@@ -428,14 +492,14 @@ export async function getLineChatThreads(options: {
             lineUserId: lid,
             studentId: ms.id,
             studentNumber: ms.studentNumber || null,
-            fullName: ms.fullName || stepState?.display_name || '名前未設定',
-            lineDisplayName: stepState?.display_name || idxEntry?.displayName || fbLatest?.displayName || null,
+            fullName: ms.fullName || idxEntry?.displayName || stepState?.display_name || '名前未設定',
+            lineDisplayName: stepState?.display_name || idxEntry?.displayName || fbLatest?.displayName || tagDisplayNameByLineId.get(lid) || null,
             fullNameKana: ms.fullNameKana || null,
             status: effectiveStatus,
             statusLabel: statusLabelMap.get(effectiveStatus) || STATUS_DISPLAY_LABELS[effectiveStatus] || effectiveStatus,
             area: ms.area || '東京都',
-            coachId: ms.coachId || null,
-            coachName: ms.coachName || null,
+            coachId: ms.coachId || fbLatest?.coachId || null,
+            coachName: ms.coachName || fbLatest?.coachName || null,
             planName: ms.planName || null,
             trialDate: ms.trialDate || null,
             tags,
@@ -456,18 +520,11 @@ export async function getLineChatThreads(options: {
         if (threadMap.has(lid)) continue;
 
         const rawStudent = rawStudentByLineId.get(lid);
+        const rawLead = rawLeadByLineId.get(lid);
         const idxEntry = threadIndexMap[lid];
         const fbLatest = fallbackLatestMsgMap.get(lid);
 
-        let lastMessageText = idxEntry?.lastMessageText || null;
-        let lastMessageAt = idxEntry?.lastMessageAt || null;
-        let lastMessageDirection = idxEntry?.lastMessageDirection || null;
-
-        if (fbLatest && (!lastMessageAt || new Date(fbLatest.at) > new Date(lastMessageAt))) {
-            lastMessageText = fbLatest.text;
-            lastMessageAt = fbLatest.at;
-            lastMessageDirection = fbLatest.direction;
-        }
+        const { lastMessageText, lastMessageAt, lastMessageDirection } = resolveLatestMessageInfo(idxEntry, fbLatest);
 
         const effectiveStatus = idxEntry?.customStatus || rawStudent?.status || stepState.status || 'friend_only';
         const unreadCount = idxEntry ? idxEntry.unreadCount : (fbLatest?.isUnreadMonitoring ? 1 : 0);
@@ -477,22 +534,24 @@ export async function getLineChatThreads(options: {
             ...(effectiveStatus === 'friend_only' ? ['friend_only'] : []),
         ]));
 
+        const leadArea = [rawLead?.area, rawLead?.lesson_location, rawLead?.confirmed_location].filter(Boolean).join(' ').trim();
+
         threadMap.set(lid, {
             lineUserId: lid,
             studentId: rawStudent?.id || null,
             studentNumber: rawStudent?.student_number || null,
-            fullName: rawStudent?.full_name || stepState.display_name || idxEntry?.displayName || '公式LINE友だち',
-            lineDisplayName: stepState.display_name || idxEntry?.displayName || fbLatest?.displayName || null,
-            fullNameKana: rawStudent?.full_name_kana || null,
+            fullName: idxEntry?.displayName || rawStudent?.full_name || rawLead?.name || stepState.display_name || tagDisplayNameByLineId.get(lid) || '公式LINE友だち',
+            lineDisplayName: stepState.display_name || idxEntry?.displayName || fbLatest?.displayName || tagDisplayNameByLineId.get(lid) || null,
+            fullNameKana: rawStudent?.full_name_kana || rawLead?.name_kana || null,
             status: effectiveStatus,
             statusLabel: statusLabelMap.get(effectiveStatus) || STATUS_DISPLAY_LABELS[effectiveStatus] || effectiveStatus,
-            area: '未設定',
-            coachId: null,
-            coachName: null,
+            area: leadArea || '未設定',
+            coachId: fbLatest?.coachId || null,
+            coachName: fbLatest?.coachName || null,
             planName: null,
             trialDate: null,
             tags,
-            notes: idxEntry?.customNotes ?? rawStudent?.notes ?? stepState.notes ?? null,
+            notes: idxEntry?.customNotes ?? rawStudent?.notes ?? stepState.notes ?? rawLead?.notes ?? null,
             lastMessageText,
             lastMessageAt: lastMessageAt || stepState.followed_at || null,
             lastMessageDirection,
@@ -504,10 +563,12 @@ export async function getLineChatThreads(options: {
         });
     }
 
-    // (3) threadIndexMap または fallbackLatestMsgMap にのみ存在する LINE User ID も補完
+    // (3) threadIndexMap、fallbackLatestMsgMap、leads、userTags に存在する LINE User ID も補完
     const remainingIds = new Set<string>([
         ...Object.keys(threadIndexMap),
         ...fallbackLatestMsgMap.keys(),
+        ...rawLeadByLineId.keys(),
+        ...Array.from(userTagsMap.keys()).filter(id => /^U[0-9a-f]{32}$/i.test(id.trim())),
     ]);
 
     for (const lid of remainingIds) {
@@ -515,31 +576,45 @@ export async function getLineChatThreads(options: {
         const idxEntry = threadIndexMap[lid];
         const fbLatest = fallbackLatestMsgMap.get(lid);
         const rawStudent = rawStudentByLineId.get(lid);
+        const rawLead = rawLeadByLineId.get(lid);
 
-        let lastMessageText = idxEntry?.lastMessageText || fbLatest?.text || null;
-        let lastMessageAt = idxEntry?.lastMessageAt || fbLatest?.at || null;
-        let lastMessageDirection = idxEntry?.lastMessageDirection || fbLatest?.direction || null;
+        const { lastMessageText, lastMessageAt, lastMessageDirection } = resolveLatestMessageInfo(idxEntry, fbLatest);
 
-        const effectiveStatus = idxEntry?.customStatus || rawStudent?.status || 'friend_only';
+        // コーチ監視ログ由来のユーザー（coachIdあり）は既存受講生（active）、leads由来は体験申込済（applied）、それ以外は友だち追加（friend_only）
+        const defaultStatus = rawStudent?.status
+            || (rawLead ? 'applied' : (fbLatest?.coachId ? 'active' : 'friend_only'));
+        const effectiveStatus = idxEntry?.customStatus || defaultStatus;
         const unreadCount = idxEntry ? idxEntry.unreadCount : (fbLatest?.isUnreadMonitoring ? 1 : 0);
         const needsReply = idxEntry ? idxEntry.needsReply : (unreadCount > 0);
+
+        const leadArea = [rawLead?.area, rawLead?.lesson_location, rawLead?.confirmed_location].filter(Boolean).join(' ').trim();
+        let resolvedArea = leadArea || '未設定';
+        if (resolvedArea === '未設定' && fbLatest?.coachBaseArea) {
+            if (fbLatest.coachBaseArea.includes('東京')) resolvedArea = '東京都';
+            else if (fbLatest.coachBaseArea.includes('神奈川') || fbLatest.coachBaseArea.includes('横浜') || fbLatest.coachBaseArea.includes('川崎')) resolvedArea = '神奈川県';
+            else if (fbLatest.coachBaseArea.includes('千葉')) resolvedArea = '千葉県';
+            else if (fbLatest.coachBaseArea.includes('埼玉')) resolvedArea = '埼玉県';
+            else resolvedArea = fbLatest.coachBaseArea;
+        }
+
+        const displayNameCandidate = idxEntry?.displayName || fbLatest?.displayName || tagDisplayNameByLineId.get(lid) || null;
 
         threadMap.set(lid, {
             lineUserId: lid,
             studentId: rawStudent?.id || null,
             studentNumber: rawStudent?.student_number || null,
-            fullName: rawStudent?.full_name || idxEntry?.displayName || fbLatest?.displayName || 'LINEユーザー',
-            lineDisplayName: idxEntry?.displayName || fbLatest?.displayName || null,
-            fullNameKana: rawStudent?.full_name_kana || null,
+            fullName: idxEntry?.displayName || rawStudent?.full_name || rawLead?.name || displayNameCandidate || 'LINEユーザー',
+            lineDisplayName: displayNameCandidate,
+            fullNameKana: rawStudent?.full_name_kana || rawLead?.name_kana || null,
             status: effectiveStatus,
             statusLabel: statusLabelMap.get(effectiveStatus) || STATUS_DISPLAY_LABELS[effectiveStatus] || effectiveStatus,
-            area: '未設定',
-            coachId: null,
-            coachName: null,
+            area: resolvedArea,
+            coachId: fbLatest?.coachId || null,
+            coachName: fbLatest?.coachName || null,
             planName: null,
             trialDate: null,
             tags: userTagsMap.get(lid) || [],
-            notes: idxEntry?.customNotes ?? rawStudent?.notes ?? null,
+            notes: idxEntry?.customNotes ?? rawStudent?.notes ?? rawLead?.notes ?? null,
             lastMessageText,
             lastMessageAt,
             lastMessageDirection,
@@ -547,7 +622,7 @@ export async function getLineChatThreads(options: {
             needsReply,
             isBlocked: false,
             stepStage: null,
-            followedAt: rawStudent?.created_at || lastMessageAt || null,
+            followedAt: rawStudent?.created_at || rawLead?.created_at || lastMessageAt || null,
         });
     }
 
@@ -555,6 +630,7 @@ export async function getLineChatThreads(options: {
     if (!threadMap.has(TEST_TARO_LINE_USER_ID)) {
         const idxEntry = threadIndexMap[TEST_TARO_LINE_USER_ID];
         const fbLatest = fallbackLatestMsgMap.get(TEST_TARO_LINE_USER_ID);
+        const { lastMessageText, lastMessageAt, lastMessageDirection } = resolveLatestMessageInfo(idxEntry, fbLatest);
         threadMap.set(TEST_TARO_LINE_USER_ID, {
             lineUserId: TEST_TARO_LINE_USER_ID,
             studentId: TEST_TARO_STUDENT_ID,
@@ -571,9 +647,9 @@ export async function getLineChatThreads(options: {
             trialDate: null,
             tags: userTagsMap.get(TEST_TARO_LINE_USER_ID) || ['trial_done'],
             notes: idxEntry?.customNotes || 'テスト送信専用アカウント（会員番号0035）',
-            lastMessageText: idxEntry?.lastMessageText || fbLatest?.text || null,
-            lastMessageAt: idxEntry?.lastMessageAt || fbLatest?.at || new Date().toISOString(),
-            lastMessageDirection: idxEntry?.lastMessageDirection || fbLatest?.direction || null,
+            lastMessageText,
+            lastMessageAt: lastMessageAt || new Date().toISOString(),
+            lastMessageDirection,
             unreadCount: idxEntry?.unreadCount || 0,
             needsReply: idxEntry?.needsReply || false,
             isBlocked: false,
@@ -902,14 +978,23 @@ export async function markLineChatRead(lineUserId: string): Promise<void> {
         }
     } catch {}
 
-    // 3. スレッドインデックスの未読数を 0 にリセット
+    // 3. スレッドインデックスの未読数を 0 にリセット（未登録エントリも作成して監視ログ由来の未読を確実に解除）
     try {
         const indexMap = await getThreadIndexMap();
-        if (indexMap[cleanId]) {
-            indexMap[cleanId].unreadCount = 0;
-            indexMap[cleanId].updatedAt = new Date().toISOString();
-            await saveThreadIndexMap(indexMap);
-        }
+        const prev = indexMap[cleanId];
+        indexMap[cleanId] = {
+            lineUserId: cleanId,
+            displayName: prev?.displayName || null,
+            lastMessageText: prev?.lastMessageText || null,
+            lastMessageAt: prev?.lastMessageAt || null,
+            lastMessageDirection: prev?.lastMessageDirection || null,
+            unreadCount: 0,
+            needsReply: prev?.needsReply ?? false,
+            customNotes: prev?.customNotes ?? null,
+            customStatus: prev?.customStatus ?? null,
+            updatedAt: new Date().toISOString(),
+        };
+        await saveThreadIndexMap(indexMap);
     } catch {}
 }
 
@@ -923,7 +1008,7 @@ export async function toggleLineChatNeedsReply(lineUserId: string, needsReply: b
         lineUserId: cleanId,
         displayName: prev?.displayName || null,
         lastMessageText: prev?.lastMessageText || null,
-        lastMessageAt: prev?.lastMessageAt || new Date().toISOString(),
+        lastMessageAt: prev?.lastMessageAt || null,
         lastMessageDirection: prev?.lastMessageDirection || null,
         unreadCount: needsReply ? (prev?.unreadCount || 0) : 0,
         needsReply,
@@ -1065,7 +1150,7 @@ export async function updateLineChatUserProfile(params: UpdateChatUserProfilePar
             lineUserId: cleanLineId,
             displayName: params.customDisplayName?.trim() || prev?.displayName || null,
             lastMessageText: prev?.lastMessageText || null,
-            lastMessageAt: prev?.lastMessageAt || new Date().toISOString(),
+            lastMessageAt: prev?.lastMessageAt || null,
             lastMessageDirection: prev?.lastMessageDirection || null,
             unreadCount: prev?.unreadCount || 0,
             needsReply: prev?.needsReply || false,

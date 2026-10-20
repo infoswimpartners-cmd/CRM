@@ -173,6 +173,7 @@ export function IndividualChatTab({
     const [confirmSendDialogOpen, setConfirmSendDialogOpen] = useState(false);
 
     // 右ペイン（顧客カルテ編集）状態
+    const [editingDisplayName, setEditingDisplayName] = useState<string>('');
     const [editingStatus, setEditingStatus] = useState<string>('friend_only');
     const [editingNotes, setEditingNotes] = useState<string>('');
     const [isSavingProfile, setIsSavingProfile] = useState(false);
@@ -189,6 +190,25 @@ export function IndividualChatTab({
         () => threads.find(t => t.lineUserId === selectedLineUserId) || null,
         [threads, selectedLineUserId]
     );
+
+    // 標準タグ＋付与済みカスタムタグを統合したフィルタ選択肢
+    const filterTagOptions = useMemo(() => {
+        const map = new Map<string, string>();
+        for (const st of STANDARD_TAG_OPTIONS) {
+            map.set(st.value, st.label);
+        }
+        for (const t of threads) {
+            for (const tag of t.tags || []) {
+                if (!map.has(tag)) {
+                    map.set(tag, TAG_DISPLAY_MAP[tag] || tag);
+                }
+            }
+        }
+        if (tagFilter && tagFilter !== 'all' && !map.has(tagFilter)) {
+            map.set(tagFilter, TAG_DISPLAY_MAP[tagFilter] || tagFilter);
+        }
+        return Array.from(map.entries()).map(([value, label]) => ({ value, label }));
+    }, [threads, tagFilter]);
 
     const isSelectedTestTaro = useMemo(() => {
         if (!selectedUser) return false;
@@ -279,10 +299,11 @@ export function IndividualChatTab({
 
     useEffect(() => {
         if (selectedUser) {
+            setEditingDisplayName(selectedUser.fullName || '');
             setEditingStatus(selectedUser.status || 'friend_only');
             setEditingNotes(selectedUser.notes || '');
         }
-    }, [selectedUser?.lineUserId, selectedUser?.status, selectedUser?.notes]);
+    }, [selectedUser?.lineUserId, selectedUser?.fullName, selectedUser?.status, selectedUser?.notes]);
 
     // チャット履歴更新時に最下部へスクロール
     useEffect(() => {
@@ -405,7 +426,7 @@ export function IndividualChatTab({
         }
     };
 
-    // 顧客カルテ（ステータス・メモ）保存
+    // 顧客カルテ（表示名・ステータス・メモ）保存
     const handleSaveProfile = async (stopStepDelivery?: boolean) => {
         if (!selectedUser) return;
         setIsSavingProfile(true);
@@ -413,6 +434,7 @@ export function IndividualChatTab({
             const res = await updateLineChatUserProfileAction({
                 lineUserId: selectedUser.lineUserId,
                 studentId: selectedUser.studentId,
+                customDisplayName: editingDisplayName.trim() || undefined,
                 status: editingStatus,
                 notes: editingNotes,
                 stopStepDelivery,
@@ -670,7 +692,7 @@ export function IndividualChatTab({
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="all" className="text-xs">全タグ</SelectItem>
-                                    {STANDARD_TAG_OPTIONS.map(tg => (
+                                    {filterTagOptions.map(tg => (
                                         <SelectItem key={tg.value} value={tg.value} className="text-xs">
                                             {tg.label}
                                         </SelectItem>
@@ -1290,6 +1312,18 @@ export function IndividualChatTab({
 
                                     <div className="space-y-1.5">
                                         <label className="text-[10px] font-medium text-slate-500 block">
+                                            管理用表示名（お名前）
+                                        </label>
+                                        <Input
+                                            value={editingDisplayName}
+                                            onChange={e => setEditingDisplayName(e.target.value)}
+                                            placeholder="表示名・生徒名を入力..."
+                                            className="h-8 text-xs"
+                                        />
+                                    </div>
+
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-medium text-slate-500 block">
                                             顧客ステータス
                                         </label>
                                         <div className="flex items-center gap-1.5">
@@ -1309,7 +1343,11 @@ export function IndividualChatTab({
                                                 type="button"
                                                 size="sm"
                                                 onClick={() => handleSaveProfile()}
-                                                disabled={isSavingProfile || editingStatus === selectedUser.status}
+                                                disabled={
+                                                    isSavingProfile ||
+                                                    (editingStatus === selectedUser.status &&
+                                                        editingDisplayName.trim() === (selectedUser.fullName || '').trim())
+                                                }
                                                 className="h-8 text-xs px-2.5 bg-blue-600 hover:bg-blue-700 text-white"
                                             >
                                                 更新

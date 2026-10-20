@@ -9,6 +9,7 @@ import { StudentWithdrawalSetting, SaveStudentWithdrawalParams } from '@/types/w
 import { buildWithdrawalResumeReminderMessage } from '@/lib/withdrawal';
 import { emailService } from '@/lib/email';
 import { lineService } from '@/lib/line';
+import { getJstDateString } from '@/lib/leave';
 
 const REASON_LABELS: Record<string, string> = {
   'time-finance': 'スケジュール・金銭的に継続が難しい',
@@ -350,95 +351,156 @@ export async function saveStudentWithdrawalSetting(
       return { success: false, error: '生徒情報が見つかりませんでした。' };
     }
 
+    const todayJst = getJstDateString();
+    const isFutureWithdrawal = withdrawalDate > todayJst;
     const now = new Date();
     const nowJstStr = now.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' });
     const yearMonth = withdrawalDate.slice(0, 7);
 
-    // 2. Stripeサブスクリプションの課金停止
-    if (cancelStripe && student.stripe_subscription_id) {
-      try {
-        await stripe.subscriptions.cancel(student.stripe_subscription_id);
-        console.log(`[WithdrawalAction] Cancelled Stripe subscription: ${student.stripe_subscription_id}`);
-      } catch (stripeErr: any) {
-        console.error('[WithdrawalAction] Stripe cancel error:', stripeErr?.message);
+    if (isFutureWithdrawal) {
+      // --- 未来の退会予約（例: 11月末退会など） ---
+      // 1. Stripe サブスクリプションは即時解約せず、退会日末日（JST 23:59:59）での解約予定 (cancel_at) を登録
+      // これにより、退会日前の月謝決済（例: 11月5日）は通常通り実行され、退会日に自動解約されます
+      if (cancelStripe && student.stripe_subscription_id) {
+        try {
+          const cancelAtTimestamp = Math.floor(new Date(`${withdrawalDate}T23:59:59+09:00`).getTime() / 1000);
+          await stripe.subscriptions.update(student.stripe_subscription_id, {
+            cancel_at: cancelAtTimestamp,
+          });
+          console.log(`[WithdrawalAction] Scheduled Stripe subscription cancel_at for ${student.stripe_subscription_id} at ${withdrawalDate} 23:59:59`);
+        } catch (stripeErr: any) {
+          console.error('[WithdrawalAction] Stripe schedule cancel error:', stripeErr?.message);
+        }
       }
-    }
 
-    // 3. メモ欄（notes）に退会設定情報を追記
-    const resumeText = resumeTargetMonth ? `・再開案内希望: ${resumeTargetMonth}頃` : '・再開案内希望: なし';
-    const withdrawalNote = 
-`【管理者による退会設定: ${nowJstStr}】
+      // 2. 生徒ステータスは active（有効）のまま維持し、メモのみ追記
+      const resumeText = resumeTargetMonth ? `・再開案内希望: ${resumeTargetMonth}頃` : '・再開案内希望: なし';
+      const withdrawalNote = 
+`【退会予約受付: ${nowJstStr}】
+・退会予定日: ${withdrawalDate}
+・退会理由: ${reason?.trim() || '（指定なし）'}
+${resumeText}
+※ 退会予定日までは会員ステータス（active）が維持され、月謝決済完了後の退会日に自動解約・退会となります。
+--------------------------------------------------`;
+      const updatedNotes = student.notes ? `${withdrawalNote}\n\n${student.notes}` : withdrawalNote;
+
+      const { error: updateErr } = await supabaseAdmin
+        .from('students')
+        .update({
+          notes: updatedNotes,
+        })
+        .eq('id', student.id);
+
+      if (updateErr) {
+        console.error('[WithdrawalAction] Failed to update student notes for withdrawal reservation:', updateErr);
+      }
+
+      // 3. app_configs に status: 'scheduled'（退会予約中）として保存
+      const existing = await getStudentWithdrawalSetting(studentId);
+      const setting: StudentWithdrawalSetting = {
+        student_id: studentId,
+        withdrawal_date: withdrawalDate,
+        withdrawal_year_month: yearMonth,
+        reason: reason?.trim() || undefined,
+        resume_target_month: resumeTargetMonth?.trim() || undefined,
+        resume_reminder_sent_at: existing?.resume_reminder_sent_at || null,
+        status: 'scheduled',
+        created_at: existing?.created_at || now.toISOString(),
+        updated_at: now.toISOString(),
+      };
+
+      await supabaseAdmin.from('app_configs').upsert({
+        key: `student_withdrawal:${studentId}`,
+        value: JSON.stringify(setting),
+        description: `生徒退会予約: ${student.full_name} 様 (退会予定日: ${withdrawalDate})`,
+        updated_at: now.toISOString(),
+      });
+
+      safeRevalidatePath(`/customers/${studentId}`);
+      safeRevalidatePath('/customers');
+      safeRevalidatePath('/customers/withdrawn');
+
+      return { success: true, setting };
+    } else {
+      // --- 即時退会（今日以前の退会日） ---
+      // 1. Stripe サブスクリプションを即時解約
+      if (cancelStripe && student.stripe_subscription_id) {
+        try {
+          await stripe.subscriptions.cancel(student.stripe_subscription_id);
+          console.log(`[WithdrawalAction] Cancelled Stripe subscription: ${student.stripe_subscription_id}`);
+        } catch (stripeErr: any) {
+          console.error('[WithdrawalAction] Stripe cancel error:', stripeErr?.message);
+        }
+      }
+
+      // 2. メモ追記 & ステータスを withdrawn に更新
+      const resumeText = resumeTargetMonth ? `・再開案内希望: ${resumeTargetMonth}頃` : '・再開案内希望: なし';
+      const withdrawalNote = 
+`【退会完了: ${nowJstStr}】
 ・退会日: ${withdrawalDate}
 ・退会理由: ${reason?.trim() || '（指定なし）'}
 ${resumeText}
 --------------------------------------------------`;
-    const updatedNotes = student.notes ? `${withdrawalNote}\n\n${student.notes}` : withdrawalNote;
+      const updatedNotes = student.notes ? `${withdrawalNote}\n\n${student.notes}` : withdrawalNote;
 
-    // 4. students テーブルのステータス更新
-    const { error: updateErr } = await supabaseAdmin
-      .from('students')
-      .update({
-        status: 'withdrawn',
-        notes: updatedNotes,
-        stripe_subscription_id: null,
-        membership_type_id: null,
-      })
-      .eq('id', student.id);
+      const { error: updateErr } = await supabaseAdmin
+        .from('students')
+        .update({
+          status: 'withdrawn',
+          notes: updatedNotes,
+          stripe_subscription_id: null,
+          membership_type_id: null,
+        })
+        .eq('id', student.id);
 
-    if (updateErr) {
-      console.error('[WithdrawalAction] Failed to update student status to withdrawn:', updateErr);
-      return { success: false, error: '生徒ステータスの更新に失敗しました。' };
-    }
-
-    // 5. LINE連携ユーザーの処理（リッチメニュー解除、ステップリマインド停止）
-    if (student.line_user_id) {
-      try {
-        const { unlinkRichMenuFromUser } = await import('@/lib/line-richmenu');
-        await unlinkRichMenuFromUser(student.line_user_id);
-      } catch (rmErr) {
-        console.error('[WithdrawalAction] Failed to unlink rich menu:', rmErr);
+      if (updateErr) {
+        console.error('[WithdrawalAction] Failed to update student status to withdrawn:', updateErr);
+        return { success: false, error: '生徒ステータスの更新に失敗しました。' };
       }
 
-      try {
-        await stopStepReminderForUser(student.line_user_id, 'withdrawn');
-      } catch (stepErr) {
-        console.error('[WithdrawalAction] Failed to stop step reminder:', stepErr);
+      // 3. LINE連携ユーザーの処理（リッチメニュー解除、ステップリマインド停止）
+      if (student.line_user_id) {
+        try {
+          const { unlinkRichMenuFromUser } = await import('@/lib/line-richmenu');
+          await unlinkRichMenuFromUser(student.line_user_id);
+        } catch (rmErr) {
+          console.error('[WithdrawalAction] Failed to unlink rich menu:', rmErr);
+        }
+
+        try {
+          await stopStepReminderForUser(student.line_user_id, 'withdrawn');
+        } catch (stepErr) {
+          console.error('[WithdrawalAction] Failed to stop step reminder:', stepErr);
+        }
       }
-    }
 
-    // 6. 退会設定の永続化 (app_configs)
-    const existing = await getStudentWithdrawalSetting(studentId);
-    const setting: StudentWithdrawalSetting = {
-      student_id: studentId,
-      withdrawal_date: withdrawalDate,
-      withdrawal_year_month: yearMonth,
-      reason: reason?.trim() || undefined,
-      resume_target_month: resumeTargetMonth?.trim() || undefined,
-      resume_reminder_sent_at: existing?.resume_reminder_sent_at || null,
-      status: 'active',
-      created_at: existing?.created_at || now.toISOString(),
-      updated_at: now.toISOString(),
-    };
+      // 4. 退会設定の永続化 (status: 'active' 退会完了)
+      const existing = await getStudentWithdrawalSetting(studentId);
+      const setting: StudentWithdrawalSetting = {
+        student_id: studentId,
+        withdrawal_date: withdrawalDate,
+        withdrawal_year_month: yearMonth,
+        reason: reason?.trim() || undefined,
+        resume_target_month: resumeTargetMonth?.trim() || undefined,
+        resume_reminder_sent_at: existing?.resume_reminder_sent_at || null,
+        status: 'active',
+        created_at: existing?.created_at || now.toISOString(),
+        updated_at: now.toISOString(),
+      };
 
-    const { error: configErr } = await supabaseAdmin
-      .from('app_configs')
-      .upsert({
+      await supabaseAdmin.from('app_configs').upsert({
         key: `student_withdrawal:${studentId}`,
         value: JSON.stringify(setting),
-        description: `生徒退会設定: ${student.full_name} 様 (退会日: ${withdrawalDate})`,
+        description: `生徒退会完了: ${student.full_name} 様 (退会日: ${withdrawalDate})`,
         updated_at: now.toISOString(),
       });
 
-    if (configErr) {
-      console.error('[WithdrawalAction] Failed to save withdrawal config:', configErr);
-      return { success: false, error: '退会設定の保存に失敗しました。' };
+      safeRevalidatePath(`/customers/${studentId}`);
+      safeRevalidatePath('/customers');
+      safeRevalidatePath('/customers/withdrawn');
+
+      return { success: true, setting };
     }
-
-    safeRevalidatePath(`/customers/${studentId}`);
-    safeRevalidatePath('/customers');
-    safeRevalidatePath('/customers/withdrawn');
-
-    return { success: true, setting };
   } catch (error: any) {
     console.error('Error in saveStudentWithdrawalSetting:', error);
     return { success: false, error: error.message || '退会設定の保存中にエラーが発生しました。' };
@@ -456,7 +518,7 @@ export async function cancelStudentWithdrawalSetting(
 
     const { data: student, error: studentError } = await supabaseAdmin
       .from('students')
-      .select('id, full_name, line_user_id, notes')
+      .select('id, full_name, line_user_id, stripe_subscription_id, notes')
       .eq('id', studentId)
       .single();
 
@@ -471,6 +533,18 @@ export async function cancelStudentWithdrawalSetting(
 ・退会設定を取り消し、ステータスを有効（active）に復帰しました。
 --------------------------------------------------`;
     const updatedNotes = student.notes ? `${cancelNote}\n\n${student.notes}` : cancelNote;
+
+    // もし Stripe サブスクリプションに cancel_at が設定されていた場合はクリアして復元
+    if (student.stripe_subscription_id) {
+      try {
+        await stripe.subscriptions.update(student.stripe_subscription_id, {
+          cancel_at: '',
+        });
+        console.log(`[cancelStudentWithdrawalSetting] Cleared cancel_at for Stripe subscription ${student.stripe_subscription_id}`);
+      } catch (stripeErr: any) {
+        console.error('[cancelStudentWithdrawalSetting] Failed to clear cancel_at:', stripeErr?.message);
+      }
+    }
 
     // ステータスを active に戻す
     const { error: updateErr } = await supabaseAdmin
@@ -517,6 +591,112 @@ export async function cancelStudentWithdrawalSetting(
     console.error('Error in cancelStudentWithdrawalSetting:', err);
     return { success: false, error: err.message || '退会取り消し中にエラーが発生しました。' };
   }
+}
+
+/**
+ * 退会予約の自動処理（日次Cron用）
+ * 退会日を迎えた scheduled 状態の生徒を検出し、Stripe解約・ステータス更新を実行
+ */
+export async function processWithdrawalManagement(options: {
+  dryRun?: boolean;
+  targetDate?: string; // YYYY-MM-DD
+  targetStudentId?: string;
+} = {}) {
+  const { dryRun = false, targetDate, targetStudentId } = options;
+  const supabaseAdmin = createAdminClient();
+  const todayJst = targetDate || getJstDateString();
+
+  console.log(`[WithdrawalManagement] Processing withdrawals for date: ${todayJst} (dryRun=${dryRun})`);
+
+  const { data: configs, error: configError } = await supabaseAdmin
+    .from('app_configs')
+    .select('key, value')
+    .ilike('key', 'student_withdrawal:%')
+    .limit(5000);
+
+  if (configError) {
+    console.error('[WithdrawalManagement] Error fetching withdrawal configs:', configError);
+    return { success: false, error: configError.message };
+  }
+
+  const results = {
+    date: todayJst,
+    processed: [] as any[],
+  };
+
+  for (const config of configs || []) {
+    let setting: StudentWithdrawalSetting;
+    try {
+      setting = JSON.parse(config.value);
+    } catch {
+      continue;
+    }
+
+    if (targetStudentId && setting.student_id !== targetStudentId) {
+      continue;
+    }
+
+    // 退会予約中（scheduled）かつ、今日が退会日以降の場合
+    if (setting.status === 'scheduled' && todayJst >= setting.withdrawal_date) {
+      if (!dryRun) {
+        const { data: student } = await supabaseAdmin
+          .from('students')
+          .select('id, full_name, stripe_subscription_id, line_user_id')
+          .eq('id', setting.student_id)
+          .single();
+
+        if (student) {
+          // Stripeサブスク解約（まだアクティブなら）
+          if (student.stripe_subscription_id) {
+            try {
+              await stripe.subscriptions.cancel(student.stripe_subscription_id);
+              console.log(`[WithdrawalManagement] Cancelled Stripe sub ${student.stripe_subscription_id} for ${student.full_name}`);
+            } catch (e: any) {
+              console.error(`[WithdrawalManagement] Stripe cancel error:`, e?.message);
+            }
+          }
+
+          // ステータスを withdrawn に更新
+          await supabaseAdmin
+            .from('students')
+            .update({
+              status: 'withdrawn',
+              stripe_subscription_id: null,
+              membership_type_id: null,
+            })
+            .eq('id', student.id);
+
+          // LINEリッチメニュー解除
+          if (student.line_user_id) {
+            try {
+              const { unlinkRichMenuFromUser } = await import('@/lib/line-richmenu');
+              await unlinkRichMenuFromUser(student.line_user_id);
+            } catch (e) {}
+            try {
+              await stopStepReminderForUser(student.line_user_id, 'withdrawn');
+            } catch (e) {}
+          }
+
+          // 設定レコードを active（退会完了）に更新
+          setting.status = 'active';
+          setting.updated_at = new Date().toISOString();
+          await supabaseAdmin.from('app_configs').upsert({
+            key: config.key,
+            value: JSON.stringify(setting),
+            updated_at: new Date().toISOString(),
+          });
+
+          results.processed.push({
+            student_id: student.id,
+            student_name: student.full_name,
+            withdrawal_date: setting.withdrawal_date,
+          });
+        }
+      }
+    }
+  }
+
+  return { success: true, results };
 }
 
 /**

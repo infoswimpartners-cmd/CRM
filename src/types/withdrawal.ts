@@ -5,7 +5,7 @@ export interface StudentWithdrawalSetting {
   reason?: string;                  // 退会理由（例: "寒くなってきたため一時退会、春頃に再開希望"）
   resume_target_month?: string;     // 再開案内希望年月 (YYYY-MM, 例: "2027-03")
   resume_reminder_sent_at?: string | null; // 再開案内リマインド送信日時
-  status: 'active' | 'cancelled';   // 退会ステータス（active: 退会中, cancelled: 復帰・取消）
+  status: 'scheduled' | 'active' | 'cancelled';   // 退会ステータス（scheduled: 退会予約中, active: 退会完了, cancelled: 復帰・取消）
   created_at: string;
   updated_at: string;
 }

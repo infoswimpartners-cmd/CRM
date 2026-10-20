@@ -205,6 +205,9 @@ export async function POST(req: NextRequest) {
                         : event.message.type === 'image'
                             ? '【画像を受信しました】'
                             : `【${event.message.type}メッセージを受信しました】`
+                    const nonTextSenderLabel = isOfficialBot
+                        ? (displayName || '公式LINEユーザー')
+                        : (displayName ? `${displayName} (${botName})` : `顧客 (${botName})`)
                     const { recordLineChatMessage } = await import('@/lib/line-chat-service')
                     await recordLineChatMessage({
                         lineUserId,
@@ -213,7 +216,7 @@ export async function POST(req: NextRequest) {
                         senderType: 'user',
                         messageType: msgType,
                         messageText: labelText,
-                        senderLabel: displayName || 'LINEユーザー',
+                        senderLabel: nonTextSenderLabel,
                         isRead: false,
                         status: 'received',
                     })

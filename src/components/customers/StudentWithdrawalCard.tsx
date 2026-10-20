@@ -26,7 +26,8 @@ import {
   AlertTriangle,
   RotateCcw,
   Send,
-  Calendar,
+  CalendarClock,
+  ShieldCheck,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { StudentWithdrawalSetting } from '@/types/withdrawal';
@@ -88,6 +89,8 @@ export function StudentWithdrawalCard({
   // デフォルト再開時期（半年後）
   const defaultResumeTargetMonth = getRelativeYearMonth(now, 6);
 
+  // ステータス判定
+  const isScheduled = setting && setting.status === 'scheduled';
   const isWithdrawn = currentStatus === 'withdrawn' || (setting && setting.status === 'active');
 
   // フォーム状態
@@ -97,7 +100,7 @@ export function StudentWithdrawalCard({
   const [resumeTargetMonth, setResumeTargetMonth] = useState(setting?.resume_target_month || defaultResumeTargetMonth);
 
   useEffect(() => {
-    if (setting && setting.status === 'active') {
+    if (setting && (setting.status === 'active' || setting.status === 'scheduled')) {
       setWithdrawalDate(setting.withdrawal_date);
       setReason(setting.reason || '');
       setEnableResumeReminder(!!setting.resume_target_month);
@@ -129,7 +132,12 @@ export function StudentWithdrawalCard({
       if (res.success && res.setting) {
         setSetting(res.setting);
         setIsOpen(false);
-        toast.success(`${studentName}様の退会設定を完了しました。`);
+        const isFuture = res.setting.status === 'scheduled';
+        if (isFuture) {
+          toast.success(`${studentName}様の退会予約（退会予定日: ${withdrawalDate}）を完了しました。`);
+        } else {
+          toast.success(`${studentName}様の退会処理を完了しました。`);
+        }
       } else {
         toast.error(res.error || '退会設定の保存に失敗しました。');
       }
@@ -142,7 +150,11 @@ export function StudentWithdrawalCard({
 
   // 退会取り消し・復帰
   const handleCancelWithdrawal = async () => {
-    if (!confirm(`${studentName}様の退会設定を取り消し、有効（active）に復帰しますか？`)) {
+    const confirmText = isScheduled
+      ? `${studentName}様の退会予約（退会予定日: ${setting?.withdrawal_date}）を取り消しますか？`
+      : `${studentName}様の退会設定を取り消し、有効（active）に復帰しますか？`;
+
+    if (!confirm(confirmText)) {
       return;
     }
 
@@ -151,7 +163,7 @@ export function StudentWithdrawalCard({
       const res = await cancelStudentWithdrawalSetting(studentId);
       if (res.success) {
         setSetting(null);
-        toast.success('退会を取り消し、ステータスを復帰しました。');
+        toast.success(isScheduled ? '退会予約を取り消しました。' : '退会を取り消し、ステータスを復帰しました。');
       } else {
         toast.error(res.error || '退会取り消しに失敗しました。');
       }
@@ -206,15 +218,27 @@ export function StudentWithdrawalCard({
     setResumeTargetMonth(ym);
   };
 
+  // カードスタイル
+  const cardBorderClass = isScheduled
+    ? 'border-amber-200 bg-amber-50/20 shadow-sm'
+    : isWithdrawn
+    ? 'border-rose-200 bg-rose-50/20 shadow-sm'
+    : 'border-slate-200 shadow-sm';
+
   return (
-    <Card className={isWithdrawn ? 'border-rose-200 bg-rose-50/20 shadow-sm' : 'border-slate-200 shadow-sm'}>
+    <Card className={cardBorderClass}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base font-bold flex items-center gap-2">
-            <UserMinus className={`h-4 w-4 ${isWithdrawn ? 'text-rose-600' : 'text-slate-500'}`} />
+            <UserMinus className={`h-4 w-4 ${isScheduled ? 'text-amber-600' : isWithdrawn ? 'text-rose-600' : 'text-slate-500'}`} />
             退会管理
           </CardTitle>
-          {isWithdrawn ? (
+          {isScheduled ? (
+            <Badge variant="outline" className="border-amber-300 text-amber-800 bg-amber-50 font-bold flex items-center gap-1">
+              <CalendarClock className="h-3 w-3 text-amber-600" />
+              退会予約中
+            </Badge>
+          ) : isWithdrawn ? (
             <Badge variant="outline" className="border-rose-300 text-rose-700 bg-rose-50 font-bold">
               退会済み
             </Badge>
@@ -226,7 +250,75 @@ export function StudentWithdrawalCard({
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        {isWithdrawn ? (
+        {/* ==================== 1. 退会予約中（未来の退会） ==================== */}
+        {isScheduled && (
+          <>
+            <div className="bg-white rounded-lg p-3 border border-amber-200 space-y-2 text-xs">
+              <div className="flex justify-between items-center text-slate-600">
+                <span className="text-amber-900 font-bold flex items-center gap-1">
+                  <CalendarClock className="h-3.5 w-3.5 text-amber-600" />
+                  退会予定日
+                </span>
+                <span className="font-bold text-amber-900 text-sm">
+                  {setting?.withdrawal_date}
+                </span>
+              </div>
+              <div className="p-2 bg-amber-50/80 rounded border border-amber-100 text-[11px] text-amber-800 leading-snug">
+                退会予定日までは会員ステータス（active）が維持され、月謝決済完了後の退会日に自動解約されます。
+              </div>
+              {setting?.reason && (
+                <div className="text-slate-600 pt-1 border-t border-slate-50">
+                  <span className="text-slate-400 font-medium block mb-0.5">退会理由</span>
+                  <span className="text-slate-700 whitespace-pre-wrap">{setting.reason}</span>
+                </div>
+              )}
+            </div>
+
+            {/* 再開希望時期 */}
+            {setting?.resume_target_month && (
+              <div className="bg-white rounded-lg p-2.5 border border-amber-100 text-xs flex items-center justify-between">
+                <span className="text-slate-500 font-medium flex items-center gap-1">
+                  <Bell className="h-3 w-3 text-amber-600" />
+                  再開案内希望時期
+                </span>
+                <span className="font-bold text-amber-900">
+                  {formatYearMonth(setting.resume_target_month)}頃
+                </span>
+              </div>
+            )}
+
+            {/* 管理者操作エリア */}
+            {isAdmin && (
+              <div className="flex gap-2 pt-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsOpen(true)}
+                  className="flex-1 text-xs h-8 border-amber-300 hover:bg-amber-50 text-amber-900 font-medium"
+                >
+                  設定を変更
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={cancelLoading}
+                  onClick={handleCancelWithdrawal}
+                  className="text-xs h-8 text-slate-500 hover:text-rose-600 hover:bg-rose-50"
+                >
+                  {cancelLoading ? (
+                    <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                  ) : (
+                    <RotateCcw className="h-3 w-3 mr-1" />
+                  )}
+                  予約を取り消す
+                </Button>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ==================== 2. 退会完了（過去または今日以前） ==================== */}
+        {isWithdrawn && !isScheduled && (
           <>
             {/* 退会日情報 */}
             <div className="bg-white rounded-lg p-3 border border-rose-100 space-y-2 text-xs">
@@ -337,10 +429,13 @@ export function StudentWithdrawalCard({
               </div>
             )}
           </>
-        ) : (
+        )}
+
+        {/* ==================== 3. 未設定時 ==================== */}
+        {!isScheduled && !isWithdrawn && (
           <>
             <p className="text-xs text-slate-500">
-              退会の申請があった場合、退会日の設定やStripe課金停止、再開時期に応じた案内リマインドの登録を行えます。
+              退会の申請があった場合、退会予定日の設定や再開時期に応じた案内リマインドの登録を行えます。
             </p>
             {isAdmin && (
               <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -378,9 +473,10 @@ export function StudentWithdrawalCard({
                         onChange={(e) => setWithdrawalDate(e.target.value)}
                         className="text-xs h-9"
                       />
-                      <p className="text-[11px] text-slate-400">
-                        通常は当月末日を指定します。
-                      </p>
+                      <div className="p-2 bg-slate-50 rounded border border-slate-100 text-[11px] text-slate-500 leading-snug">
+                        💡 <strong>翌月末日など未来の日付を指定した場合：</strong><br />
+                        退会予定日までは会員ステータス（active）が維持され、月謝決済完了後の退会日に自動解約されます。
+                      </div>
                     </div>
 
                     {/* 退会理由 */}
@@ -480,14 +576,14 @@ export function StudentWithdrawalCard({
                               onClick={() => setQuickResumeMonth(getRelativeYearMonth(now, 3))}
                               className="text-[10px] bg-white border border-amber-300 hover:bg-amber-100 text-amber-900 px-2 py-0.5 rounded-md font-medium transition-colors"
                             >
-                              3ヶ月後 ({formatYearMonth(getRelativeYearMonth(now, 3))})
+                              3ヶ月後
                             </button>
                             <button
                               type="button"
                               onClick={() => setQuickResumeMonth(getRelativeYearMonth(now, 6))}
                               className="text-[10px] bg-white border border-amber-300 hover:bg-amber-100 text-amber-900 px-2 py-0.5 rounded-md font-medium transition-colors"
                             >
-                              半年後 ({formatYearMonth(getRelativeYearMonth(now, 6))})
+                              半年後
                             </button>
                             <button
                               type="button"
@@ -504,21 +600,9 @@ export function StudentWithdrawalCard({
                               来夏 (7月)
                             </button>
                           </div>
-
-                          <p className="text-[10px] text-amber-700">
-                            ※ 指定の年月になったら、このカードまたは退会者一覧から案内メッセージ（LINE/メール）をワンクリックで送信できます。
-                          </p>
                         </div>
                       )}
                     </div>
-
-                    {/* 注意事項 */}
-                    {hasStripeSubscription && (
-                      <div className="bg-rose-50 border border-rose-100 rounded-lg p-2.5 text-[11px] text-rose-700 flex items-start gap-2">
-                        <AlertTriangle className="h-3.5 w-3.5 text-rose-500 shrink-0 mt-0.5" />
-                        <span>退会設定を確定すると、Stripeの定期課金サブスクリプションも自動解約されます。</span>
-                      </div>
-                    )}
                   </div>
 
                   <DialogFooter className="grid grid-cols-2 gap-2 pt-2">
@@ -536,7 +620,7 @@ export function StudentWithdrawalCard({
                       onClick={handleSave}
                       className="text-xs h-9 bg-rose-600 hover:bg-rose-700 text-white font-bold"
                     >
-                      {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin mx-auto" /> : '退会を確定する'}
+                      {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin mx-auto" /> : '退会を設定する'}
                     </Button>
                   </DialogFooter>
                 </DialogContent>
@@ -546,8 +630,8 @@ export function StudentWithdrawalCard({
         )}
       </CardContent>
 
-      {/* 退会済み状態での「設定変更」ダイアログ */}
-      {isWithdrawn && isAdmin && (
+      {/* 設定変更ダイアログ（予約中または退会済み時） */}
+      {(isScheduled || isWithdrawn) && isAdmin && (
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogContent className="sm:max-w-md bg-white">
             <DialogHeader>
@@ -572,6 +656,9 @@ export function StudentWithdrawalCard({
                   onChange={(e) => setWithdrawalDate(e.target.value)}
                   className="text-xs h-9"
                 />
+                <p className="text-[11px] text-slate-400">
+                  未来の日付を指定した場合は退会予約として扱われます。
+                </p>
               </div>
 
               <div className="space-y-1.5">

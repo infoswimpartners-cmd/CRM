@@ -1054,7 +1054,13 @@ export async function getDeliveryLogs(
             .select('*', { count: 'exact' });
 
         if (params.deliveryType && params.deliveryType !== 'all') {
-            query = query.eq('delivery_type', params.deliveryType);
+            if (params.deliveryType === 'direct_chat') {
+                query = query.or('delivery_type.eq.direct_chat,step_name.eq.個別トーク（1対1チャット）');
+            } else if (params.deliveryType === 'cart_recovery') {
+                query = query.or('delivery_type.eq.cart_recovery,step_name.eq.カゴ落ち自動フォロー');
+            } else {
+                query = query.eq('delivery_type', params.deliveryType);
+            }
         }
 
         if (params.status && params.status !== 'all') {
@@ -1098,10 +1104,19 @@ export async function getDeliveryLogs(
                 try { fallbackLogs = JSON.parse(config.value); } catch {}
             }
 
-            // 簡易フィルタリング
+            // 簡易フィルタリング（direct_chat / cart_recovery の step_name 互換判定を含む）
             let filtered = fallbackLogs;
             if (params.deliveryType && params.deliveryType !== 'all') {
-                filtered = filtered.filter((l: any) => l.delivery_type === params.deliveryType);
+                filtered = filtered.filter((l: any) => {
+                    const isDirectChat = l.delivery_type === 'direct_chat' || l.step_name === '個別トーク（1対1チャット）';
+                    const isCartRecovery = l.delivery_type === 'cart_recovery' || l.step_name === 'カゴ落ち自動フォロー';
+                    if (params.deliveryType === 'direct_chat') return isDirectChat;
+                    if (params.deliveryType === 'cart_recovery') return isCartRecovery;
+                    if (params.deliveryType === 'broadcast') {
+                        return l.delivery_type === 'broadcast' && !isDirectChat && !isCartRecovery;
+                    }
+                    return l.delivery_type === params.deliveryType;
+                });
             }
             if (params.status && params.status !== 'all') {
                 filtered = filtered.filter((l: any) => l.status === params.status);
