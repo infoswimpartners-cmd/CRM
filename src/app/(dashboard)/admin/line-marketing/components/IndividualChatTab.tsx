@@ -67,7 +67,67 @@ import {
     Save,
     Ban,
     Play,
+    Volume2,
+    VolumeX,
+    Radio,
 } from 'lucide-react';
+
+/**
+ * LINE風の優しい通知チャイム（Web Audio API）
+ * 外部MP3ファイル不要・ブラウザ標準実装
+ */
+function playLineNotificationSound() {
+    if (typeof window === 'undefined') return;
+    try {
+        const AudioCtx =
+            window.AudioContext ||
+            (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        if (ctx.state === 'suspended') {
+            ctx.resume();
+        }
+
+        const now = ctx.currentTime;
+
+        // 1音目（軽快なアタック音 880Hz / A5）
+        const osc1 = ctx.createOscillator();
+        const gain1 = ctx.createGain();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(880, now);
+        gain1.gain.setValueAtTime(0, now);
+        gain1.gain.linearRampToValueAtTime(0.12, now + 0.02);
+        gain1.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
+        osc1.connect(gain1);
+        gain1.connect(ctx.destination);
+        osc1.start(now);
+        osc1.stop(now + 0.18);
+
+        // 2音目（高音の澄んだベル音 1318.5Hz / E6）
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(1318.5, now + 0.08);
+        gain2.gain.setValueAtTime(0, now + 0.08);
+        gain2.gain.linearRampToValueAtTime(0.16, now + 0.1);
+        gain2.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
+        osc2.connect(gain2);
+        gain2.connect(ctx.destination);
+        osc2.start(now + 0.08);
+        osc2.stop(now + 0.38);
+
+        // コンテキストの自動クリーンアップ
+        setTimeout(() => {
+            try {
+                ctx.close();
+            } catch {
+                // ignore
+            }
+        }, 500);
+    } catch {
+        // 音声ブロック時はサイレントに無視
+    }
+}
 
 const TEST_TARO_LINE_USER_ID = 'U0e5a7654874369ca5e38deb47fd783aa';
 const TEST_TARO_STUDENT_NUMBER = '0035';
@@ -182,6 +242,26 @@ export function IndividualChatTab({
     const [isUpdatingTag, setIsUpdatingTag] = useState(false);
     const [copiedLineId, setCopiedLineId] = useState(false);
 
+    // リアルタイム自動更新・サウンド設定
+    const [isAutoRefreshEnabled, setIsAutoRefreshEnabled] = useState(true);
+    const [refreshIntervalSec, setRefreshIntervalSec] = useState<number>(4);
+    const [isSoundEnabled, setIsSoundEnabled] = useState<boolean>(() => {
+        if (typeof window === 'undefined') return true;
+        const saved = localStorage.getItem('line_chat_sound_enabled');
+        return saved !== null ? saved === 'true' : true;
+    });
+    const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
+    const [isSyncing, setIsSyncing] = useState(false);
+    const [newInboundMessageIds, setNewInboundMessageIds] = useState<string[]>([]);
+
+    // 新着検知用Refs
+    const previousMessagesCountRef = useRef<number>(0);
+    const previousLatestMessageIdRef = useRef<string | null>(null);
+    const previousThreadsMapRef = useRef<
+        Map<string, { unreadCount: number; lastMessageAt?: string | null; lastMessageText?: string | null }>
+    >(new Map());
+    const hasInitialLoadedRef = useRef<boolean>(false);
+
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -229,6 +309,55 @@ export function IndividualChatTab({
                 tagFilter,
             });
             if (res.success) {
+                // 他スレッドの新着判定（初回ロード以降）
+                if (hasInitialLoadedRef.current) {
+                    for (const th of res.threads) {
+                        if (th.lineUserId !== selectedLineUserId) {
+                            const prev = previousThreadsMapRef.current.get(th.lineUserId);
+                            const prevUnread = prev?.unreadCount || 0;
+                            const prevTime = prev?.lastMessageAt;
+
+                            // 未読が増えた、または最新メッセージ時刻が更新された場合（受信メッセージ）
+                            const isNewInbound =
+                                th.unreadCount > prevUnread ||
+                                (th.lastMessageAt && th.lastMessageAt !== prevTime);
+
+                            if (isNewInbound) {
+                                if (isSoundEnabled) {
+                                    playLineNotificationSound();
+                                }
+                                toast.info(`💬 ${th.fullName} 様から新着メッセージ`, {
+                                    description: th.lastMessageText || '新しいメッセージを受信しました',
+                                    action: {
+                                        label: 'トークを開く',
+                                        onClick: () => {
+                                            setSelectedLineUserId(th.lineUserId);
+                                            setMobilePane('chat');
+                                        },
+                                    },
+                                    duration: 6000,
+                                });
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // 前回のスレッドマップを更新
+                const nextMap = new Map<
+                    string,
+                    { unreadCount: number; lastMessageAt?: string | null; lastMessageText?: string | null }
+                >();
+                for (const th of res.threads) {
+                    nextMap.set(th.lineUserId, {
+                        unreadCount: th.unreadCount,
+                        lastMessageAt: th.lastMessageAt,
+                        lastMessageText: th.lastMessageText,
+                    });
+                }
+                previousThreadsMapRef.current = nextMap;
+                hasInitialLoadedRef.current = true;
+
                 setThreads(res.threads);
                 setTotalUnread(res.totalUnreadCount);
                 setTotalNeedsReply(res.totalNeedsReplyCount);
@@ -253,7 +382,7 @@ export function IndividualChatTab({
         } finally {
             if (!silent) setIsLoadingThreads(false);
         }
-    }, [searchQuery, filterMode, statusFilter, tagFilter, selectedLineUserId, initialLineUserId, onUnreadCountChange]);
+    }, [searchQuery, filterMode, statusFilter, tagFilter, selectedLineUserId, initialLineUserId, onUnreadCountChange, isSoundEnabled]);
 
     // 選択ユーザーのチャット履歴取得
     const fetchChatHistory = useCallback(async (lineUserId: string, silent = false) => {
@@ -262,7 +391,35 @@ export function IndividualChatTab({
         try {
             const res = await getLineChatHistoryAction(lineUserId, true);
             if (res.success) {
-                setMessages(res.messages);
+                const newMessages = res.messages;
+
+                // バックグラウンド同期時の新着検知
+                if (silent && previousLatestMessageIdRef.current) {
+                    const prevCount = previousMessagesCountRef.current;
+                    const prevLatestId = previousLatestMessageIdRef.current;
+                    const latestMessage = newMessages[newMessages.length - 1];
+
+                    if (latestMessage && latestMessage.id !== prevLatestId && newMessages.length > prevCount) {
+                        const newlyAdded = newMessages.slice(prevCount);
+                        const hasInbound = newlyAdded.some(m => m.direction === 'inbound');
+
+                        if (hasInbound) {
+                            if (isSoundEnabled) {
+                                playLineNotificationSound();
+                            }
+                            const addedIds = newlyAdded.map(m => m.id);
+                            setNewInboundMessageIds(addedIds);
+                            setTimeout(() => {
+                                setNewInboundMessageIds([]);
+                            }, 3500);
+                        }
+                    }
+                }
+
+                setMessages(newMessages);
+                previousMessagesCountRef.current = newMessages.length;
+                previousLatestMessageIdRef.current = newMessages[newMessages.length - 1]?.id || null;
+
                 // 未読だったスレッドのローカル未読バッジを即時クリア
                 setThreads(prev =>
                     prev.map(t => (t.lineUserId === lineUserId ? { ...t, unreadCount: 0 } : t))
@@ -275,7 +432,7 @@ export function IndividualChatTab({
         } finally {
             if (!silent) setIsLoadingMessages(false);
         }
-    }, []);
+    }, [isSoundEnabled]);
 
     useEffect(() => {
         fetchThreads();
@@ -291,6 +448,8 @@ export function IndividualChatTab({
     // ユーザー切り替え時に履歴取得＆右ペイン初期値セット
     useEffect(() => {
         if (selectedLineUserId) {
+            previousMessagesCountRef.current = 0;
+            previousLatestMessageIdRef.current = null;
             fetchChatHistory(selectedLineUserId);
         } else {
             setMessages([]);
@@ -312,16 +471,62 @@ export function IndividualChatTab({
         }
     }, [messages.length, selectedLineUserId]);
 
-    // 15秒ごとのバックグラウンド自動更新（新着メッセージのリアルタイム反映）
+    // LINE風リアルタイムスマートポーリング（フォアグラウンド4秒、バックグラウンド15秒、タブ復帰時即時）
     useEffect(() => {
-        const timer = setInterval(() => {
-            fetchThreads(true);
-            if (selectedLineUserId) {
-                fetchChatHistory(selectedLineUserId, true);
+        if (!isAutoRefreshEnabled) return;
+
+        let timerId: NodeJS.Timeout | null = null;
+        let isMounted = true;
+
+        const runPoll = async () => {
+            if (!isMounted) return;
+            setIsSyncing(true);
+            try {
+                await fetchThreads(true);
+                if (selectedLineUserId) {
+                    await fetchChatHistory(selectedLineUserId, true);
+                }
+                if (isMounted) {
+                    setLastSyncedAt(new Date());
+                }
+            } catch (err) {
+                console.error('[IndividualChatTab] Polling error:', err);
+            } finally {
+                if (isMounted) {
+                    setIsSyncing(false);
+                }
             }
-        }, 15000);
-        return () => clearInterval(timer);
-    }, [fetchThreads, fetchChatHistory, selectedLineUserId]);
+        };
+
+        const scheduleNext = () => {
+            if (!isMounted || !isAutoRefreshEnabled) return;
+            const isDocumentHidden = typeof document !== 'undefined' && document.hidden;
+            const delay = isDocumentHidden ? 15000 : refreshIntervalSec * 1000;
+            timerId = setTimeout(async () => {
+                await runPoll();
+                scheduleNext();
+            }, delay);
+        };
+
+        scheduleNext();
+
+        // タブが前面に戻ってきたら即時反映
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                if (timerId) clearTimeout(timerId);
+                runPoll();
+                scheduleNext();
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            isMounted = false;
+            if (timerId) clearTimeout(timerId);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [isAutoRefreshEnabled, refreshIntervalSec, fetchThreads, fetchChatHistory, selectedLineUserId]);
 
     // 変数置換プレビュー計算
     const previewRenderedText = useMemo(() => {
@@ -575,7 +780,7 @@ export function IndividualChatTab({
                     {/* 左ペインヘッダー & 検索バー */}
                     <div className="p-3 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-2.5 shrink-0">
                         <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
                                 <MessageSquare className="w-4 h-4 text-[#06C755]" />
                                 <span className="text-xs font-bold text-slate-800 dark:text-slate-100">
                                     個別トーク一覧
@@ -583,18 +788,41 @@ export function IndividualChatTab({
                                 <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 font-mono">
                                     {threads.length}
                                 </Badge>
+                                {isAutoRefreshEnabled ? (
+                                    <span
+                                        className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/50 px-1.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800"
+                                        title={`LINE風スマート同期中（${refreshIntervalSec}秒間隔）`}
+                                    >
+                                        <span className="relative flex h-1.5 w-1.5">
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                                        </span>
+                                        LIVE
+                                    </span>
+                                ) : (
+                                    <span className="text-[10px] text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded-full">
+                                        停止中
+                                    </span>
+                                )}
                             </div>
-                            <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => fetchThreads(false)}
-                                disabled={isLoadingThreads}
-                                className="h-7 w-7 text-slate-500 hover:text-slate-800"
-                                title="一覧を最新に更新"
-                            >
-                                <RefreshCw className={`w-3.5 h-3.5 ${isLoadingThreads ? 'animate-spin' : ''}`} />
-                            </Button>
+                            <div className="flex items-center gap-1">
+                                {isSyncing && (
+                                    <span className="text-[10px] text-slate-400 hidden sm:inline-flex items-center gap-1">
+                                        <Loader2 className="w-3 h-3 animate-spin text-emerald-600" />
+                                    </span>
+                                )}
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => fetchThreads(false)}
+                                    disabled={isLoadingThreads}
+                                    className="h-7 w-7 text-slate-500 hover:text-slate-800"
+                                    title="一覧を最新に更新"
+                                >
+                                    <RefreshCw className={`w-3.5 h-3.5 ${isLoadingThreads ? 'animate-spin' : ''}`} />
+                                </Button>
+                            </div>
                         </div>
 
                         {/* 検索ボックス */}
@@ -931,6 +1159,88 @@ export function IndividualChatTab({
                                         )}
                                     </Button>
 
+                                    {/* 自動更新ステータスバッジ & 更新間隔切り替え */}
+                                    <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-[11px] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (!isAutoRefreshEnabled) {
+                                                    setIsAutoRefreshEnabled(true);
+                                                    setRefreshIntervalSec(4);
+                                                    toast.success('リアルタイム自動更新を有効化しました（4秒間隔）');
+                                                } else if (refreshIntervalSec === 4) {
+                                                    setRefreshIntervalSec(8);
+                                                    toast.info('自動更新間隔を 8秒 に変更しました');
+                                                } else if (refreshIntervalSec === 8) {
+                                                    setRefreshIntervalSec(15);
+                                                    toast.info('自動更新間隔を 15秒 に変更しました');
+                                                } else {
+                                                    setIsAutoRefreshEnabled(false);
+                                                    toast.info('自動更新を一時停止しました（手動更新のみ）');
+                                                }
+                                            }}
+                                            className="flex items-center gap-1.5 hover:opacity-80 transition-opacity"
+                                            title={`クリックで更新間隔切り替え（4秒 → 8秒 → 15秒 → 停止）${
+                                                lastSyncedAt
+                                                    ? `\n最新同期: ${lastSyncedAt.toLocaleTimeString('ja-JP')}`
+                                                    : ''
+                                            }`}
+                                        >
+                                            <span className="relative flex h-2 w-2">
+                                                {isAutoRefreshEnabled && (
+                                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                                )}
+                                                <span
+                                                    className={`relative inline-flex rounded-full h-2 w-2 ${
+                                                        isAutoRefreshEnabled ? 'bg-emerald-500' : 'bg-slate-400'
+                                                    }`}
+                                                ></span>
+                                            </span>
+                                            <span className="hidden sm:inline font-mono font-medium text-[10px]">
+                                                {isAutoRefreshEnabled ? `${refreshIntervalSec}秒同期` : '自動更新停止'}
+                                            </span>
+                                        </button>
+                                        {isSyncing && (
+                                            <Loader2 className="w-3 h-3 animate-spin text-emerald-600 shrink-0" />
+                                        )}
+                                    </div>
+
+                                    {/* 音声通知ON/OFFトグル */}
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => {
+                                            const next = !isSoundEnabled;
+                                            setIsSoundEnabled(next);
+                                            if (typeof window !== 'undefined') {
+                                                localStorage.setItem('line_chat_sound_enabled', String(next));
+                                            }
+                                            if (next) {
+                                                playLineNotificationSound();
+                                                toast.success('🔔 新着通知音をONにしました（テスト再生）');
+                                            } else {
+                                                toast.info('🔕 新着通知音をOFFにしました');
+                                            }
+                                        }}
+                                        className={`h-8 w-8 ${
+                                            isSoundEnabled
+                                                ? 'text-emerald-600 hover:text-emerald-700'
+                                                : 'text-slate-400 hover:text-slate-600'
+                                        }`}
+                                        title={
+                                            isSoundEnabled
+                                                ? '新着通知音: ON（クリックでミュート）'
+                                                : '新着通知音: OFF（クリックでON）'
+                                        }
+                                    >
+                                        {isSoundEnabled ? (
+                                            <Volume2 className="w-4 h-4" />
+                                        ) : (
+                                            <VolumeX className="w-4 h-4" />
+                                        )}
+                                    </Button>
+
                                     <Button
                                         type="button"
                                         variant="ghost"
@@ -938,7 +1248,7 @@ export function IndividualChatTab({
                                         onClick={() => fetchChatHistory(selectedUser.lineUserId, false)}
                                         disabled={isLoadingMessages}
                                         className="h-8 w-8 text-slate-500"
-                                        title="トーク履歴を更新"
+                                        title="トーク履歴を手動更新"
                                     >
                                         <RefreshCw className={`w-4 h-4 ${isLoadingMessages ? 'animate-spin' : ''}`} />
                                     </Button>
@@ -1022,7 +1332,13 @@ export function IndividualChatTab({
                                                                 {msg.sender_label || selectedUser.fullName}
                                                             </div>
                                                             <div className="flex items-end gap-1.5">
-                                                                <div className="bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-2xl rounded-tl-xs px-3.5 py-2.5 text-xs whitespace-pre-wrap leading-relaxed shadow-2xs border border-slate-200/80 dark:border-slate-700">
+                                                                <div
+                                                                    className={`bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 rounded-2xl rounded-tl-xs px-3.5 py-2.5 text-xs whitespace-pre-wrap leading-relaxed shadow-2xs border border-slate-200/80 dark:border-slate-700 transition-all duration-700 ${
+                                                                        newInboundMessageIds.includes(msg.id)
+                                                                            ? 'ring-2 ring-[#06C755] ring-offset-2 animate-in fade-in-50 zoom-in-95 bg-emerald-50/40 dark:bg-emerald-950/40'
+                                                                            : ''
+                                                                    }`}
+                                                                >
                                                                     {msg.message_text}
                                                                 </div>
                                                                 <span className="text-[10px] text-slate-400 font-mono shrink-0">
