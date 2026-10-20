@@ -82,6 +82,8 @@ export default function BookingForm() {
 
   // 2人目入力欄の展開トグル（初期値: 折りたたみ）
   const [showSecondStudent, setShowSecondStudent] = useState(false);
+  // ご紹介者入力欄の展開トグル（初期値: 折りたたみ、誤入力・誤認を防止）
+  const [hasReferrer, setHasReferrer] = useState(false);
 
   // 送信成功フラグ（サンクス画面の表示制御）
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -162,6 +164,7 @@ export default function BookingForm() {
             const refFromUrl = urlParams.get("ref") || urlParams.get("referrer") || "";
             if (refFromUrl) {
               setFormData(prev => prev.referrerName ? prev : { ...prev, referrerName: refFromUrl });
+              setHasReferrer(true);
             }
 
             fetch("/api/liff-tracking", {
@@ -206,6 +209,11 @@ export default function BookingForm() {
           const fallbackUid = urlParams.get("userId") || urlParams.get("line_user_id") || urlParams.get("uid");
           if (fallbackUid) {
             setUserId(fallbackUid);
+          }
+          const refFromUrl = urlParams.get("ref") || urlParams.get("referrer") || "";
+          if (refFromUrl) {
+            setFormData(prev => prev.referrerName ? prev : { ...prev, referrerName: refFromUrl });
+            setHasReferrer(true);
           }
         } catch (_) {}
         // LIFFの初期化失敗時もWebブラウザとしてフォーム送信可能にする
@@ -356,6 +364,11 @@ export default function BookingForm() {
     }
     if (!formData.skillLevel.trim()) {
       scrollToField("skillLevel", "現在の泳力・お悩みまたは目標を選択・入力してください。");
+      return;
+    }
+    // ご紹介者様のお名前のセルフ重複チェック（自分の名前が入力されていた場合の親切な案内）
+    if (formData.referrerName.trim() && formData.name.trim() && formData.referrerName.trim() === formData.name.trim()) {
+      scrollToField("referrerName", "ご紹介者様のお名前にご自身のお名前が入力されています。紹介してくださったお友達・お知り合いのお名前をご入力いただくか、ご紹介者がいない場合はチェックを外して空欄にしてください。");
       return;
     }
     if (!formData.agreed) {
@@ -590,7 +603,7 @@ export default function BookingForm() {
           </div>
           <p className="text-xs text-amber-800 leading-relaxed">
             ご紹介でお申し込みの方は、初回体験が<strong>特別価格 3,500円（通常 6,000円）</strong>となります。<br />
-            ご紹介者様のお名前を下記フォームにご記入ください。
+            ご紹介者様のお名前は、フォーム一番下（利用規約の上）の紹介欄にご記入ください。
           </p>
         </div>
 
@@ -606,34 +619,6 @@ export default function BookingForm() {
           <CardContent className="p-5 sm:p-8">
             <form onSubmit={handleSubmit} className="space-y-8">
               
-              {/* セクション: ご紹介者様（任意） */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                  <span className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
-                    <User className="h-4 w-4 text-sky-500" />
-                    <span>ご紹介者様（任意）</span>
-                  </span>
-                  <Badge variant="outline" className="text-[10px] text-slate-500 border-slate-200">任意</Badge>
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="referrerName" className="text-xs font-semibold text-slate-700">
-                    ご紹介者様のお名前
-                  </Label>
-                  <Input
-                    id="referrerName"
-                    type="text"
-                    name="referrerName"
-                    value={formData.referrerName}
-                    onChange={handleChange}
-                    placeholder="例：山田 太郎 様（ご紹介者がいる場合のみ）"
-                    className="h-11 text-sm rounded-xl border-slate-200 focus-visible:ring-sky-500"
-                  />
-                  <p className="text-[11px] text-amber-700">
-                    ※ご紹介者様を入力いただくと初回体験が特別価格3,500円になります。
-                  </p>
-                </div>
-              </div>
-
               {/* セクション: 基本情報（1人目） */}
               <div className="space-y-4">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2">
@@ -1304,6 +1289,80 @@ export default function BookingForm() {
                     className="min-h-[70px] text-sm rounded-xl border-slate-200 focus-visible:ring-sky-500"
                   />
                 </div>
+              </div>
+
+              {/* セクション: お友達紹介（任意・最下部トグル配置） */}
+              <div className="rounded-2xl border border-amber-200/90 bg-gradient-to-r from-amber-50/80 to-orange-50/60 p-4 sm:p-5 space-y-3 shadow-xs">
+                <div 
+                  className="flex items-center justify-between cursor-pointer select-none"
+                  onClick={() => {
+                    const next = !hasReferrer;
+                    setHasReferrer(next);
+                    if (!next) {
+                      setFormData(prev => ({ ...prev, referrerName: "" }));
+                    }
+                  }}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Checkbox
+                      id="toggleReferrer"
+                      checked={hasReferrer}
+                      onCheckedChange={(checked) => {
+                        const next = !!checked;
+                        setHasReferrer(next);
+                        if (!next) {
+                          setFormData(prev => ({ ...prev, referrerName: "" }));
+                        }
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="h-5 w-5 data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500"
+                    />
+                    <div>
+                      <label 
+                        htmlFor="toggleReferrer" 
+                        className="text-xs sm:text-sm font-bold text-amber-950 cursor-pointer block"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        🎁 お友達・既存会員様からのご紹介の方はこちら（特別価格 3,500円）
+                      </label>
+                      <p className="text-[11px] text-amber-800">
+                        ご紹介者がいらっしゃる場合はチェックを入れてお名前をご記入ください
+                      </p>
+                    </div>
+                  </div>
+                  <button 
+                    type="button" 
+                    className="text-amber-700/60 hover:text-amber-900 ml-2"
+                    aria-label="Toggle referrer input"
+                  >
+                    {hasReferrer ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </button>
+                </div>
+
+                {hasReferrer && (
+                  <div className="pt-3 border-t border-amber-200/80 space-y-2">
+                    <Label htmlFor="referrerName" className="text-xs font-semibold text-amber-950">
+                      ご紹介いただいた方（お友達・会員様）のお名前
+                    </Label>
+                    <Input
+                      id="referrerName"
+                      type="text"
+                      name="referrerName"
+                      value={formData.referrerName}
+                      onChange={handleChange}
+                      placeholder="例：山田 太郎 様（※受講者様ご自身ではなく、紹介してくれた方のお名前）"
+                      className="h-11 text-sm rounded-xl border-amber-200 bg-white focus-visible:ring-amber-500"
+                    />
+                    {formData.name.trim() && formData.referrerName.trim() === formData.name.trim() && (
+                      <p className="text-xs text-rose-600 font-medium">
+                        ⚠️ 受講者様ご自身のお名前が入力されています。紹介してくださったお友達・お知り合いのお名前をご入力ください。
+                      </p>
+                    )}
+                    <p className="text-[11px] text-amber-700">
+                      ※ご紹介者様をご記入いただくと、初回体験が特別価格3,500円（通常6,000円）となります。
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* セクション: 利用規約 */}
