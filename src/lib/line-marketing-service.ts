@@ -271,7 +271,7 @@ export async function writeDeliveryLog(params: {
     studentNumber?: string | null;
     studentName?: string | null;
     lineUserId: string;
-    deliveryType: 'broadcast' | 'step_message' | 'test_preview' | 'cart_recovery';
+    deliveryType: 'broadcast' | 'step_message' | 'test_preview' | 'cart_recovery' | 'direct_chat';
     campaignId?: string | null;
     stepId?: string | null;
     stepName?: string | null;
@@ -284,7 +284,8 @@ export async function writeDeliveryLog(params: {
 }): Promise<void> {
     try {
         const supabase = createAdminClient();
-        const { error } = await supabase.from('line_delivery_logs').insert({
+        const nowIso = new Date().toISOString();
+        let { error } = await supabase.from('line_delivery_logs').insert({
             student_id: params.studentId || null,
             student_number: params.studentNumber || null,
             student_name: params.studentName || null,
@@ -300,8 +301,31 @@ export async function writeDeliveryLog(params: {
             response_status_code: params.responseStatusCode || null,
             line_request_id: params.lineRequestId || null,
             is_test_preview: params.isTestPreview || params.deliveryType === 'test_preview',
-            sent_at: new Date().toISOString(),
+            sent_at: nowIso,
         });
+
+        // DBのCHECK制約が未マイグレーションで direct_chat / cart_recovery が弾かれた場合、互換種別で再試行
+        if (error && (params.deliveryType === 'direct_chat' || params.deliveryType === 'cart_recovery')) {
+            const retryRes = await supabase.from('line_delivery_logs').insert({
+                student_id: params.studentId || null,
+                student_number: params.studentNumber || null,
+                student_name: params.studentName || null,
+                line_user_id: params.lineUserId,
+                delivery_type: 'broadcast',
+                campaign_id: params.campaignId || null,
+                step_id: params.stepId || null,
+                step_name: params.stepName || (params.deliveryType === 'direct_chat' ? '個別トーク（1対1チャット）' : 'カゴ落ち自動フォロー'),
+                message_body: params.renderedMessage,
+                rendered_message: params.renderedMessage,
+                status: params.status,
+                error_message: params.errorMessage || null,
+                response_status_code: params.responseStatusCode || null,
+                line_request_id: params.lineRequestId || null,
+                is_test_preview: params.isTestPreview || false,
+                sent_at: nowIso,
+            });
+            error = retryRes.error;
+        }
 
         if (error) {
             // テーブル未作成時は app_configs にフォールバック保存
@@ -1552,7 +1576,7 @@ export async function processCartAbandonmentReminders(
             continue;
         }
 
-        // 条件4: 閲覧日時の存在と経過時間（1時間以上24時間以内: 熱量の高いタイミングを逃さずカバー）
+        // 条件4: 閲覧日時の存在と経過時間（30分以上24時間以内: 熱量の高いタイミングを逃さずカバー）
         if (!viewedAt) {
             skippedCount++;
             details.push({
@@ -1566,7 +1590,7 @@ export async function processCartAbandonmentReminders(
         const elapsedMs = nowDate.getTime() - viewedAt.getTime();
         const elapsedHours = elapsedMs / (1000 * 60 * 60);
 
-        if (elapsedHours < 1 || elapsedHours > 24) {
+        if (elapsedHours < 0.5 || elapsedHours > 24) {
             skippedCount++;
             details.push({
                 lineUserId,

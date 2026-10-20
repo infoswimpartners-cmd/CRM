@@ -62,6 +62,18 @@ const GENERAL_TIME_SLOT_OPTIONS = [
   "平日夜間（18:00〜21:00）",
 ];
 
+// 年代・学年のクイック入力プリセット（スマホでのドラムロールスクロール離脱を防止）
+const AGE_GROUP_PRESETS = [
+  { label: "幼児 (4〜6歳)", defaultDob: "2021-04-01" },
+  { label: "小学生", defaultDob: "2016-04-01" },
+  { label: "中高生", defaultDob: "2010-04-01" },
+  { label: "20代", defaultDob: "2001-01-01" },
+  { label: "30代", defaultDob: "1991-01-01" },
+  { label: "40代", defaultDob: "1981-01-01" },
+  { label: "50代", defaultDob: "1971-01-01" },
+  { label: "60代〜", defaultDob: "1961-01-01" },
+];
+
 export default function BookingForm() {
   const [isLiffReady, setIsLiffReady] = useState(false);
   const [isLiffEnvironment, setIsLiffEnvironment] = useState(false);
@@ -301,41 +313,53 @@ export default function BookingForm() {
     e.preventDefault();
     setSubmitError(null);
     
+    // スクロールとフォーカス付きのエラー通知
+    const scrollToField = (id: string, message: string) => {
+      setSubmitError(message);
+      const el = document.getElementById(id);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.focus();
+      } else {
+        window.scrollTo({ top: 120, behavior: "smooth" });
+      }
+    };
+
     // バリデーション
     if (!formData.name.trim()) {
-      alert("お名前を入力してください。");
+      scrollToField("name", "お名前を入力してください。");
       return;
     }
     if (!formData.dob) {
-      alert("生年月日を選択してください。");
+      scrollToField("dob", "生年月日（または年代）を選択してください。");
       return;
     }
     if (showSecondStudent && formData.name2.trim() && !formData.dob2) {
-      alert("2人目の生年月日を入力してください。");
+      scrollToField("dob2", "2人目の生年月日（または年代）を選択してください。");
       return;
     }
     if (!formData.email.trim()) {
-      alert("メールアドレスを入力してください。");
+      scrollToField("email", "メールアドレスを入力してください。");
       return;
     }
     if (!formData.phone.trim()) {
-      alert("電話番号を入力してください。");
+      scrollToField("phone", "電話番号を入力してください。");
       return;
     }
     if (!formData.station.trim()) {
-      alert("最寄駅または希望エリアを入力してください。");
+      scrollToField("station", "最寄駅または希望エリアを入力してください。");
       return;
     }
     if (!formData.date1) {
-      alert("第1希望日を選択してください。");
+      scrollToField("date1", "第1希望日を選択してください。");
       return;
     }
     if (!formData.skillLevel.trim()) {
-      alert("現在の泳力・お悩みまたは目標を選択・入力してください。");
+      scrollToField("skillLevel", "現在の泳力・お悩みまたは目標を選択・入力してください。");
       return;
     }
     if (!formData.agreed) {
-      alert("利用規約への同意が必要です。");
+      scrollToField("agreed", "利用規約への同意が必要です。内容をご確認の上、チェックをお願いします。");
       return;
     }
 
@@ -654,39 +678,70 @@ export default function BookingForm() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div className="space-y-3">
                   <div className="space-y-1.5">
-                    <Label htmlFor="dob" className="text-xs font-semibold text-slate-700">
-                      生年月日 <span className="text-rose-500">*</span>
-                    </Label>
-                    <Input
-                      id="dob"
-                      type="date"
-                      name="dob"
-                      value={formData.dob}
-                      onChange={handleChange}
-                      required
-                      className="h-11 text-sm rounded-xl border-slate-200 focus-visible:ring-sky-500"
-                    />
-                  </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="dob" className="text-xs font-semibold text-slate-700">
+                        生年月日 <span className="text-rose-500">*</span>
+                      </Label>
+                      <span className="text-[11px] text-sky-600 font-medium">年代ボタンでワンタップ入力も可能</span>
+                    </div>
 
-                  <div className="space-y-1.5">
-                    <Label htmlFor="gender" className="text-xs font-semibold text-slate-700">
-                      性別 <span className="text-rose-500">*</span>
-                    </Label>
-                    <select
-                      id="gender"
-                      name="gender"
-                      value={formData.gender}
-                      onChange={handleChange}
-                      required
-                      className="w-full h-11 px-3 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
-                    >
-                      <option value="">選択してください</option>
-                      <option value="男性">男性</option>
-                      <option value="女性">女性</option>
-                      <option value="回答しない">回答しない</option>
-                    </select>
+                    {/* 年代・学年のクイック入力チップ */}
+                    <div className="flex flex-wrap gap-1.5 pt-0.5 pb-1">
+                      {AGE_GROUP_PRESETS.map((preset) => {
+                        const isSelected = formData.dob === preset.defaultDob;
+                        return (
+                          <button
+                            key={preset.label}
+                            type="button"
+                            onClick={() => {
+                              setFormData(prev => ({ ...prev, dob: preset.defaultDob }));
+                            }}
+                            className={`text-xs px-2.5 py-1 rounded-lg border transition-all ${
+                              isSelected
+                                ? "bg-sky-500 border-sky-500 text-white font-bold shadow-xs scale-102"
+                                : "bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700"
+                            }`}
+                          >
+                            {isSelected ? `✓ ${preset.label}` : preset.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+                      <div className="space-y-1">
+                        <Input
+                          id="dob"
+                          type="date"
+                          name="dob"
+                          value={formData.dob}
+                          onChange={handleChange}
+                          required
+                          className="h-11 text-sm rounded-xl border-slate-200 focus-visible:ring-sky-500 bg-white"
+                        />
+                        <p className="text-[11px] text-slate-500">
+                          ※上の年代ボタンを押すか、カレンダーから日付をお選びください
+                        </p>
+                      </div>
+
+                      <div className="space-y-1">
+                        <select
+                          id="gender"
+                          name="gender"
+                          value={formData.gender}
+                          onChange={handleChange}
+                          required
+                          className="w-full h-11 px-3 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                        >
+                          <option value="">性別を選択してください *</option>
+                          <option value="男性">男性</option>
+                          <option value="女性">女性</option>
+                          <option value="回答しない">回答しない</option>
+                        </select>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -753,32 +808,68 @@ export default function BookingForm() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div className="space-y-3">
                       <div className="space-y-1.5">
-                        <Label htmlFor="dob2" className="text-xs font-semibold text-slate-700">生年月日（2人目）</Label>
-                        <Input
-                          id="dob2"
-                          type="date"
-                          name="dob2"
-                          value={formData.dob2}
-                          onChange={handleChange}
-                          className="h-11 text-sm rounded-xl border-slate-200 focus-visible:ring-sky-500 bg-white"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label htmlFor="gender2" className="text-xs font-semibold text-slate-700">性別（2人目）</Label>
-                        <select
-                          id="gender2"
-                          name="gender2"
-                          value={formData.gender2}
-                          onChange={handleChange}
-                          className="w-full h-11 px-3 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
-                        >
-                          <option value="">選択してください</option>
-                          <option value="男性">男性</option>
-                          <option value="女性">女性</option>
-                          <option value="回答しない">回答しない</option>
-                        </select>
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="dob2" className="text-xs font-semibold text-slate-700">
+                            生年月日（2人目）
+                          </Label>
+                          <span className="text-[11px] text-sky-600 font-medium">年代ボタンでワンタップ入力も可能</span>
+                        </div>
+
+                        {/* 年代・学年のクイック入力チップ */}
+                        <div className="flex flex-wrap gap-1.5 pt-0.5 pb-1">
+                          {AGE_GROUP_PRESETS.map((preset) => {
+                            const isSelected = formData.dob2 === preset.defaultDob;
+                            return (
+                              <button
+                                key={preset.label}
+                                type="button"
+                                onClick={() => {
+                                  setFormData(prev => ({ ...prev, dob2: preset.defaultDob }));
+                                }}
+                                className={`text-xs px-2.5 py-1 rounded-lg border transition-all ${
+                                  isSelected
+                                    ? "bg-sky-500 border-sky-500 text-white font-bold shadow-xs scale-102"
+                                    : "bg-white hover:bg-slate-100 border-slate-200 text-slate-700"
+                                }`}
+                              >
+                                {isSelected ? `✓ ${preset.label}` : preset.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+                          <div className="space-y-1">
+                            <Input
+                              id="dob2"
+                              type="date"
+                              name="dob2"
+                              value={formData.dob2}
+                              onChange={handleChange}
+                              className="h-11 text-sm rounded-xl border-slate-200 focus-visible:ring-sky-500 bg-white"
+                            />
+                            <p className="text-[11px] text-slate-500">
+                              ※上の年代ボタンを押すか、カレンダーから日付をお選びください
+                            </p>
+                          </div>
+
+                          <div className="space-y-1">
+                            <select
+                              id="gender2"
+                              name="gender2"
+                              value={formData.gender2}
+                              onChange={handleChange}
+                              className="w-full h-11 px-3 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-transparent"
+                            >
+                              <option value="">性別を選択してください</option>
+                              <option value="男性">男性</option>
+                              <option value="女性">女性</option>
+                              <option value="回答しない">回答しない</option>
+                            </select>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1222,15 +1313,27 @@ export default function BookingForm() {
                   {termsText === null ? "利用規約を読み込み中..." : termsText}
                 </div>
 
-                <div className="flex items-center gap-2 pt-1">
+                <div 
+                  className={`flex items-center gap-3 p-3.5 rounded-xl border transition-all cursor-pointer select-none ${
+                    formData.agreed 
+                      ? "bg-sky-50/80 border-sky-300 ring-1 ring-sky-200" 
+                      : "bg-slate-50 border-slate-200 hover:bg-slate-100/70"
+                  }`}
+                  onClick={() => setFormData(prev => ({ ...prev, agreed: !prev.agreed }))}
+                >
                   <Checkbox
                     id="agreed"
                     name="agreed"
                     checked={formData.agreed}
                     onCheckedChange={(checked) => setFormData(prev => ({ ...prev, agreed: !!checked }))}
-                    required
+                    onClick={(e) => e.stopPropagation()}
+                    className="h-5 w-5 data-[state=checked]:bg-sky-500 data-[state=checked]:border-sky-500"
                   />
-                  <Label htmlFor="agreed" className="text-xs font-bold text-slate-800 cursor-pointer">
+                  <Label 
+                    htmlFor="agreed" 
+                    className="text-xs sm:text-sm font-bold text-slate-800 cursor-pointer flex-1"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     上記の利用規約に同意する <span className="text-rose-500">*</span>
                   </Label>
                 </div>

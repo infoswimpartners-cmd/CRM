@@ -194,16 +194,64 @@ export async function POST(req: NextRequest) {
                 continue
             }
 
+            // C-0. スタンプ・画像等の非テキストメッセージも1対1チャット履歴に記録
+            if (event.type === 'message' && event.message && event.message.type !== 'text' && lineUserId) {
+                try {
+                    const activeAccessToken = coachAccessToken || CHANNEL_ACCESS_TOKEN
+                    const displayName = await getLineUserProfile(lineUserId, activeAccessToken)
+                    const msgType = event.message.type === 'sticker' ? 'sticker' : event.message.type === 'image' ? 'image' : 'text'
+                    const labelText = event.message.type === 'sticker'
+                        ? '【スタンプを受信しました】'
+                        : event.message.type === 'image'
+                            ? '【画像を受信しました】'
+                            : `【${event.message.type}メッセージを受信しました】`
+                    const { recordLineChatMessage } = await import('@/lib/line-chat-service')
+                    await recordLineChatMessage({
+                        lineUserId,
+                        displayName,
+                        direction: 'inbound',
+                        senderType: 'user',
+                        messageType: msgType,
+                        messageText: labelText,
+                        senderLabel: displayName || 'LINEユーザー',
+                        isRead: false,
+                        status: 'received',
+                    })
+                } catch (nonTextErr) {
+                    console.warn('[LINE Webhook] Non-text chat history record warning:', nonTextErr)
+                }
+            }
+
             // C. テキストメッセージイベント
             if (event.type === 'message' && event.message && event.message.type === 'text') {
                 const messageText = event.message.text
                 const direction = event.source.type === 'user' ? 'customer_to_coach' : 'coach_to_customer'
 
-                // 事務局公式LINE宛てのメッセージの場合、ステップ配信を即時停止＆管理者通知
+                // 事務局公式LINE宛てのメッセージの場合、ステップ配信を即時停止＆管理者通知（内部でチャット履歴にも保存）
                 if (isOfficialBot && lineUserId && direction === 'customer_to_coach') {
                     const activeAccessToken = coachAccessToken || CHANNEL_ACCESS_TOKEN
                     const displayName = await getLineUserProfile(lineUserId, activeAccessToken)
                     await handleOfficialLineMessage(lineUserId, messageText, displayName)
+                } else if (lineUserId && direction === 'customer_to_coach') {
+                    // 公式ボット以外（またはdestination未指定時）の顧客メッセージも1対1チャット履歴へ保存
+                    try {
+                        const activeAccessToken = coachAccessToken || CHANNEL_ACCESS_TOKEN
+                        const displayName = await getLineUserProfile(lineUserId, activeAccessToken)
+                        const { recordLineChatMessage } = await import('@/lib/line-chat-service')
+                        await recordLineChatMessage({
+                            lineUserId,
+                            displayName,
+                            direction: 'inbound',
+                            senderType: 'user',
+                            messageType: 'text',
+                            messageText,
+                            senderLabel: displayName ? `${displayName} (${botName})` : `顧客 (${botName})`,
+                            isRead: false,
+                            status: 'received',
+                        })
+                    } catch (chatRecErr) {
+                        console.warn('[LINE Webhook] Chat history record warning:', chatRecErr)
+                    }
                 }
 
                 // 3. 日程調整に関するメッセージか判定

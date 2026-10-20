@@ -1513,5 +1513,170 @@ export async function unlinkAllUserRichMenusAction(): Promise<{
     }
 }
 
+// ==============================================================================
+// 11. Lステップ風 1対1 個別トーク・チャット管理 Actions
+// ==============================================================================
 
+import {
+    getLineChatThreads,
+    getLineChatHistory,
+    sendDirectLineChatMessage,
+    markLineChatRead,
+    toggleLineChatNeedsReply,
+    updateLineChatUserProfile,
+} from '@/lib/line-chat-service';
+import {
+    LineChatMessage,
+    LineChatThreadUser,
+    SendDirectChatParams,
+    UpdateChatUserProfileParams,
+} from '@/types/line-marketing';
 
+/**
+ * 1対1チャットの対象ユーザー（スレッド一覧）および未読・要対応数を取得するアクション
+ */
+export async function getLineChatThreadsAction(options: {
+    searchQuery?: string;
+    filterMode?: 'all' | 'unread' | 'needs_reply' | 'leads' | 'students';
+    statusFilter?: string;
+    tagFilter?: string;
+} = {}): Promise<{
+    success: boolean;
+    threads: LineChatThreadUser[];
+    totalUnreadCount: number;
+    totalNeedsReplyCount: number;
+    error?: string;
+}> {
+    try {
+        await assertAdminUser();
+        const res = await getLineChatThreads(options);
+        return {
+            success: true,
+            threads: res.threads,
+            totalUnreadCount: res.totalUnreadCount,
+            totalNeedsReplyCount: res.totalNeedsReplyCount,
+        };
+    } catch (err: any) {
+        console.error('[getLineChatThreadsAction] Error:', err);
+        return {
+            success: false,
+            threads: [],
+            totalUnreadCount: 0,
+            totalNeedsReplyCount: 0,
+            error: err.message,
+        };
+    }
+}
+
+/**
+ * 選択したユーザーの時系列チャット履歴を取得するアクション
+ */
+export async function getLineChatHistoryAction(
+    lineUserId: string,
+    markAsRead = true
+): Promise<{
+    success: boolean;
+    messages: LineChatMessage[];
+    error?: string;
+}> {
+    try {
+        await assertAdminUser();
+        if (markAsRead) {
+            await markLineChatRead(lineUserId);
+        }
+        const messages = await getLineChatHistory(lineUserId);
+        return {
+            success: true,
+            messages,
+        };
+    } catch (err: any) {
+        console.error('[getLineChatHistoryAction] Error:', err);
+        return {
+            success: false,
+            messages: [],
+            error: err.message,
+        };
+    }
+}
+
+/**
+ * 選択したユーザーへ1対1の個別LINEメッセージを送信するアクション
+ */
+export async function sendDirectLineChatMessageAction(
+    params: SendDirectChatParams
+): Promise<{
+    success: boolean;
+    messageId?: string;
+    chatMessage?: LineChatMessage | null;
+    error?: string;
+}> {
+    try {
+        await assertAdminUser();
+        const res = await sendDirectLineChatMessage(params);
+        safeRevalidate('/admin/line-marketing');
+        return {
+            success: res.success,
+            messageId: res.messageId,
+            chatMessage: res.chatMessage,
+            error: res.error,
+        };
+    } catch (err: any) {
+        console.error('[sendDirectLineChatMessageAction] Error:', err);
+        return {
+            success: false,
+            error: err.message,
+        };
+    }
+}
+
+/**
+ * スレッドの既読化アクション
+ */
+export async function markLineChatReadAction(
+    lineUserId: string
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        await assertAdminUser();
+        await markLineChatRead(lineUserId);
+        return { success: true };
+    } catch (err: any) {
+        console.error('[markLineChatReadAction] Error:', err);
+        return { success: false, error: err.message };
+    }
+}
+
+/**
+ * 要対応マーク（未対応 / 対応済み）を手動で切り替えるアクション
+ */
+export async function toggleLineChatNeedsReplyAction(
+    lineUserId: string,
+    needsReply: boolean
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        await assertAdminUser();
+        await toggleLineChatNeedsReply(lineUserId, needsReply);
+        safeRevalidate('/admin/line-marketing');
+        return { success: true };
+    } catch (err: any) {
+        console.error('[toggleLineChatNeedsReplyAction] Error:', err);
+        return { success: false, error: err.message };
+    }
+}
+
+/**
+ * 1対1チャットの右ペイン（顧客カルテ）からステータス・メモ・ステップ配信状態を更新するアクション
+ */
+export async function updateLineChatUserProfileAction(
+    params: UpdateChatUserProfileParams
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        await assertAdminUser();
+        const res = await updateLineChatUserProfile(params);
+        safeRevalidate('/admin/line-marketing');
+        safeRevalidate('/customers');
+        return res;
+    } catch (err: any) {
+        console.error('[updateLineChatUserProfileAction] Error:', err);
+        return { success: false, error: err.message };
+    }
+}

@@ -406,6 +406,24 @@ export async function handleOfficialLineMessage(lineUserId: string, messageText:
     const supabase = createAdminClient()
     const state = await getStepLeadState(lineUserId)
 
+    // 0. 1対1個別チャット履歴にユーザーからの受信メッセージを永続保存
+    try {
+        const { recordLineChatMessage } = await import('@/lib/line-chat-service')
+        await recordLineChatMessage({
+            lineUserId,
+            displayName: displayName || state?.display_name || null,
+            direction: 'inbound',
+            senderType: 'user',
+            messageType: 'text',
+            messageText,
+            senderLabel: displayName || state?.display_name || '公式LINEユーザー',
+            isRead: false,
+            status: 'received',
+        })
+    } catch (chatErr) {
+        console.error('[Official LINE Step] Failed to record inbound chat message:', chatErr)
+    }
+
     // もしステップ配信対象中であれば即座に停止
     if (state && (state.step_stage >= 0 || state.status === 'friend_only')) {
         state.status = 'inquired' // 問い合わせ・相談中へ
@@ -617,6 +635,24 @@ export async function processLineStepReminders(options: { dryRun?: boolean } = {
             state.next_send_at = nextSendAt
             state.last_sent_at = nowIso
             await saveStepLeadState(state)
+
+            // 1対1個別チャット履歴にも友だち追加ステップ配信メッセージを記録
+            try {
+                const { recordLineChatMessage } = await import('@/lib/line-chat-service')
+                await recordLineChatMessage({
+                    lineUserId: state.line_user_id,
+                    displayName: name,
+                    direction: 'outbound',
+                    senderType: 'system_auto',
+                    messageType: 'step_message',
+                    messageText,
+                    senderLabel: `友だち追加ステップ配信 (Step ${nextStage})`,
+                    isRead: true,
+                    status: 'sent',
+                })
+            } catch (chatErr) {
+                console.error('[Official LINE Step] Failed to record step chat message:', chatErr)
+            }
 
             results.push({
                 line_user_id: state.line_user_id,

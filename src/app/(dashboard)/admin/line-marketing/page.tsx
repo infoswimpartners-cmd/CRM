@@ -9,7 +9,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Megaphone, Layers, History } from 'lucide-react';
+import { Megaphone, Layers, History, Menu, Tag } from 'lucide-react';
 import { toast } from 'sonner';
 import { LineMarketingHeader } from './components/LineMarketingHeader';
 import { MarketingKpiCards, MarketingKpiData } from './components/MarketingKpiCards';
@@ -17,12 +17,12 @@ import { SegmentBroadcastTab } from './components/SegmentBroadcastTab';
 import { StepScenarioEditorTab } from './components/StepScenarioEditorTab';
 import { DeliveryLogsTab } from './components/DeliveryLogsTab';
 import { LiffTrackingTab, preloadLiffTrackingData } from './components/LiffTrackingTab';
+import { RichMenuSettingsTab } from './components/RichMenuSettingsTab';
 import { getMarketingKpiSummaryAction, syncTrialDoneStudentsAction } from '@/actions/line-marketing';
-import { Tag } from 'lucide-react';
 import { formatErrorToastMessage, sanitizeErrorMessage } from '@/lib/error-formatter';
 
 export default function LineMarketingPage() {
-    const [activeTab, setActiveTab] = useState<'broadcast' | 'steps' | 'tracking' | 'logs'>('broadcast');
+    const [activeTab, setActiveTab] = useState<'broadcast' | 'steps' | 'tracking' | 'logs' | 'richmenu'>('broadcast');
     const [selectedTagForBroadcast, setSelectedTagForBroadcast] = useState<string | null>(null);
     const [kpi, setKpi] = useState<MarketingKpiData>({
         totalSent: 0,
@@ -108,9 +108,9 @@ export default function LineMarketingPage() {
             {/* KPIサマリーカード（総配信数、成功率、エラー件数、ステップ配信中生徒数） */}
             <MarketingKpiCards kpi={kpi} isLoading={isLoadingKpi} />
 
-            {/* 4大タブ構成（セグメント一括配信 / カード型ステップ配信 / LIFFアクセス分析・タグ / 配信ログ） */}
+            {/* 5大タブ構成（セグメント一括配信 / カード型ステップ配信 / LIFFアクセス分析・タグ / 配信ログ / リッチメニュー設定） */}
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="space-y-6">
-                <TabsList className="bg-slate-100 dark:bg-slate-800 p-1.5 rounded-xl grid grid-cols-2 sm:grid-cols-4 max-w-3xl h-auto border border-slate-200 dark:border-slate-700">
+                <TabsList className="bg-slate-100 dark:bg-slate-800 p-1.5 rounded-xl grid grid-cols-2 sm:grid-cols-5 max-w-4xl h-auto border border-slate-200 dark:border-slate-700">
                     <TabsTrigger
                         value="broadcast"
                         className="py-2.5 px-3 font-semibold text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:text-blue-600 dark:data-[state=active]:bg-slate-900 dark:data-[state=active]:text-blue-400 data-[state=active]:shadow-sm transition-all"
@@ -139,6 +139,13 @@ export default function LineMarketingPage() {
                         <History className="h-4 w-4 mr-1.5" />
                         配信ログ
                     </TabsTrigger>
+                    <TabsTrigger
+                        value="richmenu"
+                        className="py-2.5 px-3 font-semibold text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:text-blue-600 dark:data-[state=active]:bg-slate-900 dark:data-[state=active]:text-blue-400 data-[state=active]:shadow-sm transition-all"
+                    >
+                        <Menu className="h-4 w-4 mr-1.5 text-emerald-500" />
+                        リッチメニュー設定
+                    </TabsTrigger>
                 </TabsList>
 
                 {/* タブ1: セグメント一括配信 */}
@@ -163,6 +170,11 @@ export default function LineMarketingPage() {
                 {/* タブ4: 配信ログ・トラッキング */}
                 <TabsContent value="logs" forceMount className="data-[state=inactive]:hidden focus-visible:outline-none">
                     <DeliveryLogsTab />
+                </TabsContent>
+
+                {/* タブ5: リッチメニュー設定・切り替え */}
+                <TabsContent value="richmenu" forceMount className="data-[state=inactive]:hidden focus-visible:outline-none">
+                    <RichMenuSettingsTab />
                 </TabsContent>
             </Tabs>
         </div>

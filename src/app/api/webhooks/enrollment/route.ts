@@ -128,13 +128,22 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Database Update Failed' }, { status: 500 })
         }
 
-        // 5. Send Notification
         // 5. Send Notification (Template)
         await emailService.sendTriggerEmail('enrollment_completed', email, {
             name: student.full_name,
             plan_name: membershipType.name,
             start_date: `${anchorDate.getFullYear()}年${anchorDate.getMonth() + 1}月1日`
         })
+
+        // 6. LINE会員用リッチメニューの自動適用
+        if (student.line_user_id) {
+            try {
+                const { linkMemberRichMenuToUser } = await import('@/lib/line-richmenu')
+                await linkMemberRichMenuToUser(student.line_user_id)
+            } catch (rmErr) {
+                console.error('[Enrollment Webhook] Failed to link member rich menu:', rmErr)
+            }
+        }
 
         console.log(`[Enrollment] Success! Student: ${student.id}, Sub: ${subscription.id}`)
         return NextResponse.json({ success: true, subscriptionId: subscription.id }, { status: 200 })

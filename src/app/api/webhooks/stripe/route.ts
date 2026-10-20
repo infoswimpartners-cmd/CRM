@@ -535,6 +535,16 @@ ${slotsListText}
                                     console.error('[Stripe Webhook] Failed to send enrollment email:', e)
                                 }
                             }
+
+                            // LINE会員用リッチメニューの自動適用
+                            if (lineUserId) {
+                                try {
+                                    const { linkMemberRichMenuToUser } = await import('@/lib/line-richmenu')
+                                    await linkMemberRichMenuToUser(lineUserId)
+                                } catch (rmErr) {
+                                    console.error('[Stripe Webhook] Failed to link member rich menu:', rmErr)
+                                }
+                            }
                         } else {
                             console.log(`[Stripe Webhook] Student not found for LINE User: ${lineUserId}. Creating a new student record...`)
                             const customerName = session.customer_details?.name || '新規LINEユーザー'
@@ -589,6 +599,16 @@ ${slotsListText}
                                     })
                                 } catch (e) {
                                     console.error('[Stripe Webhook] Failed to send enrollment email to new student:', e)
+                                }
+                            }
+
+                            // LINE会員用リッチメニューの自動適用
+                            if (lineUserId) {
+                                try {
+                                    const { linkMemberRichMenuToUser } = await import('@/lib/line-richmenu')
+                                    await linkMemberRichMenuToUser(lineUserId)
+                                } catch (rmErr) {
+                                    console.error('[Stripe Webhook] Failed to link member rich menu for new student:', rmErr)
                                 }
                             }
                         }

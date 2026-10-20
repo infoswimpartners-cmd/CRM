@@ -72,7 +72,7 @@ export interface SyncTrialDoneResult {
 export interface LineDeliveryLog {
     id: string;
     created_at: string;
-    delivery_type: 'broadcast' | 'step_message' | 'test_preview' | 'cart_recovery';
+    delivery_type: 'broadcast' | 'step_message' | 'test_preview' | 'cart_recovery' | 'direct_chat';
     campaign_id: string | null;
     step_id: string | null;
     step_name: string | null;
@@ -101,7 +101,7 @@ export interface SendMessageOptions {
     lineUserId: string;
     rawMessage: string;
     variables?: Record<string, string | null | undefined>;
-    deliveryType: 'broadcast' | 'step_message' | 'test_preview' | 'cart_recovery';
+    deliveryType: 'broadcast' | 'step_message' | 'test_preview' | 'cart_recovery' | 'direct_chat';
     campaignId?: string;
     stepId?: string;
     stepName?: string;
@@ -192,7 +192,7 @@ export interface CreateBroadcastParams {
 export interface GetDeliveryLogsParams {
     page?: number;
     pageSize?: number;
-    deliveryType?: 'broadcast' | 'step_message' | 'test_preview' | 'cart_recovery' | 'all';
+    deliveryType?: 'broadcast' | 'step_message' | 'test_preview' | 'cart_recovery' | 'direct_chat' | 'all';
     status?: 'success' | 'sent' | 'failed' | 'skipped' | 'all';
     searchQuery?: string;
     startDate?: string;
@@ -243,4 +243,70 @@ export interface ProcessCartAbandonmentResult {
     mode?: string;
     details?: CartAbandonmentDetail[];
 }
+
+// ==============================================================================
+// 5. Lステップ風 1対1個別チャット・トーク管理 型定義
+// ==============================================================================
+
+export interface LineChatMessage {
+    id: string;
+    created_at: string;
+    line_user_id: string;
+    student_id?: string | null;
+    display_name?: string | null;
+    direction: 'inbound' | 'outbound';
+    sender_type: 'user' | 'admin' | 'system_auto' | 'coach';
+    message_type: 'text' | 'broadcast' | 'step_message' | 'cart_recovery' | 'direct_chat' | 'test_preview' | 'sticker' | 'image';
+    message_text: string;
+    sender_label?: string | null;
+    is_read: boolean;
+    status: 'received' | 'sent' | 'success' | 'failed';
+    metadata?: Record<string, any>;
+}
+
+export interface LineChatThreadUser {
+    lineUserId: string;
+    studentId: string | null;
+    studentNumber: string | null;
+    fullName: string;
+    lineDisplayName: string | null;
+    fullNameKana: string | null;
+    status: string;
+    statusLabel: string;
+    area: string;
+    coachId: string | null;
+    coachName: string | null;
+    planName: string | null;
+    trialDate: string | null;
+    tags: string[];
+    notes: string | null;
+    lastMessageText: string | null;
+    lastMessageAt: string | null;
+    lastMessageDirection: 'inbound' | 'outbound' | null;
+    unreadCount: number;
+    needsReply: boolean;
+    isBlocked: boolean;
+    stepStage: number | null;
+    followedAt: string | null;
+}
+
+export interface SendDirectChatParams {
+    lineUserId: string;
+    rawMessage: string;
+    studentId?: string | null;
+    studentNumber?: string | null;
+    studentName?: string | null;
+    variables?: Record<string, string | null | undefined>;
+    isTestPreview?: boolean;
+}
+
+export interface UpdateChatUserProfileParams {
+    lineUserId: string;
+    studentId?: string | null;
+    status?: string;
+    notes?: string;
+    customDisplayName?: string;
+    stopStepDelivery?: boolean;
+}
+
 

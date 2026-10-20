@@ -266,6 +266,21 @@ export async function updateStudent(id: string, formData: any) {
             }
         }
 
+        // 5. ステータス変更に応じたLINEリッチメニューの更新
+        const finalLineUserId = updates.line_user_id !== undefined ? updates.line_user_id : currentStudent.line_user_id
+        if (finalLineUserId && updates.status) {
+            try {
+                const { linkMemberRichMenuToUser, unlinkRichMenuFromUser } = await import('@/lib/line-richmenu')
+                if (updates.status === 'active' && currentStudent.status !== 'active') {
+                    await linkMemberRichMenuToUser(finalLineUserId)
+                } else if (updates.status === 'withdrawn') {
+                    await unlinkRichMenuFromUser(finalLineUserId)
+                }
+            } catch (rmErr) {
+                console.error('[updateStudent] Failed to update rich menu:', rmErr)
+            }
+        }
+
         revalidatePath(`/customers/${id}`)
         return { success: true, emailSent }
 
@@ -313,6 +328,20 @@ export async function updateStudentStatus(studentId: string, newStatus: string) 
                 await stopStepReminderForUser(student.line_user_id, newStatus)
             } catch (stepErr) {
                 console.error('Failed to stop step reminder:', stepErr)
+            }
+        }
+
+        // 5. 入会（active）または退会（withdrawn）時のLINEリッチメニュー自動切り替え
+        if (student.line_user_id) {
+            try {
+                const { linkMemberRichMenuToUser, unlinkRichMenuFromUser } = await import('@/lib/line-richmenu')
+                if (newStatus === 'active') {
+                    await linkMemberRichMenuToUser(student.line_user_id)
+                } else if (newStatus === 'withdrawn') {
+                    await unlinkRichMenuFromUser(student.line_user_id)
+                }
+            } catch (richMenuErr) {
+                console.error('[updateStudentStatus] Failed to update rich menu:', richMenuErr)
             }
         }
 
