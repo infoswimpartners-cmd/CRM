@@ -30,6 +30,8 @@ import { UsageStatusCard } from '@/components/customers/UsageStatusCard'
 import MembershipChangeRequestApproval from '@/components/admin/MembershipChangeRequestApproval'
 import { StudentLeaveCard } from '@/components/customers/StudentLeaveCard'
 import { getStudentLeaveSetting } from '@/actions/leave'
+import { StudentWithdrawalCard } from '@/components/customers/StudentWithdrawalCard'
+import { getStudentWithdrawalSetting } from '@/actions/withdrawal'
 
 export const dynamic = 'force-dynamic'
 
@@ -73,7 +75,8 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
         assignedCoachesRes,
         schedulesRes,
         changeRequestRes,
-        leaveSettingRes
+        leaveSettingRes,
+        withdrawalSettingRes
     ] = await Promise.all([
         // Fetch Lesson History via RPC (Bypasses RLS)
         supabase.rpc('get_student_lesson_history_public', {
@@ -126,7 +129,9 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
             .eq('status', 'pending')
             .limit(1),
         // Fetch Student Leave Setting
-        getStudentLeaveSetting(student.id)
+        getStudentLeaveSetting(student.id),
+        // Fetch Student Withdrawal Setting
+        getStudentWithdrawalSetting(student.id)
     ])
 
     const lessons = lessonsRes.data
@@ -144,6 +149,7 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
     const schedules = schedulesRes.data
     const changeRequest = changeRequestRes.data && changeRequestRes.data.length > 0 ? changeRequestRes.data[0] : null
     const leaveSetting = leaveSettingRes
+    const withdrawalSetting = withdrawalSettingRes
 
     // 担当コーチ情報のフォールバック：student_coachesテーブルが空でstudents.coach_idがある場合
     let finalAssignedCoaches: any[] = assignedCoaches || []
@@ -419,6 +425,16 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
                         studentId={student.id}
                         studentName={student.full_name}
                         initialSetting={leaveSetting}
+                        currentStatus={student.status || ''}
+                        hasStripeSubscription={!!student.stripe_subscription_id}
+                        isAdmin={isAdmin}
+                    />
+
+                    {/* Student Withdrawal Card (退会管理・再開リマインド) */}
+                    <StudentWithdrawalCard
+                        studentId={student.id}
+                        studentName={student.full_name}
+                        initialSetting={withdrawalSetting}
                         currentStatus={student.status || ''}
                         hasStripeSubscription={!!student.stripe_subscription_id}
                         isAdmin={isAdmin}

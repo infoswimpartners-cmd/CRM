@@ -9,7 +9,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Megaphone, Layers, History, Menu, Tag } from 'lucide-react';
+import { Megaphone, Layers, History, Menu, Tag, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
 import { LineMarketingHeader } from './components/LineMarketingHeader';
 import { MarketingKpiCards, MarketingKpiData } from './components/MarketingKpiCards';
@@ -18,12 +18,15 @@ import { StepScenarioEditorTab } from './components/StepScenarioEditorTab';
 import { DeliveryLogsTab } from './components/DeliveryLogsTab';
 import { LiffTrackingTab, preloadLiffTrackingData } from './components/LiffTrackingTab';
 import { RichMenuSettingsTab } from './components/RichMenuSettingsTab';
+import { IndividualChatTab } from './components/IndividualChatTab';
 import { getMarketingKpiSummaryAction, syncTrialDoneStudentsAction } from '@/actions/line-marketing';
 import { formatErrorToastMessage, sanitizeErrorMessage } from '@/lib/error-formatter';
 
 export default function LineMarketingPage() {
-    const [activeTab, setActiveTab] = useState<'broadcast' | 'steps' | 'tracking' | 'logs' | 'richmenu'>('broadcast');
+    const [activeTab, setActiveTab] = useState<'chat' | 'broadcast' | 'steps' | 'tracking' | 'logs' | 'richmenu'>('broadcast');
     const [selectedTagForBroadcast, setSelectedTagForBroadcast] = useState<string | null>(null);
+    const [initialChatLineUserId, setInitialChatLineUserId] = useState<string | null>(null);
+    const [chatBadgeCount, setChatBadgeCount] = useState(0);
     const [kpi, setKpi] = useState<MarketingKpiData>({
         totalSent: 0,
         successCount: 0,
@@ -61,11 +64,16 @@ export default function LineMarketingPage() {
             const params = new URLSearchParams(window.location.search);
             const tabParam = params.get('tab');
             const tagParam = params.get('tag');
-            if (tabParam && ['broadcast', 'steps', 'tracking', 'logs'].includes(tabParam)) {
+            const lineUserParam = params.get('lineUserId');
+            if (tabParam && ['chat', 'broadcast', 'steps', 'tracking', 'logs', 'richmenu'].includes(tabParam)) {
                 setActiveTab(tabParam as any);
             }
             if (tagParam) {
                 setSelectedTagForBroadcast(tagParam);
+            }
+            if (lineUserParam) {
+                setInitialChatLineUserId(lineUserParam);
+                setActiveTab('chat');
             }
         }
     }, [fetchKpi]);
@@ -108,9 +116,21 @@ export default function LineMarketingPage() {
             {/* KPIサマリーカード（総配信数、成功率、エラー件数、ステップ配信中生徒数） */}
             <MarketingKpiCards kpi={kpi} isLoading={isLoadingKpi} />
 
-            {/* 5大タブ構成（セグメント一括配信 / カード型ステップ配信 / LIFFアクセス分析・タグ / 配信ログ / リッチメニュー設定） */}
+            {/* 6大タブ構成（個別トーク / セグメント一括配信 / カード型ステップ配信 / LIFFアクセス分析・タグ / 配信ログ / リッチメニュー設定） */}
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="space-y-6">
-                <TabsList className="bg-slate-100 dark:bg-slate-800 p-1.5 rounded-xl grid grid-cols-2 sm:grid-cols-5 max-w-4xl h-auto border border-slate-200 dark:border-slate-700">
+                <TabsList className="bg-slate-100 dark:bg-slate-800 p-1.5 rounded-xl grid grid-cols-2 sm:grid-cols-6 max-w-5xl h-auto border border-slate-200 dark:border-slate-700">
+                    <TabsTrigger
+                        value="chat"
+                        className="py-2.5 px-3 font-semibold text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#06C755] dark:data-[state=active]:bg-slate-900 dark:data-[state=active]:text-[#06C755] data-[state=active]:shadow-sm transition-all"
+                    >
+                        <MessageSquare className="h-4 w-4 mr-1.5 text-[#06C755]" />
+                        個別トーク
+                        {chatBadgeCount > 0 && (
+                            <span className="ml-1.5 bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+                                {chatBadgeCount}
+                            </span>
+                        )}
+                    </TabsTrigger>
                     <TabsTrigger
                         value="broadcast"
                         className="py-2.5 px-3 font-semibold text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:text-blue-600 dark:data-[state=active]:bg-slate-900 dark:data-[state=active]:text-blue-400 data-[state=active]:shadow-sm transition-all"
@@ -147,6 +167,15 @@ export default function LineMarketingPage() {
                         リッチメニュー設定
                     </TabsTrigger>
                 </TabsList>
+
+                {/* タブ0: Lステップ風 1対1 個別トーク・チャット管理 */}
+                <TabsContent value="chat" forceMount className="data-[state=inactive]:hidden focus-visible:outline-none">
+                    <IndividualChatTab
+                        initialLineUserId={initialChatLineUserId}
+                        onUnreadCountChange={(unread, needsReply) => setChatBadgeCount(unread || needsReply)}
+                        onDeliverySuccess={fetchKpi}
+                    />
+                </TabsContent>
 
                 {/* タブ1: セグメント一括配信 */}
                 <TabsContent value="broadcast" forceMount className="data-[state=inactive]:hidden focus-visible:outline-none">

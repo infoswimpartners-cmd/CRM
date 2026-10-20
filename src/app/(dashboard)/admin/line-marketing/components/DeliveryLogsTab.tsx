@@ -184,8 +184,10 @@ export function DeliveryLogsTab() {
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">全種別</SelectItem>
+                                <SelectItem value="direct_chat">個別トーク</SelectItem>
                                 <SelectItem value="broadcast">一括配信</SelectItem>
                                 <SelectItem value="step_message">ステップ配信</SelectItem>
+                                <SelectItem value="cart_recovery">カゴ落ちフォロー</SelectItem>
                                 <SelectItem value="test_preview">テスト送信</SelectItem>
                             </SelectContent>
                         </Select>
@@ -289,21 +291,27 @@ export function DeliveryLogsTab() {
 
                                         {/* 配信種別 */}
                                         <TableCell>
-                                            {log.delivery_type === 'broadcast' && (
+                                            {(log.delivery_type === 'direct_chat' || log.step_name === '個別トーク（1対1チャット）') ? (
+                                                <Badge variant="outline" className="text-[11px] bg-emerald-50 text-emerald-700 border-emerald-200">
+                                                    個別トーク
+                                                </Badge>
+                                            ) : log.delivery_type === 'broadcast' ? (
                                                 <Badge variant="outline" className="text-[11px] bg-blue-50 text-blue-700 border-blue-200">
                                                     一括配信
                                                 </Badge>
-                                            )}
-                                            {log.delivery_type === 'step_message' && (
+                                            ) : log.delivery_type === 'step_message' ? (
                                                 <Badge variant="outline" className="text-[11px] bg-purple-50 text-purple-700 border-purple-200">
                                                     ステップ
                                                 </Badge>
-                                            )}
-                                            {log.delivery_type === 'test_preview' && (
+                                            ) : log.delivery_type === 'cart_recovery' ? (
+                                                <Badge variant="outline" className="text-[11px] bg-indigo-50 text-indigo-700 border-indigo-200">
+                                                    カゴ落ち
+                                                </Badge>
+                                            ) : log.delivery_type === 'test_preview' ? (
                                                 <Badge variant="outline" className="text-[11px] bg-amber-50 text-amber-700 border-amber-200">
                                                     テスト
                                                 </Badge>
-                                            )}
+                                            ) : null}
                                         </TableCell>
 
                                         {/* 宛先生徒 */}

@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Search, User, ChevronLeft } from 'lucide-react'
+import { Search, User, ChevronLeft, Bell } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
 import {
     Table,
@@ -29,6 +30,11 @@ interface Student {
     membership_types?: {
         name: string
     }
+    withdrawal_setting?: {
+        withdrawal_date?: string
+        resume_target_month?: string
+        resume_reminder_sent_at?: string | null
+    } | null
 }
 
 export default function WithdrawnCustomersPage() {
@@ -43,22 +49,44 @@ export default function WithdrawnCustomersPage() {
     const fetchStudents = async () => {
         setLoading(true)
         const supabase = createClient()
-        let query = supabase
-            .from('students')
-            .select(`
-                *,
-                membership_types:membership_type_id (
-                    name
-                )
-            `)
-            .eq('status', 'withdrawn')
-            .order('created_at', { ascending: false })
+        const [studentsRes, configsRes] = await Promise.all([
+            supabase
+                .from('students')
+                .select(`
+                    *,
+                    membership_types:membership_type_id (
+                        name
+                    )
+                `)
+                .eq('status', 'withdrawn')
+                .order('created_at', { ascending: false }),
+            supabase
+                .from('app_configs')
+                .select('key, value')
+                .ilike('key', 'student_withdrawal:%')
+        ])
 
-        const { data, error } = await query
-        if (error) {
-            console.error('Error fetching students:', error)
+        if (studentsRes.error) {
+            console.error('Error fetching students:', studentsRes.error)
         }
-        if (data) setStudents(data)
+
+        const withdrawalMap: Record<string, any> = {}
+        if (configsRes.data) {
+            configsRes.data.forEach((c) => {
+                try {
+                    const studentId = c.key.replace('student_withdrawal:', '')
+                    withdrawalMap[studentId] = JSON.parse(c.value)
+                } catch {}
+            })
+        }
+
+        if (studentsRes.data) {
+            const mapped = studentsRes.data.map((s) => ({
+                ...s,
+                withdrawal_setting: withdrawalMap[s.id] || null,
+            }))
+            setStudents(mapped)
+        }
         setLoading(false)
     }
 
@@ -99,6 +127,7 @@ export default function WithdrawnCustomersPage() {
                         <TableRow>
                             <TableHead>氏名</TableHead>
                             <TableHead>ステータス</TableHead>
+                            <TableHead>再開案内予定</TableHead>
                             <TableHead>会員区分</TableHead>
                             <TableHead>カナ</TableHead>
                             <TableHead>性別</TableHead>
@@ -108,11 +137,11 @@ export default function WithdrawnCustomersPage() {
                     <TableBody>
                         {loading ? (
                             <TableRow>
-                                <TableCell colSpan={6} className="h-24 text-center">読み込み中...</TableCell>
+                                <TableCell colSpan={7} className="h-24 text-center">読み込み中...</TableCell>
                             </TableRow>
                         ) : filteredStudents.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={6} className="h-24 text-center">退会者は見つかりません</TableCell>
+                                <TableCell colSpan={7} className="h-24 text-center">退会者は見つかりません</TableCell>
                             </TableRow>
                         ) : (
                             filteredStudents.map((student) => (
@@ -135,6 +164,21 @@ export default function WithdrawnCustomersPage() {
                                                 initialStatus={student.status || 'withdrawn'}
                                             />
                                         </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        {student.withdrawal_setting?.resume_target_month ? (
+                                            <div className="flex flex-col gap-0.5">
+                                                <Badge variant="outline" className="border-amber-300 text-amber-800 bg-amber-50 text-[11px] font-bold w-fit whitespace-nowrap">
+                                                    <Bell className="h-3 w-3 mr-1 text-amber-600 inline" />
+                                                    {student.withdrawal_setting.resume_target_month.replace('-', '年')}月頃
+                                                </Badge>
+                                                <span className="text-[10px] text-slate-400 pl-0.5">
+                                                    {student.withdrawal_setting.resume_reminder_sent_at ? '案内送信済' : '未送信'}
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <span className="text-xs text-slate-300">-</span>
+                                        )}
                                     </TableCell>
                                     <TableCell>
                                         <div onClick={(e) => e.stopPropagation()}>
