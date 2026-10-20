@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import liff from "@line/liff";
 import Link from "next/link";
 import { 
@@ -84,6 +84,7 @@ export default function BookingForm() {
   const [showSecondStudent, setShowSecondStudent] = useState(false);
   // ご紹介者入力欄の展開トグル（初期値: 折りたたみ、誤入力・誤認を防止）
   const [hasReferrer, setHasReferrer] = useState(false);
+  const referrerInputRef = useRef<HTMLInputElement>(null);
 
   // 送信成功フラグ（サンクス画面の表示制御）
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -1300,6 +1301,8 @@ export default function BookingForm() {
                     setHasReferrer(next);
                     if (!next) {
                       setFormData(prev => ({ ...prev, referrerName: "" }));
+                    } else {
+                      setTimeout(() => referrerInputRef.current?.focus(), 80);
                     }
                   }}
                 >
@@ -1312,6 +1315,8 @@ export default function BookingForm() {
                         setHasReferrer(next);
                         if (!next) {
                           setFormData(prev => ({ ...prev, referrerName: "" }));
+                        } else {
+                          setTimeout(() => referrerInputRef.current?.focus(), 80);
                         }
                       }}
                       onClick={(e) => e.stopPropagation()}
@@ -1345,12 +1350,13 @@ export default function BookingForm() {
                       ご紹介いただいた方（お友達・会員様）のお名前
                     </Label>
                     <Input
+                      ref={referrerInputRef}
                       id="referrerName"
                       type="text"
                       name="referrerName"
                       value={formData.referrerName}
                       onChange={handleChange}
-                      placeholder="例：山田 太郎 様（※受講者様ご自身ではなく、紹介してくれた方のお名前）"
+                      placeholder="例：紹介してくれたお友達のお名前（田中 〇〇 様）"
                       className="h-11 text-sm rounded-xl border-amber-200 bg-white focus-visible:ring-amber-500"
                     />
                     {formData.name.trim() && formData.referrerName.trim() === formData.name.trim() && (
