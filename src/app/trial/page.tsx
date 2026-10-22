@@ -131,6 +131,7 @@ export default function BookingForm() {
   const [customTimeMode3, setCustomTimeMode3] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   // LIFF初期化 & Webハイブリッド対応
@@ -320,6 +321,7 @@ export default function BookingForm() {
   // フォーム送信処理（LIFF/Webハイブリッド）
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingRef.current || isSubmitting) return;
     setSubmitError(null);
     
     // スクロールとフォーカス付きのエラー通知
@@ -377,6 +379,7 @@ export default function BookingForm() {
       return;
     }
 
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
 
     // 日時文字列のフォーマット
@@ -462,6 +465,7 @@ export default function BookingForm() {
       console.error("送信エラー:", error);
       setSubmitError("通信エラーが発生しました。インターネット接続をご確認の上、もう一度お試しください。");
     } finally {
+      isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
   };

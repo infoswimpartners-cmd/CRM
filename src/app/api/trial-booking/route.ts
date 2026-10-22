@@ -20,41 +20,123 @@ export async function POST(req: Request) {
     const referrerNote = referrer ? `【ご紹介者様】${referrer} 様（お友達紹介キャンペーン対象: 特別価格3,500円）` : "";
     const combinedNotes = [referrerNote, payload.notes].filter(Boolean).join("\n\n") || null;
 
-    // 1. Supabaseの leads テーブルに直接保存（/admin/leads で即座に確認可能に）
+    // 1. Supabaseの leads テーブルへの重複防止付き保存（同一人物の重複登録・連打防止）
+    let isDuplicateSubmission = false;
     try {
-      const { data: newLead, error: leadError } = await supabase
-        .from('leads')
-        .insert({
-          name: payload.name || '未入力',
-          full_name_kana: payload.kana || null,
-          birth_date: payload.dob || null,
-          gender: payload.gender || null,
-          second_student_name: payload.name2 || null,
-          second_student_kana: payload.kana2 || null,
-          second_student_birth_date: payload.dob2 || null,
-          second_student_gender: payload.gender2 || null,
-          email: payload.email || null,
-          phone: payload.phone || null,
-          area: payload.station || null,
-          datetime1: payload.datetime1 || null,
-          datetime2: payload.datetime2 || null,
-          datetime3: payload.datetime3 || null,
-          available_times: payload.availableTimes || null,
-          skill_level: payload.skillLevel || null,
-          frequency: payload.frequency || null,
-          notes: combinedNotes,
-          line_user_id: payload.userId || null,
-          status: '新規',
-          created_at: new Date().toISOString()
-        })
-        .select()
-        .maybeSingle();
+      const cleanPhone = (payload.phone || '').replace(/[-\s]/g, '').trim();
+      const applicantEmail = (payload.email || '').trim().toLowerCase();
+      const applicantLineId = (payload.userId || '').trim();
 
-      if (leadError) {
-        console.error('[Trial Booking] Failed to save lead to DB:', leadError);
+      // 既存リードの検索（未完了または直近24時間以内の同一人物）
+      let existingLead: any = null;
+
+      // 1.1 LINE ID で検索
+      if (applicantLineId) {
+        const { data: leadsByLine } = await supabase
+          .from('leads')
+          .select('id, status, created_at, name')
+          .eq('line_user_id', applicantLineId)
+          .order('created_at', { ascending: false })
+          .limit(5);
+
+        if (leadsByLine && leadsByLine.length > 0) {
+          // 未確定（新規、連絡中、調整中）を最優先、なければ直近のものを取得
+          existingLead = leadsByLine.find(l => ['新規', '連絡中', '調整中'].includes(l.status)) || leadsByLine[0];
+        }
+      }
+
+      // 1.2 メールアドレスで検索
+      if (!existingLead && applicantEmail) {
+        const { data: leadsByEmail } = await supabase
+          .from('leads')
+          .select('id, status, created_at, name')
+          .ilike('email', applicantEmail)
+          .order('created_at', { ascending: false })
+          .limit(5);
+
+        if (leadsByEmail && leadsByEmail.length > 0) {
+          existingLead = leadsByEmail.find(l => ['新規', '連絡中', '調整中'].includes(l.status)) || leadsByEmail[0];
+        }
+      }
+
+      // 1.3 電話番号で検索
+      if (!existingLead && cleanPhone) {
+        const { data: allRecentLeads } = await supabase
+          .from('leads')
+          .select('id, status, created_at, phone, name')
+          .order('created_at', { ascending: false })
+          .limit(50);
+
+        if (allRecentLeads) {
+          existingLead = allRecentLeads.find(l => {
+            const lp = (l.phone || '').replace(/[-\s]/g, '').trim();
+            return lp && (lp === cleanPhone || lp.endsWith(cleanPhone) || cleanPhone.endsWith(lp));
+          });
+        }
+      }
+
+      const leadDataToSave = {
+        name: payload.name || '未入力',
+        full_name_kana: payload.kana || null,
+        birth_date: payload.dob || null,
+        gender: payload.gender || null,
+        second_student_name: payload.name2 || null,
+        second_student_kana: payload.kana2 || null,
+        second_student_birth_date: payload.dob2 || null,
+        second_student_gender: payload.gender2 || null,
+        email: payload.email ? payload.email.trim() : null,
+        phone: payload.phone ? payload.phone.trim() : null,
+        area: payload.station || null,
+        datetime1: payload.datetime1 || null,
+        datetime2: payload.datetime2 || null,
+        datetime3: payload.datetime3 || null,
+        available_times: payload.availableTimes || null,
+        skill_level: payload.skillLevel || null,
+        frequency: payload.frequency || null,
+        notes: combinedNotes,
+        line_user_id: payload.userId || null,
+      };
+
+      // 直近の二重送信判定（同一人物が120秒以内に送信したか）
+      const nowMs = Date.now();
+      const existingCreatedAtMs = existingLead ? new Date(existingLead.created_at).getTime() : 0;
+      const isRapidResubmission = existingLead && (nowMs - existingCreatedAtMs < 120 * 1000);
+
+      // 未完了（新規/連絡中/調整中）のリードが存在する場合、または120秒以内の連打の場合は既存レコードをUPDATE
+      if (existingLead && (['新規', '連絡中', '調整中'].includes(existingLead.status) || isRapidResubmission)) {
+        savedLeadId = existingLead.id;
+        isDuplicateSubmission = isRapidResubmission;
+        console.log(`[Trial Booking] Found existing active/recent lead (${existingLead.id}, rapid=${isRapidResubmission}). Updating instead of creating duplicate.`);
+
+        const { error: updateLeadErr } = await supabase
+          .from('leads')
+          .update({
+            ...leadDataToSave,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingLead.id);
+
+        if (updateLeadErr) {
+          console.error('[Trial Booking] Failed to update existing lead:', updateLeadErr);
+        }
       } else {
-        savedLeadId = newLead?.id || null;
-        console.log('[Trial Booking] Lead successfully saved to DB:', newLead?.id);
+        // 新規作成
+        const { data: newLead, error: leadError } = await supabase
+          .from('leads')
+          .insert({
+            ...leadDataToSave,
+            status: '新規',
+            created_at: new Date().toISOString()
+          })
+          .select()
+          .maybeSingle();
+
+        if (leadError) {
+          console.error('[Trial Booking] Failed to save lead to DB:', leadError);
+        } else {
+          savedLeadId = newLead?.id || null;
+          console.log('[Trial Booking] Lead successfully saved to DB:', newLead?.id);
+        }
       }
     } catch (dbErr) {
       console.error('[Trial Booking] Exception saving lead to DB:', dbErr);
@@ -285,7 +367,7 @@ SWIM PARTNERS/スイムパートナーズ事務局`;
         gchatWebhookUrl = process.env.GOOGLE_CHAT_WEBHOOK_URL || null;
       }
 
-      if (gchatWebhookUrl) {
+      if (gchatWebhookUrl && !isDuplicateSubmission) {
         const gchatMessage = 
           `🏊‍♂️ *【体験レッスンお申し込みを受信しました】*\n` +
           `・氏名: *${payload.name || '未入力'}* 様（${payload.kana || ''}）\n` +
@@ -307,7 +389,8 @@ SWIM PARTNERS/スイムパートナーズ事務局`;
     }
 
     // 4.2. 対応可能コーチの自動選定 ＆ 各コーチ個別スペースへの自動送信（パターンA ＋ 2名以下全員送信）
-    if (savedLeadId) {
+    // ※ 短時間連打・重複時は二重配信を防止
+    if (savedLeadId && !isDuplicateSubmission) {
       try {
         const dispatchResult = await dispatchNewLeadToMatchingCoaches(savedLeadId);
         console.log(`[Trial Booking] Coach matching dispatch result:`, dispatchResult);

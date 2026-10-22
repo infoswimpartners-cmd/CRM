@@ -106,6 +106,95 @@ function parseConfirmedDateTime(dateTimeStr: string): { start: string; end: stri
     }
 }
 
+// リード情報から既存生徒を安全に照合するヘルパー関数
+async function findStudentForLead(supabaseAdmin: any, lead: { line_user_id?: string | null; email?: string | null; phone?: string | null; name?: string | null }): Promise<{ id: string; contact_email: string | null; full_name?: string | null; stripe_customer_id?: string | null } | null> {
+    // 1. LINE User ID で照合
+    if (lead.line_user_id) {
+        const { data: studentsByLine } = await supabaseAdmin
+            .from('students')
+            .select('id, contact_email, stripe_customer_id, full_name, status')
+            .eq('line_user_id', lead.line_user_id)
+            .order('created_at', { ascending: false })
+        if (studentsByLine && studentsByLine.length > 0) {
+            const matchStd = studentsByLine.find((s: any) => s.status === 'friend_only') || studentsByLine[0]
+            return {
+                id: matchStd.id,
+                contact_email: matchStd.contact_email,
+                full_name: matchStd.full_name,
+                stripe_customer_id: matchStd.stripe_customer_id
+            }
+        }
+    }
+
+    // 2. メールアドレスで照合
+    if (lead.email && lead.email.trim()) {
+        const { data: stdByEmail } = await supabaseAdmin
+            .from('students')
+            .select('id, contact_email, stripe_customer_id, full_name')
+            .ilike('contact_email', lead.email.trim())
+            .maybeSingle()
+        if (stdByEmail) {
+            return {
+                id: stdByEmail.id,
+                contact_email: stdByEmail.contact_email,
+                full_name: stdByEmail.full_name,
+                stripe_customer_id: stdByEmail.stripe_customer_id
+            }
+        }
+    }
+
+    // 3. 電話番号で照合（ハイフン除去・空白除去して5000件検索）
+    if (lead.phone) {
+        const cleanPhone = lead.phone.replace(/[\s\-]/g, '').trim()
+        if (cleanPhone) {
+            const { data: allPhoneStudents } = await supabaseAdmin
+                .from('students')
+                .select('id, contact_email, stripe_customer_id, full_name, contact_phone')
+                .not('contact_phone', 'is', null)
+                .limit(5000)
+            const matchPhone = allPhoneStudents?.find((s: any) => (s.contact_phone || '').replace(/[\s\-]/g, '').trim() === cleanPhone)
+            if (matchPhone) {
+                return {
+                    id: matchPhone.id,
+                    contact_email: matchPhone.contact_email,
+                    full_name: matchPhone.full_name,
+                    stripe_customer_id: matchPhone.stripe_customer_id
+                }
+            }
+        }
+    }
+
+    // 4. お名前で照合（全角半角スペース除去・100件上限を撤廃）
+    if (lead.name) {
+        const cleanLeadName = lead.name.replace(/[\s　]+/g, '').trim()
+        if (cleanLeadName) {
+            const { data: stdByName } = await supabaseAdmin
+                .from('students')
+                .select('id, contact_email, stripe_customer_id, full_name')
+                .ilike('full_name', `%${cleanLeadName}%`)
+                .limit(50)
+            let matchStd = stdByName?.find((s: any) => (s.full_name || '').replace(/[\s　]+/g, '').trim() === cleanLeadName)
+            if (!matchStd) {
+                const { data: allStudents } = await supabaseAdmin
+                    .from('students')
+                    .select('id, contact_email, stripe_customer_id, full_name')
+                    .limit(5000)
+                matchStd = allStudents?.find((s: any) => (s.full_name || '').replace(/[\s　]+/g, '').trim() === cleanLeadName)
+            }
+            if (matchStd) {
+                return {
+                    id: matchStd.id,
+                    contact_email: matchStd.contact_email,
+                    full_name: matchStd.full_name,
+                    stripe_customer_id: matchStd.stripe_customer_id
+                }
+            }
+        }
+    }
+
+    return null
+}
+
 // 体験アサイン時に体験スケジュールを登録し決済リンクを生成するヘルパー関数
 async function createTrialScheduleForLead(params: {
     leadId: string
@@ -784,45 +873,11 @@ export async function assignLeadAction(leadId: string, confirmedDate: string, co
         let studentId: string | null = null
         let studentEmail: string | null = lead.email || null
 
-        // LINE ID での生徒検索
-        if (lead.line_user_id) {
-            const { data: studentsByLine } = await supabaseAdmin
-                .from('students')
-                .select('id, contact_email, stripe_customer_id, full_name, status')
-                .eq('line_user_id', lead.line_user_id)
-                .order('created_at', { ascending: false })
-            if (studentsByLine && studentsByLine.length > 0) {
-                const matchStd = studentsByLine.find(s => s.status === 'friend_only') || studentsByLine[0]
-                studentId = matchStd.id
-                if (matchStd.contact_email) studentEmail = matchStd.contact_email
-            }
-        }
-
-        // メールアドレスでの生徒検索
-        if (!studentId && lead.email) {
-            const { data: stdByEmail } = await supabaseAdmin
-                .from('students')
-                .select('id, contact_email, stripe_customer_id, full_name')
-                .ilike('contact_email', lead.email.trim())
-                .maybeSingle()
-            if (stdByEmail) {
-                studentId = stdByEmail.id
-                if (stdByEmail.contact_email) studentEmail = stdByEmail.contact_email
-            }
-        }
-
-        // お名前での生徒検索
-        if (!studentId && lead.name) {
-            const cleanLeadName = lead.name.replace(/[\s　]+/g, '')
-            const { data: allStudents } = await supabaseAdmin
-                .from('students')
-                .select('id, contact_email, stripe_customer_id, full_name')
-                .limit(100)
-            const matchStd = allStudents?.find(s => (s.full_name || '').replace(/[\s　]+/g, '') === cleanLeadName)
-            if (matchStd) {
-                studentId = matchStd.id
-                if (matchStd.contact_email) studentEmail = matchStd.contact_email
-            }
+        // 既存生徒をLINE / メール / 電話番号 / 氏名から安全に照合（100件制限撤廃・電話番号照合対応）
+        const matchedStudent = await findStudentForLead(supabaseAdmin, lead)
+        if (matchedStudent) {
+            studentId = matchedStudent.id
+            if (matchedStudent.contact_email) studentEmail = matchedStudent.contact_email
         }
 
         // 生徒マスタに存在しない場合は、リード情報から新規生徒を自動作成
@@ -833,7 +888,7 @@ export async function assignLeadAction(leadId: string, confirmedDate: string, co
                     full_name: lead.name || 'お客様',
                     full_name_kana: lead.full_name_kana || null,
                     contact_email: lead.email || null,
-                    phone: lead.phone || null,
+                    contact_phone: lead.phone || null,
                     line_user_id: lead.line_user_id || null,
                     gender: lead.gender || null,
                     birth_date: lead.birth_date || null,
@@ -1261,45 +1316,11 @@ export async function adminAssignLeadAction(
         let studentId: string | null = null
         let studentEmail: string | null = lead.email || null
 
-        // LINE ID での生徒検索
-        if (lead.line_user_id) {
-            const { data: studentsByLine } = await supabaseAdmin
-                .from('students')
-                .select('id, contact_email, stripe_customer_id, full_name, status')
-                .eq('line_user_id', lead.line_user_id)
-                .order('created_at', { ascending: false })
-            if (studentsByLine && studentsByLine.length > 0) {
-                const matchStd = studentsByLine.find(s => s.status === 'friend_only') || studentsByLine[0]
-                studentId = matchStd.id
-                if (matchStd.contact_email) studentEmail = matchStd.contact_email
-            }
-        }
-
-        // メールアドレスでの生徒検索
-        if (!studentId && lead.email) {
-            const { data: stdByEmail } = await supabaseAdmin
-                .from('students')
-                .select('id, contact_email, stripe_customer_id, full_name')
-                .ilike('contact_email', lead.email.trim())
-                .maybeSingle()
-            if (stdByEmail) {
-                studentId = stdByEmail.id
-                if (stdByEmail.contact_email) studentEmail = stdByEmail.contact_email
-            }
-        }
-
-        // お名前での生徒検索
-        if (!studentId && lead.name) {
-            const cleanLeadName = lead.name.replace(/[\s　]+/g, '')
-            const { data: allStudents } = await supabaseAdmin
-                .from('students')
-                .select('id, contact_email, stripe_customer_id, full_name')
-                .limit(100)
-            const matchStd = allStudents?.find(s => (s.full_name || '').replace(/[\s　]+/g, '') === cleanLeadName)
-            if (matchStd) {
-                studentId = matchStd.id
-                if (matchStd.contact_email) studentEmail = matchStd.contact_email
-            }
+        // 既存生徒をLINE / メール / 電話番号 / 氏名から安全に照合（100件制限撤廃・電話番号照合対応）
+        const matchedStudent = await findStudentForLead(supabaseAdmin, lead)
+        if (matchedStudent) {
+            studentId = matchedStudent.id
+            if (matchedStudent.contact_email) studentEmail = matchedStudent.contact_email
         }
 
         // 生徒マスタに存在しない場合は、リード情報から新規生徒を自動作成
@@ -1310,7 +1331,7 @@ export async function adminAssignLeadAction(
                     full_name: lead.name || 'お客様',
                     full_name_kana: lead.full_name_kana || null,
                     contact_email: lead.email || null,
-                    phone: lead.phone || null,
+                    contact_phone: lead.phone || null,
                     line_user_id: lead.line_user_id || null,
                     gender: lead.gender || null,
                     birth_date: lead.birth_date || null,
@@ -2707,27 +2728,11 @@ export async function getOrCreateTrialPaymentUrlAction(leadId: string): Promise<
             }
         }
 
-        // 4. 生徒マスタの検索・自動作成
+        // 4. 生徒マスタの検索・自動作成（LINE / メール / 電話番号 / 氏名から安全に照合、100件制限撤廃）
         let studentId: string | null = null
-        if (lead.line_user_id) {
-            const { data: studentsByLine } = await supabaseAdmin
-                .from('students')
-                .select('id, status')
-                .eq('line_user_id', lead.line_user_id)
-                .order('created_at', { ascending: false })
-            if (studentsByLine && studentsByLine.length > 0) {
-                studentId = (studentsByLine.find(s => s.status === 'friend_only') || studentsByLine[0]).id
-            }
-        }
-        if (!studentId && lead.email) {
-            const { data: s } = await supabaseAdmin.from('students').select('id').ilike('contact_email', lead.email.trim()).maybeSingle()
-            if (s) studentId = s.id
-        }
-        if (!studentId && lead.name) {
-            const cleanLeadName = lead.name.replace(/[\s　]+/g, '')
-            const { data: allStudents } = await supabaseAdmin.from('students').select('id, full_name').limit(100)
-            const matchStd = allStudents?.find(s => (s.full_name || '').replace(/[\s　]+/g, '') === cleanLeadName)
-            if (matchStd) studentId = matchStd.id
+        const matchedStudent = await findStudentForLead(supabaseAdmin, lead)
+        if (matchedStudent) {
+            studentId = matchedStudent.id
         }
 
         if (!studentId) {
@@ -2737,7 +2742,7 @@ export async function getOrCreateTrialPaymentUrlAction(leadId: string): Promise<
                     full_name: lead.name || 'お客様',
                     full_name_kana: lead.full_name_kana || null,
                     contact_email: lead.email || null,
-                    phone: lead.phone || null,
+                    contact_phone: lead.phone || null,
                     line_user_id: lead.line_user_id || null,
                     gender: lead.gender || null,
                     birth_date: lead.birth_date || null,
