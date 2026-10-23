@@ -59,6 +59,33 @@ export default async function AdminDashboard(props: {
                 </div>
             </div>
 
+            {/* SwimPartners Quest (ERP & Gamification Dashboard) クイック起動バナー */}
+            <div className="bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-900 border border-indigo-500/40 rounded-3xl p-5 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-slate-950 uppercase">
+                            NEW / ERP & RPG
+                        </span>
+                        <span className="text-xs font-bold text-cyan-300">
+                            ギルドLv・月次P/L・投資回収計算機・コーチズギルド統合
+                        </span>
+                    </div>
+                    <h2 className="text-lg md:text-xl font-black tracking-tight flex items-center gap-2">
+                        <Crown className="w-5 h-5 text-amber-400" />
+                        SwimPartners Quest（総合経営・顧客・コーチ評価コマンドセンター）
+                    </h2>
+                    <p className="text-xs text-slate-300">
+                        年収1,000万円モデル（月間粗利105万円＝Guild Lv.50）到達度、代表人件費控除後P/L、LTV/CAC、自己資金ペイバック計算をリアルタイム分析
+                    </p>
+                </div>
+                <Link
+                    href="/admin/quest"
+                    className="shrink-0 inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 font-black text-xs md:text-sm hover:brightness-110 transition shadow-lg"
+                >
+                    コマンドセンターを開く →
+                </Link>
+            </div>
+
             <Suspense fallback={<AdminDashboardSkeleton />}>
                 <AdminDashboardContent monthParam={monthParam} />
             </Suspense>

@@ -65,6 +65,13 @@ export const navigationConfig: NavigationConfig = {
                         exact: true,
                         description: '全体KPI・アラート・最新状況',
                     },
+                    {
+                        title: 'SwimPartners Quest',
+                        href: '/admin/quest',
+                        icon: Sparkles,
+                        badge: 'ERP・RPG',
+                        description: '総合経営P/L・投資計算機・ギルド評価',
+                    },
                 ],
             },
             {
@@ -185,6 +192,12 @@ export const navigationConfig: NavigationConfig = {
                         href: '/coach',
                         icon: LayoutDashboard,
                         exact: true,
+                    },
+                    {
+                        title: 'コーチズ・ギルド',
+                        href: '/coach/quest',
+                        icon: Sparkles,
+                        badge: 'Lv・報酬UP',
                     },
                 ],
             },
