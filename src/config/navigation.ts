@@ -193,12 +193,6 @@ export const navigationConfig: NavigationConfig = {
                         icon: LayoutDashboard,
                         exact: true,
                     },
-                    {
-                        title: 'コーチズ・ギルド',
-                        href: '/coach/quest',
-                        icon: Sparkles,
-                        badge: 'Lv・報酬UP',
-                    },
                 ],
             },
             {

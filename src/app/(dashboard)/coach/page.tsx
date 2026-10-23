@@ -43,29 +43,6 @@ export default async function CoachDashboard() {
             {/* Bank Info Alert Banner */}
             <BankAlertBanner userId={user.id} />
 
-            {/* コーチズ・ギルド (SwimPartners Quest) 起動バナー */}
-            <div className="bg-gradient-to-r from-slate-950 via-amber-950/80 to-slate-900 border border-amber-500/40 rounded-2xl p-4 md:p-5 text-white shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-slate-950">
-                            COACH&apos;S GUILD
-                        </span>
-                        <span className="text-xs font-bold text-amber-300">
-                            スライド報酬ランク（50%〜70%）進捗・ファストパス案件・感謝の宝箱
-                        </span>
-                    </div>
-                    <h2 className="text-base md:text-lg font-black">
-                        🔥 コーチズ・ギルド（ランク昇格ゲージ＆3行報告EXPクエスト）
-                    </h2>
-                </div>
-                <Link
-                    href="/coach/quest"
-                    className="shrink-0 inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 font-black text-xs hover:brightness-110 transition shadow-md"
-                >
-                    ギルド画面を開く →
-                </Link>
-            </div>
-
             <Suspense fallback={<CoachDashboardSkeleton />}>
                 <CoachDashboardContent userId={user.id} profile={profile} />
             </Suspense>
