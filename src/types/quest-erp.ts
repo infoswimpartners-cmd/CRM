@@ -37,6 +37,7 @@ export interface QuestStudent {
     status: FunnelStage
     acquisition_channel: AcquisitionChannel
     swim_step_level: number // Lv.1 〜 Lv.20
+    swim_step_rank?: SkillRank // SSS 〜 D
     swim_step_title: string // 例: "Lv.1 水慣れ", "Lv.8 クロール息継ぎ", "Lv.20 4泳法マスター"
     next_challenge: string // 次回レッスンの課題
     aio_status: AioArticleStatus
@@ -66,14 +67,31 @@ export interface GratitudeMessage {
     exp_bonus: number
 }
 
+export type SkillRank = 'SSS' | 'SS' | 'S' | 'A' | 'B' | 'C' | 'D'
+
+export interface SkillEvaluation {
+    id: string
+    name: string // 例: "【豪腕収益術】STR" / "【水恐怖心ゼロ化】"
+    category: '経営・ギルド' | '指導・技術' | '成約・定着' | '機動・スピード' | 'ホスピタリティ' | '水泳進級'
+    rank: SkillRank // SSS 〜 D
+    score: number // 0 〜 100
+    level: number // 1 〜 10
+    currentValueLabel: string // 例: "月粗利 ¥982,000"
+    nextThresholdLabel: string // 例: "SSS昇格まで あと¥68,000"
+    abilityDescription: string // 発動アビリティ・効果
+    badgeIcon: string
+}
+
 export interface CoachSkillNode {
     id: string
     name: string
     category: '指導技術' | '成約・定着' | 'スピード対応' | '専門スキル'
+    rank?: SkillRank
     level: number
     max_level: number
     unlocked: boolean
     description: string
+    bonusExpRate?: number
 }
 
 // ② コーチテーブル（Coaches / 新規・拡張）
@@ -83,6 +101,7 @@ export interface QuestCoach {
     avatar_initials: string
     coach_type: CoachType
     home_station: string
+    rpg_class?: string // RPGクラス・二つ名（例: "疾風のフォーム矯正士", "深海のクロージングマスター"）
     target_monthly_income: number // 希望月収目標
     current_month_lessons: number // 当月完遂コマ数
     reward_rank: RewardRank // Standard[50%] 〜 Platinum[70%]
@@ -94,6 +113,7 @@ export interface QuestCoach {
     is_ceo?: boolean // 代表自身かどうか
     gratitude_chest: GratitudeMessage[] // 感謝の宝箱コレクション
     skills: CoachSkillNode[] // スキルツリー
+    evaluations?: SkillEvaluation[] // 各分野のスキルランク評価
 }
 
 // ③ レッスン＆収支トランザクション（Lessons_Transactions / 既存拡張）
@@ -188,10 +208,12 @@ export interface SixAxisRadarScore {
     axis: string
     code: 'STR' | 'VIT' | 'AGI' | 'INT' | 'DEX' | 'LUK'
     score: number // 0 - 100
+    rank: SkillRank // SSS 〜 D
     fullMark: number
     rawValueLabel: string
     targetLabel: string
     description: string
+    abilityName: string // 発動スキル名（例: "豪腕収益術", "鉄壁ストック術"）
 }
 
 // エリア別・施設別ROIマトリクス行
