@@ -89,7 +89,20 @@ import {
     calculateAreaRoiMatrix,
     simulateInvestmentPayback,
 } from '@/lib/analytics-engine'
-import { RealQuestDataResult, getScoreRank, getSwimStepRank } from '@/lib/quest-real-data'
+import type { RealQuestDataResult } from '@/lib/quest-real-data'
+
+/**
+ * スイムステップレベル（Lv.1〜20）からスキルランクを算出する（クライアント側ヘルパー）
+ */
+function getSwimStepRank(level: number): SkillRank {
+    if (level >= 20) return 'SSS'
+    if (level >= 16) return 'SS'
+    if (level >= 13) return 'S'
+    if (level >= 11) return 'A'
+    if (level >= 8) return 'B'
+    if (level >= 5) return 'C'
+    return 'D'
+}
 
 type ActiveTab =
     | 'command_center'
@@ -190,6 +203,9 @@ export function SwimPartnersQuestApp({
                     setCoaches(result.coaches)
                     setTransactions(result.transactions)
                     setFinances(result.finances)
+                    if (result.quests && Array.isArray(result.quests)) {
+                        setQuests(result.quests)
+                    }
                     setFastPassQuests(result.fastPassQuests)
                     setIsLiveDatabase(true)
                     setRewardCelebration({
@@ -197,28 +213,38 @@ export function SwimPartnersQuestApp({
                         title: '⚡ REAL DATABASE SYNC COMPLETE!',
                         gainedExp: 250,
                         gainedYen: 0,
-                        subMessage: `Supabase本番DB（生徒${result.students.length}名、レッスン${result.transactions.length}件、コーチ${result.coaches.length}名）とのリアルタイム同期に成功しました！`,
+                        subMessage: `Supabase本番DB（生徒${result.students.length}名、レッスン${result.transactions.length}件、コーチ${result.coaches.length}名、クエスト${result.quests?.length || 0}件）とのリアルタイム同期に成功しました！`,
                     })
                     return
                 }
             }
-            // フォールバック
-            const { fetchQuestRealData } = await import('@/lib/quest-real-data')
-            const result = await fetchQuestRealData()
-            if (result.isRealData) {
-                setStudents(result.students)
-                setCoaches(result.coaches)
-                setTransactions(result.transactions)
-                setFinances(result.finances)
-                setFastPassQuests(result.fastPassQuests)
-                setIsLiveDatabase(true)
-                setRewardCelebration({
-                    visible: true,
-                    title: '⚡ REAL DATABASE SYNC COMPLETE!',
-                    gainedExp: 250,
-                    gainedYen: 0,
-                    subMessage: `Supabase本番DB（生徒${result.students.length}名、レッスン${result.transactions.length}件、コーチ${result.coaches.length}名）とのリアルタイム同期に成功しました！`,
-                })
+            // フォールバック（API未疎通時の安全なクライアントサイドフォールバック）
+            if (initialRealData) {
+                setStudents(initialRealData.students)
+                setCoaches(initialRealData.coaches)
+                setTransactions(initialRealData.transactions)
+                setFinances(initialRealData.finances)
+                if (initialRealData.quests && Array.isArray(initialRealData.quests)) {
+                    setQuests(initialRealData.quests)
+                }
+                setFastPassQuests(initialRealData.fastPassQuests)
+                setIsLiveDatabase(initialRealData.isRealData)
+            } else {
+                const {
+                    INITIAL_QUEST_STUDENTS,
+                    INITIAL_QUEST_COACHES,
+                    INITIAL_LESSON_TRANSACTIONS,
+                    INITIAL_MONTHLY_FINANCES,
+                    INITIAL_QUEST_ACHIEVEMENTS,
+                    INITIAL_FAST_PASS_QUESTS
+                } = await import('@/lib/quest-mock-data')
+                setStudents(INITIAL_QUEST_STUDENTS)
+                setCoaches(INITIAL_QUEST_COACHES)
+                setTransactions(INITIAL_LESSON_TRANSACTIONS)
+                setFinances(INITIAL_MONTHLY_FINANCES)
+                setQuests(INITIAL_QUEST_ACHIEVEMENTS)
+                setFastPassQuests(INITIAL_FAST_PASS_QUESTS)
+                setIsLiveDatabase(false)
             }
         } catch (e) {
             console.error('Failed to sync real database:', e)
@@ -1036,23 +1062,26 @@ export function SwimPartnersQuestApp({
                                     {quests
                                         .filter(q => q.target_role === 'CEO')
                                         .map(quest => {
-                                            const pct = Math.min(
-                                                100,
-                                                Math.round((quest.current_value / quest.threshold) * 100)
-                                            )
+                                            const pct = quest.threshold > 0
+                                                ? Math.min(100, Math.max(0, Math.round((quest.current_value / quest.threshold) * 100)))
+                                                : (quest.completed ? 100 : 0)
                                             return (
                                                 <div
                                                     key={quest.quest_id}
-                                                    className={`p-3.5 rounded-xl border ${
+                                                    className={`p-3.5 rounded-xl border transition-all ${
                                                         quest.completed
                                                             ? 'bg-emerald-50/80 border-emerald-300'
-                                                            : 'bg-slate-50 border-slate-200'
+                                                            : 'bg-white border-slate-200/90 shadow-xs hover:border-sky-300'
                                                     }`}
                                                 >
                                                     <div className="flex items-start justify-between gap-2">
                                                         <div>
                                                             <div className="flex items-center gap-2">
-                                                                <span className="text-[10px] font-black px-2 py-0.5 rounded bg-slate-200 text-slate-700">
+                                                                <span className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${
+                                                                    quest.completed
+                                                                        ? 'bg-emerald-100/80 text-emerald-800 border-emerald-200'
+                                                                        : 'bg-sky-50 text-sky-700 border-sky-200'
+                                                                }`}>
                                                                     {quest.quest_type}
                                                                 </span>
                                                                 <span className="text-xs font-black text-slate-900">
@@ -1068,12 +1097,12 @@ export function SwimPartnersQuestApp({
                                                         </span>
                                                     </div>
                                                     <div className="mt-2.5 flex items-center gap-3">
-                                                        <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden">
+                                                        <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
                                                             <div
-                                                                className={`h-full rounded-full ${
+                                                                className={`h-full rounded-full transition-all duration-500 ${
                                                                     quest.completed
                                                                         ? 'bg-emerald-500'
-                                                                        : 'bg-gradient-to-r from-amber-400 to-orange-500'
+                                                                        : 'bg-sky-500'
                                                                 }`}
                                                                 style={{ width: `${pct}%` }}
                                                             />

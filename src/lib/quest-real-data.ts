@@ -16,6 +16,34 @@ import {
     PlanType,
 } from '@/types/quest-erp'
 import { SWIM_STEP_LEVELS, INITIAL_QUEST_ACHIEVEMENTS } from '@/lib/quest-mock-data'
+import { fetchGA4GoogleAdsAnalytics } from '@/lib/google-analytics'
+
+/**
+ * app_configs (quest_finance_settings) の型定義
+ */
+export interface QuestFinanceSettings {
+    safe_reserve_cash: number       // 生活防衛・安全確保資金（デフォルト: 3,000,000円）
+    total_cash_balance: number      // 現在の総保有キャッシュ（デフォルト: 5,550,000円）
+    ad_spend_google_default: number // Google広告費デフォルト値（デフォルト: 60,000円）
+    ad_spend_meta_default: number   // Meta広告費デフォルト値（デフォルト: 20,000円）
+    system_tool_cost_default: number // システム固定費（デフォルト: 19,500円）
+    insurance_cost_default: number   // 賠責保険料（デフォルト: 8,000円）
+    joto_friday_capacity: number    // 城東小金曜枠目標定員（デフォルト: 12名）
+    facility_cost_per_lesson: number // 通常レッスン施設費/コマ（デフォルト: 700円）
+    ceo_hourly_rate: number         // 代表実働仮想時給（デフォルト: 3,500円）
+}
+
+export const DEFAULT_QUEST_FINANCE_SETTINGS: QuestFinanceSettings = {
+    safe_reserve_cash: 3000000,
+    total_cash_balance: 5550000,
+    ad_spend_google_default: 60000,
+    ad_spend_meta_default: 20000,
+    system_tool_cost_default: 19500,
+    insurance_cost_default: 8000,
+    joto_friday_capacity: 12,
+    facility_cost_per_lesson: 700,
+    ceo_hourly_rate: 3500,
+}
 
 /**
  * スコア（0〜100）からスキルランク（SSS〜D）を算出する
@@ -68,21 +96,32 @@ export async function fetchQuestRealData(): Promise<RealQuestDataResult> {
 
         const supabase = createClient(supabaseUrl, serviceKey)
 
-        // 並列フェッチ
+        // 並列フェッチ（実績データ・マスター設定・GA4広告費の全量取得）
         const [
             { data: rawStudents, error: sErr },
             { data: rawProfiles, error: pErr },
             { data: rawLessons, error: lErr },
             { data: rawLeads, error: leadErr },
             { data: rawMembershipTypes },
-            { data: rawFacilities }
+            { data: rawFacilities },
+            { data: rawLessonMasters },
+            rawArticlesResult,
+            { data: financeConfigRow },
+            ga4AdsData
         ] = await Promise.all([
             supabase.from('students').select('*').order('created_at', { ascending: false }),
             supabase.from('profiles').select('*'),
             supabase.from('lessons').select('*').order('lesson_date', { ascending: false }),
-            supabase.from('leads').select('*').order('created_at', { ascending: false }).limit(30),
+            supabase.from('leads').select('*').order('created_at', { ascending: false }).limit(100),
             supabase.from('membership_types').select('*'),
-            supabase.from('facilities').select('*')
+            supabase.from('facilities').select('*'),
+            supabase.from('lesson_masters').select('id, name, is_trial'),
+            Promise.resolve(supabase.from('generated_articles').select('id, article_type, status, created_at, published_at').limit(50)).catch(() => ({ data: [] })),
+            supabase.from('app_configs').select('value').eq('key', 'quest_finance_settings').maybeSingle(),
+            fetchGA4GoogleAdsAnalytics().catch(err => {
+                console.warn('[Quest Real Data] fetchGA4GoogleAdsAnalytics skipped or failed:', err)
+                return null
+            })
         ])
 
         if (sErr || pErr || lErr) {
@@ -94,7 +133,54 @@ export async function fetchQuestRealData(): Promise<RealQuestDataResult> {
         const allProfiles = rawProfiles || []
         const allLessons = rawLessons || []
         const allLeads = rawLeads || []
+        const rawArticles = (rawArticlesResult as any)?.data || []
         const membershipMap = new Map((rawMembershipTypes || []).map(m => [m.id, m.name]))
+        const lessonMasterMap = new Map((rawLessonMasters || []).map((m: any) => [m.id, m]))
+        const studentMap = new Map(allStudents.map(s => [s.id, s]))
+
+        // 財務マスタ設定の安全なフォールバックパース
+        let financeSettings: QuestFinanceSettings = { ...DEFAULT_QUEST_FINANCE_SETTINGS }
+        if (financeConfigRow?.value) {
+            try {
+                const parsed = JSON.parse(financeConfigRow.value)
+                financeSettings = {
+                    safe_reserve_cash: Number(parsed.safe_reserve_cash) || DEFAULT_QUEST_FINANCE_SETTINGS.safe_reserve_cash,
+                    total_cash_balance: Number(parsed.total_cash_balance) || DEFAULT_QUEST_FINANCE_SETTINGS.total_cash_balance,
+                    ad_spend_google_default: Number(parsed.ad_spend_google_default) || DEFAULT_QUEST_FINANCE_SETTINGS.ad_spend_google_default,
+                    ad_spend_meta_default: Number(parsed.ad_spend_meta_default) || DEFAULT_QUEST_FINANCE_SETTINGS.ad_spend_meta_default,
+                    system_tool_cost_default: Number(parsed.system_tool_cost_default) || DEFAULT_QUEST_FINANCE_SETTINGS.system_tool_cost_default,
+                    insurance_cost_default: Number(parsed.insurance_cost_default) || DEFAULT_QUEST_FINANCE_SETTINGS.insurance_cost_default,
+                    joto_friday_capacity: Number(parsed.joto_friday_capacity) || DEFAULT_QUEST_FINANCE_SETTINGS.joto_friday_capacity,
+                    facility_cost_per_lesson: Number(parsed.facility_cost_per_lesson) || DEFAULT_QUEST_FINANCE_SETTINGS.facility_cost_per_lesson,
+                    ceo_hourly_rate: Number(parsed.ceo_hourly_rate) || DEFAULT_QUEST_FINANCE_SETTINGS.ceo_hourly_rate,
+                }
+            } catch (e) {
+                console.warn('[Quest Real Data] Failed to parse quest_finance_settings. Using defaults:', e)
+            }
+        }
+
+        // GA4 日別実績から月別広告費マップを構築
+        const ga4MonthlyCostMap = new Map<string, number>()
+        if (ga4AdsData?.dailyTrends && Array.isArray(ga4AdsData.dailyTrends)) {
+            for (const dt of ga4AdsData.dailyTrends) {
+                if (!dt.date) continue
+                const ym = dt.date.slice(0, 7)
+                const current = ga4MonthlyCostMap.get(ym) || 0
+                ga4MonthlyCostMap.set(ym, current + (Number(dt.adCost) || 0))
+            }
+        }
+
+        // 体験レッスン判定ヘルパー（lesson_mastersマスタ、レッスン名、単価から総合判定）
+        const isTrialLesson = (l: any): boolean => {
+            const master = l.lesson_master_id ? lessonMasterMap.get(l.lesson_master_id) : null
+            if (master?.is_trial === true) return true
+            if (master?.name && master.name.includes('体験')) return true
+            if (l.lesson_masters?.is_trial === true) return true
+            if (l.lesson_masters?.name && l.lesson_masters.name.includes('体験')) return true
+            const price = Number(l.billing_price || l.price || l.base_price || 0)
+            return price > 0 && price <= 6000
+        }
+
 
         // 1. コーチマップ作成
         const coachMap = new Map(allProfiles.map(p => [p.id, p]))
@@ -157,10 +243,20 @@ export async function fetchQuestRealData(): Promise<RealQuestDataResult> {
                 else if (age >= 18) grade = '成人'
             }
 
+            // 個人情報保護マスキング（会員番号0035・テスト太郎様のみ実情報維持、他顧客は完全マスキング）
+            const studentNumber = s.student_number || String(index + 1).padStart(4, '0')
+            const isTestTaro = studentNumber === '0035' || Boolean(s.full_name && s.full_name.includes('テスト太郎'))
+            const displayName = isTestTaro
+                ? (s.full_name || 'テスト太郎')
+                : `会員 #${studentNumber}`
+            const displayNextChallenge = isTestTaro
+                ? (s.notes || `${stepDef.title}の反復安定化とフォーム意識の定着`)
+                : `${stepDef.title}の反復安定化とフォーム意識の定着`
+
             return {
                 student_id: s.id,
-                student_number: s.student_number || String(index + 1).padStart(4, '0'),
-                name: s.full_name || 'お客様',
+                student_number: studentNumber,
+                name: displayName,
                 grade,
                 area_station: assignedCoach?.base_area || '都心エリア（品川・港・渋谷）',
                 area_tier: areaTier,
@@ -170,7 +266,7 @@ export async function fetchQuestRealData(): Promise<RealQuestDataResult> {
                 swim_step_level: calculatedLevel,
                 swim_step_rank: stepRank,
                 swim_step_title: stepDef.title,
-                next_challenge: s.notes || `${stepDef.title}の反復安定化とフォーム意識の定着`,
+                next_challenge: displayNextChallenge,
                 aio_status: index % 2 === 0 ? '公開済(AIO上位)' : 'AI下書き済',
                 cumulative_revenue: ltv > 0 ? ltv : (status === '本契約継続中' ? 108000 : 6000),
                 monthly_fee: planType.includes('2回') ? 26000 : 36000,
@@ -190,12 +286,21 @@ export async function fetchQuestRealData(): Promise<RealQuestDataResult> {
             const coach = coachMap.get(l.coach_id)
             const isCeo = coach?.role === 'admin'
 
+            // 会員番号0035（テスト太郎様）のみ実名表示、他はマスキング保護
+            const student = l.student_id ? studentMap.get(l.student_id) : null
+            const isTestTaroLesson = (student?.student_number === '0035') ||
+                Boolean(student?.full_name && student.full_name.includes('テスト太郎')) ||
+                Boolean(l.student_name && l.student_name.includes('テスト太郎'))
+            const maskedStudentName = isTestTaroLesson
+                ? (l.student_name || student?.full_name || 'テスト太郎')
+                : (student?.student_number ? `会員 #${student.student_number}` : '受講生徒')
+
             return {
                 lesson_id: l.id || `tx-${idx}`,
                 date: l.lesson_date ? l.lesson_date.slice(0, 10) : '2026-10-01',
                 year_month: l.lesson_date ? l.lesson_date.slice(0, 7) : '2026-10',
                 student_id: l.student_id || `std-${idx}`,
-                student_name: l.student_name || '受講生徒',
+                student_name: maskedStudentName,
                 coach_id: l.coach_id || 'coach-unknown',
                 coach_name: coach?.full_name || '担当コーチ',
                 pool_facility: l.location || '都心公営プール',
@@ -260,11 +365,66 @@ export async function fetchQuestRealData(): Promise<RealQuestDataResult> {
             const coachExp = Math.max(1200, stat.totalLessons * 150 + 2000)
             const coachLevel = Math.min(50, Math.max(1, Math.floor(Math.pow(coachExp / 500, 1 / 1.35))))
 
-            // コーチのスキルランク評価
-            const teachingScore = Math.min(99, Math.max(65, stat.totalLessons * 2 + 50))
-            const closingScore = p.full_name?.includes('岡野') || p.full_name?.includes('髙島') ? 92 : 82
-            const fastPassScore = p.full_name?.includes('岡野') ? 95 : 86
-            const hospitalityScore = 94
+            // コーチのスキルランク評価（実実績からの動的算出）
+
+            // ① 体験即決成約力: 担当体験レッスンから正会員・継続受講へ移行した比率
+            const coachTrialLessons = allLessons.filter(l => l.coach_id === p.id && isTrialLesson(l))
+            const coachTrialStudentIds = Array.from(new Set(coachTrialLessons.map(l => l.student_id).filter(Boolean)))
+            let coachConvertedCount = 0
+            coachTrialStudentIds.forEach(sId => {
+                const st = studentMap.get(sId)
+                const count = studentLessonCountMap.get(sId) || 0
+                if (st?.status === 'active' || count >= 2) {
+                    coachConvertedCount++
+                }
+            })
+
+            let closingScore: number
+            if (coachTrialStudentIds.length > 0) {
+                const rawConversionRate = (coachConvertedCount / coachTrialStudentIds.length) * 100
+                closingScore = Math.min(99, Math.max(60, Math.round(rawConversionRate)))
+            } else {
+                const assignedActiveCount = allStudents.filter(s => s.coach_id === p.id && s.status === 'active').length
+                closingScore = isCeo ? 92 : assignedActiveCount >= 5 ? 90 : assignedActiveCount >= 2 ? 85 : 82
+            }
+
+            // ② 神速レスポンス・機動力: leadsテーブルからの1時間以内受託率
+            const coachLeads = allLeads.filter(ld => ld.assigned_coach_id === p.id)
+            let coachFastPassCount = 0
+            let evaluatedLeadsCount = 0
+            coachLeads.forEach(ld => {
+                if (ld.created_at && ld.assigned_at) {
+                    const diffMs = new Date(ld.assigned_at).getTime() - new Date(ld.created_at).getTime()
+                    const diffHours = diffMs / (1000 * 60 * 60)
+                    if (diffHours >= 0) {
+                        evaluatedLeadsCount++
+                        if (diffHours <= 1.0) {
+                            coachFastPassCount++
+                        }
+                    }
+                }
+            })
+
+            let fastPassScore: number
+            if (evaluatedLeadsCount > 0) {
+                const rawRate = (coachFastPassCount / evaluatedLeadsCount) * 100
+                fastPassScore = Math.min(99, Math.max(65, Math.round(rawRate)))
+            } else {
+                fastPassScore = isCeo ? 95 : stat.currentLessons >= 20 ? 91 : stat.currentLessons >= 10 ? 88 : 86
+            }
+
+            // ③ 指導技術スコア: 累計完遂コマ数からの動的算出
+            const teachingScore = Math.min(99, Math.max(65, Math.round(stat.totalLessons * 1.5 + 50)))
+
+            // ④ 顧客ホスピタリティ: 担当生徒の定着率からの動的算出
+            const coachAssignedStudents = allStudents.filter(s => s.coach_id === p.id)
+            const activeCoachStudents = coachAssignedStudents.filter(s => s.status === 'active')
+            let hospitalityScore = 94
+            if (coachAssignedStudents.length > 0) {
+                const retentionRate = activeCoachStudents.length / coachAssignedStudents.length
+                hospitalityScore = Math.min(99, Math.max(82, Math.round(85 + retentionRate * 13)))
+            }
+            const avgSatisfaction = Number((4.5 + (hospitalityScore / 100) * 0.48).toFixed(2))
 
             const evaluations: SkillEvaluation[] = [
                 {
@@ -286,7 +446,9 @@ export async function fetchQuestRealData(): Promise<RealQuestDataResult> {
                     rank: getScoreRank(closingScore),
                     score: closingScore,
                     level: Math.floor(closingScore / 10),
-                    currentValueLabel: `成約率 ${closingScore}%`,
+                    currentValueLabel: coachTrialStudentIds.length > 0 
+                        ? `成約率 ${closingScore}% (${coachConvertedCount}/${coachTrialStudentIds.length}名)` 
+                        : `成約率 ${closingScore}%`,
                     nextThresholdLabel: 'SSSまで 成約率90%超',
                     abilityDescription: '初回体験から月4回・25m完泳保証コースへの移行率を最大化する',
                     badgeIcon: 'Trophy'
@@ -298,7 +460,9 @@ export async function fetchQuestRealData(): Promise<RealQuestDataResult> {
                     rank: getScoreRank(fastPassScore),
                     score: fastPassScore,
                     level: Math.floor(fastPassScore / 10),
-                    currentValueLabel: `1時間以内受託率 ${fastPassScore}%`,
+                    currentValueLabel: evaluatedLeadsCount > 0 
+                        ? `1時間以内受託率 ${fastPassScore}% (${coachFastPassCount}/${evaluatedLeadsCount}件)` 
+                        : `1時間以内受託率 ${fastPassScore}%`,
                     nextThresholdLabel: 'ファストパス即決受託維持',
                     abilityDescription: '新規案件打診から1時間以内に即決受託し顧客の熱量を逃さない',
                     badgeIcon: 'Zap'
@@ -330,7 +494,7 @@ export async function fetchQuestRealData(): Promise<RealQuestDataResult> {
                 coach_exp: coachExp,
                 coach_level: coachLevel,
                 trial_conversion_rate: closingScore / 100,
-                avg_satisfaction: 4.92,
+                avg_satisfaction: avgSatisfaction,
                 fast_pass_rate: fastPassScore / 100,
                 is_ceo: isCeo,
                 gratitude_chest: [
@@ -370,28 +534,113 @@ export async function fetchQuestRealData(): Promise<RealQuestDataResult> {
         })
 
         // 7. 実月次財務データ（MonthlyFinance 2026-05〜2026-10）
-        const monthGroups = new Map<string, { totalRev: number; totalReward: number; lessonCount: number }>()
+        interface MonthAggregate {
+            totalRev: number
+            totalReward: number
+            lessonCount: number
+            facilityCost: number
+            flowRev: number
+            stockRev: number
+            fixedSchoolRev: number
+            ceoLessonCount: number
+        }
+
+        const monthGroups = new Map<string, MonthAggregate>()
         allLessons.forEach(l => {
             if (!l.lesson_date) return
             const ym = l.lesson_date.slice(0, 7)
-            const g = monthGroups.get(ym) || { totalRev: 0, totalReward: 0, lessonCount: 0 }
-            g.totalRev += Number(l.billing_price || l.price || 0)
-            g.totalReward += Number(l.final_reward_amount || l.base_reward || 0)
+            const g = monthGroups.get(ym) || {
+                totalRev: 0,
+                totalReward: 0,
+                lessonCount: 0,
+                facilityCost: 0,
+                flowRev: 0,
+                stockRev: 0,
+                fixedSchoolRev: 0,
+                ceoLessonCount: 0,
+            }
+
+            const price = Number(l.billing_price || l.price || l.base_price || 0)
+            const reward = Number(l.final_reward_amount || l.base_reward || 0)
+            const isJoto = Boolean(l.location?.includes('城東') || l.location?.includes('ヤエスク'))
+            const fCost = isJoto ? 4950 : financeSettings.facility_cost_per_lesson
+
+            if (isJoto) {
+                g.fixedSchoolRev += price
+            } else if (price >= 20000) {
+                g.stockRev += price
+            } else {
+                g.flowRev += price
+            }
+
+            const coach = coachMap.get(l.coach_id)
+            if (coach?.role === 'admin') {
+                g.ceoLessonCount += 1
+            }
+
+            g.totalRev += price
+            g.totalReward += reward
             g.lessonCount += 1
+            g.facilityCost += fCost
             monthGroups.set(ym, g)
         })
 
+        // 城東小金曜枠のアクティブ在籍生徒数の実測集計
+        const actualJotoEnrolledCount = allStudents.filter(s => {
+            const isActive = s.status === 'active' || s.status === 'applied' || !s.status
+            const mName = s.membership_type_id ? membershipMap.get(s.membership_type_id) : ''
+            const isJoto = Boolean(
+                (mName && mName.includes('城東')) ||
+                (s.notes && (s.notes.includes('城東') || s.notes.includes('ヤエスク')))
+            )
+            return isActive && isJoto
+        }).length
+
         const targetMonths = ['2026-05', '2026-06', '2026-07', '2026-08', '2026-09', '2026-10']
         const questFinances: MonthlyFinance[] = targetMonths.map((ym, mIdx) => {
-            const mg = monthGroups.get(ym) || { totalRev: 450000, totalReward: 280000, lessonCount: 50 }
-            // 実際のレッスン売上
-            const rev = mg.totalRev
-            const reward = mg.totalReward
-            const stockRev = Math.round(rev * 0.65)
-            const flowRev = Math.round(rev * 0.20)
-            const fixedSchoolRev = Math.round(rev * 0.15)
-            const facilityCost = Math.round(mg.lessonCount * 700)
+            const mg = monthGroups.get(ym)
+            const hasActualLessons = Boolean(mg && mg.lessonCount > 0)
+
+            // レッスン売上・報酬・施設費の決定
+            const rev = hasActualLessons ? mg!.totalRev : (450000 + mIdx * 50000)
+            const reward = hasActualLessons ? mg!.totalReward : (280000 + mIdx * 30000)
+            const facilityCost = hasActualLessons ? mg!.facilityCost : ((40 + mIdx * 5) * financeSettings.facility_cost_per_lesson)
+            const stockRev = hasActualLessons && mg!.stockRev > 0 ? mg!.stockRev : Math.round(rev * 0.65)
+            const flowRev = hasActualLessons && mg!.flowRev > 0 ? mg!.flowRev : Math.round(rev * 0.20)
+            const fixedSchoolRev = hasActualLessons && mg!.fixedSchoolRev > 0 ? mg!.fixedSchoolRev : Math.round(rev * 0.15)
             const stripeFee = Math.round(rev * 0.036)
+
+            // Google広告費: GA4実測値優先 → 当月総額 → デフォルト設定値
+            let adSpendGoogle = financeSettings.ad_spend_google_default
+            if (ga4MonthlyCostMap.has(ym) && (ga4MonthlyCostMap.get(ym)! > 0)) {
+                adSpendGoogle = Math.round(ga4MonthlyCostMap.get(ym)!)
+            } else if (mIdx === targetMonths.length - 1 && ga4AdsData?.totalCost && ga4AdsData.totalCost > 0) {
+                adSpendGoogle = Math.round(ga4AdsData.totalCost)
+            } else {
+                adSpendGoogle = financeSettings.ad_spend_google_default + (mIdx - 5) * 2000
+            }
+
+            // 代表実働時間と仮想人件費
+            const ceoHours = hasActualLessons
+                ? Math.max(10, Math.round(mg!.ceoLessonCount * 1.5))
+                : Math.max(10, 30 - mIdx * 4)
+            const ceoCost = ceoHours * financeSettings.ceo_hourly_rate
+
+            // 総保有キャッシュと生活防衛資金・投資可能余力
+            const totalCash = mIdx === targetMonths.length - 1
+                ? financeSettings.total_cash_balance
+                : Math.max(3000000, financeSettings.total_cash_balance - (targetMonths.length - 1 - mIdx) * 350000)
+            const safeReserve = financeSettings.safe_reserve_cash
+            const investableCash = Math.max(0, totalCash - safeReserve)
+
+            // 新規生徒数・リード獲得数
+            const newCount = allStudents.filter(s => s.created_at && s.created_at.slice(0, 7) === ym).length
+            const leadCount = allLeads.filter(l => l.created_at && l.created_at.slice(0, 7) === ym).length
+
+            // 城東小枠在籍数
+            const jotoEnrolled = mIdx === targetMonths.length - 1
+                ? Math.max(actualJotoEnrolledCount, 10)
+                : Math.min(financeSettings.joto_friday_capacity, Math.max(6, 6 + mIdx))
 
             return {
                 year_month: ym,
@@ -402,45 +651,256 @@ export async function fetchQuestRealData(): Promise<RealQuestDataResult> {
                 coach_cost_total: reward,
                 facility_transport_total: facilityCost,
                 stripe_fee_total: stripeFee,
-                ad_spend_google: 60000 + mIdx * 2000,
-                ad_spend_meta: 20000,
-                system_tool_cost: 19500,
-                insurance_cost: 8000,
-                ceo_operated_hours: Math.max(10, 30 - mIdx * 4),
-                ceo_shadow_cost: Math.max(10, 30 - mIdx * 4) * 3500,
-                safe_reserve_cash: 3000000,
-                total_cash_balance: 3800000 + mIdx * 350000,
-                investable_cash: 800000 + mIdx * 350000,
-                new_customers_count: 12 + mIdx * 2,
-                line_friends_added: 30 + mIdx * 4,
-                joto_friday_enrolled: Math.min(12, 6 + mIdx),
-                joto_friday_capacity: 12
+                ad_spend_google: Math.max(0, adSpendGoogle),
+                ad_spend_meta: financeSettings.ad_spend_meta_default,
+                system_tool_cost: financeSettings.system_tool_cost_default,
+                insurance_cost: financeSettings.insurance_cost_default,
+                ceo_operated_hours: ceoHours,
+                ceo_shadow_cost: ceoCost,
+                safe_reserve_cash: safeReserve,
+                total_cash_balance: totalCash,
+                investable_cash: investableCash,
+                new_customers_count: newCount > 0 ? newCount : (12 + mIdx * 2),
+                line_friends_added: leadCount > 0 ? leadCount : (30 + mIdx * 4),
+                joto_friday_enrolled: jotoEnrolled,
+                joto_friday_capacity: financeSettings.joto_friday_capacity
             }
         })
 
-        // 8. 実際のリードからファストパス・クエストを構築
-        const questLeads: FastPassLeadQuest[] = allLeads.slice(0, 5).map((ld, i) => ({
-            lead_id: ld.id,
-            student_label: `${ld.name} 様（${ld.area || '都心希望'}）`,
-            area_tier: ld.area?.includes('千葉') ? 'Tier3千葉城東' : ld.area?.includes('世田谷') ? 'Tier2城南' : 'Tier1都心',
-            pool_facility: ld.area ? `${ld.area} 周辺公営プール` : 'ひがし健康プラザ / 港南プール',
-            preferred_datetime: ld.created_at ? `${ld.created_at.slice(0, 10)} 随時打診中` : '今週土日',
-            plan_interest: '月4回[ストック]',
-            estimated_reward: 5000,
-            fast_pass_exp: 50,
-            conversion_bonus_exp: 500,
-            conversion_incentive: 3000,
-            time_remaining_minutes: 30 + i * 15,
-            matching_coach_types: ['Type A:都心主力', 'Type B:平日キッズ'],
-            accepted_by_coach_id: ld.assigned_coach_id || null
-        }))
+        // 8. 実際のリードからファストパス・クエストを構築（会員番号0035以外マスキング保護）
+        const questLeads: FastPassLeadQuest[] = allLeads.slice(0, 5).map((ld, i) => {
+            const isTestLead = (ld as any).student_number === '0035' || Boolean(ld.name && ld.name.includes('テスト太郎'))
+            const maskedLabel = isTestLead
+                ? `${ld.name || 'テスト太郎'} 様（${ld.area || '都心希望'}）`
+                : `新規問合せ生 #${String(i + 1).padStart(3, '0')} 様（${ld.area || '都心希望'}）`
+
+            return {
+                lead_id: ld.id,
+                student_label: maskedLabel,
+                area_tier: ld.area?.includes('千葉') ? 'Tier3千葉城東' : ld.area?.includes('世田谷') ? 'Tier2城南' : 'Tier1都心',
+                pool_facility: ld.area ? `${ld.area} 周辺公営プール` : 'ひがし健康プラザ / 港南プール',
+                preferred_datetime: ld.created_at ? `${ld.created_at.slice(0, 10)} 随時打診中` : '今週土日',
+                plan_interest: '月4回[ストック]',
+                estimated_reward: 5000,
+                fast_pass_exp: 50,
+                conversion_bonus_exp: 500,
+                conversion_incentive: 3000,
+                time_remaining_minutes: 30 + i * 15,
+                matching_coach_types: ['Type A:都心主力', 'Type B:平日キッズ'],
+                accepted_by_coach_id: ld.assigned_coach_id || null
+            }
+        })
+
+        // 8.5 クエスト達成状況（QuestAchievement）の動的集計・判定
+        const latestFinance = questFinances[questFinances.length - 1]
+        const latestGrossProfit = Math.max(0, latestFinance.total_revenue - latestFinance.coach_cost_total - latestFinance.facility_transport_total)
+        const jotoEnrolled = latestFinance.joto_friday_enrolled
+        const jotoCapacity = latestFinance.joto_friday_capacity || 12
+        const remainingJoto = Math.max(0, jotoCapacity - jotoEnrolled)
+
+        // 非代表コーチ稼働比率
+        const currentMonthLessons = allLessons.filter(l => l.lesson_date && l.lesson_date.startsWith('2026-10'))
+        const totalLessonsCount = currentMonthLessons.length > 0 ? currentMonthLessons.length : allLessons.length
+        const ceoProfile = allProfiles.find(p => p.role === 'admin')
+        const ceoLessonsCount = currentMonthLessons.length > 0
+            ? currentMonthLessons.filter(l => l.coach_id === ceoProfile?.id).length
+            : allLessons.filter(l => l.coach_id === ceoProfile?.id).length
+        const nonCeoRatio = totalLessonsCount > 0
+            ? Math.min(100, Math.max(0, Math.round(((totalLessonsCount - ceoLessonsCount) / totalLessonsCount) * 100)))
+            : 88
+
+        // 定期会員純増数（当月新規アクティブ会員 - 当月退会会員）
+        const newActiveStudents = allStudents.filter(s => 
+            s.status === 'active' && 
+            s.created_at && 
+            s.created_at.startsWith('2026-10')
+        ).length
+        const withdrawnStudents = allStudents.filter(s => 
+            s.status === 'withdrawn' && 
+            s.updated_at && 
+            s.updated_at.startsWith('2026-10')
+        ).length
+        const netActiveStudentGrowth = Math.max(1, newActiveStudents - withdrawnStudents || 
+            Math.min(12, allStudents.filter(s => s.status === 'active').length - 20) || 
+            4
+        )
+
+        // 主力コーチ完遂コマ数（Coach用クエスト1用）
+        const nonCeoStats = allProfiles
+            .filter(p => p.role !== 'admin')
+            .map(p => coachStatsMap.get(p.id)?.currentLessons || 0)
+        const topCoachLessons = nonCeoStats.length > 0 ? Math.max(...nonCeoStats) : 22
+        let coachTargetThreshold = 25
+        if (topCoachLessons < 15) coachTargetThreshold = 15
+        else if (topCoachLessons < 20) coachTargetThreshold = 20
+        else if (topCoachLessons < 25) coachTargetThreshold = 25
+        else coachTargetThreshold = 30
+        const remainingCoachLessons = Math.max(0, coachTargetThreshold - topCoachLessons)
+
+        // ファストパス全件1時間以内受託件数（Coach用クエスト2用）
+        let totalFastPassAccepted = 0
+        allLeads.forEach(ld => {
+            if (ld.created_at && ld.assigned_at) {
+                const diffMs = new Date(ld.assigned_at).getTime() - new Date(ld.created_at).getTime()
+                if (diffMs >= 0 && diffMs <= 3600000) {
+                    totalFastPassAccepted++
+                }
+            }
+        })
+        const currentFastPassAccepted = totalFastPassAccepted > 0 ? totalFastPassAccepted : 3
+
+        // 当月進級クリア生徒数（Coach用クエスト3用）
+        const progressedCount = allStudents.filter(s => (s.swim_step_level || 0) >= 5).length
+        const currentMonthStepUpCount = Math.min(10, Math.max(1, Math.round(progressedCount * 0.4)))
+
+        // 今週のAIO公開記事数（CEO用クエスト4用）
+        const currentAioArticlesCount = (rawArticles || []).filter((a: any) => 
+            a.status === 'published' || a.article_type === 'aio'
+        ).length || 2
+
+        // 動的クエスト配列の構築
+        const dynamicQuestAchievements: QuestAchievement[] = [
+            // 1. CEO メインクエスト: 城東小金曜枠満枠
+            {
+                quest_id: 'q-ceo-main-1',
+                target_role: 'CEO',
+                quest_type: 'Monthly',
+                title: remainingJoto > 0 
+                    ? `【重要指令】城東小金曜枠をあと${remainingJoto}名埋めて完全満枠・高収益化せよ！`
+                    : '【重要指令】城東小金曜枠 12名完全満枠・高収益化達成！',
+                description: `ヤエスク（城東小）貸切枠（施設費4,950円/回）の損益分岐を超え、${jotoCapacity}名満枠達成で月間粗利+52,000円を確定させる`,
+                condition_metric: '城東小金曜枠 在籍生徒数',
+                current_value: jotoEnrolled,
+                threshold: jotoCapacity,
+                unit: '名',
+                reward_exp: 2500,
+                reward_Label: '称号「八重洲スイムステップの覇者」解放',
+                badge_icon: 'Crown',
+                is_main_quest: true,
+                completed: jotoEnrolled >= jotoCapacity,
+            },
+            // 2. CEO マイルストーンクエスト: 月間粗利105万円突破
+            {
+                quest_id: 'q-ceo-2',
+                target_role: 'CEO',
+                quest_type: 'Milestone',
+                title: 'Guild Lv.50：月間粗利105万円（年収1,000万円モデル）の突破',
+                description: 'ストック収益比率75%以上を維持しつつ、月間粗利1,050,000円を達成する',
+                condition_metric: '月間粗利額',
+                current_value: latestGrossProfit,
+                threshold: 1050000,
+                unit: '円',
+                reward_exp: 5000,
+                reward_Label: 'Master Guild Rank 昇格',
+                badge_icon: 'Trophy',
+                completed: latestGrossProfit >= 1050000,
+            },
+            // 3. CEO マンスリークエスト: 代表現場稼働抑制
+            {
+                quest_id: 'q-ceo-3',
+                target_role: 'CEO',
+                quest_type: 'Monthly',
+                title: '完全委任ボーナス：代表自身の現場稼働を月10時間以下に抑えよ',
+                description: '髙島コーチ・岡野コーチへのアサイン委任を進め、代表の時間をAIO集客と新拠点開拓へ集中させる',
+                condition_metric: '非代表コーチ稼働比率',
+                current_value: nonCeoRatio,
+                threshold: 85,
+                unit: '%',
+                reward_exp: 1500,
+                reward_Label: nonCeoRatio >= 85 ? '脱・現場ボーナス +1,500 EXP獲得済' : '脱・現場ボーナス +1,500 EXP',
+                badge_icon: 'ShieldCheck',
+                completed: nonCeoRatio >= 85,
+            },
+            // 4. CEO ウィークリークエスト: AIO記事今週3本公開
+            {
+                quest_id: 'q-ceo-4',
+                target_role: 'CEO',
+                quest_type: 'Weekly',
+                title: 'スイムステップ連動AIO記事を今週3本公開せよ',
+                description: 'テスト太郎様（0035）等の25m完泳進級事例を構造化AIO記事として公開し、Google自然流入を強化する',
+                condition_metric: '今週のAIO公開記事数',
+                current_value: currentAioArticlesCount,
+                threshold: 3,
+                unit: '本',
+                reward_exp: 800,
+                badge_icon: 'Sparkles',
+                completed: currentAioArticlesCount >= 3,
+            },
+            // 5. CEO マンスリークエスト: 定期会員純増クエスト
+            {
+                quest_id: 'q-ceo-5',
+                target_role: 'CEO',
+                quest_type: 'Monthly',
+                title: '定期会員純増クエスト：当月ネット＋5名の定期会員純増を達成せよ',
+                description: '休会退会を抑えつつ新規本契約を獲得し、月間ストック収益の基盤を磐石にする',
+                condition_metric: '定期会員純増数',
+                current_value: netActiveStudentGrowth,
+                threshold: 5,
+                unit: '名',
+                reward_exp: 1800,
+                reward_Label: 'ストック基盤強化ボーナス +1,800 EXP',
+                badge_icon: 'Users',
+                completed: netActiveStudentGrowth >= 5,
+            },
+            // 6. Coach マンスリークエスト: ランク昇格クエスト
+            {
+                quest_id: 'q-coach-1',
+                target_role: 'Coach',
+                quest_type: 'Monthly',
+                title: remainingCoachLessons > 0
+                    ? `ランク昇格クエスト：あと${remainingCoachLessons}コマ完遂で次ランク（報酬率+5%）へ昇格せよ！`
+                    : 'ランク昇格クエスト：次ランク昇格条件達成！',
+                description: '月間完遂コマ数を積み上げ、当月すべてのレッスン報酬単価を5%アップさせる',
+                condition_metric: '当月完遂コマ数',
+                current_value: topCoachLessons,
+                threshold: coachTargetThreshold,
+                unit: 'コマ',
+                reward_exp: 1200,
+                reward_Label: '当月報酬総額 +12,000円〜15,000円UP',
+                badge_icon: 'Flame',
+                is_main_quest: true,
+                completed: topCoachLessons >= coachTargetThreshold,
+            },
+            // 7. Coach ウィークリークエスト: ファストパス疾風受託
+            {
+                quest_id: 'q-coach-2',
+                target_role: 'Coach',
+                quest_type: 'Weekly',
+                title: 'ファストパス疾風受託：新規体験打診に1時間以内で即レス受託せよ',
+                description: 'スピード受託で顧客の体験キャンセル率をゼロにし、スピードボーナスEXPを獲得する',
+                condition_metric: '1時間以内即決受託数',
+                current_value: currentFastPassAccepted,
+                threshold: 3,
+                unit: '件',
+                reward_exp: 300,
+                reward_Label: currentFastPassAccepted >= 3 ? `+50 EXP × ${currentFastPassAccepted}件達成！` : `1件につき +50 EXP（現在${currentFastPassAccepted}件）`,
+                badge_icon: 'Zap',
+                completed: currentFastPassAccepted >= 3,
+            },
+            // 8. Coach マンスリークエスト: スイムステップ進級マイスター
+            {
+                quest_id: 'q-coach-3',
+                target_role: 'Coach',
+                quest_type: 'Monthly',
+                title: 'スイムステップ進級マイスター：担当生徒5名を次レベルへ進級させよ',
+                description: '3行レッスン報告から生徒の進級（顔つけ〜25m完泳）を記録し、保護者の感動とLTVを高める',
+                condition_metric: '当月進級クリア生徒数',
+                current_value: currentMonthStepUpCount,
+                threshold: 5,
+                unit: '名',
+                reward_exp: 1000,
+                reward_Label: '1名進級ごとに +200 EXP',
+                badge_icon: 'Award',
+                completed: currentMonthStepUpCount >= 5,
+            },
+        ]
 
         return {
             students: questStudents,
             coaches: questCoaches,
             transactions: questTransactions,
             finances: questFinances,
-            quests: INITIAL_QUEST_ACHIEVEMENTS,
+            quests: dynamicQuestAchievements,
             fastPassQuests: questLeads.length > 0 ? questLeads : [],
             isRealData: true
         }
@@ -457,16 +917,77 @@ function getFallbackRealData(): RealQuestDataResult {
         INITIAL_LESSON_TRANSACTIONS,
         INITIAL_MONTHLY_FINANCES,
         INITIAL_QUEST_ACHIEVEMENTS,
-        INITIAL_FAST_PASS_QUESTS
+        INITIAL_FAST_PASS_QUESTS,
+        SWIM_STEP_LEVELS
     } = require('@/lib/quest-mock-data')
 
+    // 1. 生徒データのマスキング（会員番号0035・テスト太郎様のみ実情報維持、他は完全マスキング保護）
+    const maskedStudents = (INITIAL_QUEST_STUDENTS as QuestStudent[]).map((s, idx) => {
+        const studentNumber = s.student_number || String(idx + 1).padStart(4, '0')
+        const is0035 = studentNumber === '0035' || Boolean(s.name && s.name.includes('テスト太郎'))
+        if (is0035) return s
+
+        const stepDef = SWIM_STEP_LEVELS?.find((lvl: any) => lvl.level === s.swim_step_level) || { title: s.swim_step_title || 'スイムステップ' }
+        return {
+            ...s,
+            student_number: studentNumber,
+            name: `会員 #${studentNumber}`,
+            next_challenge: `${stepDef.title}の反復安定化とフォーム意識の定着`
+        }
+    })
+
+    const studentMap = new Map(maskedStudents.map(s => [s.student_id, s]))
+
+    // 2. レッスントランザクションのマスキング保護
+    const maskedTransactions = (INITIAL_LESSON_TRANSACTIONS as LessonTransaction[]).map(t => {
+        const student = t.student_id ? studentMap.get(t.student_id) : null
+        const is0035 = (student?.student_number === '0035') ||
+            Boolean(student?.name && student.name.includes('テスト太郎')) ||
+            Boolean(t.student_name && (t.student_name.includes('テスト太郎') || t.student_name.includes('0035')))
+        if (is0035) return t
+
+        return {
+            ...t,
+            student_name: student?.student_number ? `会員 #${student.student_number}` : '受講生徒'
+        }
+    })
+
+    // 3. ファストパスリードのマスキング保護
+    const maskedFastPassQuests = (INITIAL_FAST_PASS_QUESTS as FastPassLeadQuest[]).map((q, idx) => {
+        const is0035 = Boolean(q.student_label && (q.student_label.includes('テスト太郎') || q.student_label.includes('0035')))
+        if (is0035) return q
+
+        const areaStr = q.area_tier === 'Tier3千葉城東' ? '千葉希望' : '都心希望'
+        return {
+            ...q,
+            student_label: `新規問合せ生 #${String(idx + 1).padStart(3, '0')} 様（${areaStr}）`
+        }
+    })
+
+    // 4. コーチ感謝チェスト（gratitude_chest）のマスキング保護（実DB時と同様にテスト太郎様のみ）
+    const maskedCoaches = (INITIAL_QUEST_COACHES as QuestCoach[]).map(c => {
+        return {
+            ...c,
+            gratitude_chest: [
+                {
+                    id: `gr-${c.coach_id}-1`,
+                    student_name: 'テスト太郎 保護者様（0035）',
+                    date: '2026-10-22',
+                    rating: 5,
+                    comment: '熱心なご指導のおかげで、毎回のレッスンを楽しみにしてぐんぐん上達しています！',
+                    exp_bonus: 300
+                }
+            ]
+        }
+    })
+
     return {
-        students: INITIAL_QUEST_STUDENTS,
-        coaches: INITIAL_QUEST_COACHES,
-        transactions: INITIAL_LESSON_TRANSACTIONS,
+        students: maskedStudents,
+        coaches: maskedCoaches,
+        transactions: maskedTransactions,
         finances: INITIAL_MONTHLY_FINANCES,
         quests: INITIAL_QUEST_ACHIEVEMENTS,
-        fastPassQuests: INITIAL_FAST_PASS_QUESTS,
+        fastPassQuests: maskedFastPassQuests,
         isRealData: false
     }
 }
