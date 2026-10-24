@@ -1547,9 +1547,23 @@ import {
     getLineChatHistory,
     sendDirectLineChatMessage,
     markLineChatRead,
+    getLineChatSyncSignature,
     toggleLineChatNeedsReply,
     updateLineChatUserProfile,
 } from '@/lib/line-chat-service';
+
+/**
+ * 個別トークの新着検知用 軽量シグネチャ取得アクション（高頻度ポーリング用）
+ */
+export async function getLineChatSyncSignatureAction(): Promise<{ success: boolean; signature: string }> {
+    try {
+        await assertAdminUser();
+        const signature = await getLineChatSyncSignature();
+        return { success: true, signature };
+    } catch {
+        return { success: false, signature: '' };
+    }
+}
 import {
     LineChatMessage,
     LineChatThreadUser,
@@ -1606,10 +1620,11 @@ export async function getLineChatHistoryAction(
 }> {
     try {
         await assertAdminUser();
-        if (markAsRead) {
-            await markLineChatRead(lineUserId);
-        }
-        const messages = await getLineChatHistory(lineUserId);
+        // 既読処理と履歴取得を並列実行（既読処理の完了待ちで表示が遅れないようにする）
+        const [messages] = await Promise.all([
+            getLineChatHistory(lineUserId),
+            markAsRead ? markLineChatRead(lineUserId).catch(() => {}) : Promise.resolve(),
+        ]);
         return {
             success: true,
             messages,

@@ -935,6 +935,48 @@ export async function getLineChatHistory(lineUserId: string): Promise<LineChatMe
 // 5. 既読処理 & 要対応フラグ切り替え
 // ==============================================================================
 
+/**
+ * 新着検知用の軽量シグネチャ取得（各ソースの最新更新時刻のみを limit 1 で取得）
+ * クライアントはこの値が変化した時だけ重いスレッド一覧・履歴を再取得する
+ */
+export async function getLineChatSyncSignature(): Promise<string> {
+    const supabase = createAdminClient();
+    const [idxRes, chatRes, monRes, dlvRes] = await Promise.all([
+        supabase
+            .from('app_configs')
+            .select('updated_at')
+            .eq('key', THREAD_INDEX_CONFIG_KEY)
+            .maybeSingle()
+            .then(r => r, () => ({ data: null })),
+        supabase
+            .from('line_chat_messages')
+            .select('created_at')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .then(r => r, () => ({ data: null })),
+        supabase
+            .from('line_monitoring_logs')
+            .select('detected_at')
+            .order('detected_at', { ascending: false })
+            .limit(1)
+            .then(r => r, () => ({ data: null })),
+        supabase
+            .from('line_delivery_logs')
+            .select('sent_at')
+            .order('sent_at', { ascending: false })
+            .limit(1)
+            .then(r => r, () => ({ data: null })),
+    ]);
+    const pick = (res: any, col: string) =>
+        Array.isArray(res?.data) ? res.data[0]?.[col] || '' : res?.data?.[col] || '';
+    return [
+        pick(idxRes, 'updated_at'),
+        pick(chatRes, 'created_at'),
+        pick(monRes, 'detected_at'),
+        pick(dlvRes, 'sent_at'),
+    ].join('|');
+}
+
 export async function markLineChatRead(lineUserId: string): Promise<void> {
     if (!lineUserId) return;
     const supabase = createAdminClient();
@@ -982,6 +1024,10 @@ export async function markLineChatRead(lineUserId: string): Promise<void> {
     try {
         const indexMap = await getThreadIndexMap();
         const prev = indexMap[cleanId];
+        // 既に既読（未読0）のエントリが存在する場合は無駄な全体書き込みをスキップ（高速化）
+        if (prev && (prev.unreadCount || 0) === 0) {
+            return;
+        }
         indexMap[cleanId] = {
             lineUserId: cleanId,
             displayName: prev?.displayName || null,

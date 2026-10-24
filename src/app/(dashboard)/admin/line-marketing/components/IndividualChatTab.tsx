@@ -17,6 +17,7 @@ import {
 import {
     getLineChatThreadsAction,
     getLineChatHistoryAction,
+    getLineChatSyncSignatureAction,
     sendDirectLineChatMessageAction,
     toggleLineChatNeedsReplyAction,
     updateLineChatUserProfileAction,
@@ -132,6 +133,17 @@ function playLineNotificationSound() {
 const TEST_TARO_LINE_USER_ID = 'U0e5a7654874369ca5e38deb47fd783aa';
 const TEST_TARO_STUDENT_NUMBER = '0035';
 
+// ページ/タブ切り替えでコンポーネントが再マウントされても即時表示できるよう、モジュールレベルで保持するキャッシュ
+const chatModuleCache: {
+    threads: LineChatThreadUser[] | null;
+    messages: Map<string, LineChatMessage[]>;
+    lastSelectedLineUserId: string | null;
+} = {
+    threads: null,
+    messages: new Map(),
+    lastSelectedLineUserId: null,
+};
+
 const STANDARD_TAG_OPTIONS = [
     { value: 'trial_done', label: '体験受講後' },
     { value: 'trial_form_viewed', label: '体験フォーム閲覧' },
@@ -208,8 +220,8 @@ export function IndividualChatTab({
     onDeliverySuccess,
 }: IndividualChatTabProps) {
     // スレッド一覧状態
-    const [threads, setThreads] = useState<LineChatThreadUser[]>([]);
-    const [isLoadingThreads, setIsLoadingThreads] = useState(true);
+    const [threads, setThreads] = useState<LineChatThreadUser[]>(() => chatModuleCache.threads || []);
+    const [isLoadingThreads, setIsLoadingThreads] = useState(() => !chatModuleCache.threads);
     const [searchQuery, setSearchQuery] = useState('');
     const [filterMode, setFilterMode] = useState<'all' | 'unread' | 'needs_reply' | 'leads' | 'students'>('all');
     const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -218,8 +230,13 @@ export function IndividualChatTab({
     const [totalNeedsReply, setTotalNeedsReply] = useState(0);
 
     // 選択中ユーザー & チャット履歴状態
-    const [selectedLineUserId, setSelectedLineUserId] = useState<string | null>(initialLineUserId || null);
-    const [messages, setMessages] = useState<LineChatMessage[]>([]);
+    const [selectedLineUserId, setSelectedLineUserId] = useState<string | null>(
+        initialLineUserId || chatModuleCache.lastSelectedLineUserId || null
+    );
+    const [messages, setMessages] = useState<LineChatMessage[]>(() => {
+        const initId = initialLineUserId || chatModuleCache.lastSelectedLineUserId;
+        return (initId && chatModuleCache.messages.get(initId)) || [];
+    });
     const [isLoadingMessages, setIsLoadingMessages] = useState(false);
 
     // モバイル表示モード ('list' | 'chat' | 'profile') & 右ペイン開閉
@@ -244,7 +261,7 @@ export function IndividualChatTab({
 
     // リアルタイム自動更新・サウンド設定
     const [isAutoRefreshEnabled, setIsAutoRefreshEnabled] = useState(true);
-    const [refreshIntervalSec, setRefreshIntervalSec] = useState<number>(4);
+    const [refreshIntervalSec, setRefreshIntervalSec] = useState<number>(2);
     const [isSoundEnabled, setIsSoundEnabled] = useState<boolean>(() => {
         if (typeof window === 'undefined') return true;
         const saved = localStorage.getItem('line_chat_sound_enabled');
@@ -261,6 +278,22 @@ export function IndividualChatTab({
         Map<string, { unreadCount: number; lastMessageAt?: string | null; lastMessageText?: string | null }>
     >(new Map());
     const hasInitialLoadedRef = useRef<boolean>(false);
+
+    // 高速化用Refs: 選択中ユーザー（依存配列から外して再取得連鎖を防止）・履歴キャッシュ・新着シグネチャ
+    const selectedLineUserIdRef = useRef<string | null>(selectedLineUserId);
+    selectedLineUserIdRef.current = selectedLineUserId;
+    if (selectedLineUserId) {
+        chatModuleCache.lastSelectedLineUserId = selectedLineUserId;
+    }
+    const messagesCacheRef = useRef<Map<string, LineChatMessage[]>>(chatModuleCache.messages);
+    const prefetchingRef = useRef<Set<string>>(new Set());
+    const lastSignatureRef = useRef<string | null>(null);
+    // 親から渡されるコールバックは毎レンダー再生成されるため Ref で保持（一覧の無限再取得を防止）
+    const onUnreadCountChangeRef = useRef(onUnreadCountChange);
+    onUnreadCountChangeRef.current = onUnreadCountChange;
+    // 通知音設定も Ref で参照（切り替え時に一覧を再取得しない）
+    const isSoundEnabledRef = useRef(isSoundEnabled);
+    isSoundEnabledRef.current = isSoundEnabled;
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -312,7 +345,7 @@ export function IndividualChatTab({
                 // 他スレッドの新着判定（初回ロード以降）
                 if (hasInitialLoadedRef.current) {
                     for (const th of res.threads) {
-                        if (th.lineUserId !== selectedLineUserId) {
+                        if (th.lineUserId !== selectedLineUserIdRef.current) {
                             const prev = previousThreadsMapRef.current.get(th.lineUserId);
                             const prevUnread = prev?.unreadCount || 0;
                             const prevTime = prev?.lastMessageAt;
@@ -323,7 +356,7 @@ export function IndividualChatTab({
                                 (th.lastMessageAt && th.lastMessageAt !== prevTime);
 
                             if (isNewInbound) {
-                                if (isSoundEnabled) {
+                                if (isSoundEnabledRef.current) {
                                     playLineNotificationSound();
                                 }
                                 toast.info(`💬 ${th.fullName} 様から新着メッセージ`, {
@@ -359,12 +392,21 @@ export function IndividualChatTab({
                 hasInitialLoadedRef.current = true;
 
                 setThreads(res.threads);
+                // 絞り込みなしの一覧のみ再マウント時の即時表示用にキャッシュ
+                if (
+                    !searchQuery &&
+                    filterMode === 'all' &&
+                    (!statusFilter || statusFilter === 'all') &&
+                    (!tagFilter || tagFilter === 'all')
+                ) {
+                    chatModuleCache.threads = res.threads;
+                }
                 setTotalUnread(res.totalUnreadCount);
                 setTotalNeedsReply(res.totalNeedsReplyCount);
-                onUnreadCountChange?.(res.totalUnreadCount, res.totalNeedsReplyCount);
+                onUnreadCountChangeRef.current?.(res.totalUnreadCount, res.totalNeedsReplyCount);
 
                 // 初回ロード時に未選択ならテスト太郎または先頭ユーザーを選択
-                if (!selectedLineUserId && res.threads.length > 0) {
+                if (!selectedLineUserIdRef.current && res.threads.length > 0) {
                     const targetInitial = initialLineUserId
                         ? res.threads.find(t => t.lineUserId === initialLineUserId)
                         : (res.threads.find(t => t.unreadCount > 0 || t.needsReply) ||
@@ -382,7 +424,7 @@ export function IndividualChatTab({
         } finally {
             if (!silent) setIsLoadingThreads(false);
         }
-    }, [searchQuery, filterMode, statusFilter, tagFilter, selectedLineUserId, initialLineUserId, onUnreadCountChange, isSoundEnabled]);
+    }, [searchQuery, filterMode, statusFilter, tagFilter, initialLineUserId]);
 
     // 選択ユーザーのチャット履歴取得
     const fetchChatHistory = useCallback(async (lineUserId: string, silent = false) => {
@@ -392,6 +434,14 @@ export function IndividualChatTab({
             const res = await getLineChatHistoryAction(lineUserId, true);
             if (res.success) {
                 const newMessages = res.messages;
+
+                // 履歴キャッシュを更新（次回切り替え時に即時表示）
+                messagesCacheRef.current.set(lineUserId, newMessages);
+
+                // 応答到着前に別ユーザーへ切り替わっていた場合は画面に反映しない（表示の混線防止）
+                if (lineUserId !== selectedLineUserIdRef.current) {
+                    return;
+                }
 
                 // バックグラウンド同期時の新着検知
                 if (silent && previousLatestMessageIdRef.current) {
@@ -404,7 +454,7 @@ export function IndividualChatTab({
                         const hasInbound = newlyAdded.some(m => m.direction === 'inbound');
 
                         if (hasInbound) {
-                            if (isSoundEnabled) {
+                            if (isSoundEnabledRef.current) {
                                 playLineNotificationSound();
                             }
                             const addedIds = newlyAdded.map(m => m.id);
@@ -432,10 +482,14 @@ export function IndividualChatTab({
         } finally {
             if (!silent) setIsLoadingMessages(false);
         }
-    }, [isSoundEnabled]);
+    }, []);
 
+    const isFirstThreadsFetchRef = useRef(true);
     useEffect(() => {
-        fetchThreads();
+        // 初回マウント時にキャッシュがあれば即時表示済みのため、裏で静かに最新化
+        const silent = isFirstThreadsFetchRef.current && !!chatModuleCache.threads;
+        isFirstThreadsFetchRef.current = false;
+        fetchThreads(silent);
     }, [fetchThreads]);
 
     useEffect(() => {
@@ -448,13 +502,52 @@ export function IndividualChatTab({
     // ユーザー切り替え時に履歴取得＆右ペイン初期値セット
     useEffect(() => {
         if (selectedLineUserId) {
-            previousMessagesCountRef.current = 0;
-            previousLatestMessageIdRef.current = null;
-            fetchChatHistory(selectedLineUserId);
+            const cached = messagesCacheRef.current.get(selectedLineUserId);
+            if (cached) {
+                // キャッシュがあれば即時表示し、裏で最新化（ローディング表示なし）
+                setMessages(cached);
+                previousMessagesCountRef.current = cached.length;
+                previousLatestMessageIdRef.current = cached[cached.length - 1]?.id || null;
+                setIsLoadingMessages(false);
+                fetchChatHistory(selectedLineUserId, true);
+            } else {
+                previousMessagesCountRef.current = 0;
+                previousLatestMessageIdRef.current = null;
+                setMessages([]);
+                fetchChatHistory(selectedLineUserId);
+            }
         } else {
             setMessages([]);
         }
     }, [selectedLineUserId, fetchChatHistory]);
+
+    // スレッドにマウスを乗せた時点で履歴を先読み（クリック時に即表示するため・既読化はしない）
+    const prefetchChatHistory = useCallback(async (lineUserId: string) => {
+        if (!lineUserId) return;
+        if (messagesCacheRef.current.has(lineUserId) || prefetchingRef.current.has(lineUserId)) return;
+        prefetchingRef.current.add(lineUserId);
+        try {
+            const res = await getLineChatHistoryAction(lineUserId, false);
+            if (res.success && !messagesCacheRef.current.has(lineUserId)) {
+                messagesCacheRef.current.set(lineUserId, res.messages);
+            }
+        } catch {
+            // 先読み失敗は無視
+        } finally {
+            prefetchingRef.current.delete(lineUserId);
+        }
+    }, []);
+
+    // スレッド一覧取得後、上位スレッドを数件だけ先読み
+    useEffect(() => {
+        const top = threads.slice(0, 5);
+        for (const t of top) {
+            if (t.lineUserId !== selectedLineUserIdRef.current) {
+                prefetchChatHistory(t.lineUserId);
+            }
+        }
+        // threads 更新ごとに実行（キャッシュ済みはスキップされる）
+    }, [threads, prefetchChatHistory]);
 
     useEffect(() => {
         if (selectedUser) {
@@ -471,20 +564,41 @@ export function IndividualChatTab({
         }
     }, [messages.length, selectedLineUserId]);
 
-    // LINE風リアルタイムスマートポーリング（フォアグラウンド4秒、バックグラウンド15秒、タブ復帰時即時）
+    // LINE風リアルタイムスマートポーリング（フォアグラウンド2秒の軽量新着チェック、バックグラウンド15秒、タブ復帰時即時）
     useEffect(() => {
         if (!isAutoRefreshEnabled) return;
 
         let timerId: NodeJS.Timeout | null = null;
         let isMounted = true;
+        let isPolling = false;
+        let lastFullSyncAt = Date.now();
 
-        const runPoll = async () => {
-            if (!isMounted) return;
-            setIsSyncing(true);
+        // 軽量シグネチャで変化を検知した時のみ重い再取得を行う（30秒ごとに保険のフル同期）
+        const runPoll = async (force = false) => {
+            if (!isMounted || isPolling) return;
+            isPolling = true;
             try {
-                await fetchThreads(true);
-                if (selectedLineUserId) {
-                    await fetchChatHistory(selectedLineUserId, true);
+                let changed = force;
+                const sigRes = await getLineChatSyncSignatureAction();
+                if (sigRes.success && sigRes.signature) {
+                    if (lastSignatureRef.current !== null && lastSignatureRef.current !== sigRes.signature) {
+                        changed = true;
+                    }
+                    lastSignatureRef.current = sigRes.signature;
+                }
+                if (Date.now() - lastFullSyncAt > 30000) {
+                    changed = true;
+                }
+
+                if (changed && isMounted) {
+                    setIsSyncing(true);
+                    lastFullSyncAt = Date.now();
+                    const currentId = selectedLineUserIdRef.current;
+                    // 一覧と履歴を並列で取得
+                    await Promise.all([
+                        fetchThreads(true),
+                        currentId ? fetchChatHistory(currentId, true) : Promise.resolve(),
+                    ]);
                 }
                 if (isMounted) {
                     setLastSyncedAt(new Date());
@@ -492,6 +606,7 @@ export function IndividualChatTab({
             } catch (err) {
                 console.error('[IndividualChatTab] Polling error:', err);
             } finally {
+                isPolling = false;
                 if (isMounted) {
                     setIsSyncing(false);
                 }
@@ -514,7 +629,7 @@ export function IndividualChatTab({
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible') {
                 if (timerId) clearTimeout(timerId);
-                runPoll();
+                runPoll(true);
                 scheduleNext();
             }
         };
@@ -526,7 +641,7 @@ export function IndividualChatTab({
             if (timerId) clearTimeout(timerId);
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, [isAutoRefreshEnabled, refreshIntervalSec, fetchThreads, fetchChatHistory, selectedLineUserId]);
+    }, [isAutoRefreshEnabled, refreshIntervalSec, fetchThreads, fetchChatHistory]);
 
     // 変数置換プレビュー計算
     const previewRenderedText = useMemo(() => {
@@ -970,6 +1085,8 @@ export function IndividualChatTab({
                                             setSelectedLineUserId(thread.lineUserId);
                                             setMobilePane('chat');
                                         }}
+                                        onMouseEnter={() => prefetchChatHistory(thread.lineUserId)}
+                                        onTouchStart={() => prefetchChatHistory(thread.lineUserId)}
                                         className={`w-full text-left p-3 transition-colors flex items-start gap-2.5 ${
                                             isSelected
                                                 ? 'bg-emerald-50/90 dark:bg-emerald-950/30 border-l-4 border-l-[#06C755]'
@@ -1166,21 +1283,21 @@ export function IndividualChatTab({
                                             onClick={() => {
                                                 if (!isAutoRefreshEnabled) {
                                                     setIsAutoRefreshEnabled(true);
-                                                    setRefreshIntervalSec(4);
-                                                    toast.success('リアルタイム自動更新を有効化しました（4秒間隔）');
-                                                } else if (refreshIntervalSec === 4) {
-                                                    setRefreshIntervalSec(8);
-                                                    toast.info('自動更新間隔を 8秒 に変更しました');
-                                                } else if (refreshIntervalSec === 8) {
-                                                    setRefreshIntervalSec(15);
-                                                    toast.info('自動更新間隔を 15秒 に変更しました');
+                                                    setRefreshIntervalSec(2);
+                                                    toast.success('リアルタイム自動更新を有効化しました（2秒間隔）');
+                                                } else if (refreshIntervalSec === 2) {
+                                                    setRefreshIntervalSec(5);
+                                                    toast.info('自動更新間隔を 5秒 に変更しました');
+                                                } else if (refreshIntervalSec === 5) {
+                                                    setRefreshIntervalSec(10);
+                                                    toast.info('自動更新間隔を 10秒 に変更しました');
                                                 } else {
                                                     setIsAutoRefreshEnabled(false);
                                                     toast.info('自動更新を一時停止しました（手動更新のみ）');
                                                 }
                                             }}
                                             className="flex items-center gap-1.5 hover:opacity-80 transition-opacity"
-                                            title={`クリックで更新間隔切り替え（4秒 → 8秒 → 15秒 → 停止）${
+                                            title={`クリックで更新間隔切り替え（2秒 → 5秒 → 10秒 → 停止）${
                                                 lastSyncedAt
                                                     ? `\n最新同期: ${lastSyncedAt.toLocaleTimeString('ja-JP')}`
                                                     : ''
