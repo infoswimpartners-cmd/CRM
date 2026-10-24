@@ -54,6 +54,8 @@ import {
     Activity,
     Compass,
     ScrollText,
+    Settings,
+    X,
 } from 'lucide-react'
 import {
     QuestStudent,
@@ -89,6 +91,10 @@ import {
     calculateAreaRoiMatrix,
     simulateInvestmentPayback,
 } from '@/lib/analytics-engine'
+import {
+    DEFAULT_QUEST_FINANCE_SETTINGS,
+    type QuestFinanceSettings,
+} from '@/types/quest-erp'
 import type { RealQuestDataResult } from '@/lib/quest-real-data'
 
 /**
@@ -191,6 +197,59 @@ export function SwimPartnersQuestApp({
     const [isLiveDatabase, setIsLiveDatabase] = useState<boolean>(
         Boolean(initialRealData?.isRealData)
     )
+
+    // 固定費・財務マスタ設定モーダルの状態
+    const [isFinanceModalOpen, setIsFinanceModalOpen] = useState(false)
+    const [financeForm, setFinanceForm] = useState<QuestFinanceSettings>(DEFAULT_QUEST_FINANCE_SETTINGS)
+    const [isSavingSettings, setIsSavingSettings] = useState(false)
+    const [settingsSaveStatus, setSettingsSaveStatus] = useState<string | null>(null)
+
+    // 財務マスタ設定をAPIから取得
+    const fetchFinanceSettings = async () => {
+        try {
+            const res = await fetch('/api/quest/settings')
+            if (res.ok) {
+                const data = await res.json()
+                setFinanceForm(prev => ({ ...prev, ...data }))
+            }
+        } catch (e) {
+            console.error('Failed to fetch finance settings:', e)
+        }
+    }
+
+    // 初回ロード時に財務マスタ設定を取得
+    useEffect(() => {
+        fetchFinanceSettings()
+    }, [])
+
+    // 固定費設定の保存処理
+    const handleSaveFinanceSettings = async (e: React.FormEvent) => {
+        e.preventDefault()
+        setIsSavingSettings(true)
+        setSettingsSaveStatus(null)
+        try {
+            const res = await fetch('/api/quest/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(financeForm),
+            })
+            if (!res.ok) {
+                const errJson = await res.json().catch(() => ({}))
+                throw new Error(errJson.error || '設定の保存に失敗しました')
+            }
+            setSettingsSaveStatus('設定を保存しました。実DBとP/Lを再集計中...')
+            // 実DBと財務計算を即時再同期
+            await handleSyncRealDatabase()
+            setTimeout(() => {
+                setSettingsSaveStatus(null)
+                setIsFinanceModalOpen(false)
+            }, 1000)
+        } catch (err: any) {
+            setSettingsSaveStatus(`保存エラー: ${err.message || '通信に失敗しました'}`)
+        } finally {
+            setIsSavingSettings(false)
+        }
+    }
 
     // クライアントサイドでの動的実データ再同期
     const handleSyncRealDatabase = async () => {
@@ -654,6 +713,17 @@ export function SwimPartnersQuestApp({
                                         <RefreshCw className="w-3 h-3 text-sky-600" /> 実DB同期を実行
                                     </button>
                                 )}
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        fetchFinanceSettings()
+                                        setIsFinanceModalOpen(true)
+                                    }}
+                                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-slate-100 text-slate-700 border border-slate-300 hover:bg-slate-200 transition cursor-pointer"
+                                    title="固定費や保有資金の手動設定・freee連携案内"
+                                >
+                                    <Settings className="w-3 h-3 text-slate-600" /> 固定費・財務設定
+                                </button>
                             </div>
                             <h1 className="text-lg md:text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
                                 スイムパートナーズ 経営ギルド司令室
@@ -1355,6 +1425,139 @@ export function SwimPartnersQuestApp({
                             </div>
                         </div>
                     </div>
+
+                    {/* 当月P/L構造 内訳明細＆マイナス要因の構造分析カード */}
+                    <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-sm space-y-5">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
+                            <div>
+                                <span className="text-[10px] font-black uppercase text-sky-600 tracking-widest">
+                                    CURRENT MONTH P/L BREAKDOWN & STRUCTURAL ANALYSIS
+                                </span>
+                                <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
+                                    <DollarSign className="w-4 h-4 text-sky-600" />
+                                    当月({latestPl.yearMonth}) P/L構造・費用内訳と利益改善シミュレーション
+                                </h2>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    fetchFinanceSettings()
+                                    setIsFinanceModalOpen(true)
+                                }}
+                                className="self-start sm:self-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-600 text-white text-xs font-black hover:bg-sky-700 transition shadow-sm cursor-pointer"
+                            >
+                                <Settings className="w-3.5 h-3.5" />
+                                固定費・財務マスタ設定を変更
+                            </button>
+                        </div>
+
+                        {/* P/L内訳グリッド */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {/* ① 売上構造 */}
+                            <div className="bg-sky-50/60 border border-sky-200 rounded-xl p-4 space-y-2">
+                                <div className="text-xs font-black text-sky-900 flex items-center justify-between">
+                                    <span>① 売上高合計</span>
+                                    <span className="text-base text-sky-950 font-black">¥{latestPl.totalRevenue.toLocaleString()}</span>
+                                </div>
+                                <div className="space-y-1.5 pt-2 border-t border-sky-200 text-xs text-slate-700">
+                                    <div className="flex justify-between">
+                                        <span className="text-slate-600">・定期サブスク(ストック):</span>
+                                        <span className="font-bold">¥{latestPl.stockRevenue.toLocaleString()}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-slate-600">・城東小金曜固定枠:</span>
+                                        <span className="font-bold">¥{latestPl.fixedSchoolRevenue.toLocaleString()}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-slate-600">・都度受講・体験(フロー):</span>
+                                        <span className="font-bold">¥{latestPl.flowRevenue.toLocaleString()}</span>
+                                    </div>
+                                    <div className="text-[10px] text-sky-700 font-bold pt-1">
+                                        ストック売上比率: {latestPl.stockRatioPercent}%
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* ② 売上原価・粗利 */}
+                            <div className="bg-emerald-50/60 border border-emerald-200 rounded-xl p-4 space-y-2">
+                                <div className="text-xs font-black text-emerald-900 flex items-center justify-between">
+                                    <span>② 売上原価 ＆ 粗利益</span>
+                                    <span className="text-base text-emerald-950 font-black">粗利 ¥{latestPl.grossProfit.toLocaleString()}</span>
+                                </div>
+                                <div className="space-y-1.5 pt-2 border-t border-emerald-200 text-xs text-slate-700">
+                                    <div className="flex justify-between">
+                                        <span className="text-slate-600">・コーチ指導委託費:</span>
+                                        <span className="font-bold text-rose-600">¥{latestPl.coachCost.toLocaleString()}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-slate-600">・プール施設利用料:</span>
+                                        <span className="font-bold text-rose-600">¥{latestPl.facilityTransportCost.toLocaleString()}</span>
+                                    </div>
+                                    <div className="flex justify-between pt-1 border-t border-emerald-200 font-bold">
+                                        <span>原価合計:</span>
+                                        <span className="text-rose-700">¥{(latestPl.coachCost + latestPl.facilityTransportCost).toLocaleString()}</span>
+                                    </div>
+                                    <div className="text-[10px] text-emerald-700 font-bold">
+                                        粗利率: {latestPl.grossMarginPercent}%
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* ③ 販管費・営業利益 */}
+                            <div className="bg-purple-50/60 border border-purple-200 rounded-xl p-4 space-y-2">
+                                <div className="text-xs font-black text-purple-900 flex items-center justify-between">
+                                    <span>③ 販管費 ＆ 営業利益</span>
+                                    <span className={`text-base font-black ${latestPl.operatingProfitBeforeCeo >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
+                                        {latestPl.operatingProfitBeforeCeo >= 0 ? `+¥${latestPl.operatingProfitBeforeCeo.toLocaleString()}` : `▲¥${Math.abs(latestPl.operatingProfitBeforeCeo).toLocaleString()}`}
+                                    </span>
+                                </div>
+                                <div className="space-y-1.5 pt-2 border-t border-purple-200 text-xs text-slate-700">
+                                    <div className="flex justify-between">
+                                        <span className="text-slate-600 flex items-center gap-1">
+                                            ・Google広告費:
+                                            <span className="px-1.5 py-0.2 bg-sky-100 text-sky-800 text-[9px] rounded font-bold">実測連動</span>
+                                        </span>
+                                        <span className="font-bold">¥{latestPl.adSpendGoogle.toLocaleString()}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-slate-600">・Meta広告費:</span>
+                                        <span className="font-bold">¥{latestPl.adSpendMeta.toLocaleString()}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-slate-600">・システム・ツール代:</span>
+                                        <span className="font-bold">¥{latestFinance.system_tool_cost.toLocaleString()}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-slate-600">・指導者賠償保険等:</span>
+                                        <span className="font-bold">¥{latestFinance.insurance_cost.toLocaleString()}</span>
+                                    </div>
+                                    <div className="flex justify-between pt-1 border-t border-purple-200 font-bold">
+                                        <span>販管費合計:</span>
+                                        <span className="text-rose-700">¥{(latestPl.adSpendTotal + latestPl.fixedOverheadCost + latestPl.stripeFee).toLocaleString()}</span>
+                                    </div>
+                                    <div className="text-[10px] text-purple-700 font-bold">
+                                        実質営業利益(代表時給控除後): {latestPl.realOperatingProfitAfterCeo >= 0 ? `+¥${latestPl.realOperatingProfitAfterCeo.toLocaleString()}` : `▲¥${Math.abs(latestPl.realOperatingProfitAfterCeo).toLocaleString()}`}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 営業利益マイナス要因の分析 ＆ 黒字化ブレイクスルーのロードマップ */}
+                        <div className="bg-amber-50/80 border border-amber-300 rounded-xl p-4 space-y-2">
+                            <div className="flex items-center gap-2 text-xs font-black text-amber-900">
+                                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                                当月の営業利益マイナス要因分析 ＆ 最短黒字化ロードマップ
+                            </div>
+                            <div className="text-xs text-amber-950/90 leading-relaxed space-y-1.5">
+                                <p>
+                                    <strong>【マイナスの直接原因】</strong> 当月粗利益 <span className="font-bold">¥{latestPl.grossProfit.toLocaleString()}</span> に対し、販売管理費（Google実測広告費 ¥{latestPl.adSpendGoogle.toLocaleString()} ＋ Meta広告費 ¥{latestPl.adSpendMeta.toLocaleString()} ＋ ツール・保険固定費 ¥{latestPl.fixedOverheadCost.toLocaleString()} ＋ 決済手数料 ¥{latestPl.stripeFee.toLocaleString()}）の合計 <span className="font-bold text-rose-700">¥{(latestPl.adSpendTotal + latestPl.fixedOverheadCost + latestPl.stripeFee).toLocaleString()}</span> が上回っているため、代表時給控除前で <span className="font-bold text-rose-700">▲¥{Math.abs(latestPl.operatingProfitBeforeCeo).toLocaleString()}</span>（代表時給控除後 ▲¥{Math.abs(latestPl.realOperatingProfitAfterCeo).toLocaleString()}）となっております。
+                                </p>
+                                <p>
+                                    <strong>【最速の黒字化レバー】</strong> 城東小金曜固定枠（現在 {latestFinance.joto_friday_enrolled}名 / 定員{latestFinance.joto_friday_capacity}名）は追加のコーチ人件費が発生しない高粗利構造です。残り{Math.max(0, latestFinance.joto_friday_capacity - latestFinance.joto_friday_enrolled)}名の空き枠が埋まると <span className="font-bold text-emerald-800">＋¥{(Math.max(0, latestFinance.joto_friday_capacity - latestFinance.joto_friday_enrolled) * 26000).toLocaleString()}/月 の粗利純増</span> となり、営業利益は一気に <span className="font-bold text-emerald-800">大幅黒字</span> へ好転します！
+                                </p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -1635,6 +1838,294 @@ export function SwimPartnersQuestApp({
                                 >
                                     🪙 報告を送信して EXP＆報酬を獲得！
                                 </button>
+                            </form>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* ================= 固定費・財務マスタ設定モーダル（管理者専用） ================= */}
+            <AnimatePresence>
+                {isFinanceModalOpen && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto"
+                        onClick={() => setIsFinanceModalOpen(false)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, y: 20 }}
+                            animate={{ scale: 1, y: 0 }}
+                            exit={{ scale: 0.95, y: 20 }}
+                            onClick={e => e.stopPropagation()}
+                            className="max-w-2xl w-full bg-white border border-slate-200 rounded-3xl p-6 shadow-2xl space-y-5 my-8 max-h-[90vh] overflow-y-auto"
+                        >
+                            {/* モーダルヘッダー */}
+                            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+                                <div className="flex items-center gap-2">
+                                    <div className="p-2 bg-sky-100 text-sky-700 rounded-xl">
+                                        <Settings className="w-5 h-5" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-base font-black text-slate-900">
+                                            固定費・財務マスタ設定（管理者専用）
+                                        </h3>
+                                        <p className="text-xs text-slate-500">
+                                            Google広告費は自動取得中。その他の固定費・資金枠を手動設定できます。
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsFinanceModalOpen(false)}
+                                    className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            <form onSubmit={handleSaveFinanceSettings} className="space-y-4">
+                                {/* ① 広告宣伝費セクション */}
+                                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
+                                    <div className="text-xs font-black text-slate-900 flex items-center justify-between">
+                                        <span>① 広告宣伝費（当月P/L）</span>
+                                        <span className="text-[10px] text-slate-500">Google広告は実測値、Metaは手動</span>
+                                    </div>
+
+                                    {/* Google広告（実測・読み取り専用） */}
+                                    <div className="bg-white border border-sky-200 rounded-xl p-3 flex items-center justify-between">
+                                        <div>
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="text-xs font-bold text-slate-800">Google広告 実消化額</span>
+                                                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-sky-100 text-sky-800 border border-sky-300">
+                                                    ⚡ GA4実測API連動中
+                                                </span>
+                                            </div>
+                                            <div className="text-[11px] text-slate-500 mt-0.5">
+                                                GA4/Google広告アカウントより当月消化額を自動取得しています
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="text-base font-black text-sky-900">
+                                                ¥{latestPl.adSpendGoogle.toLocaleString()}
+                                            </div>
+                                            <div className="text-[10px] text-slate-400">（自動集計値）</div>
+                                        </div>
+                                    </div>
+
+                                    {/* Meta広告費（手動入力） */}
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                                            Meta広告費（月額・手動入力）
+                                        </label>
+                                        <div className="relative">
+                                            <input
+                                                type="number"
+                                                min={0}
+                                                step={1000}
+                                                value={financeForm.ad_spend_meta_default}
+                                                onChange={e => setFinanceForm({ ...financeForm, ad_spend_meta_default: Number(e.target.value) })}
+                                                className="w-full rounded-xl bg-white border border-slate-300 px-3 py-2 text-xs text-slate-900 font-bold focus:outline-sky-500 pl-7"
+                                                required
+                                            />
+                                            <span className="absolute left-2.5 top-2 text-xs font-bold text-slate-400">¥</span>
+                                        </div>
+                                        <p className="text-[10px] text-slate-500 mt-1">Instagram・Facebook広告の月間概算消化額</p>
+                                    </div>
+                                </div>
+
+                                {/* ② 月額固定費・ツール・保険セクション */}
+                                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
+                                    <div className="text-xs font-black text-slate-900">
+                                        ② 月額固定費（販管費・手動設定）
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-700 mb-1">
+                                                システム・ツール代（月額）
+                                            </label>
+                                            <div className="relative">
+                                                <input
+                                                    type="number"
+                                                    min={0}
+                                                    step={500}
+                                                    value={financeForm.system_tool_cost_default}
+                                                    onChange={e => setFinanceForm({ ...financeForm, system_tool_cost_default: Number(e.target.value) })}
+                                                    className="w-full rounded-xl bg-white border border-slate-300 px-3 py-2 text-xs text-slate-900 font-bold focus:outline-sky-500 pl-7"
+                                                    required
+                                                />
+                                                <span className="absolute left-2.5 top-2 text-xs font-bold text-slate-400">¥</span>
+                                            </div>
+                                            <p className="text-[10px] text-slate-500 mt-1">Workspace, Notion, Canva, Supabase等</p>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-700 mb-1">
+                                                賠償責任保険料（月割換算）
+                                            </label>
+                                            <div className="relative">
+                                                <input
+                                                    type="number"
+                                                    min={0}
+                                                    step={500}
+                                                    value={financeForm.insurance_cost_default}
+                                                    onChange={e => setFinanceForm({ ...financeForm, insurance_cost_default: Number(e.target.value) })}
+                                                    className="w-full rounded-xl bg-white border border-slate-300 px-3 py-2 text-xs text-slate-900 font-bold focus:outline-sky-500 pl-7"
+                                                    required
+                                                />
+                                                <span className="absolute left-2.5 top-2 text-xs font-bold text-slate-400">¥</span>
+                                            </div>
+                                            <p className="text-[10px] text-slate-500 mt-1">水泳指導者・施設損害賠償責任保険</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* ③ 資金管理・手元キャッシュセクション */}
+                                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
+                                    <div className="text-xs font-black text-slate-900">
+                                        ③ 手元資金残高 ＆ 生活防衛資金（MP/HPゲージ連動）
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-700 mb-1">
+                                                総保有キャッシュ残高（手元資金）
+                                            </label>
+                                            <div className="relative">
+                                                <input
+                                                    type="number"
+                                                    min={0}
+                                                    step={100000}
+                                                    value={financeForm.total_cash_balance}
+                                                    onChange={e => setFinanceForm({ ...financeForm, total_cash_balance: Number(e.target.value) })}
+                                                    className="w-full rounded-xl bg-white border border-slate-300 px-3 py-2 text-xs text-slate-900 font-bold focus:outline-sky-500 pl-7"
+                                                    required
+                                                />
+                                                <span className="absolute left-2.5 top-2 text-xs font-bold text-slate-400">¥</span>
+                                            </div>
+                                            <p className="text-[10px] text-slate-500 mt-1">銀行口座残高＋現預金合計</p>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-700 mb-1">
+                                                生活防衛資金（確保枠・不可侵HP）
+                                            </label>
+                                            <div className="relative">
+                                                <input
+                                                    type="number"
+                                                    min={0}
+                                                    step={100000}
+                                                    value={financeForm.safe_reserve_cash}
+                                                    onChange={e => setFinanceForm({ ...financeForm, safe_reserve_cash: Number(e.target.value) })}
+                                                    className="w-full rounded-xl bg-white border border-slate-300 px-3 py-2 text-xs text-slate-900 font-bold focus:outline-sky-500 pl-7"
+                                                    required
+                                                />
+                                                <span className="absolute left-2.5 top-2 text-xs font-bold text-slate-400">¥</span>
+                                            </div>
+                                            <p className="text-[10px] text-slate-500 mt-1">※総資金から防衛枠を引いた額が投資可能MPとなります</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* ④ 代表工数＆城東小枠パラメータ */}
+                                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-3">
+                                    <div className="text-xs font-black text-slate-900">
+                                        ④ 経営評価・事業パラメータ設定
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-700 mb-1">
+                                                城東小金曜枠 月間定員数
+                                            </label>
+                                            <input
+                                                type="number"
+                                                min={1}
+                                                max={100}
+                                                value={financeForm.joto_friday_capacity}
+                                                onChange={e => setFinanceForm({ ...financeForm, joto_friday_capacity: Number(e.target.value) })}
+                                                className="w-full rounded-xl bg-white border border-slate-300 px-3 py-2 text-xs text-slate-900 font-bold focus:outline-sky-500"
+                                                required
+                                            />
+                                            <p className="text-[10px] text-slate-500 mt-1">現在定員: 24名（1コマ6名 × 4時間）</p>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-700 mb-1">
+                                                代表時給換算額（シャドウコスト）
+                                            </label>
+                                            <div className="relative">
+                                                <input
+                                                    type="number"
+                                                    min={0}
+                                                    step={500}
+                                                    value={financeForm.ceo_hourly_rate}
+                                                    onChange={e => setFinanceForm({ ...financeForm, ceo_hourly_rate: Number(e.target.value) })}
+                                                    className="w-full rounded-xl bg-white border border-slate-300 px-3 py-2 text-xs text-slate-900 font-bold focus:outline-sky-500 pl-7"
+                                                    required
+                                                />
+                                                <span className="absolute left-2.5 top-2 text-xs font-bold text-slate-400">¥</span>
+                                            </div>
+                                            <p className="text-[10px] text-slate-500 mt-1">実質営業利益判定用の代表実働評価単価</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* freee 会計システム連携の案内カード */}
+                                <div className="bg-sky-50/70 border border-sky-300 rounded-2xl p-4 space-y-2">
+                                    <div className="flex items-center gap-2 text-xs font-black text-sky-950">
+                                        <Sparkles className="w-4 h-4 text-sky-600 shrink-0" />
+                                        会計システム「freee（フリー）」との自動連携について
+                                    </div>
+                                    <div className="text-xs text-sky-900/90 leading-relaxed space-y-1">
+                                        <p>
+                                            <strong>Q. freeeとの自動連携は可能ですか？</strong><br />
+                                            <strong>A. はい、技術的に完全連携が可能です。</strong>
+                                        </p>
+                                        <p className="text-[11px] text-slate-700">
+                                            freee 会計 API（試算表API / 取引API）を用いることで、freee上で仕訳された「広告宣伝費」「通信費」「支払手数料」「保険料」「消耗品費」などの月次実績額を自動取得し、手動入力なしでこの司令室P/Lへ即時反映させる自動連携モジュールを追加できます。
+                                        </p>
+                                        <p className="text-[11px] text-sky-800 font-bold">
+                                            ※freee連携を導入される場合は、freeeのデベロッパー登録（アプリ作成）とOAuth2認証キーの発行を行うことで即座に本番接続できます。
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {settingsSaveStatus && (
+                                    <div className="text-xs font-bold text-center py-2 px-3 rounded-xl bg-slate-100 text-slate-800">
+                                        {settingsSaveStatus}
+                                    </div>
+                                )}
+
+                                {/* ボタン群 */}
+                                <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsFinanceModalOpen(false)}
+                                        className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition"
+                                    >
+                                        閉じる
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={isSavingSettings}
+                                        className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 text-white font-black text-xs hover:brightness-105 transition shadow-sm disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                                    >
+                                        {isSavingSettings ? (
+                                            <>
+                                                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                                保存中...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                                設定を保存してP/Lを再集計
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
                             </form>
                         </motion.div>
                     </motion.div>

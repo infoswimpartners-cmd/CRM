@@ -228,3 +228,28 @@ export interface AreaRoiItem {
     gross_margin_rate: number // %
     roi_rank: 'S (最重点投資)' | 'A (高収益)' | 'B (安定)' | 'C (要改善)'
 }
+
+// 財務マスタ・固定費設定
+export interface QuestFinanceSettings {
+    safe_reserve_cash: number       // 生活防衛・安全確保資金（デフォルト: 3,000,000円）
+    total_cash_balance: number      // 現在の総保有キャッシュ（デフォルト: 5,550,000円）
+    ad_spend_google_default: number // Google広告費デフォルト値（デフォルト: 60,000円）
+    ad_spend_meta_default: number   // Meta広告費デフォルト値（デフォルト: 20,000円）
+    system_tool_cost_default: number // システム固定費（デフォルト: 19,500円）
+    insurance_cost_default: number   // 賠責保険料（デフォルト: 8,000円）
+    joto_friday_capacity: number    // 城東小金曜枠目標定員（デフォルト: 12名）
+    facility_cost_per_lesson: number // 通常レッスン施設費/コマ（デフォルト: 700円）
+    ceo_hourly_rate: number         // 代表実働仮想時給（デフォルト: 3,500円）
+}
+
+export const DEFAULT_QUEST_FINANCE_SETTINGS: QuestFinanceSettings = {
+    safe_reserve_cash: 3000000,
+    total_cash_balance: 5550000,
+    ad_spend_google_default: 60000,
+    ad_spend_meta_default: 20000,
+    system_tool_cost_default: 19500,
+    insurance_cost_default: 8000,
+    joto_friday_capacity: 12,
+    facility_cost_per_lesson: 700,
+    ceo_hourly_rate: 3500,
+}
