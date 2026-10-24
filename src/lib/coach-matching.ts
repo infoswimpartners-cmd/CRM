@@ -32,6 +32,20 @@ const DAY_MAP: Record<string, string> = {
     '6': '土', 'sat': '土', 'saturday': '土', '土曜日': '土', '土': '土',
 }
 
+// 年齢を計算するヘルパー関数
+function calculateAge(birthDateString: string | null | undefined): number | null {
+    if (!birthDateString) return null
+    const birthDate = new Date(birthDateString)
+    if (isNaN(birthDate.getTime())) return null
+    const today = new Date()
+    let age = today.getFullYear() - birthDate.getFullYear()
+    const m = today.getMonth() - birthDate.getMonth()
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+        age--
+    }
+    return age
+}
+
 /**
  * 日時文字列から曜日（日〜土）を抽出
  */
@@ -375,7 +389,50 @@ export async function dispatchNewLeadToMatchingCoaches(
         const siteUrl = options?.siteUrl || process.env.NEXT_PUBLIC_SITE_URL || 'https://crm.swim-partners.com'
         const assignUrl = `${siteUrl}/coach/leads`
 
-        // 3. 各コーチ個別スペースへの送信メッセージ作成
+        // 3. app_configs から「案件通知テンプレート（lead_notification_template）」を取得
+        const { data: templateConfig } = await supabaseAdmin
+            .from('app_configs')
+            .select('value')
+            .eq('key', 'lead_notification_template')
+            .maybeSingle()
+
+        const defaultTemplate = `📢 *【新規レッスン案件のお知らせ】*
+コーチの皆様、新規のレッスン案件が登録されました。
+担当をご希望の方は、案件紹介ページよりアサインを行ってください。
+
+*■ 案件詳細*
+名前： {{name}}　様
+性別： {{gender}}
+年齢： {{age}}
+レベル・目標： {{skill_level}}
+希望エリア/最寄駅： {{area}}
+レッスン予定の場所：{{location}}
+希望頻度： {{frequency}}
+可能な曜日・時間帯： {{available_times}}
+その他： {{notes}}
+
+希望日時：
+① {{datetime1}}
+② {{datetime2}}
+③ {{datetime3}}
+{{second_student_info}}
+
+▼ 案件確認・アサインはこちら
+{{assign_url}}`
+
+        const baseTemplate = templateConfig?.value?.trim() || defaultTemplate
+
+        const age = calculateAge(lead.birth_date)
+        const ageStr = age !== null ? `${age}歳` : '未設定'
+
+        let secondStudentInfo = ''
+        if (lead.second_student_name) {
+            const secondAge = calculateAge(lead.second_student_birth_date)
+            const secondAgeStr = secondAge !== null ? `${secondAge}歳` : '未設定'
+            secondStudentInfo = `\n\n【2人目の情報】\n名前： ${lead.second_student_name}\n性別： ${lead.second_student_gender || '未設定'}\n年齢： ${secondAgeStr}`
+        }
+
+        // 4. 各コーチ個別スペースへの送信メッセージ作成と送信
         const isBroadcastAll = matchResult.mode === 'broadcast_all'
         const modeBadge = isBroadcastAll
             ? '📢 *【新規案件・全コーチご案内】*'
@@ -393,7 +450,8 @@ export async function dispatchNewLeadToMatchingCoaches(
                 ? `\n・マッチ項目: ${candidate.matchedReasons.join(' / ')}`
                 : ''
 
-            const message = [
+            // コーチ個別宛ての優先案内ヘッダー
+            const personalizedHeader = [
                 modeBadge,
                 `${candidate.coachName} コーチ`,
                 '',
@@ -402,23 +460,30 @@ export async function dispatchNewLeadToMatchingCoaches(
                 personalReasons,
                 '',
                 '────────────────',
-                '*■ 案件情報*',
-                `・お名前: ${lead.name || 'お客様'} 様（${lead.full_name_kana || ''}）`,
-                `・希望エリア/最寄駅: ${lead.area || '未指定'}`,
-                `・第1希望: ${lead.datetime1 || '未指定'}`,
-                `・第2希望: ${lead.datetime2 || '未指定'}`,
-                `・第3希望: ${lead.datetime3 || '未指定'}`,
-                `・可能な曜日・時間帯: ${lead.available_times || '未指定'}`,
-                `・泳力・目標: ${lead.skill_level || 'なし'}`,
-                lead.notes ? `・その他ご要望: ${lead.notes}` : '',
-                '────────────────',
-                '',
-                '担当をご希望の方は、下記ページより「アサインする」ボタンを押してください。',
-                '（※先着順となります）',
-                '',
-                `👉 *案件確認・立候補はこちら:*`,
-                assignUrl,
             ].filter(Boolean).join('\n')
+
+            // 案件通知テンプレートの変数置換
+            const renderedTemplate = baseTemplate
+                .replace(/\{\{coach_name\}\}/g, candidate.coachName)
+                .replace(/\{\{area\}\}/g, lead.area || '未設定')
+                .replace(/\{\{location\}\}/g, lead.lesson_location || lead.area || '未設定')
+                .replace(/\{\{datetime1\}\}/g, lead.datetime1 || '未指定')
+                .replace(/\{\{datetime2\}\}/g, lead.datetime2 || '未指定')
+                .replace(/\{\{datetime3\}\}/g, lead.datetime3 || '未指定')
+                .replace(/\{\{skill_level\}\}/g, lead.skill_level || lead.concern || '未設定')
+                .replace(/\{\{frequency\}\}/g, lead.frequency || '未設定')
+                .replace(/\{\{notes\}\}/g, lead.notes || 'なし')
+                .replace(/\{\{assign_url\}\}/g, assignUrl)
+                .replace(/\{\{name\}\}/g, lead.name || '未設定')
+                .replace(/\{\{gender\}\}/g, lead.gender || '未設定')
+                .replace(/\{\{age\}\}/g, ageStr)
+                .replace(/\{\{second_student_info\}\}/g, secondStudentInfo)
+                .replace(/\{\{available_times\}\}/g, lead.available_times || '未設定')
+
+            // テンプレート自体に {{coach_name}} が書かれていない場合は、個別スペース宛てのヘッダーを上部に結合
+            const message = baseTemplate.includes('{{coach_name}}')
+                ? renderedTemplate
+                : `${personalizedHeader}\n\n${renderedTemplate}`
 
             try {
                 const sent = await sendGoogleChatMessage(candidate.webhookUrl, message)

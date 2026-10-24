@@ -341,13 +341,38 @@ export default function BookingForm() {
       scrollToField("name", "お名前を入力してください。");
       return;
     }
+    if (!formData.kana.trim()) {
+      scrollToField("kana", "フリガナを入力してください。");
+      return;
+    }
+    const KANA_REGEX = /^[ぁ-んァ-ヶー・\s　]+$/;
+    if (!KANA_REGEX.test(formData.kana.trim())) {
+      scrollToField(
+        "kana",
+        formData.kana.includes("@") || /[a-zA-Z]/.test(formData.kana)
+          ? "フリガナにメールアドレスまたは英字が入力されています。全角カタカナまたはひらがなでお名前の読みをご入力ください。"
+          : "フリガナは全角カタカナまたはひらがなで入力してください。"
+      );
+      return;
+    }
     if (!formData.dob) {
       scrollToField("dob", "生年月日（または年代）を選択してください。");
       return;
     }
-    if (showSecondStudent && formData.name2.trim() && !formData.dob2) {
-      scrollToField("dob2", "2人目の生年月日（または年代）を選択してください。");
-      return;
+    if (showSecondStudent && formData.name2.trim()) {
+      if (!formData.dob2) {
+        scrollToField("dob2", "2人目の生年月日（または年代）を選択してください。");
+        return;
+      }
+      if (formData.kana2.trim() && !KANA_REGEX.test(formData.kana2.trim())) {
+        scrollToField(
+          "kana2",
+          formData.kana2.includes("@") || /[a-zA-Z]/.test(formData.kana2)
+            ? "2人目のフリガナにメールアドレスまたは英字が入力されています。全角カタカナまたはひらがなでご入力ください。"
+            : "2人目のフリガナは全角カタカナまたはひらがなで入力してください。"
+        );
+        return;
+      }
     }
     if (!formData.email.trim()) {
       scrollToField("email", "メールアドレスを入力してください。");
@@ -662,9 +687,17 @@ export default function BookingForm() {
                       value={formData.kana}
                       onChange={handleChange}
                       required
+                      autoComplete="off"
+                      autoCapitalize="none"
+                      spellCheck={false}
                       placeholder="例：ヤマダ タロウ"
                       className="h-11 text-sm rounded-xl border-slate-200 focus-visible:ring-sky-500"
                     />
+                    {formData.kana.trim() && (formData.kana.includes("@") || /[a-zA-Z]/.test(formData.kana)) && (
+                      <p className="text-[11px] text-rose-600 font-medium">
+                        ⚠️ メールアドレスが入力されています。カタカナでお名前の読みをご入力ください。
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -792,9 +825,17 @@ export default function BookingForm() {
                           name="kana2"
                           value={formData.kana2}
                           onChange={handleChange}
+                          autoComplete="off"
+                          autoCapitalize="none"
+                          spellCheck={false}
                           placeholder="例：ヤマダ ハナコ"
                           className="h-11 text-sm rounded-xl border-slate-200 focus-visible:ring-sky-500 bg-white"
                         />
+                        {formData.kana2.trim() && (formData.kana2.includes("@") || /[a-zA-Z]/.test(formData.kana2)) && (
+                          <p className="text-[11px] text-rose-600 font-medium">
+                            ⚠️ メールアドレスが入力されています。カタカナでお名前の読みをご入力ください。
+                          </p>
+                        )}
                       </div>
                     </div>
 
