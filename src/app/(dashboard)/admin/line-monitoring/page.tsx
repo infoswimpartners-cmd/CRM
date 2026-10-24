@@ -21,6 +21,7 @@ import {
     triggerStepRemindersNowAction,
     getStepTemplatesAction,
     saveStepTemplatesAction,
+    previewGeminiStepMessageAction,
     LineMonitoringLog,
     LineBotConfig
 } from '@/actions/line-monitoring'
@@ -225,12 +226,21 @@ export default function LineMonitoringPage() {
         step1: { title: string; delay_hours: number; body: string; is_active: boolean };
         step2: { title: string; delay_hours: number; body: string; is_active: boolean };
         step3: { title: string; delay_hours: number; body: string; is_active: boolean };
+        gemini_naturalize_enabled?: boolean;
+        gemini_instructions?: string;
     } | null>(null)
     const [defaultTemplates, setDefaultTemplates] = useState<any>(null)
     const [isLoadingTemplates, setIsLoadingTemplates] = useState(false)
     const [isSavingTemplates, setIsSavingTemplates] = useState(false)
     const [isTemplateEditorOpen, setIsTemplateEditorOpen] = useState(false)
     const [activeTemplateTab, setActiveTemplateTab] = useState<'step1' | 'step2' | 'step3'>('step1')
+    const [isGeneratingAiPreview, setIsGeneratingAiPreview] = useState(false)
+    const [aiPreviewResult, setAiPreviewResult] = useState<{
+        step: 'step1' | 'step2' | 'step3'
+        text: string
+        wasAiGenerated: boolean
+        modelUsed?: string
+    } | null>(null)
 
     // 時間の自動計算（レッスン種別の分数に基づく）
     const calculateEndTime = (startStr: string, masterId: string, mastersList = lessonMasters) => {
@@ -385,6 +395,36 @@ export default function LineMonitoringPage() {
             }
         })
         toast.info(`${variable} を挿入しました`)
+    }
+
+    // Gemini自然化プレビュー生成（対象: テスト太郎）
+    const handleGenerateAiPreview = async (stepKey: 'step1' | 'step2' | 'step3') => {
+        if (!stepTemplates || !stepTemplates[stepKey]) return
+        setIsGeneratingAiPreview(true)
+        try {
+            const stepNum = stepKey === 'step1' ? 1 : stepKey === 'step2' ? 2 : 3
+            const res = await previewGeminiStepMessageAction({
+                stepStage: stepNum,
+                templateBody: stepTemplates[stepKey].body,
+                customerName: 'テスト太郎',
+                customInstructions: stepTemplates.gemini_instructions,
+            })
+            if (res.success && res.naturalizedText) {
+                setAiPreviewResult({
+                    step: stepKey,
+                    text: res.naturalizedText,
+                    wasAiGenerated: res.wasAiGenerated ?? true,
+                    modelUsed: res.modelUsed,
+                })
+                toast.success(`Step ${stepNum} のGemini自然化プレビューを生成しました`)
+            } else {
+                toast.error('プレビュー生成に失敗しました: ' + (res.error || '不明なエラー'))
+            }
+        } catch (e: any) {
+            toast.error('プレビュー生成エラー: ' + (e.message || String(e)))
+        } finally {
+            setIsGeneratingAiPreview(false)
+        }
     }
 
 
@@ -1527,6 +1567,68 @@ export default function LineMonitoringPage() {
                                     </div>
                                 ) : (
                                     <>
+                                        {/* Gemini AI自然化配信設定カード */}
+                                        <div className="p-4 rounded-xl border border-indigo-100 bg-gradient-to-r from-indigo-50/80 via-purple-50/50 to-white space-y-2.5 shadow-xs">
+                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                                                        <Sparkles className="w-4 h-4" />
+                                                    </div>
+                                                    <div>
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <span className="text-xs font-bold text-slate-800">
+                                                                Gemini AI 自然文章生成（テンプレ・AI臭排除モード）
+                                                            </span>
+                                                            <Badge className="bg-emerald-600 text-white text-[10px] px-1.5 py-0 h-4">
+                                                                自然化・人間味向上
+                                                            </Badge>
+                                                        </div>
+                                                        <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                                                            テンプレートの要点・URLを基本としつつ、いかにも機械的な定型文や過剰な敬語などの「AI・テンプレ臭さ」を排除し、専任スタッフが1対1でLINEを送っているような温かみのある文章をGeminiで動的生成して配信します。
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                                                    <Switch
+                                                        checked={stepTemplates.gemini_naturalize_enabled !== false}
+                                                        onCheckedChange={(checked) => {
+                                                            setStepTemplates({
+                                                                ...stepTemplates,
+                                                                gemini_naturalize_enabled: checked,
+                                                            })
+                                                        }}
+                                                        id="gemini-naturalize-toggle"
+                                                    />
+                                                    <Label htmlFor="gemini-naturalize-toggle" className="text-xs font-bold text-slate-700 cursor-pointer">
+                                                        {stepTemplates.gemini_naturalize_enabled !== false ? (
+                                                            <span className="text-indigo-600 font-bold">有効</span>
+                                                        ) : (
+                                                            <span className="text-slate-400 font-medium">無効（固定テンプレ送信）</span>
+                                                        )}
+                                                    </Label>
+                                                </div>
+                                            </div>
+
+                                            {stepTemplates.gemini_naturalize_enabled !== false && (
+                                                <div className="pt-2 border-t border-indigo-100/70 space-y-1">
+                                                    <Label className="text-[11px] font-semibold text-slate-600">
+                                                        AI自然化における追加指示（任意）
+                                                    </Label>
+                                                    <Input
+                                                        value={stepTemplates.gemini_instructions || ''}
+                                                        onChange={(e) => {
+                                                            setStepTemplates({
+                                                                ...stepTemplates,
+                                                                gemini_instructions: e.target.value,
+                                                            })
+                                                        }}
+                                                        placeholder="例: より親しみやすく、優しいスタッフの語りかけ口調を意識してください"
+                                                        className="text-xs h-8 bg-white border-indigo-200"
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+
                                         {/* Step1 / Step2 / Step3 切り替えサブタブ ＆ 保存ボタン */}
                                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
                                             <div className="flex flex-wrap items-center gap-2">
@@ -1700,6 +1802,64 @@ export default function LineMonitoringPage() {
                                                                 .replace(/[{｛]{1,2}\s*name\s*[}｝]{1,2}/gi, 'テスト太郎')
                                                                 .replace(/[{｛]{1,2}\s*trial_url\s*[}｝]{1,2}/gi, `https://liff.line.me/${process.env.NEXT_PUBLIC_TRIAL_LIFF_ID || '2009159689-dWjvcfS7'}`)}
                                                         </div>
+                                                    </div>
+
+                                                    {/* Gemini 自然化プレビュー機能 */}
+                                                    <div className="mt-3 pt-3 border-t border-slate-200 space-y-2">
+                                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                                            <div>
+                                                                <span className="text-[11px] font-bold text-indigo-700 flex items-center gap-1.5">
+                                                                    <Sparkles className="h-3.5 w-3.5 text-indigo-600" />
+                                                                    Gemini AI 自然化生成プレビュー（テンプレ・AI臭排除）:
+                                                                </span>
+                                                                <p className="text-[10px] text-slate-500">
+                                                                    安全規約に基づきテスト太郎 様（会員番号0035）宛てを想定して動的に生成検証します
+                                                                </p>
+                                                            </div>
+                                                            <Button
+                                                                type="button"
+                                                                size="sm"
+                                                                onClick={() => handleGenerateAiPreview(activeTemplateTab)}
+                                                                disabled={isGeneratingAiPreview || !stepTemplates[activeTemplateTab].body}
+                                                                className="h-7 text-xs bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg px-3 shadow-xs shrink-0"
+                                                            >
+                                                                {isGeneratingAiPreview ? (
+                                                                    <>
+                                                                        <Loader2 className="h-3 w-3 animate-spin mr-1.5" />
+                                                                        Geminiで生成中...
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <Sparkles className="h-3 w-3 mr-1.5" />
+                                                                        自然化文章を生成・比較
+                                                                    </>
+                                                                )}
+                                                            </Button>
+                                                        </div>
+
+                                                        {aiPreviewResult && aiPreviewResult.step === activeTemplateTab && (
+                                                            <div className="p-3.5 bg-gradient-to-br from-indigo-50/70 to-purple-50/40 rounded-xl border border-indigo-200 space-y-2 animate-in fade-in-50">
+                                                                <div className="flex items-center justify-between text-[11px]">
+                                                                    <span className="font-bold text-indigo-900 flex items-center gap-1">
+                                                                        ✨ Gemini自然化メッセージ（実際にLINE送信される文面）
+                                                                    </span>
+                                                                    {aiPreviewResult.modelUsed && (
+                                                                        <span className="text-[10px] font-mono text-indigo-600 bg-white/80 px-1.5 py-0.5 rounded border border-indigo-100">
+                                                                            モデル: {aiPreviewResult.modelUsed}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                <div className="p-3 bg-white rounded-lg border border-indigo-100 text-xs text-slate-800 whitespace-pre-wrap font-sans leading-relaxed shadow-2xs">
+                                                                    {aiPreviewResult.text}
+                                                                </div>
+                                                                <div className="text-[10px] text-slate-500 flex items-center gap-1.5">
+                                                                    <Check className="w-3 h-3 text-emerald-600" />
+                                                                    <span>
+                                                                        過度な敬語や一斉送信感を排除し、専任スタッフからの親身な1対1メッセージに最適化されています。
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>

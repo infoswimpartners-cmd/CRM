@@ -28,9 +28,15 @@ export interface StepTemplatesConfig {
     step1: StepMessageTemplate
     step2: StepMessageTemplate
     step3: StepMessageTemplate
+    /** Geminiによる人間らしい自然な文章生成（AI・テンプレ臭排除）を有効にするか（デフォルトtrue） */
+    gemini_naturalize_enabled?: boolean
+    /** 自然化生成における追加指示・トーン指定（任意） */
+    gemini_instructions?: string
 }
 
 export const DEFAULT_STEP_TEMPLATES: StepTemplatesConfig = {
+    gemini_naturalize_enabled: true,
+    gemini_instructions: '過度な敬語や定型文・AI臭さを完全に排除し、専任スタッフがLINEで親身に話しかけているような温かいトーンにしてください。',
     step1: {
         title: 'Day 1 (24時間後・18:00): 場所と日程の不安解消',
         delay_hours: 24,
@@ -153,6 +159,8 @@ export async function getStepMessageTemplates(): Promise<StepTemplatesConfig> {
         if (data?.value) {
             const parsed = JSON.parse(data.value)
             return {
+                gemini_naturalize_enabled: parsed.gemini_naturalize_enabled !== undefined ? parsed.gemini_naturalize_enabled : true,
+                gemini_instructions: parsed.gemini_instructions || DEFAULT_STEP_TEMPLATES.gemini_instructions,
                 step1: { ...DEFAULT_STEP_TEMPLATES.step1, ...parsed.step1 },
                 step2: { ...DEFAULT_STEP_TEMPLATES.step2, ...parsed.step2 },
                 step3: { ...DEFAULT_STEP_TEMPLATES.step3, ...parsed.step3 }
@@ -617,12 +625,45 @@ export async function processLineStepReminders(options: { dryRun?: boolean } = {
             nextSendAt = null
         }
 
+        // Gemini によるテンプレートやAI生成らしさを除いた人間らしい自然な文章の生成
+        const isNaturalizeEnabled = templates.gemini_naturalize_enabled !== false
+        let usedAiGenerated = false
+        if (isNaturalizeEnabled) {
+            try {
+                const targetStageNum = (state.step_stage + 1) as 1 | 2 | 3
+                const baseTemplateBody =
+                    targetStageNum === 1
+                        ? templates.step1.body
+                        : targetStageNum === 2
+                            ? templates.step2.body
+                            : templates.step3.body
+
+                const { generateNaturalStepMessage } = await import('@/lib/line-step-gemini')
+                const aiRes = await generateNaturalStepMessage({
+                    stepStage: targetStageNum,
+                    originalTemplateText: baseTemplateBody,
+                    customerName: name,
+                    trialUrl: trialFormUrl,
+                    customInstructions: templates.gemini_instructions,
+                })
+                if (aiRes.wasAiGenerated && aiRes.text) {
+                    messageText = aiRes.text
+                    usedAiGenerated = true
+                    console.log(`[Official LINE Step] Gemini naturalized message generated for ${name} (${state.line_user_id}) using ${aiRes.modelUsed}`)
+                }
+            } catch (geminiErr) {
+                console.warn('[Official LINE Step] Gemini naturalization failed, using template fallback:', geminiErr)
+            }
+        }
+
         if (dryRun) {
             results.push({
                 line_user_id: state.line_user_id,
                 name,
                 step: state.step_stage + 1,
-                dryRun: true
+                dryRun: true,
+                wasAiGenerated: usedAiGenerated,
+                previewText: messageText
             })
             continue
         }
@@ -646,9 +687,13 @@ export async function processLineStepReminders(options: { dryRun?: boolean } = {
                     senderType: 'system_auto',
                     messageType: 'step_message',
                     messageText,
-                    senderLabel: `友だち追加ステップ配信 (Step ${nextStage})`,
+                    senderLabel: `友だち追加ステップ配信 (Step ${nextStage}${usedAiGenerated ? ' / Gemini自然化' : ''})`,
                     isRead: true,
                     status: 'sent',
+                    metadata: {
+                        wasAiGenerated: usedAiGenerated,
+                        stepStage: nextStage,
+                    },
                 })
             } catch (chatErr) {
                 console.error('[Official LINE Step] Failed to record step chat message:', chatErr)
@@ -658,9 +703,10 @@ export async function processLineStepReminders(options: { dryRun?: boolean } = {
                 line_user_id: state.line_user_id,
                 name,
                 step: nextStage,
-                success: true
+                success: true,
+                wasAiGenerated: usedAiGenerated
             })
-            console.log(`[Official LINE Step] Sent Step ${nextStage} to ${name} (${state.line_user_id})`)
+            console.log(`[Official LINE Step] Sent Step ${nextStage} to ${name} (${state.line_user_id})${usedAiGenerated ? ' [Gemini自然化]' : ''}`)
         } else {
             results.push({
                 line_user_id: state.line_user_id,

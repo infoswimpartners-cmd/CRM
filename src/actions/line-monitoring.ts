@@ -856,5 +856,50 @@ export async function saveStepTemplatesAction(templates: any) {
     }
 }
 
+/**
+ * Geminiを用いたステップ配信メッセージ自然化プレビュー生成（管理者のみ・テスト太郎デフォルト）
+ */
+export async function previewGeminiStepMessageAction(params: {
+    stepStage: 1 | 2 | 3
+    templateBody: string
+    customerName?: string
+    customInstructions?: string
+}) {
+    const { isAuthorized } = await verifyAdminRole()
+    if (!isAuthorized) {
+        return { success: false, error: 'Unauthorized', naturalizedText: '' }
+    }
+
+    try {
+        const { generateNaturalStepMessage } = await import('@/lib/line-step-gemini')
+        const appUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://manager.swim-partners.com'
+        const trialLiffId = process.env.NEXT_PUBLIC_TRIAL_LIFF_ID || process.env.NEXT_PUBLIC_LIFF_ID || '2009159689-dWjvcfS7'
+        const trialFormUrl = trialLiffId ? `https://liff.line.me/${trialLiffId}` : `${appUrl}/trial`
+
+        // テスト・プレビュー時は指定がなければ安全規約に従い会員番号0035（テスト太郎）を使用
+        const targetName = params.customerName || 'テスト太郎'
+
+        const res = await generateNaturalStepMessage({
+            stepStage: params.stepStage,
+            originalTemplateText: params.templateBody,
+            customerName: targetName,
+            trialUrl: trialFormUrl,
+            customInstructions: params.customInstructions,
+        })
+
+        return {
+            success: true,
+            naturalizedText: res.text,
+            wasAiGenerated: res.wasAiGenerated,
+            modelUsed: res.modelUsed,
+            error: res.error,
+        }
+    } catch (e: any) {
+        console.error('previewGeminiStepMessageAction Error:', e)
+        return { success: false, error: e.message, naturalizedText: '' }
+    }
+}
+
+
 
 
