@@ -271,7 +271,7 @@ export async function writeDeliveryLog(params: {
     studentNumber?: string | null;
     studentName?: string | null;
     lineUserId: string;
-    deliveryType: 'broadcast' | 'step_message' | 'test_preview' | 'cart_recovery' | 'direct_chat';
+    deliveryType: 'broadcast' | 'step_message' | 'test_preview' | 'cart_recovery' | 'confirm_abandon_recovery' | 'direct_chat';
     campaignId?: string | null;
     stepId?: string | null;
     stepName?: string | null;
@@ -741,11 +741,12 @@ export async function fetchAndFilterMarketingStudents(
         });
     }
 
-    // タグ絞り込み（includeTags, excludeTags, viewedFormNotApplied）を適用
+    // タグ絞り込み（includeTags, excludeTags, viewedFormNotApplied, confirmedFormNotApplied）を適用
     filtered = await filterStudentsWithTags(filtered, {
         includeTags: filter.includeTags,
         excludeTags: filter.excludeTags,
         viewedFormNotApplied: filter.viewedFormNotApplied,
+        confirmedFormNotApplied: filter.confirmedFormNotApplied,
     });
 
     return filtered;
@@ -1747,6 +1748,403 @@ export async function processCartAbandonmentReminders(
                 action: 'failed',
                 reason: sendResult.error,
                 elapsedHours,
+            });
+        }
+
+        await new Promise(r => setTimeout(r, 50));
+    }
+
+    return {
+        processedCount: candidates.length,
+        successCount,
+        skippedCount,
+        failedCount,
+        mode: recoveryMode,
+        details,
+    };
+}
+
+// ==============================================================================
+// 15. フォーム確認後未申込（ホット離脱者）即時自動フォロー処理
+// ==============================================================================
+
+export const DEFAULT_CONFIRM_ABANDON_TEMPLATE = 
+`{{name}} 様、Swim Partners事務局です🏊‍♂️
+体験レッスン予約フォームのご入力内容をご確認いただきありがとうございます！
+
+入力の途中でご不明な点やお困りごとはございませんでしたでしょうか？
+
+「希望の日時や場所をもう少し詳しく相談したい」
+「レッスンの進め方について事前に聞いておきたい」
+
+など、どんな些細なことでも構いませんので、このLINEチャットにそのままお気軽にご返信ください😊
+専任のスタッフが個別にご案内・調整いたします✨
+
+▼ 続きから体験レッスンを申し込む場合はこちら
+{{trial_url}}`;
+
+export interface ProcessConfirmAbandonmentOptions {
+    dryRun?: boolean;
+    nowDate?: Date;
+}
+
+export interface ProcessConfirmAbandonmentResult {
+    processedCount: number;
+    successCount: number;
+    skippedCount: number;
+    failedCount: number;
+    isOutsideHours?: boolean;
+    mode: string;
+    details: Array<{
+        lineUserId: string;
+        studentName?: string;
+        action: 'sent' | 'skipped' | 'dry_run' | 'failed';
+        reason?: string;
+        elapsedMinutes?: number;
+    }>;
+}
+
+/**
+ * フォーム確認後未申込（ホット離脱者）への即時自動フォロー配信を実行します。
+ * 
+ * 判定条件:
+ *   1. フォーム確認画面閲覧タグ（trial_form_confirmed）保有
+ *   2. 体験申込完了タグ（trial_applied）未保有
+ *   3. 確認後即時フォロー送信済タグ（confirm_abandon_recovery_sent）未保有
+ *   4. 確認画面到達または離脱から3分以上経過（即座に離脱を検知した最短猶予）
+ *   5. 配信時間帯ガード: JST 8:00〜21:30
+ *   6. 安全ガード: test_onlyモード時は会員番号0035（テスト太郎）のみ送信
+ */
+export async function processConfirmAbandonmentReminders(
+    options: ProcessConfirmAbandonmentOptions = {}
+): Promise<ProcessConfirmAbandonmentResult> {
+    const { dryRun = false, nowDate = new Date() } = options;
+    const supabase = createAdminClient();
+
+    // 1. 配信時間帯ガード判定 (JST 8:00〜21:30: 入力直後のホットリードのため朝から夜まで幅広く即時対応)
+    const jstDate = new Date(nowDate.getTime() + 9 * 60 * 60 * 1000);
+    const jstHour = jstDate.getUTCHours();
+    const jstMinute = jstDate.getUTCMinutes();
+    const jstMinutesOfDay = jstHour * 60 + jstMinute;
+
+    // 8:00 = 480分, 21:30 = 1290分
+    if (jstMinutesOfDay < 480 || jstMinutesOfDay > 1290) {
+        console.log(`[ConfirmRecovery] JST時間帯ガード作動: 現在JST ${jstHour}:${String(jstMinute).padStart(2, '0')}のため配信を停止します（配信許可: 8:00〜21:30）`);
+        return {
+            processedCount: 0,
+            successCount: 0,
+            skippedCount: 0,
+            failedCount: 0,
+            isOutsideHours: true,
+            mode: 'test_only',
+            details: [],
+        };
+    }
+
+    // 2. 稼働モードの取得（デフォルト: test_only）
+    const { data: modeConfig } = await supabase
+        .from('app_configs')
+        .select('value')
+        .eq('key', 'line_confirm_recovery_mode')
+        .maybeSingle();
+
+    const rawMode = modeConfig?.value?.trim().toLowerCase();
+    const recoveryMode = rawMode === 'active' || rawMode === 'live' ? 'active' : 'test_only';
+    const isTestOnly = recoveryMode === 'test_only';
+
+    // 3. メッセージテンプレート取得
+    const { data: templateConfig } = await supabase
+        .from('app_configs')
+        .select('value')
+        .eq('key', 'line_confirm_recovery_template')
+        .maybeSingle();
+
+    const templateText = templateConfig?.value?.trim() || DEFAULT_CONFIRM_ABANDON_TEMPLATE;
+
+    // 4. 全ユーザータグの取得
+    const allUserTags = await getAllUserTags();
+
+    // ユーザー毎のタグ集合と最新確認・離脱日時をマッピング
+    const userCandidateMap = new Map<string, {
+        lineUserId: string;
+        tags: Set<string>;
+        confirmedAt: Date | null;
+        abandonedAt: Date | null;
+        displayName?: string;
+    }>();
+
+    for (const tag of allUserTags) {
+        if (!tag.line_user_id) continue;
+        let entry = userCandidateMap.get(tag.line_user_id);
+        if (!entry) {
+            entry = {
+                lineUserId: tag.line_user_id,
+                tags: new Set<string>(),
+                confirmedAt: null,
+                abandonedAt: null,
+                displayName: tag.display_name || undefined,
+            };
+            userCandidateMap.set(tag.line_user_id, entry);
+        }
+
+        entry.tags.add(tag.tag_name);
+        if (tag.display_name && !entry.displayName) {
+            entry.displayName = tag.display_name;
+        }
+
+        // trial_form_confirmed の日時・離脱日時取得
+        if (tag.tag_name === STANDARD_TAGS.FORM_CONFIRMED) {
+            const confDateStr = tag.metadata?.last_confirmed_at || tag.metadata?.first_confirmed_at || tag.created_at;
+            if (confDateStr) {
+                const parsed = new Date(confDateStr);
+                if (!isNaN(parsed.getTime())) {
+                    if (!entry.confirmedAt || parsed.getTime() > entry.confirmedAt.getTime()) {
+                        entry.confirmedAt = parsed;
+                    }
+                }
+            }
+            const abandonDateStr = tag.metadata?.abandoned_at;
+            if (abandonDateStr) {
+                const parsedAb = new Date(abandonDateStr);
+                if (!isNaN(parsedAb.getTime())) {
+                    if (!entry.abandonedAt || parsedAb.getTime() > entry.abandonedAt.getTime()) {
+                        entry.abandonedAt = parsedAb;
+                    }
+                }
+            }
+        }
+    }
+
+    // 5. 候補者の判定と配信処理
+    let successCount = 0;
+    let skippedCount = 0;
+    let failedCount = 0;
+    const details: ProcessConfirmAbandonmentResult['details'] = [];
+
+    const candidates = Array.from(userCandidateMap.values());
+
+    for (const candidate of candidates) {
+        const { lineUserId, tags, confirmedAt, abandonedAt } = candidate;
+
+        // 条件1: フォーム確認タグ（trial_form_confirmed）を保有していること
+        if (!tags.has(STANDARD_TAGS.FORM_CONFIRMED)) {
+            continue;
+        }
+
+        // 条件2: 未申込であること（trial_applied 未保有）
+        if (tags.has(STANDARD_TAGS.FORM_APPLIED)) {
+            skippedCount++;
+            details.push({
+                lineUserId,
+                action: 'skipped',
+                reason: 'already_applied',
+            });
+            continue;
+        }
+
+        // 条件3: 未フォローであること（confirm_abandon_recovery_sent 未保有）
+        if (tags.has(STANDARD_TAGS.CONFIRM_ABANDON_RECOVERY_SENT)) {
+            skippedCount++;
+            details.push({
+                lineUserId,
+                action: 'skipped',
+                reason: 'already_confirm_recovery_sent',
+            });
+            continue;
+        }
+
+        // 条件4: 離脱または確認からの経過時間判定
+        // 離脱ビーコン（abandonedAt）がある場合は1分以上経過で即送信、確認のみの場合は3分以上経過で離脱と判定
+        const targetEventDate = abandonedAt || confirmedAt;
+        if (!targetEventDate) {
+            skippedCount++;
+            details.push({
+                lineUserId,
+                action: 'skipped',
+                reason: 'confirmed_at_missing',
+            });
+            continue;
+        }
+
+        const elapsedMs = nowDate.getTime() - targetEventDate.getTime();
+        const elapsedMinutes = elapsedMs / (1000 * 60);
+
+        // 離脱ビーコンありなら1分以上、確認のみなら3分以上。上限は48時間（2880分）以内
+        const minRequiredMinutes = abandonedAt ? 1.0 : 3.0;
+        if (elapsedMinutes < minRequiredMinutes || elapsedMinutes > 2880) {
+            skippedCount++;
+            details.push({
+                lineUserId,
+                action: 'skipped',
+                reason: `elapsed_out_of_range (${elapsedMinutes.toFixed(1)}m, required >= ${minRequiredMinutes}m)`,
+                elapsedMinutes,
+            });
+            continue;
+        }
+
+        // 生徒情報の照会
+        let student: any = null;
+        try {
+            const { data } = await supabase
+                .from('students')
+                .select(`
+                    id,
+                    student_number,
+                    full_name,
+                    status,
+                    coach:coach_id(full_name),
+                    membership_type:membership_type_id(name)
+                `)
+                .eq('line_user_id', lineUserId)
+                .maybeSingle();
+            student = data;
+        } catch {}
+
+        // すでに本入会・申込・退会の生徒は安全スキップ
+        if (student && student.student_number !== TEST_TARO_STUDENT_NUMBER) {
+            if (student.status === 'active' || student.status === 'applied' || student.status === 'withdrawn') {
+                skippedCount++;
+                details.push({
+                    lineUserId,
+                    studentName: student.full_name,
+                    action: 'skipped',
+                    reason: `student_already_${student.status}`,
+                    elapsedMinutes,
+                });
+                continue;
+            }
+        }
+
+        // 【最重要安全ガード】: test_only モード時はテスト太郎（0035）以外を完全にスキップ
+        if (isTestOnly) {
+            const isTestUserId = lineUserId === TEST_TARO_LINE_USER_ID;
+            const isTestStudentNumber = student?.student_number === TEST_TARO_STUDENT_NUMBER;
+
+            if (!isTestUserId && !isTestStudentNumber) {
+                skippedCount++;
+                details.push({
+                    lineUserId,
+                    studentName: student?.full_name || candidate.displayName,
+                    action: 'skipped',
+                    reason: 'test_only_mode_guard',
+                    elapsedMinutes,
+                });
+                console.log(`[ConfirmRecovery] 安全ガード作動 (test_onlyモード): 実ユーザーへの配信をスキップしました (LINE ID: ${lineUserId})`);
+                continue;
+            }
+        }
+
+        const studentName = student?.full_name || candidate.displayName || 'お客様';
+
+        // dryRunモードの場合の処理
+        if (dryRun) {
+            successCount++;
+            details.push({
+                lineUserId,
+                studentName,
+                action: 'dry_run',
+                reason: 'simulated_send_success',
+                elapsedMinutes,
+            });
+            continue;
+        }
+
+        // 変数の準備
+        const trialUrl = process.env.NEXT_PUBLIC_SITE_URL
+            ? `${process.env.NEXT_PUBLIC_SITE_URL}/trial`
+            : 'https://manager.swim-partners.com/trial';
+
+        const variables: Record<string, string> = {
+            name: studentName,
+            student_number: student?.student_number || '',
+            coach_name: student?.coach?.full_name || '',
+            plan_name: student?.membership_type?.name || '',
+            trial_url: trialUrl,
+        };
+
+        // メッセージの動的自然化（Gemini連携、失敗時は安全フォールバック）
+        let finalMessage = templateText;
+        try {
+            const { generateNaturalStepMessage } = await import('@/lib/line-step-gemini');
+            const naturalResult = await generateNaturalStepMessage({
+                stepStage: 0, // 0 = フォーム確認後即時フォロー
+                customerName: studentName,
+                originalTemplateText: templateText,
+                trialUrl,
+                customInstructions: '体験申込フォームで入力内容の確認画面まで進んでいただいた直後のフォローです。お申し込み途中で日程や場所、レッスン内容について迷われたりお困りではなかったかを優しく気遣い、このLINEチャットで気軽に相談・調整できることを専任スタッフとして温かく伝えてください。',
+            });
+            if (naturalResult.text) {
+                finalMessage = naturalResult.text;
+            }
+        } catch (geminiErr) {
+            console.warn('[ConfirmRecovery] Gemini naturalization skipped, using template:', geminiErr);
+        }
+
+        // LINE送信処理
+        const sendResult = await sendSingleLineMessage({
+            studentId: student?.id,
+            studentNumber: student?.student_number,
+            studentName,
+            lineUserId,
+            rawMessage: finalMessage,
+            variables,
+            deliveryType: 'confirm_abandon_recovery',
+            stepName: 'フォーム確認後未申込 即時フォロー',
+        });
+
+        if (sendResult.success) {
+            successCount++;
+
+            // 1. スパム防止調停: 即時フォロー送信時、後続のステップ配信予定を24時間後ろ倒し
+            try {
+                const stepLeadState = await getStepLeadState(lineUserId);
+                if (stepLeadState && stepLeadState.next_send_at && stepLeadState.step_stage !== -1 && !stepLeadState.is_blocked) {
+                    const currentNextDate = new Date(stepLeadState.next_send_at);
+                    const baseTime = currentNextDate.getTime() > nowDate.getTime()
+                        ? currentNextDate.getTime()
+                        : nowDate.getTime();
+                    const delayedNextDate = new Date(baseTime + 24 * 60 * 60 * 1000);
+
+                    await saveStepLeadState({
+                        ...stepLeadState,
+                        next_send_at: delayedNextDate.toISOString(),
+                        notes: `${stepLeadState.notes ? stepLeadState.notes + ' | ' : ''}フォーム確認後即時フォロー送信のため次回ステップ配信を24時間後ろ倒し`,
+                    });
+                    console.log(`[ConfirmRecovery] スパム防止調停適用: LINE ID ${lineUserId} の次回ステップ配信予定を後ろ倒ししました`);
+                }
+            } catch (stepErr) {
+                console.error(`[ConfirmRecovery] スパム防止調停エラー (LINE ID: ${lineUserId}):`, stepErr);
+            }
+
+            // 2. confirm_abandon_recovery_sent タグを付与
+            try {
+                await addTagToUser(lineUserId, STANDARD_TAGS.CONFIRM_ABANDON_RECOVERY_SENT, {
+                    category: 'automation',
+                    displayName: studentName,
+                    studentId: student?.id,
+                    metadata: {
+                        sent_at: nowDate.toISOString(),
+                        elapsed_minutes: Math.round(elapsedMinutes * 10) / 10,
+                    },
+                });
+            } catch (tagErr) {
+                console.error(`[ConfirmRecovery] confirm_abandon_recovery_sent タグ付与失敗 (${lineUserId}):`, tagErr);
+            }
+
+            details.push({
+                lineUserId,
+                studentName,
+                action: 'sent',
+                elapsedMinutes,
+            });
+        } else {
+            failedCount++;
+            details.push({
+                lineUserId,
+                studentName,
+                action: 'failed',
+                reason: sendResult.error,
+                elapsedMinutes,
             });
         }
 

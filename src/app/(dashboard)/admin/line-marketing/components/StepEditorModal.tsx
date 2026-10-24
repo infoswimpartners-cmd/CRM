@@ -203,6 +203,9 @@ export function StepEditorModal({
                                     <SelectItem value="trial_form_viewed">
                                         ⚡ フォーム閲覧・未申込離脱フォロー (trial_form_viewed)
                                     </SelectItem>
+                                    <SelectItem value="trial_form_confirmed">
+                                        🔥 フォーム確認済・未申込即時フォロー (trial_form_confirmed)
+                                    </SelectItem>
                                     <SelectItem value="friend_only">
                                         💬 友だち追加リード初期案内 (friend_only)
                                     </SelectItem>
@@ -214,6 +217,7 @@ export function StepEditorModal({
                             <p className="text-[11px] text-slate-500">
                                 {targetTag === 'trial_done' && '体験受講完了日を起点として、フォローや本会員入会促進メッセージを配信します。'}
                                 {targetTag === 'trial_form_viewed' && '体験予約フォーム（LIFF）を開いた日を起点として、未申込の離脱者に再案内を配信します。'}
+                                {targetTag === 'trial_form_confirmed' && '体験予約フォームで入力内容の確認画面まで進んだ未申込者に、離脱後すぐの親身なフォローを配信します。'}
                                 {targetTag === 'friend_only' && '公式LINE友だち追加日時を起点として、出張プールやスクールの魅力を順次配信します。'}
                                 {targetTag === 'referral_lead' && 'お友達紹介キャンペーン対象者へ、特別割引特典や締切案内を配信します。'}
                             </p>

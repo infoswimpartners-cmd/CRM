@@ -90,6 +90,9 @@ export default function BookingForm() {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [submittedName, setSubmittedName] = useState("");
 
+  // 確認画面（Confirmation Step）の表示制御フラグ
+  const [isConfirming, setIsConfirming] = useState(false);
+
   // フォーム入力値の状態管理
   const [formData, setFormData] = useState({
     name: "",
@@ -249,6 +252,32 @@ export default function BookingForm() {
     };
   }, []);
 
+  // フォーム確認画面閲覧中の離脱（未申込）検知ビーコン
+  useEffect(() => {
+    if (!isConfirming || isSubmitted) return;
+
+    const handleConfirmAbandon = () => {
+      if (userId) {
+        try {
+          const payload = JSON.stringify({
+            userId,
+            step: "abandon",
+            displayName: formData.name.trim() || undefined,
+            pageUrl: window.location.href,
+          });
+          if (navigator.sendBeacon) {
+            navigator.sendBeacon("/api/liff-tracking", new Blob([payload], { type: "application/json" }));
+          }
+        } catch (_) {}
+      }
+    };
+
+    window.addEventListener("pagehide", handleConfirmAbandon);
+    return () => {
+      window.removeEventListener("pagehide", handleConfirmAbandon);
+    };
+  }, [isConfirming, isSubmitted, userId, formData.name]);
+
   // 入力変更ハンドラ
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target as HTMLInputElement;
@@ -318,32 +347,29 @@ export default function BookingForm() {
     );
   };
 
-  // フォーム送信処理（LIFF/Webハイブリッド）
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isSubmittingRef.current || isSubmitting) return;
-    setSubmitError(null);
-    
-    // スクロールとフォーカス付きのエラー通知
-    const scrollToField = (id: string, message: string) => {
-      setSubmitError(message);
-      const el = document.getElementById(id);
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
-        el.focus();
-      } else {
-        window.scrollTo({ top: 120, behavior: "smooth" });
-      }
-    };
+  // スクロールとフォーカス付きのエラー通知
+  const scrollToField = (id: string, message: string) => {
+    setSubmitError(message);
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.focus();
+    } else {
+      window.scrollTo({ top: 120, behavior: "smooth" });
+    }
+  };
 
-    // バリデーション
+  // 入力値バリデーション
+  const validateForm = (): boolean => {
+    setSubmitError(null);
+
     if (!formData.name.trim()) {
       scrollToField("name", "お名前を入力してください。");
-      return;
+      return false;
     }
     if (!formData.kana.trim()) {
       scrollToField("kana", "フリガナを入力してください。");
-      return;
+      return false;
     }
     const KANA_REGEX = /^[ぁ-んァ-ヶー・\s　]+$/;
     if (!KANA_REGEX.test(formData.kana.trim())) {
@@ -353,16 +379,16 @@ export default function BookingForm() {
           ? "フリガナにメールアドレスまたは英字が入力されています。全角カタカナまたはひらがなでお名前の読みをご入力ください。"
           : "フリガナは全角カタカナまたはひらがなで入力してください。"
       );
-      return;
+      return false;
     }
     if (!formData.dob) {
       scrollToField("dob", "生年月日（または年代）を選択してください。");
-      return;
+      return false;
     }
     if (showSecondStudent && formData.name2.trim()) {
       if (!formData.dob2) {
         scrollToField("dob2", "2人目の生年月日（または年代）を選択してください。");
-        return;
+        return false;
       }
       if (formData.kana2.trim() && !KANA_REGEX.test(formData.kana2.trim())) {
         scrollToField(
@@ -371,36 +397,80 @@ export default function BookingForm() {
             ? "2人目のフリガナにメールアドレスまたは英字が入力されています。全角カタカナまたはひらがなでご入力ください。"
             : "2人目のフリガナは全角カタカナまたはひらがなで入力してください。"
         );
-        return;
+        return false;
       }
     }
     if (!formData.email.trim()) {
       scrollToField("email", "メールアドレスを入力してください。");
-      return;
+      return false;
     }
     if (!formData.phone.trim()) {
       scrollToField("phone", "電話番号を入力してください。");
-      return;
+      return false;
     }
     if (!formData.station.trim()) {
       scrollToField("station", "最寄駅または希望エリアを入力してください。");
-      return;
+      return false;
     }
     if (!formData.date1) {
       scrollToField("date1", "第1希望日を選択してください。");
-      return;
+      return false;
     }
     if (!formData.skillLevel.trim()) {
       scrollToField("skillLevel", "現在の泳力・お悩みまたは目標を選択・入力してください。");
-      return;
+      return false;
     }
     // ご紹介者様のお名前のセルフ重複チェック（自分の名前が入力されていた場合の親切な案内）
     if (formData.referrerName.trim() && formData.name.trim() && formData.referrerName.trim() === formData.name.trim()) {
       scrollToField("referrerName", "ご紹介者様のお名前にご自身のお名前が入力されています。紹介してくださったお友達・お知り合いのお名前をご入力いただくか、ご紹介者がいない場合はチェックを外して空欄にしてください。");
-      return;
+      return false;
     }
     if (!formData.agreed) {
       scrollToField("agreed", "利用規約への同意が必要です。内容をご確認の上、チェックをお願いします。");
+      return false;
+    }
+
+    return true;
+  };
+
+  // 確認画面へ進む処理（確認ログ・trial_form_confirmedタグ自動付与）
+  const handleProceedToConfirm = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!validateForm()) return;
+
+    setSubmitError(null);
+    setIsConfirming(true);
+    window.scrollTo({ top: 80, behavior: "smooth" });
+
+    // 確認画面到達をトラッキングAPIへ非同期通知（trial_form_confirmedタグを付与）
+    fetch("/api/liff-tracking", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: userId || undefined,
+        step: "confirm",
+        formType: "trial_confirm",
+        displayName: formData.name.trim() || undefined,
+        pageUrl: window.location.href,
+        referrerName: formData.referrerName.trim() || undefined,
+      }),
+    }).catch(() => {});
+  };
+
+  // 編集に戻る
+  const handleBackToEdit = () => {
+    setIsConfirming(false);
+    window.scrollTo({ top: 120, behavior: "smooth" });
+  };
+
+  // フォーム最終送信処理（LIFF/Webハイブリッド）
+  const handleFinalSubmit = async () => {
+    if (isSubmittingRef.current || isSubmitting) return;
+    setSubmitError(null);
+
+    // 送信直前の再バリデーション
+    if (!validateForm()) {
+      setIsConfirming(false);
       return;
     }
 
@@ -470,6 +540,7 @@ export default function BookingForm() {
       if (response.ok) {
         setSubmittedName(formData.name.trim());
         setIsSubmitted(true);
+        setIsConfirming(false);
         window.scrollTo({ top: 0, behavior: "smooth" });
 
         // LIFFクライアント内の場合は一定時間後に閉じる案内または自動クローズ
@@ -493,6 +564,11 @@ export default function BookingForm() {
       isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
+  };
+
+  // 後方互換ラッパー
+  const handleSubmit = (e: React.FormEvent) => {
+    handleProceedToConfirm(e);
   };
 
   // ローディング表示
@@ -647,6 +723,176 @@ export default function BookingForm() {
         {/* フォームカード */}
         <Card className="border-slate-200 bg-white shadow-sm rounded-2xl overflow-hidden">
           <CardContent className="p-5 sm:p-8">
+            {isConfirming ? (
+              <div className="space-y-6">
+                {/* 確認画面ヘッダー案内 */}
+                <div className="bg-gradient-to-r from-sky-50 to-blue-50 border border-sky-200 rounded-2xl p-4 sm:p-5">
+                  <div className="flex items-center gap-2 text-sky-900 font-bold text-sm mb-1">
+                    <Sparkles className="h-4 w-4 text-sky-600" />
+                    <span>まだお申し込みは完了していません</span>
+                  </div>
+                  <p className="text-xs text-sky-800 leading-relaxed">
+                    入力内容をご確認の上、ページ下部の「上記内容で体験予約を完了する」ボタンを押して送信してください。
+                  </p>
+                </div>
+
+                {/* 確認項目プレビューカード */}
+                <div className="divide-y divide-slate-100 border border-slate-200 rounded-2xl overflow-hidden bg-slate-50/50">
+                  {/* 1. 受講者基本情報 */}
+                  <div className="p-4 sm:p-5 space-y-3 bg-white">
+                    <div className="text-xs font-bold text-sky-700 uppercase tracking-wider flex items-center gap-1.5">
+                      <User className="h-4 w-4" />
+                      <span>受講者様情報</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <span className="text-slate-400 block text-[11px]">お名前</span>
+                        <span className="font-bold text-slate-900 text-sm">{formData.name} 様（{formData.kana}）</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[11px]">生年月日 / 年代・性別</span>
+                        <span className="font-semibold text-slate-700">{formData.dob} {formData.gender && `(${formData.gender})`}</span>
+                      </div>
+                      {showSecondStudent && formData.name2 && (
+                        <div className="sm:col-span-2 pt-2 border-t border-slate-100">
+                          <span className="text-slate-400 block text-[11px]">2人目の受講者様</span>
+                          <span className="font-bold text-slate-800">{formData.name2} 様（{formData.kana2}） {formData.dob2} {formData.gender2 && `(${formData.gender2})`}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 2. 連絡先・希望エリア */}
+                  <div className="p-4 sm:p-5 space-y-3 bg-white">
+                    <div className="text-xs font-bold text-sky-700 uppercase tracking-wider flex items-center gap-1.5">
+                      <Phone className="h-4 w-4" />
+                      <span>ご連絡先・希望エリア</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <span className="text-slate-400 block text-[11px]">電話番号</span>
+                        <span className="font-semibold text-slate-800">{formData.phone}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[11px]">メールアドレス</span>
+                        <span className="font-semibold text-slate-800 break-all">{formData.email}</span>
+                      </div>
+                      <div className="sm:col-span-2">
+                        <span className="text-slate-400 block text-[11px]">最寄駅 / 希望エリア</span>
+                        <span className="font-semibold text-slate-800 flex items-center gap-1">
+                          <MapPin className="h-3.5 w-3.5 text-rose-500 shrink-0" />
+                          {formData.station}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 3. 希望日時 */}
+                  <div className="p-4 sm:p-5 space-y-3 bg-white">
+                    <div className="text-xs font-bold text-sky-700 uppercase tracking-wider flex items-center gap-1.5">
+                      <Calendar className="h-4 w-4" />
+                      <span>体験レッスンの希望日時</span>
+                    </div>
+                    <div className="space-y-2 text-xs">
+                      <div className="flex items-start gap-2">
+                        <Badge variant="outline" className="text-[10px] shrink-0 font-bold border-sky-300 text-sky-700 bg-sky-50">第1希望</Badge>
+                        <span className="font-bold text-slate-900">{formData.date1} {formData.time1Start && formData.time1End ? `${formData.time1Start}〜${formData.time1End}` : formData.time1Slot}</span>
+                      </div>
+                      {formData.date2 && (
+                        <div className="flex items-start gap-2">
+                          <Badge variant="outline" className="text-[10px] shrink-0 font-bold border-slate-300 text-slate-600 bg-slate-50">第2希望</Badge>
+                          <span className="font-medium text-slate-700">{formData.date2} {formData.time2Start && formData.time2End ? `${formData.time2Start}〜${formData.time2End}` : formData.time2Slot}</span>
+                        </div>
+                      )}
+                      {formData.date3 && (
+                        <div className="flex items-start gap-2">
+                          <Badge variant="outline" className="text-[10px] shrink-0 font-bold border-slate-300 text-slate-600 bg-slate-50">第3希望</Badge>
+                          <span className="font-medium text-slate-700">{formData.date3} {formData.time3Start && formData.time3End ? `${formData.time3Start}〜${formData.time3End}` : formData.time3Slot}</span>
+                        </div>
+                      )}
+                      {selectedTimeSlots.length > 0 && (
+                        <div className="pt-1 text-[11px] text-slate-500">
+                          調整可能な時間枠: {selectedTimeSlots.join("、")}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 4. 泳力・お悩み・目標 */}
+                  <div className="p-4 sm:p-5 space-y-3 bg-white">
+                    <div className="text-xs font-bold text-sky-700 uppercase tracking-wider flex items-center gap-1.5">
+                      <Waves className="h-4 w-4" />
+                      <span>現在の泳力・お悩み</span>
+                    </div>
+                    <div className="text-xs text-slate-700 whitespace-pre-wrap bg-slate-50 p-3 rounded-xl border border-slate-100">
+                      {formData.skillLevel}
+                    </div>
+                    {formData.notes && (
+                      <div className="pt-1">
+                        <span className="text-slate-400 block text-[11px] mb-1">ご質問・その他ご要望</span>
+                        <div className="text-xs text-slate-600 whitespace-pre-wrap bg-slate-50 p-3 rounded-xl border border-slate-100">
+                          {formData.notes}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 5. お友達紹介特典 */}
+                  {formData.referrerName && (
+                    <div className="p-4 sm:p-5 space-y-1.5 bg-amber-50/70 border-t border-amber-200/80">
+                      <div className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+                        <span>🎁</span>
+                        <span>お友達紹介キャンペーン適用</span>
+                      </div>
+                      <p className="text-xs text-amber-800">
+                        <strong>{formData.referrerName} 様</strong> のご紹介により、初回体験レッスンが特別価格 <strong>3,500円（税込）</strong> となります。
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* 確認画面アクションボタン */}
+                <div className="space-y-3 pt-2">
+                  <Button
+                    type="button"
+                    disabled={isSubmitting}
+                    onClick={handleFinalSubmit}
+                    className={`w-full h-14 rounded-2xl text-base font-bold shadow-lg transition-all ${
+                      isSubmitting
+                        ? "bg-slate-300 text-slate-500 cursor-not-allowed"
+                        : isLiffEnvironment
+                        ? "bg-[#06C755] hover:bg-[#05b34c] text-white shadow-emerald-200"
+                        : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200"
+                    }`}
+                  >
+                    {isSubmitting ? (
+                      <span className="flex items-center gap-2">
+                        <span className="inline-block animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></span>
+                        <span>お申し込み送信中...</span>
+                      </span>
+                    ) : isLiffEnvironment ? (
+                      "上記内容でLINE体験予約を完了する"
+                    ) : (
+                      "上記内容で体験レッスンを申し込む"
+                    )}
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={isSubmitting}
+                    onClick={handleBackToEdit}
+                    className="w-full h-12 rounded-xl text-sm font-semibold border-slate-300 text-slate-600 hover:bg-slate-100"
+                  >
+                    ← 入力画面に戻って修正する
+                  </Button>
+
+                  <p className="text-[11px] text-slate-400 text-center">
+                    ※送信後24時間以内に担当者より日程確定のご連絡を差し上げます。
+                  </p>
+                </div>
+              </div>
+            ) : (
             <form onSubmit={handleSubmit} className="space-y-8">
               
               {/* セクション: 基本情報（1人目） */}
@@ -1449,36 +1695,26 @@ export default function BookingForm() {
                 </div>
               </div>
 
-              {/* 送信ボタン */}
+              {/* 確認画面へ進むボタン */}
               <div className="pt-2">
                 <Button
-                  type="submit"
-                  disabled={isSubmitting}
+                  type="button"
+                  onClick={handleProceedToConfirm}
                   className={`w-full h-14 rounded-2xl text-base font-bold shadow-md transition-all ${
-                    isSubmitting
-                      ? "bg-slate-300 text-slate-500 cursor-not-allowed"
-                      : isLiffEnvironment
+                    isLiffEnvironment
                       ? "bg-[#06C755] hover:bg-[#05b34c] text-white shadow-emerald-100"
                       : "bg-sky-500 hover:bg-sky-600 text-white shadow-sky-100"
                   }`}
                 >
-                  {isSubmitting ? (
-                    <span className="flex items-center gap-2">
-                      <span className="inline-block animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></span>
-                      <span>送信中...</span>
-                    </span>
-                  ) : isLiffEnvironment ? (
-                    "LINEで体験レッスンを申し込む"
-                  ) : (
-                    "体験レッスンを申し込む（60分）"
-                  )}
+                  入力内容を確認する
                 </Button>
                 <p className="text-[11px] text-slate-400 text-center mt-2.5">
-                  ※送信後24時間以内に担当者より日程確定のご連絡を差し上げます。
+                  ※次の画面で入力内容をご確認いただいた後、正式なお申し込みとなります。
                 </p>
               </div>
 
             </form>
+            )}
           </CardContent>
         </Card>
       </div>

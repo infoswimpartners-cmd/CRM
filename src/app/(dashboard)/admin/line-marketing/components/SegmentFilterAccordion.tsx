@@ -75,6 +75,10 @@ export const FILTER_TAG_PRESETS: Record<string, { title: string; body: string }>
         title: '【ご案内】体験レッスンのお申し込み・日程相談について',
         body: '{{name}} 様\n\nスイムパートナーズ事務局です。\n公式LINEをご覧いただきありがとうございます！\n\n体験レッスンのお申し込みフォームはご確認いただけましたでしょうか？\n\n「日程が合うか不安」「どのコーチが良いかわからない」「まずは質問だけしたい」などございましたら、このLINEチャットで専任スタッフが直接ご相談に乗らせていただきます。\n\n▼ 体験レッスン日程のご確認・お申し込みはこちら\n{{trial_url}}'
     },
+    trial_form_confirmed: {
+        title: '【即時フォロー】体験レッスン入力内容のご確認・お悩み相談',
+        body: '{{name}} 様\n\nスイムパートナーズ事務局です🏊‍♂️\n体験レッスン予約フォームのご入力内容をご確認いただきありがとうございます！\n\n入力の途中でご不明な点やお困りごとはございませんでしたでしょうか？\n日程のご都合や場所の調整など、どんな些細なことでも構いませんので、このLINEチャットにそのままお気軽にご返信ください😊\n専任のスタッフが個別にご案内・調整いたします✨\n\n▼ 入力内容からそのまま申し込む場合はこちら\n{{trial_url}}'
+    },
     friend_only: {
         title: '【公式LINE】スイムパートナーズのご案内と体験レッスン',
         body: '{{name}} 様\n\n友だち追加ありがとうございます！\n水泳の出張マンツーマン個別指導【スイムパートナーズ】です。\n\nお子様から大人・マスターズまで、お近くの公営・民間プールでプロコーチが1対1で優しく指導いたします。\n\nまずは手軽に受けられる「体験レッスン」からぜひお試しください！\n▼ 体験レッスンの詳細・お申し込みはこちら\n{{trial_url}}'
@@ -348,6 +352,18 @@ export const SegmentFilterAccordion: React.FC<SegmentFilterAccordionProps> = ({
 
                         <button
                             type="button"
+                            onClick={() => handleQuickTagClick('trial_form_confirmed')}
+                            className={`min-h-[38px] sm:min-h-[32px] px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex items-center gap-1 ${
+                                selectedTag === 'trial_form_confirmed'
+                                    ? 'bg-rose-600 text-white shadow-xs font-bold'
+                                    : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200/60 dark:bg-rose-950/40 dark:text-rose-300'
+                            }`}
+                        >
+                            🔥 フォーム確認済未申込
+                        </button>
+
+                        <button
+                            type="button"
                             onClick={() => handleQuickTagClick('friend_only')}
                             className={`min-h-[38px] sm:min-h-[32px] px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex items-center gap-1 ${
                                 selectedTag === 'friend_only'
@@ -458,6 +474,7 @@ export const SegmentFilterAccordion: React.FC<SegmentFilterAccordionProps> = ({
                                         <SelectItem value="all">すべてのタグ</SelectItem>
                                         <SelectItem value="trial_done">🏊‍♂️ 体験受講後</SelectItem>
                                         <SelectItem value="trial_form_viewed">⚡ 体験フォーム閲覧未申込</SelectItem>
+                                        <SelectItem value="trial_form_confirmed">🔥 フォーム確認済未申込</SelectItem>
                                         <SelectItem value="friend_only">💬 友だち追加のみ</SelectItem>
                                         <SelectItem value="referral_lead">🎁 お友達紹介経由</SelectItem>
                                         <SelectItem value="trial_applied">📝 体験申込完了</SelectItem>

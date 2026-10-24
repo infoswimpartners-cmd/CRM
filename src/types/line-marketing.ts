@@ -72,7 +72,7 @@ export interface SyncTrialDoneResult {
 export interface LineDeliveryLog {
     id: string;
     created_at: string;
-    delivery_type: 'broadcast' | 'step_message' | 'test_preview' | 'cart_recovery' | 'direct_chat';
+    delivery_type: 'broadcast' | 'step_message' | 'test_preview' | 'cart_recovery' | 'confirm_abandon_recovery' | 'direct_chat';
     campaign_id: string | null;
     step_id: string | null;
     step_name: string | null;
@@ -101,7 +101,7 @@ export interface SendMessageOptions {
     lineUserId: string;
     rawMessage: string;
     variables?: Record<string, string | null | undefined>;
-    deliveryType: 'broadcast' | 'step_message' | 'test_preview' | 'cart_recovery' | 'direct_chat';
+    deliveryType: 'broadcast' | 'step_message' | 'test_preview' | 'cart_recovery' | 'confirm_abandon_recovery' | 'direct_chat';
     campaignId?: string;
     stepId?: string;
     stepName?: string;
@@ -136,6 +136,7 @@ export interface SegmentFilterConditions {
     includeTags?: string[];    // 含むべきタグ (例: ['trial_form_viewed'])
     excludeTags?: string[];    // 除外すべきタグ (例: ['trial_applied'])
     viewedFormNotApplied?: boolean; // フォーム閲覧済かつ申込未完了（離脱者抽出フラグ）
+    confirmedFormNotApplied?: boolean; // フォーム確認済かつ申込未完了（ホット離脱者抽出フラグ）
 }
 
 export interface FilterPreviewStudent {
@@ -192,7 +193,7 @@ export interface CreateBroadcastParams {
 export interface GetDeliveryLogsParams {
     page?: number;
     pageSize?: number;
-    deliveryType?: 'broadcast' | 'step_message' | 'test_preview' | 'cart_recovery' | 'direct_chat' | 'all';
+    deliveryType?: 'broadcast' | 'step_message' | 'test_preview' | 'cart_recovery' | 'confirm_abandon_recovery' | 'direct_chat' | 'all';
     status?: 'success' | 'sent' | 'failed' | 'skipped' | 'all';
     searchQuery?: string;
     startDate?: string;

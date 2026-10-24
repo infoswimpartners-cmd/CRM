@@ -13,6 +13,8 @@
  *   2. 体験レッスン受講完了（status: trial_done）生徒のステップ進行同期
  *   3. 到来したステップ配信のLINE Push実行
  *   4. 【最重要安全制御】本入会（status: active）または退会（status: withdrawn）生徒の安全自動スキップ
+ *   5. カゴ落ち自動フォロー（フォーム閲覧後離脱者）の実行
+ *   6. フォーム確認後未申込（ホット離脱者）即時自動フォローの実行
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -21,6 +23,7 @@ import {
     processStepDeliveries,
     syncTrialDoneStudentsToProgress,
     processCartAbandonmentReminders,
+    processConfirmAbandonmentReminders,
 } from '@/lib/line-marketing-service';
 
 export const dynamic = 'force-dynamic';
@@ -55,6 +58,14 @@ async function runMarketingDispatcher(options: { dryRun?: boolean } = {}) {
         console.error('[Dispatcher] Error in processCartAbandonmentReminders:', cartRecoveryErr);
     }
 
+    // 6. フォーム確認後未申込（ホット離脱者）即時自動フォローの判定・実行
+    let confirmRecoveryResult: any = null;
+    try {
+        confirmRecoveryResult = await processConfirmAbandonmentReminders({ dryRun });
+    } catch (confirmRecoveryErr) {
+        console.error('[Dispatcher] Error in processConfirmAbandonmentReminders:', confirmRecoveryErr);
+    }
+
     return {
         dryRun,
         timestamp: nowIso,
@@ -63,6 +74,7 @@ async function runMarketingDispatcher(options: { dryRun?: boolean } = {}) {
         stepDeliveries: stepResult,
         leadStepReminders: leadStepResult,
         cartRecovery: cartRecoveryResult,
+        confirmRecovery: confirmRecoveryResult,
     };
 }
 

@@ -21,10 +21,12 @@ import {
 export const STANDARD_TAGS = {
     TRIAL_DONE: 'trial_done',              // 体験レッスン受講済
     FORM_VIEWED: 'trial_form_viewed',      // 体験申込フォーム閲覧
+    FORM_CONFIRMED: 'trial_form_confirmed', // 体験申込フォーム確認画面閲覧（入力完了・未申込）
     FORM_APPLIED: 'trial_applied',         // 体験申込完了
     FRIEND_ONLY: 'friend_only',            // 友だち追加のみ
     REFERRAL: 'referral_lead',             // お友達紹介キャンペーン経由
     CART_RECOVERY_SENT: 'cart_recovery_sent', // カゴ落ちフォロー送信済
+    CONFIRM_ABANDON_RECOVERY_SENT: 'confirm_abandon_recovery_sent', // フォーム確認後未申込の即時フォロー送信済
     AUDIENCE_KIDS: 'audience:kids',        // 対象: キッズ/ジュニア
     AUDIENCE_ADULT: 'audience:adult',      // 対象: 大人/マスターズ
 } as const;
@@ -39,6 +41,11 @@ export const TAG_LABELS: Record<string, { label: string; category: string; descr
         label: '体験フォーム閲覧',
         category: 'behavior',
         description: 'リッチメニュー等から体験予約フォーム（LIFF）を開いたユーザー'
+    },
+    [STANDARD_TAGS.FORM_CONFIRMED]: {
+        label: 'フォーム確認済未申込',
+        category: 'behavior',
+        description: '体験予約フォームで全項目を入力し、確認画面まで進んだが最終申込を完了していないユーザー'
     },
     [STANDARD_TAGS.FORM_APPLIED]: {
         label: '体験申込完了',
@@ -59,6 +66,11 @@ export const TAG_LABELS: Record<string, { label: string; category: string; descr
         label: 'カゴ落ちフォロー送信済',
         category: 'automation',
         description: 'フォーム閲覧後未完了者への自動リマインドを送信完了したユーザー'
+    },
+    [STANDARD_TAGS.CONFIRM_ABANDON_RECOVERY_SENT]: {
+        label: '確認後即時フォロー送信済',
+        category: 'automation',
+        description: 'フォーム確認後未申込の離脱者へ即時フォローメッセージを送信完了したユーザー'
     },
     [STANDARD_TAGS.AUDIENCE_KIDS]: {
         label: '対象: キッズ/ジュニア',
@@ -127,6 +139,20 @@ export async function recordAccessLog(params: RecordAccessParams): Promise<LineA
                 }
             });
 
+            // フォーム確認画面到達（step === 'confirm' または formType === 'trial_confirm'）の場合
+            if (params.step === 'confirm' || params.formType === 'trial_confirm') {
+                await addTagToUser(params.lineUserId, STANDARD_TAGS.FORM_CONFIRMED, {
+                    category: 'behavior',
+                    displayName: params.displayName || undefined,
+                    metadata: {
+                        first_confirmed_at: now,
+                        last_confirmed_at: now,
+                        form_type: params.formType,
+                        referrer_name: params.referrerName || null
+                    }
+                });
+            }
+
             // 紹介者名がある場合は紹介タグも付与
             if (params.referrerName) {
                 await addTagToUser(params.lineUserId, STANDARD_TAGS.REFERRAL, {
@@ -141,6 +167,48 @@ export async function recordAccessLog(params: RecordAccessParams): Promise<LineA
     }
 
     return accessLog;
+}
+
+/**
+ * フォーム確認画面到達を明示的に記録し、trial_form_confirmed タグを付与します
+ */
+export async function recordConfirmStep(params: RecordAccessParams): Promise<LineAccessLog> {
+    return recordAccessLog({
+        ...params,
+        step: 'confirm',
+        formType: params.formType || 'trial_confirm',
+        metadata: {
+            ...params.metadata,
+            confirmed_at: new Date().toISOString(),
+        }
+    });
+}
+
+/**
+ * フォーム確認画面からの離脱ビーコンを記録します
+ */
+export async function recordConfirmAbandon(params: {
+    lineUserId?: string | null;
+    displayName?: string | null;
+    pageUrl?: string | null;
+}): Promise<boolean> {
+    if (!params.lineUserId) return false;
+    const now = new Date().toISOString();
+
+    try {
+        await addTagToUser(params.lineUserId, STANDARD_TAGS.FORM_CONFIRMED, {
+            category: 'behavior',
+            displayName: params.displayName || undefined,
+            metadata: {
+                abandoned_at: now,
+                page_url: params.pageUrl || null,
+            }
+        });
+        return true;
+    } catch (err) {
+        console.error('[LineTrackingService] Failed to record confirm abandon:', err);
+        return false;
+    }
 }
 
 // ==============================================================================
@@ -420,13 +488,15 @@ export async function filterStudentsWithTags<T extends { line_user_id?: string |
         includeTags?: string[];
         excludeTags?: string[];
         viewedFormNotApplied?: boolean; // フォーム閲覧済かつ申込未完了
+        confirmedFormNotApplied?: boolean; // フォーム確認済かつ申込未完了（ホット離脱者）
     }
 ): Promise<T[]> {
-    const { includeTags, excludeTags, viewedFormNotApplied } = options;
+    const { includeTags, excludeTags, viewedFormNotApplied, confirmedFormNotApplied } = options;
 
     const needsTagCheck = (includeTags && includeTags.length > 0) ||
                           (excludeTags && excludeTags.length > 0) ||
-                          viewedFormNotApplied;
+                          viewedFormNotApplied ||
+                          confirmedFormNotApplied;
 
     if (!needsTagCheck) {
         return students;
@@ -439,11 +509,20 @@ export async function filterStudentsWithTags<T extends { line_user_id?: string |
         const lineId = student.lineUserId || student.line_user_id;
         const tags = lineId ? (allUserTags.get(lineId) || []) : [];
 
-        // 離脱者フィルター: trial_form_viewed あり かつ trial_applied なし
+        // フォーム閲覧後未申込フィルター: trial_form_viewed あり かつ trial_applied なし
         if (viewedFormNotApplied) {
             const hasViewed = tags.includes(STANDARD_TAGS.FORM_VIEWED);
             const hasApplied = tags.includes(STANDARD_TAGS.FORM_APPLIED);
             if (!hasViewed || hasApplied) {
+                return false;
+            }
+        }
+
+        // フォーム確認後未申込フィルター: trial_form_confirmed あり かつ trial_applied なし
+        if (confirmedFormNotApplied) {
+            const hasConfirmed = tags.includes(STANDARD_TAGS.FORM_CONFIRMED);
+            const hasApplied = tags.includes(STANDARD_TAGS.FORM_APPLIED);
+            if (!hasConfirmed || hasApplied) {
                 return false;
             }
         }

@@ -96,7 +96,7 @@ export function SortableStepCard({
 
                     <div className="flex items-center gap-1 text-xs font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
                         <Calendar className="w-3.5 h-3.5 text-slate-500" />
-                        <span>{rule.targetTag === 'friend_only' ? '登録から' : rule.targetTag === 'trial_form_viewed' ? '閲覧から' : '体験から'} {rule.delayDays} 日後</span>
+                        <span>{rule.targetTag === 'friend_only' ? '登録から' : rule.targetTag === 'trial_form_viewed' ? '閲覧から' : rule.targetTag === 'trial_form_confirmed' ? '確認から' : '体験から'} {rule.delayDays} 日後</span>
                     </div>
 
                     <div className="flex items-center gap-1 text-xs font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
@@ -108,6 +108,7 @@ export function SortableStepCard({
                         <span className="inline-flex items-center text-[10px] font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
                             {rule.targetTag === 'trial_done' && '🏊‍♂️ 体験受講後'}
                             {rule.targetTag === 'trial_form_viewed' && '⚡ フォーム閲覧未申込'}
+                            {rule.targetTag === 'trial_form_confirmed' && '🔥 フォーム確認済未申込'}
                             {rule.targetTag === 'friend_only' && '💬 友だち追加'}
                             {rule.targetTag === 'referral_lead' && '🎁 お友達紹介'}
                             {rule.targetTag === 'all' && '全対象'}

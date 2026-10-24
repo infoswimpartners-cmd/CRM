@@ -52,6 +52,7 @@ export interface RecordAccessParams {
     lineUserId?: string | null;
     displayName?: string | null;
     formType: string;
+    step?: 'view' | 'confirm' | 'abandon'; // フォーム内の進行ステップ（閲覧・確認画面・離脱）
     referrerName?: string | null;
     pageUrl?: string | null;
     utmSource?: string | null;

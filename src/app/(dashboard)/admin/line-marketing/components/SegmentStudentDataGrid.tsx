@@ -60,6 +60,11 @@ const getTagBadge = (tag: string) => {
                 label: '⚡ フォーム閲覧',
                 className: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800',
             };
+        case 'trial_form_confirmed':
+            return {
+                label: '🔥 確認済未申込',
+                className: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-800 font-bold',
+            };
         case 'trial_applied':
             return {
                 label: '📝 体験申込済',

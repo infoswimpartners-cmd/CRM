@@ -220,6 +220,7 @@ export function StepScenarioEditorTab({ onUpdate }: StepScenarioEditorTabProps) 
                     {[
                         { id: 'trial_done', label: '🏊‍♂️ 体験受講後', desc: '体験後入会促進' },
                         { id: 'trial_form_viewed', label: '⚡ フォーム閲覧未申込', desc: '離脱フォロー' },
+                        { id: 'trial_form_confirmed', label: '🔥 フォーム確認済未申込', desc: '即時フォロー' },
                         { id: 'friend_only', label: '💬 友だち追加リード', desc: '初期アプローチ' },
                         { id: 'referral_lead', label: '🎁 お友達紹介', desc: '特典案内' },
                         { id: 'all', label: '📋 すべて', desc: '全ステップ' },
@@ -250,6 +251,7 @@ export function StepScenarioEditorTab({ onUpdate }: StepScenarioEditorTabProps) 
                         <h3 className="text-sm font-bold text-blue-900 dark:text-blue-200">
                             {selectedTag === 'trial_done' && '🏊‍♂️ 体験後フォロー自動ステップ配信シナリオ'}
                             {selectedTag === 'trial_form_viewed' && '⚡ フォーム閲覧・未申込 離脱フォロー配信シナリオ'}
+                            {selectedTag === 'trial_form_confirmed' && '🔥 フォーム確認済・未申込 即時フォロー配信シナリオ'}
                             {selectedTag === 'friend_only' && '💬 公式LINE友だち追加リード 初期ステップ配信シナリオ'}
                             {selectedTag === 'referral_lead' && '🎁 お友達紹介キャンペーン案内ステップ配信シナリオ'}
                             {selectedTag === 'all' && '📋 全ステップ配信シナリオ一覧'}
@@ -257,6 +259,7 @@ export function StepScenarioEditorTab({ onUpdate }: StepScenarioEditorTabProps) 
                         <p className="text-xs text-blue-700 dark:text-blue-300 mt-0.5 leading-relaxed">
                             {selectedTag === 'trial_done' && '生徒のステータスが「体験レッスン受講完了（trial_done）」になった日を起点（0日目）として、設定した経過日数・配信時刻にLINEメッセージを自動配信します。'}
                             {selectedTag === 'trial_form_viewed' && '体験予約フォーム（LIFF）を開いた日を起点として、未申込のユーザーに対してフォローメッセージを自動配信します。申込完了すると自動スキップされます。'}
+                            {selectedTag === 'trial_form_confirmed' && '体験予約フォームで全項目を入力し、確認画面まで進んだ未申込ユーザーに対して、離脱後すぐに親身な個別フォローメッセージを配信します。'}
                             {selectedTag === 'friend_only' && '公式LINEを友だち追加した日を起点として、出張プールやスクールの魅力を定期的に自動配信します。'}
                             {selectedTag === 'referral_lead' && 'お友達紹介キャンペーン対象者へ、特別価格（3,500円）の体験予約促進や特典案内を配信します。'}
                             {selectedTag === 'all' && '登録済みのすべてのステップ配信ルールを表示しています。'}

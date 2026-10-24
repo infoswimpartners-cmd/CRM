@@ -147,6 +147,7 @@ const chatModuleCache: {
 const STANDARD_TAG_OPTIONS = [
     { value: 'trial_done', label: '体験受講後' },
     { value: 'trial_form_viewed', label: '体験フォーム閲覧' },
+    { value: 'trial_form_confirmed', label: 'フォーム確認済未申込' },
     { value: 'trial_applied', label: '体験申込完了' },
     { value: 'friend_only', label: '友だち追加のみ' },
     { value: 'referral_lead', label: 'お友達紹介経由' },
@@ -157,10 +158,12 @@ const STANDARD_TAG_OPTIONS = [
 const TAG_DISPLAY_MAP: Record<string, string> = {
     trial_done: '体験受講後',
     trial_form_viewed: 'フォーム閲覧',
+    trial_form_confirmed: '確認済未申込',
     trial_applied: '体験申込完了',
     friend_only: '友だち追加のみ',
     referral_lead: '紹介経由',
     cart_recovery_sent: 'カゴ落ち送信済',
+    confirm_abandon_recovery_sent: '確認後即時送信済',
     'audience:kids': 'キッズ',
     'audience:adult': '大人',
 };
