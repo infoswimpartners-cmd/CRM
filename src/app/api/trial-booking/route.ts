@@ -143,8 +143,8 @@ export async function POST(req: Request) {
     }
 
     // 2. students テーブルとの連動（status: 'applied' へ更新または作成）
+    let targetStudent: any = null;
     try {
-      let targetStudent: any = null;
 
       // 2.1. LINE ID での既存生徒検索（複数レコード存在時も最新かつfriend_only優先で取得）
       if (payload.userId) {
@@ -282,16 +282,18 @@ export async function POST(req: Request) {
     }
 
     // 3. 公式LINEステップ配信を停止（申込済ステータスへ移行＆表示名を申込氏名に更新）
-    if (payload.userId) {
+    // ※ payload.userId が空でも、紐付けられた既存生徒に line_user_id があれば補完利用
+    const effectiveLineUserId = payload.userId || targetStudent?.line_user_id || null;
+    if (effectiveLineUserId) {
       try {
-        await stopStepReminderForUser(payload.userId, 'applied', payload.name || undefined);
+        await stopStepReminderForUser(effectiveLineUserId, 'applied', payload.name || undefined);
       } catch (stepErr) {
         console.error('[Trial Booking] Failed to stop step reminder:', stepErr);
       }
 
       // 3.2. トラッキングログのコンバージョン（CV）更新＆タグ付与（trial_applied）
       try {
-        await markConversionForUser(payload.userId, undefined, referrer);
+        await markConversionForUser(effectiveLineUserId, undefined, referrer);
       } catch (convErr) {
         console.error('[Trial Booking] Failed to mark tracking conversion:', convErr);
       }
@@ -325,11 +327,11 @@ export async function POST(req: Request) {
 ────────────────
 SWIM PARTNERS/スイムパートナーズ事務局`;
 
-        const lineSent = await lineService.pushMessage(payload.userId, lineMessage);
+        const lineSent = await lineService.pushMessage(effectiveLineUserId, lineMessage);
         if (lineSent) {
-          console.log(`[Trial Booking] Successfully sent reception LINE message to user: ${payload.userId}`);
+          console.log(`[Trial Booking] Successfully sent reception LINE message to user: ${effectiveLineUserId}`);
         } else {
-          console.error(`[Trial Booking] Failed to send reception LINE message to user: ${payload.userId}`);
+          console.error(`[Trial Booking] Failed to send reception LINE message to user: ${effectiveLineUserId}`);
         }
       } catch (lineErr) {
         console.error('[Trial Booking] Exception sending reception LINE message:', lineErr);
