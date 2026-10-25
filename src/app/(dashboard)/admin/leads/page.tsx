@@ -1061,9 +1061,27 @@ export default function AdminLeadsPage() {
                 } else {
                     toast.success(`${res.coachName} コーチにアサインしました`)
                 }
+
+                // 楽観的UI更新（即時にテーブル反映してモーダルを閉じる）
+                setLeads(prev => prev.map(l => {
+                    if (l.id === assigningLead.id) {
+                        return {
+                            ...l,
+                            status: 'scheduled',
+                            assigned_coach_id: assignTargetCoachId,
+                            assigned_at: new Date().toISOString(),
+                            confirmed_datetime: assignConfirmedDate.trim(),
+                            confirmed_location: assignConfirmedLocation.trim()
+                        }
+                    }
+                    return l
+                }))
+
                 setIsAssignDialogOpen(false)
                 setAssigningLead(null)
-                await fetchData()
+
+                // バックグラウンドで最新データを同期（画面待機させない）
+                fetchData().catch(console.error)
             } else {
                 toast.error(res.error || 'アサインに失敗しました')
             }

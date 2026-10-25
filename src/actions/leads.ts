@@ -427,38 +427,66 @@ async function createTrialScheduleForLead(params: {
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://manager.swim-partners.com'
         const paymentLink = `${appUrl}/pay/trial/${targetScheduleId}`
 
-        // 4. Googleカレンダーへの同期
+        // 4. Googleカレンダーへの同期（コーチと管理者を並列実行して高速化）
         try {
             const { createCalendarEvent, getAdminRefreshToken, getCoachRefreshToken } = await import('@/lib/google-calendar')
-            let finalEventId: string | null = null
             const calSummary = `${params.studentName}様${params.hasSecondStudent ? ` & ${params.secondStudentName || '2人目'}様` : ''}　担当：${coachName}`
             const calDescription = `[体験レッスンスケジュール]\n案件ID: ${params.leadId}\n確定日時: ${params.confirmedDate}\n確定場所: ${params.confirmedLocation}\nご要望・備考: ${params.leadNotes || 'なし'}`
 
-            // a) コーチのカレンダー同期
+            const calendarSyncTasks: Promise<string | null>[] = []
+
+            // a) コーチのカレンダー同期タスク
             if (params.coachId) {
-                const coachRefreshToken = await getCoachRefreshToken(supabaseAdmin, params.coachId)
-                if (coachRefreshToken) {
-                    finalEventId = await createCalendarEvent(coachRefreshToken, {
-                        summary: calSummary,
-                        description: calDescription,
-                        location: params.confirmedLocation || '',
-                        start: start,
-                        end: end
-                    })
-                }
+                calendarSyncTasks.push(
+                    (async () => {
+                        try {
+                            const coachRefreshToken = await getCoachRefreshToken(supabaseAdmin, params.coachId)
+                            if (coachRefreshToken) {
+                                return await createCalendarEvent(coachRefreshToken, {
+                                    summary: calSummary,
+                                    description: calDescription,
+                                    location: params.confirmedLocation || '',
+                                    start: start,
+                                    end: end
+                                })
+                            }
+                        } catch (cErr) {
+                            console.error('Coach calendar sync error:', cErr)
+                        }
+                        return null
+                    })()
+                )
             }
 
-            // b) 管理者のカレンダー同期
-            const adminRefreshToken = await getAdminRefreshToken(supabaseAdmin)
-            if (adminRefreshToken) {
-                const adminEventId = await createCalendarEvent(adminRefreshToken, {
-                    summary: calSummary,
-                    description: calDescription,
-                    location: params.confirmedLocation || '',
-                    start: start,
-                    end: end
-                })
-                if (!finalEventId) finalEventId = adminEventId
+            // b) 管理者のカレンダー同期タスク
+            calendarSyncTasks.push(
+                (async () => {
+                    try {
+                        const adminRefreshToken = await getAdminRefreshToken(supabaseAdmin)
+                        if (adminRefreshToken) {
+                            return await createCalendarEvent(adminRefreshToken, {
+                                summary: calSummary,
+                                description: calDescription,
+                                location: params.confirmedLocation || '',
+                                start: start,
+                                end: end
+                            })
+                        }
+                    } catch (aErr) {
+                        console.error('Admin calendar sync error:', aErr)
+                    }
+                    return null
+                })()
+            )
+
+            // 並列実行で待ち時間を半減
+            const calResults = await Promise.allSettled(calendarSyncTasks)
+            let finalEventId: string | null = null
+            for (const r of calResults) {
+                if (r.status === 'fulfilled' && r.value) {
+                    finalEventId = r.value
+                    break
+                }
             }
 
             if (finalEventId && targetScheduleId) {
@@ -1465,155 +1493,130 @@ export async function adminAssignLeadAction(
         const paymentLink = trialResult?.paymentLink || ''
         const amountStr = trialResult?.price ? trialResult.price.toLocaleString() : '6,000'
 
-        // 4. 顧客への自動確定通知（LINEプッシュメッセージ）の送信（アサイン連絡とお支払い連絡の2通に分けて送信）
-        // ※体験アサイン時点では担当コーチのLINEはまだ未追加のため、必ず「SWIM PARTNERS 公式LINE」から送信します
+        // 4. 外部通知処理を並列実行（LINE、メール、Google Chat、コーチ通知を同時送信して大幅に高速化）
+        const notificationPromises: Promise<any>[] = []
+
+        // 4.1. 顧客へのLINE通知タスク
         if (lead.line_user_id && lead.send_customer_notification !== false) {
-            // SWIM PARTNERS 公式LINEのアクセストークンを取得
-            const { data: tokenConfig } = await supabaseAdmin
-                .from('app_configs')
-                .select('value')
-                .eq('key', 'line_channel_access_token')
-                .maybeSingle()
-            const token = tokenConfig?.value || process.env.LINE_CHANNEL_ACCESS_TOKEN || ''
+            notificationPromises.push(
+                (async () => {
+                    try {
+                        const { data: tokenConfig } = await supabaseAdmin
+                            .from('app_configs')
+                            .select('value')
+                            .eq('key', 'line_channel_access_token')
+                            .maybeSingle()
+                        const token = tokenConfig?.value || process.env.LINE_CHANNEL_ACCESS_TOKEN || ''
 
-            // 1通目：アサイン連絡テンプレート
-            const { data: assignedTemplateConfig } = await supabaseAdmin
-                .from('app_configs')
-                .select('value')
-                .eq('key', 'line_assigned_template')
-                .maybeSingle()
+                        const { data: assignedTemplateConfig } = await supabaseAdmin
+                            .from('app_configs')
+                            .select('value')
+                            .eq('key', 'line_assigned_template')
+                            .maybeSingle()
 
-            const defaultLineAssignedTemplate = `{{name}} 様
+                        const defaultLineAssignedTemplate = `{{name}} 様\n\nスイムパートナーズにお申し込みいただきありがとうございます。\n体験レッスンの担当コーチおよび日程が確定いたしました。\n\n■ 担当コーチ: {{coach_name}}\n■ 確定日時: {{lesson_date}}\n■ レッスン場所: {{location}}\n{{second_student_info}}\n\n【担当コーチへご連絡のお願い】\n当日の集合場所や事前打ち合わせのため、下記URLより担当コーチのLINEを追加いただき、メッセージをお送りいただけますようお願いいたします。\n▼ 担当コーチLINE追加URL\n{{coach_line_url}}\n\nご不明な点がございましたら、本メッセージまたは本部までお気軽にお問い合わせください。\n\nSwim Partners`
 
-スイムパートナーズにお申し込みいただきありがとうございます。
-体験レッスンの担当コーチおよび日程が確定いたしました。
+                        const { data: paymentTemplateConfig } = await supabaseAdmin
+                            .from('app_configs')
+                            .select('value')
+                            .eq('key', 'line_payment_template')
+                            .maybeSingle()
 
-■ 担当コーチ: {{coach_name}}
-■ 確定日時: {{lesson_date}}
-■ レッスン場所: {{location}}
-{{second_student_info}}
+                        const defaultLinePaymentTemplate = `{{name}} 様\n\n体験レッスンの確定に伴い、体験料のお支払いについてご案内いたします。\n\n■ 体験レッスン料金: {{amount}}円\n\n【体験料お支払いのお願い】\n体験レッスン料金のお支払いは、下記の専用決済URL（クレジットカード）よりお願いいたします。\n▼ 体験レッスン事前決済URL\n{{payment_link}}\n\n※レッスン前日までにお手続きいただけますようお願い申し上げます。\nご不明な点がございましたら、本部までお気軽にお問い合わせください。\n\nSwim Partners`
 
-【担当コーチへご連絡のお願い】
-当日の集合場所や事前打ち合わせのため、下記URLより担当コーチのLINEを追加いただき、メッセージをお送りいただけますようお願いいたします。
-▼ 担当コーチLINE追加URL
-{{coach_line_url}}
+                        let secondStudentInfo = ''
+                        if (lead.second_student_name) {
+                            const secondAge = calculateAge(lead.second_student_birth_date)
+                            const secondAgeStr = secondAge !== null ? `${secondAge}歳` : '未設定'
+                            secondStudentInfo = `\n■ 2人目の情報: ${lead.second_student_name}（${lead.second_student_gender || '未設定'} / ${secondAgeStr}）`
+                        }
 
-ご不明な点がございましたら、本メッセージまたは本部までお気軽にお問い合わせください。
+                        // 1通目メッセージの生成
+                        const assignedBodyTemplate = assignedTemplateConfig?.value || defaultLineAssignedTemplate
+                        const assignedMessage = assignedBodyTemplate
+                            .replace(/\{\{name\}\}/g, lead.name || 'お客様')
+                            .replace(/\{\{coach_name\}\}/g, targetCoach.full_name || '')
+                            .replace(/\{\{coach_line_url\}\}/g, targetCoach.line_friend_url || '')
+                            .replace(/\{\{lesson_date\}\}/g, confirmedDate)
+                            .replace(/\{\{location\}\}/g, confirmedLocation)
+                            .replace(/\{\{second_student_info\}\}/g, secondStudentInfo)
+                            .replace(/\{\{amount\}\}/g, amountStr)
+                            .replace(/\{\{payment_link\}\}/g, paymentLink)
+                            .replace(/\{\{payment_url\}\}/g, paymentLink)
 
-Swim Partners`
+                        // 2通目メッセージの生成
+                        const paymentBodyTemplate = paymentTemplateConfig?.value || defaultLinePaymentTemplate
+                        let paymentMessage = paymentBodyTemplate
+                            .replace(/\{\{name\}\}/g, lead.name || 'お客様')
+                            .replace(/\{\{coach_name\}\}/g, targetCoach.full_name || '')
+                            .replace(/\{\{coach_line_url\}\}/g, targetCoach.line_friend_url || '')
+                            .replace(/\{\{lesson_date\}\}/g, confirmedDate)
+                            .replace(/\{\{location\}\}/g, confirmedLocation)
+                            .replace(/\{\{second_student_info\}\}/g, secondStudentInfo)
+                            .replace(/\{\{amount\}\}/g, amountStr)
+                            .replace(/\{\{payment_link\}\}/g, paymentLink)
+                            .replace(/\{\{payment_url\}\}/g, paymentLink)
 
-            // 2通目：確定・お支払い連絡テンプレート
-            const { data: paymentTemplateConfig } = await supabaseAdmin
-                .from('app_configs')
-                .select('value')
-                .eq('key', 'line_payment_template')
-                .maybeSingle()
+                        if (paymentLink && !paymentMessage.includes(paymentLink)) {
+                            paymentMessage += `\n\n▼ 体験レッスン事前決済URL\n${paymentLink}`
+                        }
 
-            const defaultLinePaymentTemplate = `{{name}} 様
-
-体験レッスンの確定に伴い、体験料のお支払いについてご案内いたします。
-
-■ 体験レッスン料金: {{amount}}円
-
-【体験料お支払いのお願い】
-体験レッスン料金のお支払いは、下記の専用決済URL（クレジットカード）よりお願いいたします。
-▼ 体験レッスン事前決済URL
-{{payment_link}}
-
-※レッスン前日までにお手続きいただけますようお願い申し上げます。
-ご不明な点がございましたら、本部までお気軽にお問い合わせください。
-
-Swim Partners`
-
-            let secondStudentInfo = ''
-            if (lead.second_student_name) {
-                const secondAge = calculateAge(lead.second_student_birth_date)
-                const secondAgeStr = secondAge !== null ? `${secondAge}歳` : '未設定'
-                secondStudentInfo = `\n■ 2人目の情報: ${lead.second_student_name}（${lead.second_student_gender || '未設定'} / ${secondAgeStr}）`
-            }
-
-            // 1通目メッセージの生成
-            const assignedBodyTemplate = assignedTemplateConfig?.value || defaultLineAssignedTemplate
-            const assignedMessage = assignedBodyTemplate
-                .replace(/\{\{name\}\}/g, lead.name || 'お客様')
-                .replace(/\{\{coach_name\}\}/g, targetCoach.full_name || '')
-                .replace(/\{\{coach_line_url\}\}/g, targetCoach.line_friend_url || '')
-                .replace(/\{\{lesson_date\}\}/g, confirmedDate)
-                .replace(/\{\{location\}\}/g, confirmedLocation)
-                .replace(/\{\{second_student_info\}\}/g, secondStudentInfo)
-                .replace(/\{\{amount\}\}/g, amountStr)
-                .replace(/\{\{payment_link\}\}/g, paymentLink)
-                .replace(/\{\{payment_url\}\}/g, paymentLink)
-
-            // 2通目メッセージの生成
-            const paymentBodyTemplate = paymentTemplateConfig?.value || defaultLinePaymentTemplate
-            let paymentMessage = paymentBodyTemplate
-                .replace(/\{\{name\}\}/g, lead.name || 'お客様')
-                .replace(/\{\{coach_name\}\}/g, targetCoach.full_name || '')
-                .replace(/\{\{coach_line_url\}\}/g, targetCoach.line_friend_url || '')
-                .replace(/\{\{lesson_date\}\}/g, confirmedDate)
-                .replace(/\{\{location\}\}/g, confirmedLocation)
-                .replace(/\{\{second_student_info\}\}/g, secondStudentInfo)
-                .replace(/\{\{amount\}\}/g, amountStr)
-                .replace(/\{\{payment_link\}\}/g, paymentLink)
-                .replace(/\{\{payment_url\}\}/g, paymentLink)
-
-            // 【決済リンク自動付加フォールバック】2通目に決済URLが未挿入の場合、確実に追記
-            if (paymentLink && !paymentMessage.includes(paymentLink)) {
-                paymentMessage += `\n\n▼ 体験レッスン事前決済URL\n${paymentLink}`
-            }
-
-            const { lineService } = await import('@/lib/line')
-            // 1通目（アサイン連絡）を送信
-            const success1 = await lineService.pushMessage(lead.line_user_id, assignedMessage, token)
-            if (!success1) {
-                console.error('Failed to send LINE assigned message to client')
-            }
-
-            // 2通目（確定・お支払い連絡）を送信
-            const success2 = await lineService.pushMessage(lead.line_user_id, paymentMessage, token)
-            if (!success2) {
-                console.error('Failed to send LINE payment message to client')
-            }
+                        const { lineService } = await import('@/lib/line')
+                        // 1通目（アサイン連絡）
+                        await lineService.pushMessage(lead.line_user_id, assignedMessage, token)
+                        // 2通目（決済連絡）
+                        await lineService.pushMessage(lead.line_user_id, paymentMessage, token)
+                    } catch (lineErr) {
+                        console.error('Failed to send LINE notification:', lineErr)
+                    }
+                })()
+            )
         }
 
-        // 4.5. 顧客へのメール通知送信（メールアドレスが存在する場合）
+        // 4.2. 顧客へのメール通知タスク
         if (studentEmail) {
-            try {
-                const { emailService } = await import('@/lib/email')
-                await emailService.sendTriggerEmail('trial_lesson_reserved', studentEmail, {
-                    name: lead.name || 'お客様',
-                    lesson_date: confirmedDate,
-                    trial_date: confirmedDate,
-                    location: confirmedLocation,
-                    coach_name: targetCoach.full_name || '',
-                    amount: amountStr,
-                    payment_link: paymentLink,
-                    payment_url: paymentLink,
-                    coach_line_url: targetCoach.line_friend_url || ''
-                }, undefined, { forceEmail: true })
-            } catch (mailErr) {
-                console.error('Failed to send trial reservation email:', mailErr)
-            }
+            notificationPromises.push(
+                (async () => {
+                    try {
+                        const { emailService } = await import('@/lib/email')
+                        await emailService.sendTriggerEmail('trial_lesson_reserved', studentEmail, {
+                            name: lead.name || 'お客様',
+                            lesson_date: confirmedDate,
+                            trial_date: confirmedDate,
+                            location: confirmedLocation,
+                            coach_name: targetCoach.full_name || '',
+                            amount: amountStr,
+                            payment_link: paymentLink,
+                            payment_url: paymentLink,
+                            coach_line_url: targetCoach.line_friend_url || ''
+                        }, undefined, { forceEmail: true })
+                    } catch (mailErr) {
+                        console.error('Failed to send trial reservation email:', mailErr)
+                    }
+                })()
+            )
         }
 
-        // 5. アサイン確定の Google Chat 通知
-        const targetWebhookIds = await getLeadWebhookIds(supabase, leadId, lead.notification_webhook_id)
-        if (targetWebhookIds.length > 0) {
-            try {
-                const { data: webhooks } = await supabase
-                    .from('google_chat_webhooks')
-                    .select('webhook_url')
-                    .in('id', targetWebhookIds)
-                
-                if (webhooks && webhooks.length > 0) {
+        // 4.3. Google Chat 通知タスク（紐づくスペース + 追加Webhookを並列送信）
+        notificationPromises.push(
+            (async () => {
+                try {
+                    const targetWebhookIds = await getLeadWebhookIds(supabase, leadId, lead.notification_webhook_id)
+                    if (targetWebhookIds.length === 0) return
+
+                    const { data: webhooks } = await supabase
+                        .from('google_chat_webhooks')
+                        .select('webhook_url')
+                        .in('id', targetWebhookIds)
+
+                    if (!webhooks || webhooks.length === 0) return
+
                     const { data: templateConfig } = await supabase
                         .from('app_configs')
                         .select('value')
                         .eq('key', 'lead_assigned_notification_template')
                         .maybeSingle()
 
-                    // 元案件情報の引用ブロック（Google Chat引用構文: 先頭に > ）
                     let secondStudentText = ''
                     if (lead.second_student_name) {
                         secondStudentText = ` / 2人目: ${lead.second_student_name} 様`
@@ -1637,7 +1640,7 @@ Swim Partners`
                         secondStudentNameInfo = `\n・2人目の名前： ${lead.second_student_name} 様`
                     }
 
-                    let mainBody = bodyTemplate
+                    const mainBody = bodyTemplate
                         .replace(/\{\{name\}\}/g, lead.name || '未設定')
                         .replace(/\{\{coach_name\}\}/g, targetCoach.full_name || '未設定')
                         .replace(/\{\{confirmed_datetime\}\}/g, confirmedDate || '未設定')
@@ -1647,66 +1650,80 @@ Swim Partners`
                         .replace(/\{\{payment_link\}\}/g, paymentLink)
                         .replace(/\{\{payment_url\}\}/g, paymentLink)
 
-                    // 本文（*アサイン確定のお知らせ* または *担当コーチ変更*）をトップにし、その下に元案件の引用を結合
                     const gchatMessage = `${mainBody}\n\n${quoteLines}`
 
-                    // 紐づくすべての通知先スペース（メインチャット）に送信
+                    const gchatSubTasks: Promise<any>[] = []
+                    // 各スペースへの送信を並列化
                     for (const wh of webhooks) {
                         if (wh.webhook_url) {
+                            gchatSubTasks.push(
+                                sendGoogleChatMessage(wh.webhook_url, gchatMessage).catch(err => {
+                                    console.error('Failed to send admin assign notification to space:', err)
+                                })
+                            )
+                        }
+                    }
+
+                    // 追加Webhookへの送信
+                    gchatSubTasks.push(
+                        (async () => {
                             try {
-                                await sendGoogleChatMessage(wh.webhook_url, gchatMessage)
-                            } catch (singleErr) {
-                                console.error('Failed to send admin assign notification to space:', singleErr)
+                                const { data: assignedWebhookConfig } = await supabase
+                                    .from('app_configs')
+                                    .select('value')
+                                    .eq('key', 'lead_assigned_webhook_url')
+                                    .maybeSingle()
+
+                                if (assignedWebhookConfig?.value) {
+                                    const { data: additionalTemplateConfig } = await supabase
+                                        .from('app_configs')
+                                        .select('value')
+                                        .eq('key', 'lead_assigned_additional_webhook_template')
+                                        .maybeSingle()
+
+                                    const additionalMessage = (additionalTemplateConfig?.value || defaultTemplate)
+                                        .replace(/\{\{name\}\}/g, lead.name || '未設定')
+                                        .replace(/\{\{coach_name\}\}/g, targetCoach.full_name || '未設定')
+                                        .replace(/\{\{confirmed_datetime\}\}/g, confirmedDate || '未設定')
+                                        .replace(/\{\{confirmed_location\}\}/g, confirmedLocation || '未設定')
+                                        .replace(/\{\{second_student_info\}\}/g, secondStudentNameInfo)
+                                        .replace(/\{\{amount\}\}/g, amountStr)
+                                        .replace(/\{\{payment_link\}\}/g, paymentLink)
+                                        .replace(/\{\{payment_url\}\}/g, paymentLink)
+
+                                    await sendGoogleChatMessage(assignedWebhookConfig.value, additionalMessage)
+                                }
+                            } catch (additionalGchatErr) {
+                                console.error('Failed to send additional assign notification:', additionalGchatErr)
                             }
-                        }
-                    }
+                        })()
+                    )
 
-                    try {
-                        const { data: assignedWebhookConfig } = await supabase
-                            .from('app_configs')
-                            .select('value')
-                            .eq('key', 'lead_assigned_webhook_url')
-                            .maybeSingle()
-
-                        if (assignedWebhookConfig?.value) {
-                            const { data: additionalTemplateConfig } = await supabase
-                                .from('app_configs')
-                                .select('value')
-                                .eq('key', 'lead_assigned_additional_webhook_template')
-                                .maybeSingle()
-
-                            let additionalMessage = (additionalTemplateConfig?.value || defaultTemplate)
-                                .replace(/\{\{name\}\}/g, lead.name || '未設定')
-                                .replace(/\{\{coach_name\}\}/g, targetCoach.full_name || '未設定')
-                                .replace(/\{\{confirmed_datetime\}\}/g, confirmedDate || '未設定')
-                                .replace(/\{\{confirmed_location\}\}/g, confirmedLocation || '未設定')
-                                .replace(/\{\{second_student_info\}\}/g, secondStudentNameInfo)
-                                .replace(/\{\{amount\}\}/g, amountStr)
-                                .replace(/\{\{payment_link\}\}/g, paymentLink)
-                                .replace(/\{\{payment_url\}\}/g, paymentLink)
-
-                            await sendGoogleChatMessage(assignedWebhookConfig.value, additionalMessage)
-                        }
-                    } catch (additionalGchatErr) {
-                        console.error('Failed to send additional assign notification:', additionalGchatErr)
-                    }
+                    await Promise.allSettled(gchatSubTasks)
+                } catch (gchatErr) {
+                    console.error('Failed to send assign notification to Google Chat:', gchatErr)
                 }
-            } catch (gchatErr) {
-                console.error('Failed to send assign notification to Google Chat:', gchatErr)
-            }
-        }
+            })()
+        )
 
-        // 6. コーチ連絡用Google Chatスペースへアサイン詳細通知を送信
-        await sendCoachDetailNotification({
-            supabaseAdmin,
-            coachId: targetCoach.id,
-            coachName: targetCoach.full_name || '',
-            lead,
-            confirmedDate,
-            confirmedLocation,
-            amountStr,
-            paymentLink
-        })
+        // 4.4. コーチ連絡用Google Chatスペースへアサイン詳細通知タスク
+        notificationPromises.push(
+            sendCoachDetailNotification({
+                supabaseAdmin,
+                coachId: targetCoach.id,
+                coachName: targetCoach.full_name || '',
+                lead,
+                confirmedDate,
+                confirmedLocation,
+                amountStr,
+                paymentLink
+            }).catch(coachErr => {
+                console.error('Failed to send coach detail notification:', coachErr)
+            })
+        )
+
+        // 全ての通知を並列に待機（最長処理時間のみに短縮）
+        await Promise.allSettled(notificationPromises)
 
         revalidatePath('/coach/leads')
         revalidatePath('/admin/leads')
