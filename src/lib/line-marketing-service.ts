@@ -1672,15 +1672,18 @@ export async function processCartAbandonmentReminders(
             continue;
         }
 
-        // 変数の準備
+        // 変数の準備（LINEアカウント情報を確実に引き継ぐためLIFF/userId付きURLを生成）
+        const trialLiffId = process.env.NEXT_PUBLIC_TRIAL_LIFF_ID || process.env.NEXT_PUBLIC_LIFF_ID;
+        const personalizedTrialUrl = trialLiffId
+            ? `https://liff.line.me/${trialLiffId}`
+            : `${process.env.NEXT_PUBLIC_SITE_URL || 'https://member.swim-partners.com'}/trial?userId=${encodeURIComponent(lineUserId)}`;
+
         const variables: Record<string, string> = {
             name: studentName,
             student_number: student?.student_number || '',
             coach_name: student?.coach?.full_name || '',
             plan_name: student?.membership_type?.name || '',
-            trial_url: process.env.NEXT_PUBLIC_SITE_URL
-                ? `${process.env.NEXT_PUBLIC_SITE_URL}/trial`
-                : 'https://manager.swim-partners.com/trial',
+            trial_url: personalizedTrialUrl,
         };
 
         // LINE送信処理
@@ -2049,17 +2052,18 @@ export async function processConfirmAbandonmentReminders(
             continue;
         }
 
-        // 変数の準備
-        const trialUrl = process.env.NEXT_PUBLIC_SITE_URL
-            ? `${process.env.NEXT_PUBLIC_SITE_URL}/trial`
-            : 'https://manager.swim-partners.com/trial';
+        // 変数の準備（LINEアカウント情報を確実に引き継ぐためLIFF/userId付きURLを生成）
+        const trialLiffId = process.env.NEXT_PUBLIC_TRIAL_LIFF_ID || process.env.NEXT_PUBLIC_LIFF_ID;
+        const personalizedTrialUrl = trialLiffId
+            ? `https://liff.line.me/${trialLiffId}`
+            : `${process.env.NEXT_PUBLIC_SITE_URL || 'https://member.swim-partners.com'}/trial?userId=${encodeURIComponent(lineUserId)}`;
 
         const variables: Record<string, string> = {
             name: studentName,
             student_number: student?.student_number || '',
             coach_name: student?.coach?.full_name || '',
             plan_name: student?.membership_type?.name || '',
-            trial_url: trialUrl,
+            trial_url: personalizedTrialUrl,
         };
 
         // メッセージの動的自然化（Gemini連携、失敗時は安全フォールバック）
@@ -2070,7 +2074,7 @@ export async function processConfirmAbandonmentReminders(
                 stepStage: 0, // 0 = フォーム確認後即時フォロー
                 customerName: studentName,
                 originalTemplateText: templateText,
-                trialUrl,
+                trialUrl: personalizedTrialUrl,
                 customInstructions: '体験申込フォームで入力内容の確認画面まで進んでいただいた直後のフォローです。お申し込み途中で日程や場所、レッスン内容について迷われたりお困りではなかったかを優しく気遣い、このLINEチャットで気軽に相談・調整できることを専任スタッフとして温かく伝えてください。',
             });
             if (naturalResult.text) {

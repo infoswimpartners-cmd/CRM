@@ -620,9 +620,9 @@ export default function BookingForm() {
                       1
                     </span>
                     <div>
-                      <strong className="text-slate-800">24時間以内に担当よりご連絡</strong>
+                      <strong className="text-slate-800">担当よりご連絡（コーチ調整）</strong>
                       <p className="text-slate-500 mt-0.5">
-                        ご希望日時と近隣公営プールの空き状況を確認し、候補日時・場所をご案内します。
+                        通常24時間以内にご連絡いたしますが、ご希望条件に合わせたコーチの調整に最大3日程度お時間がかかる場合がございます。
                       </p>
                     </div>
                   </div>
@@ -631,9 +631,9 @@ export default function BookingForm() {
                       2
                     </span>
                     <div>
-                      <strong className="text-slate-800">日程・プール施設の確定</strong>
+                      <strong className="text-slate-800">担当コーチとの日程・場所のご連絡</strong>
                       <p className="text-slate-500 mt-0.5">
-                        当日の持ち物（水着・キャップ・ゴーグル）や集合場所を詳しくお知らせします。
+                        担当コーチ確定後にコーチのご案内を差し上げます。具体的な日程の確認や当日の集合場所・持ち物などにつきましては、確定した担当コーチと直接ご連絡をお願いしております。
                       </p>
                     </div>
                   </div>
@@ -644,7 +644,7 @@ export default function BookingForm() {
                     <div>
                       <strong className="text-slate-800">体験レッスン当日（60分）</strong>
                       <p className="text-slate-500 mt-0.5">
-                        現地プールで専任コーチと合流。レッスン後に水中動画カルテをお渡しします。
+                        現地プールで専任コーチと合流。一人ひとりの目標やお悩みに合わせたマンツーマンレッスンを実施いたします。
                       </p>
                     </div>
                   </div>
@@ -888,7 +888,7 @@ export default function BookingForm() {
                   </Button>
 
                   <p className="text-[11px] text-slate-400 text-center">
-                    ※送信後24時間以内に担当者より日程確定のご連絡を差し上げます。
+                    ※送信後、通常24時間以内（コーチ調整により最大3日程度）にご連絡を差し上げます。
                   </p>
                 </div>
               </div>
