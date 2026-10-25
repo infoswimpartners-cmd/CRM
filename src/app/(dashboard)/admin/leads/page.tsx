@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { ChevronLeft, Send, MapPin, AlertCircle, Plus, Trash2, Eye, EyeOff, CheckCircle, Pencil, CreditCard, Copy, ExternalLink, Loader2 } from 'lucide-react'
+import { ChevronLeft, Send, MapPin, AlertCircle, Plus, Trash2, Eye, EyeOff, CheckCircle, Pencil, CreditCard, Copy, ExternalLink, Loader2, UserCheck } from 'lucide-react'
 import Link from 'next/link'
 import {
     Table,
@@ -1052,7 +1052,15 @@ export default function AdminLeadsPage() {
             )
 
             if (res.success) {
-                toast.success(`${res.coachName} コーチにアサインしました`)
+                if (res.isReassign) {
+                    toast.success(
+                        res.oldCoachName
+                            ? `担当コーチを「${res.oldCoachName}」から「${res.coachName}」に変更（再アサイン）しました`
+                            : `担当コーチを「${res.coachName}」に変更（再アサイン）しました`
+                    )
+                } else {
+                    toast.success(`${res.coachName} コーチにアサインしました`)
+                }
                 setIsAssignDialogOpen(false)
                 setAssigningLead(null)
                 await fetchData()
@@ -1755,6 +1763,36 @@ export default function AdminLeadsPage() {
                                                     </SelectContent>
                                                 </Select>
                                             </div>
+                                            {/* 担当コーチ確認・再アサイン導線 */}
+                                            {(() => {
+                                                const currentLead = leads.find(l => l.id === editingLeadId)
+                                                const assignedCoach = currentLead?.assigned_coach_id ? coaches.find(c => c.id === currentLead.assigned_coach_id) : null
+                                                return (
+                                                    <div className="space-y-1.5">
+                                                        <Label className="text-xs font-semibold text-gray-700">担当コーチ（アサイン）</Label>
+                                                        <div className="flex items-center gap-2 h-9 px-3 bg-gray-50/50 border border-gray-200 rounded-md text-xs justify-between">
+                                                            <span className="font-medium text-gray-900 truncate">
+                                                                {assignedCoach ? `${assignedCoach.full_name} コーチ` : '未アサイン'}
+                                                            </span>
+                                                            <Button
+                                                                type="button"
+                                                                size="sm"
+                                                                variant="outline"
+                                                                className="h-6 text-[10px] font-bold text-blue-700 border-blue-200 hover:bg-blue-50 px-2 shrink-0 flex items-center gap-1 cursor-pointer"
+                                                                onClick={() => {
+                                                                    if (currentLead) {
+                                                                        setIsEditDialogOpen(false)
+                                                                        handleOpenAssignDialog(currentLead)
+                                                                    }
+                                                                }}
+                                                            >
+                                                                <UserCheck className="h-3 w-3 text-blue-600" />
+                                                                {assignedCoach ? '再アサイン' : 'アサインする'}
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                )
+                                            })()}
                                         </div>
                                     </div>
 
@@ -2019,220 +2057,266 @@ export default function AdminLeadsPage() {
                             if (!open) setAssigningLead(null)
                         }}>
                             <DialogContent className="max-w-md">
-                                <DialogHeader>
-                                    <DialogTitle className="text-base font-bold">
-                                        体験レッスンのアサイン
-                                    </DialogTitle>
-                                    <p className="text-xs text-gray-500 mt-1">
-                                        担当コーチと確定日時・場所を指定してアサインします。
-                                    </p>
-                                </DialogHeader>
+                                {(() => {
+                                    const isCurrentAssigned = Boolean(assigningLead?.assigned_coach_id)
+                                    const currentCoach = assigningLead?.assigned_coach_id ? coaches.find(c => c.id === assigningLead.assigned_coach_id) : null
+                                    const selectedCoach = coaches.find(c => c.id === assignTargetCoachId)
+                                    const isChangingCoach = Boolean(isCurrentAssigned && assignTargetCoachId && assignTargetCoachId !== assigningLead?.assigned_coach_id)
 
-                                {assigningLead && (
-                                    <div className="space-y-4 py-2">
-                                        {/* 顧客情報カード */}
-                                        <div className="bg-gray-50 p-3 rounded-md border border-gray-100 space-y-1">
-                                            <div className="flex items-center justify-between">
-                                                <span className="font-bold text-xs text-gray-900">
-                                                    {assigningLead.name} 様
-                                                </span>
-                                                <span className="text-[11px] text-gray-500">
-                                                    {assigningLead.gender || '性別未設定'} {calculateAge(assigningLead.birth_date) ? `(${calculateAge(assigningLead.birth_date)}歳)` : ''}
-                                                </span>
-                                            </div>
-                                            {assigningLead.area && (
-                                                <div className="text-[11px] text-gray-600 flex items-center gap-1">
-                                                    <MapPin className="h-3 w-3 text-gray-400 shrink-0" />
-                                                    <span>希望エリア: {assigningLead.area}</span>
-                                                </div>
-                                            )}
-                                            {assigningLead.skill_level && (
-                                                <div className="text-[11px] text-gray-500">
-                                                    泳力: {assigningLead.skill_level}
-                                                </div>
-                                            )}
-                                        </div>
+                                    return (
+                                        <>
+                                            <DialogHeader>
+                                                <DialogTitle className="text-base font-bold flex items-center gap-2">
+                                                    {isCurrentAssigned ? (
+                                                        <>
+                                                            <span className="p-1 rounded bg-blue-100 text-blue-700">🔄</span>
+                                                            担当コーチの変更（再アサイン）
+                                                        </>
+                                                    ) : (
+                                                        '体験レッスンのアサイン'
+                                                    )}
+                                                </DialogTitle>
+                                                <p className="text-xs text-gray-500 mt-1">
+                                                    {isCurrentAssigned 
+                                                        ? 'アサイン済みの案件です。別のコーチに変更してスケジュールと通知を更新します。'
+                                                        : '担当コーチと確定日時・場所を指定してアサインします。'}
+                                                </p>
+                                            </DialogHeader>
 
-                                        {/* 担当コーチ選択 */}
-                                        <div className="space-y-1.5">
-                                            <Label htmlFor="assignCoachSelect" className="text-xs font-semibold text-gray-700">
-                                                担当コーチ <span className="text-destructive">*</span>
-                                            </Label>
-                                            <Select
-                                                value={assignTargetCoachId}
-                                                onValueChange={setAssignTargetCoachId}
-                                            >
-                                                <SelectTrigger id="assignCoachSelect" className="text-xs h-9 bg-white border-gray-200">
-                                                    <SelectValue placeholder="担当コーチを選択してください" />
-                                                </SelectTrigger>
-                                                <SelectContent className="max-h-60">
-                                                    {coaches.map((c) => (
-                                                        <SelectItem key={c.id} value={c.id} className="text-xs">
-                                                            <div className="flex items-center justify-between w-full gap-2">
-                                                                <span className="font-medium">{c.full_name}</span>
-                                                                <span className="text-[10px] text-gray-400">
-                                                                    {c.role === 'admin' ? '管理者' : c.role === 'owner' ? 'オーナー' : 'コーチ'}
+                                            {assigningLead && (
+                                                <div className="space-y-4 py-2">
+                                                    {/* アサイン済みアラート表示 */}
+                                                    {isCurrentAssigned && currentCoach && (
+                                                        <div className="p-2.5 rounded-lg bg-blue-50/80 border border-blue-200 text-xs space-y-1">
+                                                            <div className="flex items-center justify-between">
+                                                                <span className="text-[11px] font-bold text-blue-800">現在のアサイン先:</span>
+                                                                <span className="font-bold text-blue-950 text-xs">{currentCoach.full_name} コーチ</span>
+                                                            </div>
+                                                            {isChangingCoach && selectedCoach && (
+                                                                <div className="pt-1 text-[11px] font-bold text-emerald-700 flex items-center gap-1 border-t border-blue-200/60">
+                                                                    <span>➔ 変更先:</span>
+                                                                    <span className="underline">{selectedCoach.full_name} コーチ</span>
+                                                                    <span>に変更されます</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+
+                                                    {/* 顧客情報カード */}
+                                                    <div className="bg-gray-50 p-3 rounded-md border border-gray-100 space-y-1">
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="font-bold text-xs text-gray-900">
+                                                                {assigningLead.name} 様
+                                                            </span>
+                                                            <span className="text-[11px] text-gray-500">
+                                                                {assigningLead.gender || '性別未設定'} {calculateAge(assigningLead.birth_date) ? `(${calculateAge(assigningLead.birth_date)}歳)` : ''}
+                                                            </span>
+                                                        </div>
+                                                        {assigningLead.area && (
+                                                            <div className="text-[11px] text-gray-600 flex items-center gap-1">
+                                                                <MapPin className="h-3 w-3 text-gray-400 shrink-0" />
+                                                                <span>希望エリア: {assigningLead.area}</span>
+                                                            </div>
+                                                        )}
+                                                        {assigningLead.skill_level && (
+                                                            <div className="text-[11px] text-gray-500">
+                                                                泳力: {assigningLead.skill_level}
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {/* 担当コーチ選択 */}
+                                                    <div className="space-y-1.5">
+                                                        <Label htmlFor="assignCoachSelect" className="text-xs font-semibold text-gray-700">
+                                                            {isCurrentAssigned ? '新しい担当コーチを選択' : '担当コーチ'} <span className="text-destructive">*</span>
+                                                        </Label>
+                                                        <Select
+                                                            value={assignTargetCoachId}
+                                                            onValueChange={setAssignTargetCoachId}
+                                                        >
+                                                            <SelectTrigger id="assignCoachSelect" className="text-xs h-9 bg-white border-gray-200">
+                                                                <SelectValue placeholder="担当コーチを選択してください" />
+                                                            </SelectTrigger>
+                                                            <SelectContent className="max-h-60">
+                                                                {coaches.map((c) => (
+                                                                    <SelectItem key={c.id} value={c.id} className="text-xs">
+                                                                        <div className="flex items-center justify-between w-full gap-2">
+                                                                            <span className="font-medium">
+                                                                                {c.full_name}
+                                                                                {isCurrentAssigned && c.id === assigningLead.assigned_coach_id ? '（現在の担当）' : ''}
+                                                                            </span>
+                                                                            <span className="text-[10px] text-gray-400">
+                                                                                {c.role === 'admin' ? '管理者' : c.role === 'owner' ? 'オーナー' : 'コーチ'}
+                                                                            </span>
+                                                                        </div>
+                                                                    </SelectItem>
+                                                                ))}
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
+
+                                                    {/* 2名申込時の受講形式選択 */}
+                                                    {assigningLead.second_student_name && (
+                                                        <div className="space-y-2 p-2.5 bg-blue-50/60 rounded-md border border-blue-200">
+                                                            <div className="flex items-center justify-between">
+                                                                <Label className="text-xs font-bold text-blue-900">
+                                                                    受講形式（2名申込）
+                                                                </Label>
+                                                                <span className="text-[10px] text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded font-medium">
+                                                                    2人目: {assigningLead.second_student_name} 様
                                                                 </span>
                                                             </div>
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-
-                                        {/* 2名申込時の受講形式選択 */}
-                                        {assigningLead.second_student_name && (
-                                            <div className="space-y-2 p-2.5 bg-blue-50/60 rounded-md border border-blue-200">
-                                                <div className="flex items-center justify-between">
-                                                    <Label className="text-xs font-bold text-blue-900">
-                                                        受講形式（2名申込）
-                                                    </Label>
-                                                    <span className="text-[10px] text-blue-600 bg-blue-100 px-1.5 py-0.5 rounded font-medium">
-                                                        2人目: {assigningLead.second_student_name} 様
-                                                    </span>
-                                                </div>
-                                                <RadioGroup
-                                                    value={assignSplitIndividual ? 'individual' : 'pair'}
-                                                    onValueChange={(val) => setAssignSplitIndividual(val === 'individual')}
-                                                    className="space-y-1.5"
-                                                >
-                                                    <div className="flex items-start space-x-2 bg-white p-2 rounded border border-blue-100 cursor-pointer">
-                                                        <RadioGroupItem value="individual" id="r-indiv" className="mt-0.5" />
-                                                        <Label htmlFor="r-indiv" className="text-xs cursor-pointer flex-1">
-                                                            <div className="font-semibold text-gray-900">
-                                                                一人ずつ1時間（個別受講・計2時間）
-                                                            </div>
-                                                            <div className="text-[10px] text-gray-500 mt-0.5 leading-snug">
-                                                                1人目 1時間 / 2人目 1時間 でスケジュールを2枠連続で自動登録します。
-                                                            </div>
-                                                        </Label>
-                                                    </div>
-                                                    <div className="flex items-start space-x-2 bg-white p-2 rounded border border-gray-100 cursor-pointer">
-                                                        <RadioGroupItem value="pair" id="r-pair" className="mt-0.5" />
-                                                        <Label htmlFor="r-pair" className="text-xs cursor-pointer flex-1">
-                                                            <div className="font-semibold text-gray-900">
-                                                                2名同時受講（ペアレッスン・1枠）
-                                                            </div>
-                                                            <div className="text-[10px] text-gray-500 mt-0.5 leading-snug">
-                                                                1つの枠（60分または90分）で2名同時に受講します。
-                                                            </div>
-                                                        </Label>
-                                                    </div>
-                                                </RadioGroup>
-                                            </div>
-                                        )}
-
-                                        {/* 確定体験日時 */}
-                                        <div className="space-y-1.5">
-                                            <div className="flex items-center justify-between">
-                                                <Label htmlFor="assignDate" className="text-xs font-semibold text-gray-700">
-                                                    確定体験日時 <span className="text-destructive">*</span>
-                                                </Label>
-                                                <span className="text-[10px] text-gray-400">希望日時をクリックで自動入力</span>
-                                            </div>
-                                            {/* 希望日時ボタン */}
-                                            <div className="flex flex-wrap gap-1 mb-1">
-                                                {[
-                                                    { label: '第1希望', val: assigningLead.datetime1 },
-                                                    { label: '第2希望', val: assigningLead.datetime2 },
-                                                    { label: '第3希望', val: assigningLead.datetime3 },
-                                                ].filter(d => d.val).map((d, idx) => (
-                                                    <button
-                                                        key={idx}
-                                                        type="button"
-                                                        className="text-[10px] px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100 hover:bg-blue-100 transition-colors text-left cursor-pointer font-medium"
-                                                        onClick={() => setAssignConfirmedDate(d.val || '')}
-                                                    >
-                                                        {d.label}: {d.val}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                            {/* 10分刻みの時間候補ボタン */}
-                                            {(() => {
-                                                const allOptions = [
-                                                    ...generateTimeOptions(assigningLead.datetime1),
-                                                    ...generateTimeOptions(assigningLead.datetime2),
-                                                    ...generateTimeOptions(assigningLead.datetime3),
-                                                ].filter((opt, idx, self) => opt.value !== opt.label && self.findIndex(o => o.value === opt.value) === idx)
-
-                                                if (allOptions.length === 0) return null
-
-                                                return (
-                                                    <div className="flex flex-wrap gap-1 mb-1.5 max-h-24 overflow-y-auto p-1.5 bg-slate-50 border border-slate-100 rounded">
-                                                        <span className="text-[9px] text-gray-400 w-full mb-0.5">10分刻み候補（クリックで反映）:</span>
-                                                        {allOptions.map((opt, idx) => (
-                                                            <button
-                                                                key={idx}
-                                                                type="button"
-                                                                className={`text-[9px] px-1.5 py-0.5 rounded border transition-colors cursor-pointer ${
-                                                                    assignConfirmedDate === opt.value
-                                                                        ? 'bg-blue-600 text-white border-blue-600 font-semibold'
-                                                                        : 'bg-white text-gray-700 border-gray-200 hover:bg-blue-50 hover:text-blue-700'
-                                                                }`}
-                                                                onClick={() => setAssignConfirmedDate(opt.value)}
+                                                            <RadioGroup
+                                                                value={assignSplitIndividual ? 'individual' : 'pair'}
+                                                                onValueChange={(val) => setAssignSplitIndividual(val === 'individual')}
+                                                                className="space-y-1.5"
                                                             >
-                                                                {opt.value}
-                                                            </button>
-                                                        ))}
+                                                                <div className="flex items-start space-x-2 bg-white p-2 rounded border border-blue-100 cursor-pointer">
+                                                                    <RadioGroupItem value="individual" id="r-indiv" className="mt-0.5" />
+                                                                    <Label htmlFor="r-indiv" className="text-xs cursor-pointer flex-1">
+                                                                        <div className="font-semibold text-gray-900">
+                                                                            一人ずつ1時間（個別受講・計2時間）
+                                                                        </div>
+                                                                        <div className="text-[10px] text-gray-500 mt-0.5 leading-snug">
+                                                                            1人目 1時間 / 2人目 1時間 でスケジュールを2枠連続で自動登録します。
+                                                                        </div>
+                                                                    </Label>
+                                                                </div>
+                                                                <div className="flex items-start space-x-2 bg-white p-2 rounded border border-gray-100 cursor-pointer">
+                                                                    <RadioGroupItem value="pair" id="r-pair" className="mt-0.5" />
+                                                                    <Label htmlFor="r-pair" className="text-xs cursor-pointer flex-1">
+                                                                        <div className="font-semibold text-gray-900">
+                                                                            2名同時受講（ペアレッスン・1枠）
+                                                                        </div>
+                                                                        <div className="text-[10px] text-gray-500 mt-0.5 leading-snug">
+                                                                            1つの枠（60分または90分）で2名同時に受講します。
+                                                                        </div>
+                                                                    </Label>
+                                                                </div>
+                                                            </RadioGroup>
+                                                        </div>
+                                                    )}
+
+                                                    {/* 確定体験日時 */}
+                                                    <div className="space-y-1.5">
+                                                        <div className="flex items-center justify-between">
+                                                            <Label htmlFor="assignDate" className="text-xs font-semibold text-gray-700">
+                                                                確定体験日時 <span className="text-destructive">*</span>
+                                                            </Label>
+                                                            <span className="text-[10px] text-gray-400">希望日時をクリックで自動入力</span>
+                                                        </div>
+                                                        {/* 希望日時ボタン */}
+                                                        <div className="flex flex-wrap gap-1 mb-1">
+                                                            {[
+                                                                { label: '第1希望', val: assigningLead.datetime1 },
+                                                                { label: '第2希望', val: assigningLead.datetime2 },
+                                                                { label: '第3希望', val: assigningLead.datetime3 },
+                                                            ].filter(d => d.val).map((d, idx) => (
+                                                                <button
+                                                                    key={idx}
+                                                                    type="button"
+                                                                    className="text-[10px] px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100 hover:bg-blue-100 transition-colors text-left cursor-pointer font-medium"
+                                                                    onClick={() => setAssignConfirmedDate(d.val || '')}
+                                                                >
+                                                                    {d.label}: {d.val}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                        {/* 10分刻みの時間候補ボタン */}
+                                                        {(() => {
+                                                            const allOptions = [
+                                                                ...generateTimeOptions(assigningLead.datetime1),
+                                                                ...generateTimeOptions(assigningLead.datetime2),
+                                                                ...generateTimeOptions(assigningLead.datetime3),
+                                                            ].filter((opt, idx, self) => opt.value !== opt.label && self.findIndex(o => o.value === opt.value) === idx)
+
+                                                            if (allOptions.length === 0) return null
+
+                                                            return (
+                                                                <div className="flex flex-wrap gap-1 mb-1.5 max-h-24 overflow-y-auto p-1.5 bg-slate-50 border border-slate-100 rounded">
+                                                                    <span className="text-[9px] text-gray-400 w-full mb-0.5">10分刻み候補（クリックで反映）:</span>
+                                                                    {allOptions.map((opt, idx) => (
+                                                                        <button
+                                                                            key={idx}
+                                                                            type="button"
+                                                                            className={`text-[9px] px-1.5 py-0.5 rounded border transition-colors cursor-pointer ${
+                                                                                assignConfirmedDate === opt.value
+                                                                                    ? 'bg-blue-600 text-white border-blue-600 font-semibold'
+                                                                                    : 'bg-white text-gray-700 border-gray-200 hover:bg-blue-50 hover:text-blue-700'
+                                                                            }`}
+                                                                            onClick={() => setAssignConfirmedDate(opt.value)}
+                                                                        >
+                                                                            {opt.value}
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+                                                            )
+                                                        })()}
+                                                        <Input
+                                                            id="assignDate"
+                                                            placeholder="例: 2026/09/01 10:00〜"
+                                                            className="text-xs h-9 bg-white border-gray-200"
+                                                            value={assignConfirmedDate}
+                                                            onChange={(e) => setAssignConfirmedDate(e.target.value)}
+                                                        />
                                                     </div>
-                                                )
-                                            })()}
-                                            <Input
-                                                id="assignDate"
-                                                placeholder="例: 2026/09/01 10:00〜"
-                                                className="text-xs h-9 bg-white border-gray-200"
-                                                value={assignConfirmedDate}
-                                                onChange={(e) => setAssignConfirmedDate(e.target.value)}
-                                            />
-                                        </div>
 
-                                        {/* 確定体験場所 */}
-                                        <div className="space-y-1.5">
-                                            <div className="flex items-center justify-between">
-                                                <Label htmlFor="assignLocation" className="text-xs font-semibold text-gray-700">
-                                                    確定体験場所 <span className="text-destructive">*</span>
-                                                </Label>
-                                                {assigningLead.lesson_location && (
-                                                    <button
-                                                        type="button"
-                                                        className="text-[10px] text-blue-600 hover:underline cursor-pointer"
-                                                        onClick={() => setAssignConfirmedLocation(assigningLead.lesson_location || '')}
-                                                    >
-                                                        設定済場所を反映
-                                                    </button>
-                                                )}
-                                            </div>
-                                            <Input
-                                                id="assignLocation"
-                                                placeholder="例: ○○プール"
-                                                className="text-xs h-9 bg-white border-gray-200"
-                                                value={assignConfirmedLocation}
-                                                onChange={(e) => setAssignConfirmedLocation(e.target.value)}
-                                            />
-                                        </div>
-                                    </div>
-                                )}
+                                                    {/* 確定体験場所 */}
+                                                    <div className="space-y-1.5">
+                                                        <div className="flex items-center justify-between">
+                                                            <Label htmlFor="assignLocation" className="text-xs font-semibold text-gray-700">
+                                                                確定体験場所 <span className="text-destructive">*</span>
+                                                            </Label>
+                                                            {assigningLead.lesson_location && (
+                                                                <button
+                                                                    type="button"
+                                                                    className="text-[10px] text-blue-600 hover:underline cursor-pointer"
+                                                                    onClick={() => setAssignConfirmedLocation(assigningLead.lesson_location || '')}
+                                                                >
+                                                                    設定済場所を反映
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                        <Input
+                                                            id="assignLocation"
+                                                            placeholder="例: ○○プール"
+                                                            className="text-xs h-9 bg-white border-gray-200"
+                                                            value={assignConfirmedLocation}
+                                                            onChange={(e) => setAssignConfirmedLocation(e.target.value)}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
 
-                                <DialogFooter className="gap-2 pt-2">
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => setIsAssignDialogOpen(false)}
-                                        className="text-xs h-9"
-                                    >
-                                        キャンセル
-                                    </Button>
-                                    <Button
-                                        type="button"
-                                        size="sm"
-                                        disabled={isAssigning}
-                                        onClick={handleExecuteAdminAssign}
-                                        className="text-xs h-9 px-5 font-semibold"
-                                    >
-                                        {isAssigning ? 'アサイン中...' : 'アサインを確定する'}
-                                    </Button>
-                                </DialogFooter>
+                                            <DialogFooter className="gap-2 pt-2">
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => setIsAssignDialogOpen(false)}
+                                                    className="text-xs h-9"
+                                                >
+                                                    キャンセル
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    disabled={isAssigning}
+                                                    onClick={handleExecuteAdminAssign}
+                                                    className={`text-xs h-9 px-5 font-semibold ${
+                                                        isCurrentAssigned 
+                                                            ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                                                            : ''
+                                                    }`}
+                                                >
+                                                    {isAssigning 
+                                                        ? (isCurrentAssigned ? '担当変更中...' : 'アサイン中...') 
+                                                        : (isCurrentAssigned ? '別のコーチに変更して確定する' : 'アサインを確定する')}
+                                                </Button>
+                                            </DialogFooter>
+                                        </>
+                                    )
+                                })()}
                             </DialogContent>
                         </Dialog>
                     </div>
@@ -2337,22 +2421,26 @@ export default function AdminLeadsPage() {
                                                                                 場所: {lead.confirmed_location}
                                                                             </span>
                                                                         )}
-                                                                        <div className="flex items-center gap-2 mt-1">
+                                                                        <div className="flex items-center gap-1.5 mt-1.5">
                                                                             <Button
                                                                                 type="button"
-                                                                                variant="link"
-                                                                                className="text-[10px] text-blue-600 p-0 h-auto justify-start font-semibold hover:text-blue-800"
+                                                                                size="sm"
+                                                                                variant="outline"
+                                                                                className="h-6 text-[11px] font-semibold text-blue-700 bg-blue-50/80 border-blue-200 hover:bg-blue-100 hover:text-blue-900 px-2 shadow-2xs flex items-center gap-1 cursor-pointer"
                                                                                 onClick={() => handleOpenAssignDialog(lead)}
+                                                                                title="別のコーチに再アサインする"
                                                                             >
-                                                                                変更
+                                                                                <UserCheck className="h-3 w-3 text-blue-600" />
+                                                                                再アサイン
                                                                             </Button>
-                                                                            <span className="text-gray-300 text-[10px]">|</span>
                                                                             <Button
                                                                                 type="button"
-                                                                                variant="link"
-                                                                                className="text-[10px] text-rose-600 p-0 h-auto justify-start font-semibold hover:text-rose-800"
+                                                                                size="sm"
+                                                                                variant="ghost"
+                                                                                className="h-6 text-[10px] text-rose-600 hover:bg-rose-50 hover:text-rose-700 px-1.5 font-semibold cursor-pointer"
                                                                                 disabled={cancelingStates[lead.id]}
                                                                                 onClick={() => handleCancelAssignment(lead.id)}
+                                                                                title="アサインを解除して募集開始に戻す"
                                                                             >
                                                                                 解除
                                                                             </Button>

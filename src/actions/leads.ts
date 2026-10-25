@@ -1295,6 +1295,21 @@ export async function adminAssignLeadAction(
             throw new Error('案件が見つかりません')
         }
 
+        const supabaseAdmin = createAdminClient()
+
+        // 旧アサインコーチの確認（再アサイン判定）
+        const oldCoachId = lead.assigned_coach_id
+        const isReassign = !!(oldCoachId && oldCoachId !== targetCoach.id)
+        let oldCoachName = ''
+        if (isReassign && oldCoachId) {
+            const { data: oldCoachProfile } = await supabaseAdmin
+                .from('profiles')
+                .select('full_name')
+                .eq('id', oldCoachId)
+                .single()
+            oldCoachName = oldCoachProfile?.full_name || '前担当コーチ'
+        }
+
         // 3. リードレコードをアサイン完了状態に更新
         const { error: updateError } = await supabase
             .from('leads')
@@ -1312,7 +1327,6 @@ export async function adminAssignLeadAction(
         }
 
         // 3.5. 顧客マスタ（students）および紐付けテーブル（student_coaches）へのアサインコーチ紐付け
-        const supabaseAdmin = createAdminClient()
         let studentId: string | null = null
         let studentEmail: string | null = lead.email || null
 
@@ -1401,6 +1415,19 @@ export async function adminAssignLeadAction(
 
             if (studentUpdateError) {
                 console.error('Failed to update student coach_id and status:', studentUpdateError)
+            }
+
+            // 旧コーチの紐付けが存在し再アサインされた場合は、旧コーチの紐付けを解除
+            if (isReassign && oldCoachId && oldCoachId !== targetCoach.id) {
+                const { error: delError } = await supabaseAdmin
+                    .from('student_coaches')
+                    .delete()
+                    .eq('student_id', studentId)
+                    .eq('coach_id', oldCoachId)
+
+                if (delError) {
+                    console.error('Failed to remove old coach relation from student_coaches:', delError)
+                }
             }
 
             // student_coaches テーブルに確実に upsert
@@ -1598,8 +1625,12 @@ Swim Partners`
                         lead.datetime1 ? `> ・希望日時： ${lead.datetime1}` : null,
                     ].filter(Boolean).join('\n')
 
-                    const defaultTemplate = `*アサイン確定のお知らせ*`
-                    const bodyTemplate = templateConfig?.value || defaultTemplate
+                    const defaultTemplate = isReassign
+                        ? `🔄 *【担当コーチ変更（再アサイン）のお知らせ】*\n※担当コーチが *${oldCoachName} コーチ* から *${targetCoach.full_name || '未設定'} コーチ* に変更されました。`
+                        : `*アサイン確定のお知らせ*`
+                    const bodyTemplate = templateConfig?.value
+                        ? (isReassign ? `🔄 *【担当コーチ変更（再アサイン）】*\n※担当コーチ: *${oldCoachName} コーチ* ➔ *${targetCoach.full_name || '未設定'} コーチ*\n\n${templateConfig.value}` : templateConfig.value)
+                        : defaultTemplate
 
                     let secondStudentNameInfo = ''
                     if (lead.second_student_name) {
@@ -1616,7 +1647,7 @@ Swim Partners`
                         .replace(/\{\{payment_link\}\}/g, paymentLink)
                         .replace(/\{\{payment_url\}\}/g, paymentLink)
 
-                    // 本文（*アサイン確定のお知らせ*）をトップにし、その下に元案件の引用を結合
+                    // 本文（*アサイン確定のお知らせ* または *担当コーチ変更*）をトップにし、その下に元案件の引用を結合
                     const gchatMessage = `${mainBody}\n\n${quoteLines}`
 
                     // 紐づくすべての通知先スペース（メインチャット）に送信
@@ -1679,7 +1710,12 @@ Swim Partners`
 
         revalidatePath('/coach/leads')
         revalidatePath('/admin/leads')
-        return { success: true, coachName: targetCoach.full_name }
+        return {
+            success: true,
+            coachName: targetCoach.full_name,
+            isReassign,
+            oldCoachName: oldCoachName || undefined
+        }
     } catch (error: any) {
         console.error('Failed to admin assign lead:', error)
         return { success: false, error: error.message || '管理者アサイン処理に失敗しました' }
