@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getCoachGoogleChatWebhookUrl } from '@/lib/coach-notifications'
 import { sendGoogleChatMessage } from '@/lib/google-chat'
+import { autoDetectLocationForLead } from '@/lib/location-matcher'
 
 export interface MatchCandidate {
     coachId: string
@@ -389,6 +390,21 @@ export async function dispatchNewLeadToMatchingCoaches(
         const siteUrl = options?.siteUrl || process.env.NEXT_PUBLIC_SITE_URL || 'https://crm.swim-partners.com'
         const assignUrl = `${siteUrl}/coach/leads`
 
+        // 2.5. レッスン予定場所の自動選定（未設定の場合、顧客エリアから自動検出）
+        let candidateLocation = lead.lesson_location?.trim() || ''
+        if (!candidateLocation) {
+            candidateLocation = await autoDetectLocationForLead(supabaseAdmin, lead.area)
+            // 自動選定した候補プールをリード情報に保存
+            try {
+                await supabaseAdmin
+                    .from('leads')
+                    .update({ lesson_location: candidateLocation })
+                    .eq('id', lead.id)
+            } catch (updateLocErr) {
+                console.error('[Dispatch Lead] Failed to update auto detected location to lead:', updateLocErr)
+            }
+        }
+
         // 3. app_configs から「案件通知テンプレート（lead_notification_template）」を取得
         const { data: templateConfig } = await supabaseAdmin
             .from('app_configs')
@@ -406,7 +422,7 @@ export async function dispatchNewLeadToMatchingCoaches(
 年齢： {{age}}
 レベル・目標： {{skill_level}}
 希望エリア/最寄駅： {{area}}
-レッスン予定の場所：{{location}}
+予定プール（候補）： {{location}}
 希望頻度： {{frequency}}
 可能な曜日・時間帯： {{available_times}}
 その他： {{notes}}
@@ -416,6 +432,8 @@ export async function dispatchNewLeadToMatchingCoaches(
 ② {{datetime2}}
 ③ {{datetime3}}
 {{second_student_info}}
+
+※予定プールは生徒様の希望エリアから算出した推奨候補です。当日の実施場所はアサイン後に生徒様とご相談・変更可能です。
 
 ▼ 案件確認・アサインはこちら
 {{assign_url}}`
@@ -466,7 +484,7 @@ export async function dispatchNewLeadToMatchingCoaches(
             const renderedTemplate = baseTemplate
                 .replace(/\{\{coach_name\}\}/g, candidate.coachName)
                 .replace(/\{\{area\}\}/g, lead.area || '未設定')
-                .replace(/\{\{location\}\}/g, lead.lesson_location || lead.area || '未設定')
+                .replace(/\{\{location\}\}/g, candidateLocation || lead.area || '近隣公営プール（相談可能）')
                 .replace(/\{\{datetime1\}\}/g, lead.datetime1 || '未指定')
                 .replace(/\{\{datetime2\}\}/g, lead.datetime2 || '未指定')
                 .replace(/\{\{datetime3\}\}/g, lead.datetime3 || '未指定')

@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { sendGoogleChatMessage } from '@/lib/google-chat'
 import { emailService } from '@/lib/email'
+import { autoDetectLocationForLead } from '@/lib/location-matcher'
 
 // 年齢を計算するヘルパー関数
 function calculateAge(birthDateString: string | null | undefined): number | null {
@@ -735,11 +736,18 @@ export async function sendLeadNotificationAction(
         // 代表のWebhook ID（UUID）
         const primaryWebhookId = ids[0]
 
+        // レッスン予定場所の選定（未入力の場合は顧客の希望エリアから自動選定）
+        let finalLocation = location?.trim() || lead.lesson_location?.trim() || ''
+        if (!finalLocation) {
+            const supabaseAdminForLoc = createAdminClient()
+            finalLocation = await autoDetectLocationForLead(supabaseAdminForLoc, lead.area)
+        }
+
         // リードの場所を設定し、ステータスを「募集開始」に更新
         const { error: updateError } = await supabase
             .from('leads')
             .update({
-                lesson_location: location,
+                lesson_location: finalLocation,
                 status: '募集開始',
                 notification_webhook_id: primaryWebhookId
             })
@@ -779,6 +787,7 @@ export async function sendLeadNotificationAction(
 年齢： {{age}}
 レベル・目標： {{skill_level}}
 希望エリア/最寄駅： {{area}}
+予定プール（候補）： {{location}}
 希望頻度： {{frequency}}
 可能な曜日・時間帯： {{available_times}}
 その他： {{notes}}
@@ -788,6 +797,8 @@ export async function sendLeadNotificationAction(
 ② {{datetime2}}
 ③ {{datetime3}}
 {{second_student_info}}
+
+※予定プールは生徒様の希望エリアから算出した推奨候補です。当日の実施場所はアサイン後に生徒様とご相談・変更可能です。
 
 ▼ 案件確認・アサインはこちら
 {{assign_url}}`
@@ -806,7 +817,7 @@ export async function sendLeadNotificationAction(
 
         const message = template
             .replace(/\{\{area\}\}/g, lead.area || '未設定')
-            .replace(/\{\{location\}\}/g, location)
+            .replace(/\{\{location\}\}/g, finalLocation || lead.area || '近隣公営プール（相談可能）')
             .replace(/\{\{datetime1\}\}/g, lead.datetime1 || '未設定')
             .replace(/\{\{datetime2\}\}/g, lead.datetime2 || '未設定')
             .replace(/\{\{datetime3\}\}/g, lead.datetime3 || '未設定')

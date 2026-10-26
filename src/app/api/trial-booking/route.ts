@@ -8,6 +8,7 @@ import { appendTrialBookingToSpreadsheet, appendTrialBookingToMasterSpreadsheet 
 import { emailService } from "@/lib/email";
 import { lineService } from "@/lib/line";
 import { dispatchNewLeadToMatchingCoaches } from "@/lib/coach-matching";
+import { autoDetectLocationForLead } from "@/lib/location-matcher";
 
 export async function POST(req: Request) {
   try {
@@ -15,6 +16,7 @@ export async function POST(req: Request) {
     const supabase = createAdminClient();
 
     let savedLeadId: string | null = null;
+    let autoCandidateLocation: string = '';
 
     const referrer = (payload.referrerName || "").trim();
     const referrerNote = referrer ? `【ご紹介者様】${referrer} 様（お友達紹介キャンペーン対象: 特別価格3,500円）` : "";
@@ -75,6 +77,9 @@ export async function POST(req: Request) {
         }
       }
 
+      // 顧客の希望エリア（最寄駅）からレッスン候補プールを自動選定
+      autoCandidateLocation = await autoDetectLocationForLead(supabase, payload.station || payload.area);
+
       const leadDataToSave = {
         name: payload.name || '未入力',
         full_name_kana: payload.kana || null,
@@ -87,6 +92,7 @@ export async function POST(req: Request) {
         email: payload.email ? payload.email.trim() : null,
         phone: payload.phone ? payload.phone.trim() : null,
         area: payload.station || null,
+        lesson_location: autoCandidateLocation,
         datetime1: payload.datetime1 || null,
         datetime2: payload.datetime2 || null,
         datetime3: payload.datetime3 || null,
@@ -375,6 +381,7 @@ SWIM PARTNERS/スイムパートナーズ事務局`;
           `・氏名: *${payload.name || '未入力'}* 様（${payload.kana || ''}）\n` +
           (referrer ? `・🎁 *ご紹介者様*: *${referrer}* 様（*お友達紹介特別価格 3,500円適用*）\n` : '') +
           `・希望エリア/最寄駅: ${payload.station || '未指定'}\n` +
+          `・予定プール（自動選定候補）: ${autoCandidateLocation}\n` +
           `・第1希望: ${payload.datetime1 || '未指定'}\n` +
           `・第2希望: ${payload.datetime2 || '未指定'}\n` +
           `・第3希望: ${payload.datetime3 || '未指定'}\n` +

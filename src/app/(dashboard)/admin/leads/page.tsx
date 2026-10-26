@@ -49,6 +49,7 @@ import {
     getLeadWebhookMappingsAction,
     getOrCreateTrialPaymentUrlAction
 } from '@/actions/leads'
+import { suggestCandidateLocations } from '@/lib/location-matcher'
 import {
     Dialog,
     DialogContent,
@@ -682,10 +683,11 @@ export default function AdminLeadsPage() {
 
             if (leadsData) {
                 setLeads(leadsData)
-                // 初期値設定
+                // 初期値設定（未設定の場合は顧客の希望エリアから候補プールを自動選定）
                 const locations: Record<string, string> = {}
+                const facilityNames = (facilitiesData || []).map(f => f.name.trim())
                 leadsData.forEach(l => {
-                    locations[l.id] = l.lesson_location || ''
+                    locations[l.id] = l.lesson_location || suggestCandidateLocations(l.area, facilityNames)
                 })
                 setSelectedLocations(locations)
             }
@@ -946,7 +948,9 @@ export default function AdminLeadsPage() {
     }
 
     const handleSendNotification = async (leadId: string) => {
-        const location = selectedLocations[leadId]?.trim()
+        const lead = leads.find(l => l.id === leadId)
+        const facilityNames = facilities.map(f => f.name.trim())
+        const location = selectedLocations[leadId]?.trim() || suggestCandidateLocations(lead?.area, facilityNames)
         const webhookIds = selectedWebhooks[leadId] || []
 
         if (!location) {
