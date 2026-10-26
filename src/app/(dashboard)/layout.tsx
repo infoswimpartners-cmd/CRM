@@ -48,19 +48,9 @@ export default async function DashboardLayout({
     if (
         profile.role === 'coach' &&
         !profile.onboarding_completed_at &&
-        !pathname.includes('/coach/onboarding') &&
         !pathname.includes('/change-password')
     ) {
         redirect('/coach/onboarding')
-    }
-
-    // オンボーディング画面の場合はフルスクリーンで専用表示
-    if (pathname.includes('/coach/onboarding')) {
-        return (
-            <div className="min-h-screen bg-slate-50 font-sans">
-                {children}
-            </div>
-        )
     }
 
     const safeProfile = profile as { id: string; full_name: string | null; role: string; avatar_url: string | null; email: string; coach_number: string | null }

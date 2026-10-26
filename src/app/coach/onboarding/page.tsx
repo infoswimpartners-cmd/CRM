@@ -33,8 +33,13 @@ export default async function CoachOnboardingPage({ searchParams }: PageProps) {
     // デモモードは管理者ロール（admin）のみ許可
     const isDemo = demo === 'true' && profile.role === 'admin'
 
+    // 既にオンボーディング完了済みでデモでもない場合はダッシュボードへリダイレクト
+    if (profile.onboarding_completed_at && !isDemo) {
+        redirect(profile.role === 'admin' ? '/admin/coaches' : '/coach')
+    }
+
     return (
-        <div className="min-h-screen py-5 sm:py-8 px-3 sm:px-6 lg:px-8 bg-slate-50/60">
+        <div className="min-h-screen py-5 sm:py-8 px-3 sm:px-6 lg:px-8 bg-slate-50/60 font-sans">
             <CoachOnboardingWizard
                 isDemo={isDemo}
                 profile={{
