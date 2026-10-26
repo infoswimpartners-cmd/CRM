@@ -1,213 +1,208 @@
 // src/lib/location-matcher.ts
-// 顧客の希望エリア（最寄駅・区・市）から最適なレッスン候補プールを自動選定するモジュール
+// 顧客の希望エリア（最寄駅・区・市）からマスタ登録施設（facilities）のみを厳格に自動選定するモジュール
 
 import { SupabaseClient } from '@supabase/supabase-js'
 
 /**
- * 首都圏主要エリア・駅・区・市と公営プール・主要施設の自動マッチングルール
+ * 顧客のエリアキーワード（区・市・駅名）とマスタ登録施設名の対応マッピング
+ * ※ここに記載する施設名は、必ず facilities マスタに実在する正式名称のみを定義します。
  */
-const AREA_TO_POOLS_MAP: { keywords: string[]; pools: string[] }[] = [
-    // --- 東京都 23区 ---
+const AREA_TO_MASTER_FACILITIES_MAP: { keywords: string[]; facilityNames: string[] }[] = [
+    // --- 目黒区 ---
     {
-        keywords: ['目黒', '中目黒', '祐天寺', '学芸大学', '都立大学', '自由が丘', '武蔵小山'],
-        pools: ['目黒区民センタープール', '碑文谷プール', '品川健康センタープール']
+        keywords: ['目黒', '中目黒', '祐天寺', '学芸大学', '都立大学', '自由が丘', '五本木'],
+        facilityNames: ['目黒区民センター屋内プール', '南部地区プール（目黒）', '目黒区立　西部地区プール', '五本木小学校']
     },
+    // --- 港区・品川区 ---
     {
-        keywords: ['港区', '品川', '田町', '三田', '白金', '白金高輪', '麻布', '六本木', '赤坂', '高輪', '芝浦', '大崎', '五反田', '大井町'],
-        pools: ['港区スポーツセンタープール', '港南プール', '品川健康センタープール']
+        keywords: ['港区', '品川', '田町', '三田', '白金', '白金高輪', '麻布', '六本木', '赤坂', '高輪', '芝浦', '大崎', '五反田', '大井町', '武蔵小山'],
+        facilityNames: ['港南プール', '品川学園温水プール', '日野学園温水プール', '三田中学校', '御成門中学校', '高松中学校', 'ワールドシティータワーズ', 'ワールドシティータワーズ（品川駅）']
     },
+    // --- 世田谷区 ---
     {
-        keywords: ['世田谷', '三軒茶屋', '二子玉川', '成城', '下北沢', '桜新町', '用賀', '駒沢', '経堂', '千歳烏山'],
-        pools: ['世田谷区総合運動場温水プール', '烏山中学校温水プール', '目黒区民センタープール']
+        keywords: ['世田谷', '三軒茶屋', '二子玉川', '成城', '下北沢', '桜新町', '用賀', '駒沢', '経堂', '千歳烏山', '千歳'],
+        facilityNames: ['世田谷区立総合運動場', '世田谷区千歳温水プール', '玉川中学校温水プール']
     },
+    // --- 渋谷区 ---
     {
-        keywords: ['渋谷', '恵比寿', '広尾', '代官山', '原宿', '表参道', '代々木', '笹塚', '幡ヶ谷'],
-        pools: ['ひがし健康プラザ', '猿楽トレーニングジムプール', '目黒区民センタープール']
+        keywords: ['渋谷', '恵比寿', '広尾', '代官山', '原宿', '表参道', '代々木', '笹塚', '幡ヶ谷', '千駄ヶ谷'],
+        facilityNames: ['ひがし健康プラザ', '代官山スポーツプラザ', '渋谷区スポーツセンター', '上原中学校', '東京体育館']
     },
+    // --- 中央区 ---
     {
         keywords: ['中央区', '日本橋', '銀座', '八重洲', '勝どき', '月島', '築地', '晴海', '東京駅'],
-        pools: ['城東小学校温水プール（ヤエスク）', '中央区立総合スポーツセンター', '港南プール']
+        facilityNames: ['城東小学校', '中央区立総合スポーツセンター', '日本橋小学校', '晴美西小学校']
     },
-    {
-        keywords: ['江東区', '豊洲', '有明', '東雲', '門前仲町', '木場', '清澄白河', '東陽町', '亀戸'],
-        pools: ['有明スポーツセンタープール', '江東区深川北スポーツセンター', '城東小学校温水プール（ヤエスク）']
-    },
-    {
-        keywords: ['新宿', '高田馬場', '大久保', '新大久保', '西新宿', '神楽坂', '四谷', '信濃町'],
-        pools: ['新宿コズミックスポーツセンター', '文京スポーツセンター']
-    },
-    {
-        keywords: ['文京', '後楽園', '春日', '本郷', '茗荷谷', '白山', '千石', '湯島'],
-        pools: ['文京スポーツセンター', '新宿コズミックスポーツセンター']
-    },
+    // --- 千代田区 ---
     {
         keywords: ['千代田', '神田', '秋葉原', '御茶ノ水', '九段下', '飯田橋', '半蔵門', '麹町'],
-        pools: ['城東小学校温水プール（ヤエスク）', '文京スポーツセンター']
+        facilityNames: ['麹町小学校', '城東小学校']
     },
+    // --- 江東区 ---
     {
-        keywords: ['台東', '浅草', '上野', '御徒町', '入谷', '蔵前'],
-        pools: ['台東リバーサイドスポーツセンター', '文京スポーツセンター']
+        keywords: ['江東区', '豊洲', '有明', '東雲', '門前仲町', '木場', '清澄白河', '東陽町', '亀戸', '辰巳', '新木場'],
+        facilityNames: ['有明スポーツセンター', '深川北スポーツセンター', '江東区スポーツ会館', '東京アクアティクスセンター', 'BumB東京スポーツ文化館']
     },
+    // --- 墨田区 ---
     {
         keywords: ['墨田', '錦糸町', '押上', '両国', '曳舟'],
-        pools: ['墨田区総合体育館温水プール', '江東区深川北スポーツセンター']
+        facilityNames: ['ひがしんアリーナ']
     },
+    // --- 杉並区 ---
     {
-        keywords: ['杉並', '荻窪', '高円寺', '阿佐ヶ谷', '西荻窪', '永福町', '浜田山'],
-        pools: ['杉並区大宮前体育館プール', '荻窪体育館', '世田谷区総合運動場温水プール']
+        keywords: ['杉並', '荻窪', '高円寺', '阿佐ヶ谷', '西荻窪', '高井戸', '永福町', '浜田山'],
+        facilityNames: ['杉並第十小学校温水プール', '高井戸温水プール']
     },
-    {
-        keywords: ['中野', '東中野', '中野坂上', '新中野', '沼袋', '野方'],
-        pools: ['中野区立平和の森公園キリンレモンスポーツセンター', '新宿コズミックスポーツセンター']
-    },
-    {
-        keywords: ['大田区', '蒲田', '大森', '羽田', '平和島', '池上', '雪が谷大塚'],
-        pools: ['矢口温水プール', '大田区総合体育館', '品川健康センタープール']
-    },
+    // --- 練馬区 ---
     {
         keywords: ['練馬', '光が丘', '石神井公園', '大泉学園', '江古田'],
-        pools: ['三原台温水プール', '平和台体育館温水プール']
+        facilityNames: ['練馬区立光が丘体育館']
     },
+    // --- 大田区 ---
     {
-        keywords: ['豊島', '池袋', '大塚', '巣鴨', '駒込', '目白', '要町'],
-        pools: ['豊島区池袋スポーツセンター', '文京スポーツセンター']
+        keywords: ['大田区', '蒲田', '大森', '矢口', '羽田', '平和島', '池上', '雪が谷大塚'],
+        facilityNames: ['矢口区民センター']
     },
-    {
-        keywords: ['北区', '赤羽', '王子', '十条', '田端'],
-        pools: ['北区元気プラザ', 'パノラマプール十条台']
-    },
-    {
-        keywords: ['荒川', '日暮里', '南千住', '町屋'],
-        pools: ['荒川総合スポーツセンター', '台東リバーサイドスポーツセンター']
-    },
-    {
-        keywords: ['足立', '北千住', '西新井', '綾瀬', '竹ノ塚'],
-        pools: ['足立区総合スポーツセンター', 'スイムスポーツセンター']
-    },
-    {
-        keywords: ['葛飾', '亀有', '金町', '新小岩', '青砥'],
-        pools: ['水元総合スポーツセンター', '奥戸総合スポーツセンター温水プール']
-    },
+    // --- 江戸川区 ---
     {
         keywords: ['江戸川', '西葛西', '葛西', '船堀', '一之江', '瑞江'],
-        pools: ['江戸川区スポーツセンター', '有明スポーツセンタープール']
+        facilityNames: ['江戸川区スポーツセンター']
     },
-
-    // --- 東京都下（多摩） ---
+    // --- 多摩エリア ---
     {
         keywords: ['武蔵野', '吉祥寺', '三鷹'],
-        pools: ['武蔵野温水プール', '三鷹市SUBARU総合スポーツセンター']
+        facilityNames: ['武蔵野市総合体育館']
     },
     {
-        keywords: ['調布', '府中', '仙川', 'つつじヶ丘', '国領', '分倍河原'],
-        pools: ['調布市総合体育館プール', '府中生涯学習センター']
+        keywords: ['小金井'],
+        facilityNames: ['小金井総合体育館']
     },
     {
-        keywords: ['八王子', '立川', '国分寺', '国立', '町田', '多摩'],
-        pools: ['八王子市甲の原くらぶプール', '町田市立室内プール', '立川市泉市民体育館']
+        keywords: ['小平'],
+        facilityNames: ['小平市民総合体育館プール']
     },
-
+    {
+        keywords: ['町田'],
+        facilityNames: ['町田第一中学校']
+    },
     // --- 神奈川県 ---
     {
-        keywords: ['横浜', '都筑', '港北', '青葉', '新横浜', 'センター南', 'センター北', '日吉', '綱島'],
-        pools: ['横浜国際プール', '都筑プール', '港北スポーツセンター']
+        keywords: ['横浜', '都筑', '港北', '青葉', '新横浜', 'センター南', 'センター北', '日吉', '綱島', '西区'],
+        facilityNames: ['横浜国際プール', '西スポーツセンター']
     },
-    {
-        keywords: ['みなとみらい', '関内', '桜木町', '元町・中華街', '戸塚', '保土ヶ谷', '金沢', '磯子', '横須賀'],
-        pools: ['横浜市保土ケ谷プール', '西スポーツセンタープール', '金沢スポーツセンター']
-    },
-    {
-        keywords: ['川崎', '武蔵小杉', '中原', '元住吉', '新丸子', '溝の口', '高津', '宮前平', '登戸'],
-        pools: ['川崎市とどろきアリーナ', '中原市民館', '高津スポーツセンター']
-    },
-
     // --- 千葉県 ---
     {
-        keywords: ['千葉', '海浜幕張', '幕張', '美浜', '稲毛', '千葉みなと', '蘇我', '検見川'],
-        pools: ['千葉国際総合水泳場', '美浜打瀬プール', '千葉市稲毛プール']
-    },
-    {
         keywords: ['船橋', '西船橋', '東船橋', '南船橋', '新船橋', '北習志野'],
-        pools: ['船橋市運動公園プール', '千葉国際総合水泳場']
-    },
-    {
-        keywords: ['市川', '本八幡', '行徳', '妙典', '市川大野'],
-        pools: ['市川市塩浜市民体育館温水プール', '市川市スポーツセンター']
+        facilityNames: ['船橋アリーナ', '船橋メグスパ']
     },
     {
         keywords: ['浦安', '新浦安', '舞浜'],
-        pools: ['浦安市運動公園総合体育館温水プール', '千葉国際総合水泳場']
+        facilityNames: ['浦安市屋内プール（バルドラール浦安）', 'グランドニッコー東京ベイ　舞浜']
     },
-
+    {
+        keywords: ['千葉', '海浜幕張', '幕張', '美浜', '稲毛', '千葉みなと', '蘇我'],
+        facilityNames: ['千葉国際水泳場', '千葉公園']
+    },
     // --- 埼玉県 ---
     {
-        keywords: ['さいたま', '大宮', '浦和', '川口', '戸田', '蕨', '西川口'],
-        pools: ['川口市青木町公園総合運動場プール', 'さいたま市記念総合体育館', '戸田市スポーツセンター']
+        keywords: ['和光'],
+        facilityNames: ['和光市広沢複合施設「わぴあ」']
     }
 ]
 
 /**
- * 顧客のエリア文字列（最寄駅・区・希望エリア）から最適な候補プールを自動選定する
+ * 顧客のエリア文字列から、マスタ登録施設（facilities）のみを厳格に照合して候補を返す
+ * ※マスタ（registeredFacilities）に存在しない施設は一切記載・返却しません。
  * 
- * @param areaText 顧客の希望エリア（例: "目黒区", "品川駅徒歩圏", "船橋市", "武蔵小杉" など）
- * @param registeredFacilityNames DBのfacilitiesマスタに登録されている施設名一覧（任意）
- * @returns カンマ区切りの候補プール名（例: "目黒区民センタープール, 碑文谷プール"）
+ * @param areaText 顧客の希望エリア（例: "目黒区", "品川駅", "世田谷", "船橋市" など）
+ * @param registeredFacilities DBのfacilitiesマスタに登録されている施設オブジェクト一覧（または施設名一覧）
+ * @returns マスタ登録施設名のみで構成されたカンマ区切り文字列（例: "目黒区民センター屋内プール, 南部地区プール（目黒）"）
  */
 export function suggestCandidateLocations(
     areaText?: string | null,
-    registeredFacilityNames?: string[]
+    registeredFacilities?: ({ name: string; nearest_station?: string | null } | string)[]
 ): string {
     if (!areaText || !areaText.trim()) {
-        return '近隣公営プール（相談可能）'
+        return '近隣施設（生徒様と相談の上決定）'
     }
 
     const cleanArea = areaText.trim()
-    const matchedPools: string[] = []
 
-    // 1. エリア辞書からのキーワードマッチング
-    for (const rule of AREA_TO_POOLS_MAP) {
+    // 1. マスタ登録施設名のホワイトリストセットを構築
+    const masterFacilityNames: string[] = []
+    const stationMap: { facilityName: string; station: string }[] = []
+
+    if (registeredFacilities && registeredFacilities.length > 0) {
+        registeredFacilities.forEach(f => {
+            if (typeof f === 'string') {
+                masterFacilityNames.push(f.trim())
+            } else if (f && typeof f.name === 'string') {
+                masterFacilityNames.push(f.name.trim())
+                if (f.nearest_station && typeof f.nearest_station === 'string') {
+                    stationMap.push({ facilityName: f.name.trim(), station: f.nearest_station.trim() })
+                }
+            }
+        })
+    }
+
+    // マスタが渡されていない場合でも、安全のためマスタ外の施設は出力しない（空配列）
+    const masterWhitelistSet = new Set(masterFacilityNames)
+
+    const candidates: string[] = []
+
+    // 2. マスタ登録施設の最寄駅（nearest_station）が登録されている場合、最優先で完全照合
+    if (stationMap.length > 0) {
+        for (const item of stationMap) {
+            if (item.station && cleanArea.includes(item.station)) {
+                if (masterWhitelistSet.has(item.facilityName) && !candidates.includes(item.facilityName)) {
+                    candidates.push(item.facilityName)
+                }
+            }
+        }
+    }
+
+    // 3. マスタ施設名そのものが顧客エリアに含まれる、または施設名から地域キーワードを部分照合
+    for (const fName of masterFacilityNames) {
+        // 施設名から一般的な名詞（温水プール、体育館等）を取り除いた地名キーワード
+        const cleanName = fName.replace(/(屋内|温水|プール|区民|市民|スポーツ|センター|体育館|中学校|小学校|学園|施設)/g, '').trim()
+        if (cleanName.length >= 2 && cleanArea.includes(cleanName)) {
+            if (masterWhitelistSet.has(fName) && !candidates.includes(fName)) {
+                candidates.push(fName)
+            }
+        }
+    }
+
+    // 4. エリア辞書パターンに基づくマスタ施設のマッチング
+    for (const rule of AREA_TO_MASTER_FACILITIES_MAP) {
         const isMatched = rule.keywords.some(kw => cleanArea.includes(kw))
         if (isMatched) {
-            for (const pool of rule.pools) {
-                if (!matchedPools.includes(pool)) {
-                    matchedPools.push(pool)
+            for (const fName of rule.facilityNames) {
+                // 【厳格制約】マスタホワイトリストに存在するか判定（マスタ渡された場合）
+                const isValidInMaster = masterFacilityNames.length === 0 || masterWhitelistSet.has(fName)
+                if (isValidInMaster && !candidates.includes(fName)) {
+                    candidates.push(fName)
                 }
             }
         }
     }
 
-    // 2. DB施設マスタが存在する場合の優先マッチング
-    if (registeredFacilityNames && registeredFacilityNames.length > 0) {
-        const facilityHits: string[] = []
-        // エリア文字列が施設名に含まれる、または施設名の一部がエリア文字列に含まれる場合
-        for (const fName of registeredFacilityNames) {
-            const shortName = fName.replace(/(プール|温水|市民|区民|総合|体育館|センター)/g, '').trim()
-            if (shortName && cleanArea.includes(shortName)) {
-                if (!facilityHits.includes(fName)) {
-                    facilityHits.push(fName)
-                }
-            }
-        }
-        // マスタに合致した施設を先頭にマージ
-        if (facilityHits.length > 0) {
-            matchedPools.unshift(...facilityHits)
-        }
+    // 5. 【最終フィルタ】マスタ一覧が取得できている場合は、確実にマスタ登録施設のみに厳格制限
+    const strictlyVerifiedCandidates = masterFacilityNames.length > 0
+        ? candidates.filter(name => masterWhitelistSet.has(name))
+        : candidates
+
+    // 上位最大3件を抽出
+    if (strictlyVerifiedCandidates.length > 0) {
+        return strictlyVerifiedCandidates.slice(0, 3).join(', ')
     }
 
-    // 重複除去
-    const uniquePools = Array.from(new Set(matchedPools))
-
-    // 候補が特定できた場合は上位2〜3件を返す
-    if (uniquePools.length > 0) {
-        return uniquePools.slice(0, 3).join(', ')
-    }
-
-    // マッチしなかった場合の自然なフォールバック
-    return `${cleanArea} 近隣の公営プール（相談可能）`
+    // マスタに合致する施設がない場合、マスタ未登録施設名は一切出さず、相談ベースの表現にする
+    return '近隣施設（生徒様と相談の上決定）'
 }
 
 /**
- * Supabase DBと連動して候補場所を自動選定する非同期関数
+ * Supabase DB（facilitiesテーブル）とリアルタイム連携し、
+ * マスタ登録施設の中から最適な候補プールを厳格選定する非同期関数
  */
 export async function autoDetectLocationForLead(
     supabaseAdmin: SupabaseClient,
@@ -216,13 +211,12 @@ export async function autoDetectLocationForLead(
     try {
         const { data: facilities } = await supabaseAdmin
             .from('facilities')
-            .select('name')
+            .select('*')
             .order('name', { ascending: true })
 
-        const facilityNames = (facilities || []).map((f: { name: string }) => f.name.trim())
-        return suggestCandidateLocations(areaText, facilityNames)
+        return suggestCandidateLocations(areaText, facilities || [])
     } catch (err) {
-        console.warn('[Location Matcher] Failed to query facilities, using rule-based suggestions:', err)
-        return suggestCandidateLocations(areaText)
+        console.warn('[Location Matcher] Failed to query facilities from DB:', err)
+        return suggestCandidateLocations(areaText, [])
     }
 }
