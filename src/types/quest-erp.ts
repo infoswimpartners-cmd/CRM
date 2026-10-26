@@ -253,3 +253,36 @@ export const DEFAULT_QUEST_FINANCE_SETTINGS: QuestFinanceSettings = {
     facility_cost_per_lesson: 700,
     ceo_hourly_rate: 3500,
 }
+
+// ギルドKPI分析（月次推移項目）
+export interface GuildKpiMonthlyItem {
+    yearMonth: string          // 例: "2026-05" 〜 "2026-10"
+    monthLabel: string         // 例: "5月" 〜 "10月"
+    lineFriendsAdded: number   // ライン追加数
+    trialInquiries: number     // 体験申し込み数
+    trialLessonsDone: number   // 体験実施数
+    totalLessonsDone: number   // レッスン実施数
+    cpa: number                // CPA（顧客獲得単価、円）
+    avgLtv: number             // LTV（総利用費用の平均、円）
+    avgLessonCount: number     // 総利用回数の平均（回）
+    trialConversionRate: number // 体験からの成約率（%）
+}
+
+// ギルドKPI総合集計データ
+export interface GuildKpiData {
+    // 重要指標数値
+    trialConversionRate: number    // 体験からの成約率（%）
+    trialConversionTarget: number  // 目標値（80%）
+    avgLeadTimeDays: number        // リードタイム（初回接触〜入会までの日数）
+    avgRetentionMonths: number     // 平均継続期間（ヶ月）
+    avgLessonCountPerStudent: number // 平均利用回数（回）
+    avgLtvAmount: number           // LTV（総利用費用の平均、円）
+    overallCpa: number             // CPA（平均顧客獲得単価、円）
+    totalLineFriends: number       // 累計ライン追加数
+    totalTrialInquiries: number    // 累計体験申し込み数
+    totalTrialLessons: number      // 累計体験実施数
+    totalLessons: number           // 累計レッスン実施数
+    
+    // 月次推移配列（グラフ用）
+    monthlyTrends: GuildKpiMonthlyItem[]
+}

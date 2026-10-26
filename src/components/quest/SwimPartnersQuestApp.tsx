@@ -67,7 +67,9 @@ import {
     FunnelStage,
     SkillRank,
     SkillEvaluation,
+    GuildKpiData,
 } from '@/types/quest-erp'
+import { GuildKpiDashboardCard } from './GuildKpiDashboardCard'
 import {
     INITIAL_QUEST_STUDENTS,
     INITIAL_QUEST_COACHES,
@@ -112,10 +114,33 @@ function getSwimStepRank(level: number): SkillRank {
 
 type ActiveTab =
     | 'command_center'
+    | 'kpi_analytics'
     | 'skill_tree'
     | 'finance_simulator'
     | 'crm_funnel'
     | 'coaches_guild'
+
+const DEFAULT_GUILD_KPI: GuildKpiData = {
+    trialConversionRate: 82,
+    trialConversionTarget: 80,
+    avgLeadTimeDays: 3.4,
+    avgRetentionMonths: 5.2,
+    avgLessonCountPerStudent: 8.6,
+    avgLtvAmount: 86400,
+    overallCpa: 4200,
+    totalLineFriends: 254,
+    totalTrialInquiries: 121,
+    totalTrialLessons: 97,
+    totalLessons: 357,
+    monthlyTrends: [
+        { yearMonth: '2026-05', monthLabel: '5月', lineFriendsAdded: 32, trialInquiries: 14, trialLessonsDone: 10, totalLessonsDone: 42, cpa: 4800, avgLtv: 64000, avgLessonCount: 6.2, trialConversionRate: 75 },
+        { yearMonth: '2026-06', monthLabel: '6月', lineFriendsAdded: 36, trialInquiries: 16, trialLessonsDone: 12, totalLessonsDone: 48, cpa: 4600, avgLtv: 69000, avgLessonCount: 6.8, trialConversionRate: 78 },
+        { yearMonth: '2026-07', monthLabel: '7月', lineFriendsAdded: 41, trialInquiries: 19, trialLessonsDone: 15, totalLessonsDone: 56, cpa: 4400, avgLtv: 74000, avgLessonCount: 7.3, trialConversionRate: 80 },
+        { yearMonth: '2026-08', monthLabel: '8月', lineFriendsAdded: 45, trialInquiries: 22, trialLessonsDone: 18, totalLessonsDone: 63, cpa: 4200, avgLtv: 79000, avgLessonCount: 7.9, trialConversionRate: 82 },
+        { yearMonth: '2026-09', monthLabel: '9月', lineFriendsAdded: 48, trialInquiries: 24, trialLessonsDone: 20, totalLessonsDone: 70, cpa: 4100, avgLtv: 83000, avgLessonCount: 8.3, trialConversionRate: 83 },
+        { yearMonth: '2026-10', monthLabel: '10月', lineFriendsAdded: 52, trialInquiries: 26, trialLessonsDone: 22, totalLessonsDone: 78, cpa: 3950, avgLtv: 86400, avgLessonCount: 8.6, trialConversionRate: 84 },
+    ]
+}
 
 const FUNNEL_STAGES: FunnelStage[] = [
     'LINE友だち追加未申込',
@@ -194,6 +219,9 @@ export function SwimPartnersQuestApp({
     const [fastPassQuests, setFastPassQuests] = useState<FastPassLeadQuest[]>(
         initialRealData?.fastPassQuests || INITIAL_FAST_PASS_QUESTS
     )
+    const [guildKpi, setGuildKpi] = useState<GuildKpiData>(
+        initialRealData?.guildKpi || DEFAULT_GUILD_KPI
+    )
     const [isLiveDatabase, setIsLiveDatabase] = useState<boolean>(
         Boolean(initialRealData?.isRealData)
     )
@@ -266,6 +294,9 @@ export function SwimPartnersQuestApp({
                         setQuests(result.quests)
                     }
                     setFastPassQuests(result.fastPassQuests)
+                    if (result.guildKpi) {
+                        setGuildKpi(result.guildKpi)
+                    }
                     setIsLiveDatabase(true)
                     setRewardCelebration({
                         visible: true,
@@ -858,8 +889,8 @@ export function SwimPartnersQuestApp({
                 )}
             </header>
 
-            {/* ================= 2. 5大画面切替ナビゲーションタブ ================= */}
-            <div className="relative z-10 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 mb-6">
+            {/* ================= 2. 6大画面切替ナビゲーションタブ ================= */}
+            <div className="relative z-10 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 mb-6">
                 <button
                     type="button"
                     onClick={() => setActiveTab('command_center')}
@@ -872,6 +903,20 @@ export function SwimPartnersQuestApp({
                     <Crown className="w-5 h-5 text-sky-600 mb-1" />
                     <div className="text-[10px] font-black uppercase text-sky-600">COMMAND HUD</div>
                     <div className="text-xs md:text-sm font-black">代表コマンドセンター</div>
+                </button>
+
+                <button
+                    type="button"
+                    onClick={() => setActiveTab('kpi_analytics')}
+                    className={`p-3.5 rounded-2xl border text-left transition cursor-pointer ${
+                        activeTab === 'kpi_analytics'
+                            ? 'bg-white border-2 border-cyan-500 text-slate-900 shadow-sm ring-2 ring-cyan-500/10'
+                            : 'bg-white/90 border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                    }`}
+                >
+                    <Activity className="w-5 h-5 text-cyan-600 mb-1" />
+                    <div className="text-[10px] font-black uppercase text-cyan-600">GUILD KPI</div>
+                    <div className="text-xs md:text-sm font-black">ギルドKPI分析</div>
                 </button>
 
                 <button
@@ -1035,6 +1080,9 @@ export function SwimPartnersQuestApp({
                         </div>
                     </div>
 
+                    {/* ギルド経営KPIアナリティクス（重要指標 ＆ KPI推移グラフ） */}
+                    <GuildKpiDashboardCard data={guildKpi} />
+
                     {/* 6角形レーダー ＆ 6大経営スキルカード */}
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                         <div className="lg:col-span-6 bg-white border border-slate-200/90 rounded-2xl p-5 shadow-sm">
@@ -1192,7 +1240,14 @@ export function SwimPartnersQuestApp({
                 </div>
             )}
 
-            {/* ================= 画面②：分野別スキル格付けボード（NEW!!） ================= */}
+            {/* ================= 画面②：ギルドKPI分析（重要成長指標 ＆ グラフ） ================= */}
+            {activeTab === 'kpi_analytics' && (
+                <div className="relative z-10 space-y-6">
+                    <GuildKpiDashboardCard data={guildKpi} />
+                </div>
+            )}
+
+            {/* ================= 画面③：分野別スキル格付けボード ================= */}
             {activeTab === 'skill_tree' && (
                 <div className="relative z-10 space-y-6">
                     <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-sm">
