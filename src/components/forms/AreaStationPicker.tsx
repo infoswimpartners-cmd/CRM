@@ -254,14 +254,14 @@ export function AreaStationPicker({ value, onChange, className }: AreaStationPic
 
             {/* 選択タブ */}
             <Tabs defaultValue="area" className="w-full">
-                <TabsList className="grid grid-cols-2 bg-slate-100 h-10 p-1">
-                    <TabsTrigger value="area" className="text-xs sm:text-sm font-semibold gap-1.5">
-                        <MapPin className="h-3.5 w-3.5" />
-                        ① 都道府県・市区町村から選ぶ
+                <TabsList className="grid grid-cols-2 bg-slate-100 h-10 sm:h-11 p-1">
+                    <TabsTrigger value="area" className="text-xs sm:text-sm font-semibold gap-1 whitespace-nowrap data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                        <MapPin className="h-3.5 w-3.5 shrink-0" />
+                        <span>① エリア<span className="hidden sm:inline">・市区町村</span>から選ぶ</span>
                     </TabsTrigger>
-                    <TabsTrigger value="station" className="text-xs sm:text-sm font-semibold gap-1.5">
-                        <Train className="h-3.5 w-3.5" />
-                        ② 路線・駅から選ぶ
+                    <TabsTrigger value="station" className="text-xs sm:text-sm font-semibold gap-1 whitespace-nowrap data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                        <Train className="h-3.5 w-3.5 shrink-0" />
+                        <span>② 路線・駅から選ぶ</span>
                     </TabsTrigger>
                 </TabsList>
 

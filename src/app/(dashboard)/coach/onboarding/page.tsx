@@ -34,7 +34,7 @@ export default async function CoachOnboardingPage({ searchParams }: PageProps) {
     const isDemo = demo === 'true' && profile.role === 'admin'
 
     return (
-        <div className="min-h-screen py-8 px-4 sm:px-6 lg:px-8 bg-slate-50/60">
+        <div className="min-h-screen py-5 sm:py-8 px-3 sm:px-6 lg:px-8 bg-slate-50/60">
             <CoachOnboardingWizard
                 isDemo={isDemo}
                 profile={{

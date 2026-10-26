@@ -287,29 +287,31 @@ export function CoachOnboardingWizard({ profile, isDemo = false }: CoachOnboardi
                     <Sparkles className="h-3.5 w-3.5 text-blue-600" />
                     Coach Onboarding
                 </span>
-                <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-800">
-                    コーチ初期セットアップ
+                <h1 className="text-xl sm:text-3xl font-extrabold text-slate-800 leading-tight">
+                    <span className="inline-block">コーチ初期セットアップ</span>
                 </h1>
-                <p className="text-sm sm:text-base text-slate-600 max-w-xl mx-auto">
-                    Swim Partnersでの指導を開始するにあたり、契約内容のご確認とプロフィールの初期設定をお願いいたします。
+                <p className="text-xs sm:text-base text-slate-600 max-w-xl mx-auto leading-relaxed">
+                    <span className="inline-block">Swim Partnersでの指導開始にあたり、</span>
+                    <span className="inline-block">契約内容のご確認と</span>
+                    <span className="inline-block">プロフィールの初期設定をお願いいたします。</span>
                 </p>
             </div>
 
             {/* ステップインジケーター */}
-            <div className="grid grid-cols-5 gap-1.5 sm:gap-3">
+            <div className="grid grid-cols-5 gap-1 sm:gap-3">
                 {[
-                    { step: 1, label: '契約・覚書', icon: FileText },
-                    { step: 2, label: '基本情報', icon: User },
-                    { step: 3, label: '振込口座', icon: CreditCard },
-                    { step: 4, label: '連絡ツール', icon: Smartphone },
-                    { step: 5, label: '設定完了', icon: CheckCircle2 }
-                ].map(({ step, label, icon: Icon }) => {
+                    { step: 1, label: '契約・覚書', shortLabel: '契約', icon: FileText },
+                    { step: 2, label: '基本情報', shortLabel: '基本', icon: User },
+                    { step: 3, label: '振込口座', shortLabel: '口座', icon: CreditCard },
+                    { step: 4, label: '連絡ツール', shortLabel: '連絡', icon: Smartphone },
+                    { step: 5, label: '設定完了', shortLabel: '完了', icon: CheckCircle2 }
+                ].map(({ step, label, shortLabel, icon: Icon }) => {
                     const isDone = currentStep > step
                     const isCurrent = currentStep === step
                     return (
                         <div
                             key={step}
-                            className={`flex flex-col items-center p-3 rounded-xl border text-center transition-all ${
+                            className={`flex flex-col items-center justify-center py-2 px-1 sm:p-3 rounded-xl border text-center transition-all ${
                                 isCurrent
                                     ? 'bg-blue-600 text-white border-blue-600 shadow-md'
                                     : isDone
@@ -317,15 +319,16 @@ export function CoachOnboardingWizard({ profile, isDemo = false }: CoachOnboardi
                                     : 'bg-white text-slate-400 border-slate-200'
                             }`}
                         >
-                            <div className="flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-full mb-1 text-xs font-bold">
+                            <div className="flex items-center justify-center w-6 h-6 sm:w-8 sm:h-8 rounded-full mb-1 text-xs font-bold shrink-0">
                                 {isDone ? (
-                                    <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                                    <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600" />
                                 ) : (
-                                    <Icon className={`w-4 h-4 ${isCurrent ? 'text-white' : 'text-slate-400'}`} />
+                                    <Icon className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${isCurrent ? 'text-white' : 'text-slate-400'}`} />
                                 )}
                             </div>
-                            <span className="text-[11px] sm:text-xs font-semibold">
-                                {step}. {label}
+                            <span className="text-[10px] sm:text-xs font-semibold whitespace-nowrap leading-tight">
+                                <span className="sm:hidden">{step}.{shortLabel}</span>
+                                <span className="hidden sm:inline">{step}. {label}</span>
                             </span>
                         </div>
                     )
@@ -335,27 +338,29 @@ export function CoachOnboardingWizard({ profile, isDemo = false }: CoachOnboardi
             {/* ================= STEP 1: 契約書・覚書の確認と同意 ================= */}
             {currentStep === 1 && (
                 <Card className="border-slate-200 shadow-sm">
-                    <CardHeader className="bg-slate-50/60 border-b pb-4">
-                        <div className="flex items-center gap-2 text-blue-600 font-semibold text-sm">
-                            <ShieldCheck className="h-4 w-4" />
+                    <CardHeader className="bg-slate-50/60 border-b pb-4 px-4 sm:px-6">
+                        <div className="flex items-center gap-2 text-blue-600 font-semibold text-xs sm:text-sm">
+                            <ShieldCheck className="h-4 w-4 shrink-0" />
                             STEP 1 / 5
                         </div>
-                        <CardTitle className="text-xl text-slate-800">
-                            業務委託契約書 ＆ 報酬に関する覚書の確認・同意
+                        <CardTitle className="text-base sm:text-xl text-slate-800 leading-snug">
+                            <span className="inline-block">業務委託契約書 ＆</span>{' '}
+                            <span className="inline-block">報酬に関する覚書の確認・同意</span>
                         </CardTitle>
-                        <CardDescription>
-                            以下の2つの書類の内容をスクロールしてご確認いただき、末尾の同意欄にチェックを入れてください。
+                        <CardDescription className="text-xs sm:text-sm leading-relaxed text-slate-600">
+                            <span className="inline-block">以下の2つの書類の内容をご確認いただき、</span>
+                            <span className="inline-block">末尾の同意欄にチェックを入れてください。</span>
                         </CardDescription>
                     </CardHeader>
 
-                    <CardContent className="pt-6 space-y-6">
+                    <CardContent className="pt-5 sm:pt-6 px-4 sm:px-6 space-y-5 sm:space-y-6">
                         <Tabs defaultValue="basic" className="w-full">
-                            <TabsList className="grid w-full grid-cols-2 h-11 bg-slate-100 p-1">
-                                <TabsTrigger value="basic" className="font-semibold text-xs sm:text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm">
-                                    ① 業務委託契約書（基本契約）
+                            <TabsList className="grid w-full grid-cols-2 h-10 sm:h-11 bg-slate-100 p-1">
+                                <TabsTrigger value="basic" className="font-semibold text-xs sm:text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm whitespace-nowrap">
+                                    ① 契約書<span className="hidden sm:inline">（基本契約）</span>
                                 </TabsTrigger>
-                                <TabsTrigger value="memo" className="font-semibold text-xs sm:text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm">
-                                    ② 報酬に関する覚書（2026年6月改定）
+                                <TabsTrigger value="memo" className="font-semibold text-xs sm:text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm whitespace-nowrap">
+                                    ② 覚書<span className="hidden sm:inline">（2026年6月改定）</span>
                                 </TabsTrigger>
                             </TabsList>
 
@@ -512,41 +517,45 @@ export function CoachOnboardingWizard({ profile, isDemo = false }: CoachOnboardi
                         </div>
 
                         {/* 同意チェックボックス */}
-                        <div className="p-4 rounded-xl border border-blue-200 bg-blue-50/50 space-y-3">
-                            <div className="flex items-start space-x-3">
+                        <div className="p-3.5 sm:p-4 rounded-xl border border-blue-200 bg-blue-50/50 space-y-3">
+                            <div className="flex items-start space-x-2.5 sm:space-x-3">
                                 <Checkbox
                                     id="agreeBasic"
                                     checked={agreedBasic}
                                     onCheckedChange={(c) => setAgreedBasic(!!c)}
-                                    className="mt-0.5"
+                                    className="mt-1 shrink-0"
                                 />
-                                <Label htmlFor="agreeBasic" className="text-xs sm:text-sm font-medium text-slate-800 leading-snug cursor-pointer">
-                                    「業務委託契約書」の全文を確認し、内容を十分に理解した上でこれに同意します。
+                                <Label htmlFor="agreeBasic" className="text-xs sm:text-sm font-medium text-slate-800 leading-relaxed cursor-pointer select-none">
+                                    <span className="inline-block">「業務委託契約書」の全文を確認し、</span>
+                                    <span className="inline-block">内容を十分に理解した上で</span>
+                                    <span className="inline-block">これに同意します。</span>
                                 </Label>
                             </div>
-                            <div className="flex items-start space-x-3">
+                            <div className="flex items-start space-x-2.5 sm:space-x-3">
                                 <Checkbox
                                     id="agreeMemo"
                                     checked={agreedMemo}
                                     onCheckedChange={(c) => setAgreedMemo(!!c)}
-                                    className="mt-0.5"
+                                    className="mt-1 shrink-0"
                                 />
-                                <Label htmlFor="agreeMemo" className="text-xs sm:text-sm font-medium text-slate-800 leading-snug cursor-pointer">
-                                    「報酬に関する覚書（2026年6月改定）」の報酬体系および算定基準を確認し、これに同意します。
+                                <Label htmlFor="agreeMemo" className="text-xs sm:text-sm font-medium text-slate-800 leading-relaxed cursor-pointer select-none">
+                                    <span className="inline-block">「報酬に関する覚書（2026年6月改定）」の</span>
+                                    <span className="inline-block">報酬体系および算定基準を確認し、</span>
+                                    <span className="inline-block">これに同意します。</span>
                                 </Label>
                             </div>
-                            <div className="text-[11px] text-slate-500 flex items-center gap-1 pt-1 border-t border-blue-100">
-                                <AlertCircle className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                                同意ボタンを押した日時、IPアドレス、端末情報が電磁的記録（契約同意ログ）として安全に保存されます。
+                            <div className="text-[11px] text-slate-500 flex items-start gap-1.5 pt-2 border-t border-blue-100 leading-relaxed">
+                                <AlertCircle className="h-3.5 w-3.5 text-blue-500 shrink-0 mt-0.5" />
+                                <span>同意ボタンを押した日時、IPアドレス、端末情報が電磁的記録（契約同意ログ）として安全に保存されます。</span>
                             </div>
                         </div>
                     </CardContent>
 
-                    <CardFooter className="bg-slate-50/60 border-t py-4 flex justify-end">
+                    <CardFooter className="bg-slate-50/60 border-t py-4 px-4 sm:px-6 flex justify-end">
                         <Button
                             onClick={handleAgreeContracts}
                             disabled={loading || !agreedBasic || !agreedMemo || !signerName.trim() || !signerAddress.trim()}
-                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold h-11 px-6 rounded-xl shadow-sm"
+                            className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold h-11 px-6 rounded-xl shadow-sm whitespace-nowrap text-sm"
                         >
                             {loading ? (
                                 <>
@@ -567,21 +576,22 @@ export function CoachOnboardingWizard({ profile, isDemo = false }: CoachOnboardi
             {/* ================= STEP 2: プロフィール情報の入力 ================= */}
             {currentStep === 2 && (
                 <Card className="border-slate-200 shadow-sm">
-                    <CardHeader className="bg-slate-50/60 border-b pb-4">
-                        <div className="flex items-center gap-2 text-blue-600 font-semibold text-sm">
-                            <User className="h-4 w-4" />
+                    <CardHeader className="bg-slate-50/60 border-b pb-4 px-4 sm:px-6">
+                        <div className="flex items-center gap-2 text-blue-600 font-semibold text-xs sm:text-sm">
+                            <User className="h-4 w-4 shrink-0" />
                             STEP 2 / 5
                         </div>
-                        <CardTitle className="text-xl text-slate-800">
-                            コーチ基本プロフィールの登録
+                        <CardTitle className="text-base sm:text-xl text-slate-800 leading-snug">
+                            <span className="inline-block">コーチ基本プロフィールの登録</span>
                         </CardTitle>
-                        <CardDescription>
-                            生徒との連絡やマッチングに使用する基本情報を登録してください。
+                        <CardDescription className="text-xs sm:text-sm leading-relaxed text-slate-600">
+                            <span className="inline-block">生徒様との連絡やマッチングに使用する</span>
+                            <span className="inline-block">基本情報を登録してください。</span>
                         </CardDescription>
                     </CardHeader>
 
                     <form onSubmit={handleSaveProfile}>
-                        <CardContent className="pt-6 space-y-6">
+                        <CardContent className="pt-5 sm:pt-6 px-4 sm:px-6 space-y-5 sm:space-y-6">
                             {/* アイコン写真 */}
                             <div className="flex flex-col sm:flex-row items-center gap-5 p-4 rounded-xl border bg-slate-50/60">
                                 <Avatar className="w-20 h-20 border-2 border-white shadow-md">
@@ -681,18 +691,19 @@ export function CoachOnboardingWizard({ profile, isDemo = false }: CoachOnboardi
                             </div>
                         </CardContent>
 
-                        <CardFooter className="bg-slate-50/60 border-t py-4 flex justify-between">
+                        <CardFooter className="bg-slate-50/60 border-t py-4 px-4 sm:px-6 flex flex-col-reverse sm:flex-row sm:justify-between gap-3">
                             <Button
                                 type="button"
                                 variant="ghost"
                                 onClick={() => setCurrentStep(1)}
+                                className="w-full sm:w-auto text-xs sm:text-sm"
                             >
                                 戻る
                             </Button>
                             <Button
                                 type="submit"
-                                disabled={loading || !profileData.full_name.trim()}
-                                className="bg-blue-600 hover:bg-blue-700 text-white font-bold h-11 px-6 rounded-xl shadow-sm"
+                                disabled={loading || !profileData.full_name?.trim()}
+                                className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold h-11 px-6 rounded-xl shadow-sm whitespace-nowrap text-sm"
                             >
                                 {loading ? (
                                     <>
@@ -714,21 +725,23 @@ export function CoachOnboardingWizard({ profile, isDemo = false }: CoachOnboardi
             {/* ================= STEP 3: 報酬振込口座の登録 ================= */}
             {currentStep === 3 && (
                 <Card className="border-slate-200 shadow-sm">
-                    <CardHeader className="bg-slate-50/60 border-b pb-4">
-                        <div className="flex items-center gap-2 text-blue-600 font-semibold text-sm">
-                            <CreditCard className="h-4 w-4" />
+                    <CardHeader className="bg-slate-50/60 border-b pb-4 px-4 sm:px-6">
+                        <div className="flex items-center gap-2 text-blue-600 font-semibold text-xs sm:text-sm">
+                            <CreditCard className="h-4 w-4 shrink-0" />
                             STEP 3 / 5
                         </div>
-                        <CardTitle className="text-xl text-slate-800">
-                            報酬振込口座（銀行口座）の登録
+                        <CardTitle className="text-base sm:text-xl text-slate-800 leading-snug">
+                            <span className="inline-block">報酬振込口座（銀行口座）の登録</span>
                         </CardTitle>
-                        <CardDescription>
-                            毎月のレッスン報酬が振り込まれる口座情報を入力してください。（後から変更も可能です）
+                        <CardDescription className="text-xs sm:text-sm leading-relaxed text-slate-600">
+                            <span className="inline-block">毎月のレッスン報酬をお支払いする</span>
+                            <span className="inline-block">口座情報を入力してください。</span>
+                            <span className="inline-block text-[11px] text-slate-400">（後から変更可能）</span>
                         </CardDescription>
                     </CardHeader>
 
                     <form onSubmit={handleSaveBankInfo}>
-                        <CardContent className="pt-6 space-y-4">
+                        <CardContent className="pt-5 sm:pt-6 px-4 sm:px-6 space-y-4">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="space-y-1.5">
                                     <Label htmlFor="bank_name" className="text-xs font-semibold text-slate-700">
@@ -797,18 +810,19 @@ export function CoachOnboardingWizard({ profile, isDemo = false }: CoachOnboardi
                             </div>
                         </CardContent>
 
-                        <CardFooter className="bg-slate-50/60 border-t py-4 flex justify-between">
+                        <CardFooter className="bg-slate-50/60 border-t py-4 px-4 sm:px-6 flex flex-col-reverse sm:flex-row sm:justify-between gap-3">
                             <Button
                                 type="button"
                                 variant="ghost"
                                 onClick={() => setCurrentStep(2)}
+                                className="w-full sm:w-auto text-xs sm:text-sm"
                             >
                                 戻る
                             </Button>
                             <Button
                                 type="submit"
                                 disabled={loading}
-                                className="bg-blue-600 hover:bg-blue-700 text-white font-bold h-11 px-6 rounded-xl shadow-sm"
+                                className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold h-11 px-6 rounded-xl shadow-sm whitespace-nowrap text-sm"
                             >
                                 {loading ? (
                                     <>
@@ -830,51 +844,54 @@ export function CoachOnboardingWizard({ profile, isDemo = false }: CoachOnboardi
             {/* ================= STEP 4: 業務連絡ツールの準備 ================= */}
             {currentStep === 4 && (
                 <Card className="border-slate-200 shadow-sm">
-                    <CardHeader className="bg-slate-50/60 border-b pb-4">
-                        <div className="flex items-center gap-2 text-blue-600 font-semibold text-sm">
-                            <Smartphone className="h-4 w-4" />
+                    <CardHeader className="bg-slate-50/60 border-b pb-4 px-4 sm:px-6">
+                        <div className="flex items-center gap-2 text-blue-600 font-semibold text-xs sm:text-sm">
+                            <Smartphone className="h-4 w-4 shrink-0" />
                             STEP 4 / 5
                         </div>
-                        <CardTitle className="text-xl text-slate-800">
-                            業務連絡ツールのセットアップ（Googleチャット ＆ 公式LINE）
+                        <CardTitle className="text-base sm:text-xl text-slate-800 leading-snug">
+                            <span className="inline-block">業務連絡ツールのセットアップ</span>{' '}
+                            <span className="inline-block">（Googleチャット＆公式LINE）</span>
                         </CardTitle>
-                        <CardDescription>
-                            円滑なレッスン運営のため、本部との連絡用ツールおよび生徒様との連絡用アプリのご準備をお願いいたします。
+                        <CardDescription className="text-xs sm:text-sm leading-relaxed text-slate-600">
+                            <span className="inline-block">円滑なレッスン運営のため、</span>
+                            <span className="inline-block">本部連絡用ツールと</span>
+                            <span className="inline-block">生徒連絡用アプリのご準備をお願いいたします。</span>
                         </CardDescription>
                     </CardHeader>
 
-                    <CardContent className="pt-6 space-y-6">
+                    <CardContent className="pt-5 sm:pt-6 px-4 sm:px-6 space-y-5 sm:space-y-6">
                         {/* ① Googleチャット案内 */}
-                        <div className="p-5 rounded-xl border border-blue-100 bg-blue-50/30 space-y-3">
+                        <div className="p-4 sm:p-5 rounded-xl border border-blue-100 bg-blue-50/30 space-y-3">
                             <div className="flex items-center gap-2.5">
-                                <div className="p-2 rounded-lg bg-blue-100 text-blue-700">
+                                <div className="p-2 rounded-lg bg-blue-100 text-blue-700 shrink-0">
                                     <MessageSquare className="h-5 w-5" />
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-slate-800 text-base">
-                                        1. 【本部との連絡】Googleチャット
+                                    <h3 className="font-bold text-slate-800 text-sm sm:text-base leading-snug">
+                                        1. 【本部連絡用】Googleチャット
                                     </h3>
-                                    <p className="text-xs text-slate-500">
-                                        Swim Partners本部からのレッスン依頼・スケジュール調整・緊急連絡に使用します
+                                    <p className="text-[11px] sm:text-xs text-slate-500 leading-tight">
+                                        レッスン依頼・スケジュール調整・緊急連絡に使用
                                     </p>
                                 </div>
                             </div>
 
-                            <div className="text-xs sm:text-sm text-slate-600 pl-1 space-y-2 leading-relaxed">
+                            <div className="text-xs sm:text-sm text-slate-600 pl-0.5 space-y-2 leading-relaxed">
                                 <p>
                                     面談完了後、事務局よりGoogleチャットの専用スペース招待をお送りいたします。<br />
-                                    急な依頼や連絡を見逃さないよう、お持ちのスマートフォンに<strong>「Google Chat」アプリ</strong>をインストールし、通知を「常に許可」に設定してください。
+                                    急な依頼を見逃さないよう、スマートフォンに<strong>「Google Chat」アプリ</strong>を入れ、通知を「常に許可」に設定してください。
                                 </p>
                                 <div className="flex flex-wrap gap-2 pt-1">
-                                    <Button variant="outline" size="sm" asChild className="bg-white gap-1 text-xs">
+                                    <Button variant="outline" size="sm" asChild className="bg-white gap-1 text-xs whitespace-nowrap">
                                         <a href="https://apps.apple.com/jp/app/google-chat/id1163852619" target="_blank" rel="noopener noreferrer">
-                                            <ExternalLink className="h-3.5 w-3.5 text-blue-600" />
+                                            <ExternalLink className="h-3.5 w-3.5 text-blue-600 shrink-0" />
                                             iOS（App Store）
                                         </a>
                                     </Button>
-                                    <Button variant="outline" size="sm" asChild className="bg-white gap-1 text-xs">
+                                    <Button variant="outline" size="sm" asChild className="bg-white gap-1 text-xs whitespace-nowrap">
                                         <a href="https://play.google.com/store/apps/details?id=com.google.android.apps.dynamite" target="_blank" rel="noopener noreferrer">
-                                            <ExternalLink className="h-3.5 w-3.5 text-blue-600" />
+                                            <ExternalLink className="h-3.5 w-3.5 text-blue-600 shrink-0" />
                                             Android（Google Play）
                                         </a>
                                     </Button>
@@ -883,20 +900,20 @@ export function CoachOnboardingWizard({ profile, isDemo = false }: CoachOnboardi
                         </div>
 
                         {/* ② 公式LINEの管理者追加 ＆ アプリ案内 */}
-                        <div className="p-5 rounded-xl border border-emerald-200 bg-emerald-50/40 space-y-4 shadow-sm">
+                        <div className="p-4 sm:p-5 rounded-xl border border-emerald-200 bg-emerald-50/40 space-y-4 shadow-sm">
                             <div className="flex items-center gap-2.5">
-                                <div className="p-2 rounded-lg bg-emerald-600 text-white shadow-sm">
+                                <div className="p-2 rounded-lg bg-emerald-600 text-white shadow-sm shrink-0">
                                     <Smartphone className="h-5 w-5" />
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-slate-800 text-base flex items-center gap-2">
-                                        2. 【生徒・保護者との連絡】顧客連絡用 公式LINE
-                                        <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px]">
+                                    <h3 className="font-bold text-slate-800 text-sm sm:text-base flex flex-wrap items-center gap-1.5 leading-snug">
+                                        <span>2. 【生徒連絡用】公式LINE</span>
+                                        <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] whitespace-nowrap">
                                             重要ステップ
                                         </Badge>
                                     </h3>
-                                    <p className="text-xs text-slate-500">
-                                        生徒様や保護者様とのレッスン前のご挨拶・待ち合わせ連絡に使用します
+                                    <p className="text-[11px] sm:text-xs text-slate-500 leading-tight">
+                                        生徒・保護者様とのレッスン前のご挨拶・待ち合わせ連絡に使用
                                     </p>
                                 </div>
                             </div>
@@ -904,19 +921,21 @@ export function CoachOnboardingWizard({ profile, isDemo = false }: CoachOnboardi
                             <div className="text-xs sm:text-sm text-slate-600 space-y-3 leading-relaxed">
                                 {/* 管理者招待URLブロック */}
                                 {effectiveLineAdminUrl ? (
-                                    <div className="p-4 bg-white rounded-xl border-2 border-emerald-300 shadow-sm space-y-3">
+                                    <div className="p-3.5 sm:p-4 bg-white rounded-xl border-2 border-emerald-300 shadow-sm space-y-3">
                                         <div className="flex items-start justify-between gap-2">
                                             <div>
-                                                <div className="font-bold text-emerald-950 text-sm flex items-center gap-1.5">
+                                                <div className="font-bold text-emerald-950 text-xs sm:text-sm flex items-center gap-1.5 leading-snug">
                                                     <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
-                                                    【STEP 4-1】公式LINEの管理者アカウントに追加
+                                                    <span className="inline-block">【STEP 4-1】</span>{' '}
+                                                    <span className="inline-block">公式LINEの管理者アカウントに追加</span>
                                                 </div>
-                                                <p className="text-xs text-slate-600 mt-0.5">
-                                                    事務局にてあなた専用の公式LINEアカウントを用意いたしました。下のボタンから管理者に参加してください。
+                                                <p className="text-[11px] sm:text-xs text-slate-600 mt-1 leading-relaxed">
+                                                    <span className="inline-block">あなた専用の公式LINEアカウントを用意いたしました。</span>
+                                                    <span className="inline-block">下のボタンから管理者に参加してください。</span>
                                                 </p>
                                             </div>
                                             {isDemo && (
-                                                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px] shrink-0">
+                                                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px] shrink-0 whitespace-nowrap">
                                                     デモURL表示中
                                                 </Badge>
                                             )}
@@ -925,11 +944,11 @@ export function CoachOnboardingWizard({ profile, isDemo = false }: CoachOnboardi
                                         <div className="pt-1">
                                             <Button
                                                 asChild
-                                                className="w-full sm:w-auto bg-[#06C755] hover:bg-[#05b34c] text-white font-bold h-11 px-6 rounded-xl shadow-md gap-2"
+                                                className="w-full sm:w-auto bg-[#06C755] hover:bg-[#05b34c] text-white font-bold h-11 px-4 sm:px-6 rounded-xl shadow-md gap-2 whitespace-nowrap text-xs sm:text-sm"
                                             >
                                                 <a href={effectiveLineAdminUrl} target="_blank" rel="noopener noreferrer">
-                                                    <ExternalLink className="h-4 w-4" />
-                                                    公式LINEの管理者に参加・追加する（別タブ）
+                                                    <ExternalLink className="h-4 w-4 shrink-0" />
+                                                    <span>公式LINEの管理者に参加する（別タブ）</span>
                                                 </a>
                                             </Button>
                                         </div>
@@ -939,13 +958,14 @@ export function CoachOnboardingWizard({ profile, isDemo = false }: CoachOnboardi
                                                 id="line-admin-confirm"
                                                 checked={lineAdminConfirmed}
                                                 onCheckedChange={(checked) => setLineAdminConfirmed(checked === true)}
-                                                className="mt-0.5 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
+                                                className="mt-0.5 shrink-0 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
                                             />
                                             <label
                                                 htmlFor="line-admin-confirm"
                                                 className="text-xs font-semibold text-slate-800 cursor-pointer select-none leading-relaxed"
                                             >
-                                                公式LINEの管理者招待を開き、参加承認（管理者追加）を完了しました
+                                                <span className="inline-block">公式LINEの管理者招待を開き、</span>
+                                                <span className="inline-block">参加承認（管理者追加）を完了しました</span>
                                             </label>
                                         </div>
                                     </div>
@@ -954,7 +974,7 @@ export function CoachOnboardingWizard({ profile, isDemo = false }: CoachOnboardi
                                         <div className="font-semibold text-emerald-800 text-xs sm:text-sm">
                                             📌 コーチ専用公式LINEアカウントの発行について
                                         </div>
-                                        <p className="text-xs text-slate-600">
+                                        <p className="text-xs text-slate-600 leading-relaxed">
                                             事務局にてコーチ専用の「LINE公式アカウント」を開設準備中です。開設後に管理者追加（参加用）のURLが届き次第、承認をお願いいたします。
                                         </p>
                                     </div>
@@ -962,22 +982,23 @@ export function CoachOnboardingWizard({ profile, isDemo = false }: CoachOnboardi
 
                                 {/* スマホアプリのダウンロード */}
                                 <div className="p-3.5 bg-slate-50/80 rounded-xl border border-slate-200/80 space-y-2">
-                                    <div className="font-semibold text-slate-800 text-xs sm:text-sm">
-                                        【STEP 4-2】スマホ管理アプリ「LINE Official Account」の準備
+                                    <div className="font-semibold text-slate-800 text-xs sm:text-sm leading-snug">
+                                        <span className="inline-block">【STEP 4-2】</span>{' '}
+                                        <span className="inline-block">スマホ管理アプリのダウンロード</span>
                                     </div>
-                                    <p className="text-xs text-slate-600">
+                                    <p className="text-xs text-slate-600 leading-relaxed">
                                         生徒様からのメッセージを受信・返信できるよう、スマートフォンへ管理用アプリのダウンロードをお願いいたします。
                                     </p>
                                     <div className="flex flex-wrap gap-2 pt-1">
-                                        <Button variant="outline" size="sm" asChild className="bg-white gap-1 text-xs border-emerald-300 hover:bg-emerald-50">
+                                        <Button variant="outline" size="sm" asChild className="bg-white gap-1 text-xs border-emerald-300 hover:bg-emerald-50 whitespace-nowrap">
                                             <a href="https://apps.apple.com/jp/app/line-official-account/id1451478954" target="_blank" rel="noopener noreferrer">
-                                                <ExternalLink className="h-3.5 w-3.5 text-emerald-600" />
+                                                <ExternalLink className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
                                                 iOS（App Store）
                                             </a>
                                         </Button>
-                                        <Button variant="outline" size="sm" asChild className="bg-white gap-1 text-xs border-emerald-300 hover:bg-emerald-50">
+                                        <Button variant="outline" size="sm" asChild className="bg-white gap-1 text-xs border-emerald-300 hover:bg-emerald-50 whitespace-nowrap">
                                             <a href="https://play.google.com/store/apps/details?id=com.linecorp.lineoa" target="_blank" rel="noopener noreferrer">
-                                                <ExternalLink className="h-3.5 w-3.5 text-emerald-600" />
+                                                <ExternalLink className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
                                                 Android（Google Play）
                                             </a>
                                         </Button>
@@ -986,21 +1007,22 @@ export function CoachOnboardingWizard({ profile, isDemo = false }: CoachOnboardi
                             </div>
 
                             {/* コンプライアンス注意喚起 */}
-                            <div className="p-3 rounded-lg bg-amber-50/80 border border-amber-200 text-xs text-amber-800 flex items-start gap-2">
+                            <div className="p-3 rounded-lg bg-amber-50/80 border border-amber-200 text-xs text-amber-800 flex items-start gap-2 leading-relaxed">
                                 <ShieldAlert className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
                                 <div>
                                     <span className="font-bold">重要（直接取引・私的連絡の禁止）: </span>
-                                    個人LINEの直接交換は契約条項（第10条・第2条）に基づき禁止されています。生徒様との連絡は必ず事務局が発行する専用の公式LINEをご使用ください。
+                                    個人LINEの直接交換は契約条項に基づき禁止されています。生徒様との連絡は必ず専用の公式LINEをご使用ください。
                                 </div>
                             </div>
                         </div>
                     </CardContent>
 
-                    <CardFooter className="bg-slate-50/60 border-t py-4 flex justify-between">
+                    <CardFooter className="bg-slate-50/60 border-t py-4 px-4 sm:px-6 flex flex-col-reverse sm:flex-row sm:justify-between gap-3">
                         <Button
                             type="button"
                             variant="ghost"
                             onClick={() => setCurrentStep(3)}
+                            className="w-full sm:w-auto text-xs sm:text-sm"
                         >
                             戻る
                         </Button>
@@ -1011,7 +1033,7 @@ export function CoachOnboardingWizard({ profile, isDemo = false }: CoachOnboardi
                                 }
                                 setCurrentStep(5)
                             }}
-                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold h-11 px-6 rounded-xl shadow-sm"
+                            className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold h-11 px-6 rounded-xl shadow-sm whitespace-nowrap text-sm"
                         >
                             確認しました（完了画面へ）
                             <ChevronRight className="ml-2 h-4 w-4" />
@@ -1023,22 +1045,25 @@ export function CoachOnboardingWizard({ profile, isDemo = false }: CoachOnboardi
             {/* ================= STEP 5: 完了画面 ================= */}
             {currentStep === 5 && (
                 <Card className="border-emerald-200 bg-gradient-to-b from-white to-emerald-50/30 shadow-md">
-                    <CardContent className="pt-10 pb-8 text-center space-y-6">
-                        <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto text-emerald-600 shadow-inner">
-                            <CheckCircle2 className="h-10 w-10" />
+                    <CardContent className="pt-8 sm:pt-10 pb-8 px-4 sm:px-6 text-center space-y-6">
+                        <div className="w-14 h-14 sm:w-16 sm:h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto text-emerald-600 shadow-inner">
+                            <CheckCircle2 className="h-8 w-8 sm:h-10 sm:w-10" />
                         </div>
 
                         <div className="space-y-2 max-w-md mx-auto">
-                            <h2 className="text-2xl font-bold text-slate-800">
-                                初期セットアップが完了しました！
+                            <h2 className="text-xl sm:text-2xl font-bold text-slate-800 leading-snug">
+                                <span className="inline-block">初期セットアップが</span>
+                                <span className="inline-block">完了しました！</span>
                             </h2>
-                            <p className="text-sm text-slate-600 leading-relaxed">
-                                契約同意および基本プロフィールの登録が正常に完了しました。<br />
-                                ダッシュボードから稼働可能枠の登録やスケジュールの管理を行っていただけます。
+                            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                                <span className="inline-block">契約同意および基本プロフィールの</span>
+                                <span className="inline-block">登録が正常に完了しました。</span><br className="hidden sm:inline" />
+                                <span className="inline-block">ダッシュボードから稼働可能枠の登録や</span>
+                                <span className="inline-block">スケジュールの管理を行っていただけます。</span>
                             </p>
                         </div>
 
-                        <div className="max-w-md mx-auto p-4 rounded-xl bg-white border border-slate-200 text-left space-y-2 text-xs text-slate-600">
+                        <div className="max-w-md mx-auto p-4 rounded-xl bg-white border border-slate-200 text-left space-y-2 text-xs text-slate-600 leading-relaxed">
                             <div className="font-bold text-slate-700 pb-1 border-b">登録概要</div>
                             <div>・業務委託契約書: <span className="text-emerald-600 font-semibold">同意完了</span></div>
                             <div>・報酬に関する覚書: <span className="text-emerald-600 font-semibold">同意完了</span></div>
@@ -1047,11 +1072,11 @@ export function CoachOnboardingWizard({ profile, isDemo = false }: CoachOnboardi
                             <div>・業務連絡ツール: <span className="text-emerald-600 font-semibold">Googleチャット ＆ 公式LINE準備完了</span></div>
                         </div>
 
-                        <div className="pt-4">
+                        <div className="pt-2 sm:pt-4">
                             <Button
                                 onClick={handleFinishOnboarding}
                                 disabled={loading}
-                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-12 px-8 rounded-xl shadow-md text-base"
+                                className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-12 px-8 rounded-xl shadow-md text-sm sm:text-base whitespace-nowrap"
                             >
                                 {loading ? (
                                     <>

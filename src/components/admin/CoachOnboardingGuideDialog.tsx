@@ -121,33 +121,35 @@ Email: support@swim-partners.com
                 </Button>
             </DialogTrigger>
             <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-0 overflow-hidden">
-                <DialogHeader className="p-6 pb-4 border-b bg-gray-50/80">
-                    <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="bg-emerald-100 text-emerald-800 border-emerald-300 font-semibold">
+                <DialogHeader className="p-4 sm:p-6 pb-3 sm:pb-4 border-b bg-gray-50/80">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="outline" className="bg-emerald-100 text-emerald-800 border-emerald-300 font-semibold text-[10px] sm:text-xs">
                             事務局マニュアル
                         </Badge>
-                        <DialogTitle className="text-xl font-bold text-gray-900">
-                            面談実施後のコーチ案内手順 ＆ 送信文作成
+                        <DialogTitle className="text-base sm:text-xl font-bold text-gray-900 leading-snug">
+                            <span className="inline-block">面談後コーチ案内手順</span> ＆{' '}
+                            <span className="inline-block">送信文作成</span>
                         </DialogTitle>
                     </div>
-                    <DialogDescription className="text-gray-600 text-sm mt-1">
-                        面談を終えて採用となったコーチへ契約締結・初期設定（オンボーディング）を案内する手順と送信メッセージテンプレートです。
+                    <DialogDescription className="text-gray-600 text-xs sm:text-sm mt-1 leading-relaxed">
+                        <span className="inline-block">採用となったコーチへ契約締結・初期設定を</span>
+                        <span className="inline-block">案内する手順と送信文テンプレートです。</span>
                     </DialogDescription>
                 </DialogHeader>
 
                 <Tabs defaultValue="steps" className="flex-1 flex flex-col overflow-hidden">
-                    <div className="px-6 pt-3 border-b bg-white">
-                        <TabsList className="grid grid-cols-2 w-full max-w-md">
-                            <TabsTrigger value="steps" className="font-semibold text-xs sm:text-sm">
+                    <div className="px-4 sm:px-6 pt-3 border-b bg-white">
+                        <TabsList className="grid grid-cols-2 w-full max-w-md h-9 sm:h-10">
+                            <TabsTrigger value="steps" className="font-semibold text-xs sm:text-sm whitespace-nowrap">
                                 ① 事務局の運用手順
                             </TabsTrigger>
-                            <TabsTrigger value="template" className="font-semibold text-xs sm:text-sm">
-                                ② ご案内文の作成・コピー
+                            <TabsTrigger value="template" className="font-semibold text-xs sm:text-sm whitespace-nowrap">
+                                ② 案内文作成・コピー
                             </TabsTrigger>
                         </TabsList>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                    <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
                         {/* タブ1: 運用手順 */}
                         <TabsContent value="steps" className="mt-0 space-y-6">
                             <div className="grid gap-4">

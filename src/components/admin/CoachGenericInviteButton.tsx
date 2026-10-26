@@ -70,22 +70,23 @@ export function CoachGenericInviteButton() {
                     登録リンクを発行
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-lg">
-                <DialogHeader>
-                    <DialogTitle>コーチ登録リンクの発行</DialogTitle>
-                    <DialogDescription>
-                        氏名やメールアドレスを指定せずに、誰でも登録可能な招待リンクを発行します。<br />
-                        <span className="text-xs text-red-500 font-bold">※このリンクを知っている人は誰でもコーチとして登録できてしまうため、取り扱いには十分注意してください。</span>
+            <DialogContent className="sm:max-w-lg p-4 sm:p-6">
+                <DialogHeader className="space-y-1">
+                    <DialogTitle className="text-base sm:text-lg font-bold">コーチ登録リンクの発行</DialogTitle>
+                    <DialogDescription className="text-xs sm:text-sm leading-relaxed text-slate-600">
+                        <span className="inline-block">氏名やメールを指定せずに登録できる</span>
+                        <span className="inline-block">招待リンクを発行します。</span><br />
+                        <span className="text-[11px] text-red-500 font-semibold inline-block mt-0.5">※取り扱いには十分注意してください。</span>
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="py-4 space-y-4">
+                <div className="py-3 sm:py-4 space-y-4">
                     {!inviteUrl ? (
                         <div className="space-y-4">
-                            <div className="p-4 rounded-lg border bg-emerald-50/50 border-emerald-200 space-y-2">
-                                <Label htmlFor="line-invite-url" className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
-                                    <MessageCircle className="h-4 w-4 text-emerald-600" />
-                                    公式LINE 管理者招待URL（任意・推奨）
+                            <div className="p-3.5 sm:p-4 rounded-lg border bg-emerald-50/50 border-emerald-200 space-y-2">
+                                <Label htmlFor="line-invite-url" className="text-xs font-bold text-emerald-950 flex items-center gap-1.5 leading-snug">
+                                    <MessageCircle className="h-4 w-4 text-emerald-600 shrink-0" />
+                                    <span>公式LINE 管理者招待URL（任意・推奨）</span>
                                 </Label>
                                 <Input
                                     id="line-invite-url"
@@ -94,22 +95,23 @@ export function CoachGenericInviteButton() {
                                     onChange={(e) => setLineAdminInviteUrl(e.target.value)}
                                     className="h-9 text-xs bg-white"
                                 />
-                                <p className="text-[11px] text-emerald-700 leading-tight">
-                                    入力しておくと、コーチが初回ログインした際のオンボーディング画面（STEP 4）に<strong>「公式LINEの管理者アカウントに追加する」ボタンが自動表示</strong>され、登録手続きの流れの中でスムーズに管理者参加を完了させられます。
+                                <p className="text-[11px] text-emerald-700 leading-relaxed">
+                                    <span className="inline-block">入力すると、コーチの初期設定画面（STEP 4）に</span>
+                                    <span className="inline-block"><strong>「管理者に追加する」ボタンが自動表示</strong>されます。</span>
                                 </p>
                             </div>
 
-                            <div className="flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg bg-slate-50">
-                                <UserPlus className="h-10 w-10 text-slate-300 mb-2" />
-                                <p className="text-sm text-slate-500 text-center mb-4">
-                                    新しい登録用リンクを生成します。<br />
-                                    リンクの有効期限は3日間です。
+                            <div className="flex flex-col items-center justify-center p-5 sm:p-6 border-2 border-dashed rounded-lg bg-slate-50 text-center">
+                                <UserPlus className="h-9 w-9 text-slate-300 mb-2 shrink-0" />
+                                <p className="text-xs text-slate-500 leading-relaxed mb-3">
+                                    <span className="inline-block">新しい登録用リンクを生成します。</span>
+                                    <span className="inline-block">（有効期限: 3日間）</span>
                                 </p>
-                                <Button onClick={handleCreate} disabled={isPending}>
+                                <Button onClick={handleCreate} disabled={isPending} className="whitespace-nowrap h-10 px-5 text-xs sm:text-sm font-bold">
                                     {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                     登録リンクを生成する
                                 </Button>
-                                {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
+                                {error && <p className="text-red-500 text-xs mt-2">{error}</p>}
                             </div>
                         </div>
                     ) : (
