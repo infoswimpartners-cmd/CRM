@@ -12,6 +12,8 @@ import { CoachTaxSettingsForm } from '@/components/admin/CoachTaxSettingsForm'
 import { CoachRewardSettingsForm } from '@/components/admin/CoachRewardSettingsForm'
 import { CoachLineSettingsForm } from '@/components/admin/CoachLineSettingsForm'
 import { CoachAvailabilitySettings } from '@/components/admin/CoachAvailabilitySettings'
+import { CoachContractCard } from '@/components/admin/CoachContractCard'
+import { CoachOnboardingGuideDialog } from '@/components/admin/CoachOnboardingGuideDialog'
 
 export const dynamic = 'force-dynamic'
 
@@ -64,6 +66,13 @@ export default async function CoachDetailPage({ params }: PageProps) {
         .eq('active', true)
         .order('space_name', { ascending: true })
 
+    // Fetch coach contract logs
+    const { data: coachContracts } = await supabase
+        .from('coach_contracts')
+        .select('*')
+        .eq('coach_id', id)
+        .order('agreed_at', { ascending: false })
+
     return (
         <div className="space-y-8">
             <div className="flex items-center justify-between">
@@ -77,11 +86,14 @@ export default async function CoachDetailPage({ params }: PageProps) {
                         <h1 className="text-2xl font-bold">コーチ詳細</h1>
                     </div>
                 </div>
-                <Button variant="outline" asChild>
-                    <Link href={`/admin/coaches/${id}/edit`}>
-                        編集
-                    </Link>
-                </Button>
+                <div className="flex items-center gap-2">
+                    <CoachOnboardingGuideDialog defaultCoachName={coach.full_name || ''} />
+                    <Button variant="outline" asChild>
+                        <Link href={`/admin/coaches/${id}/edit`}>
+                            編集
+                        </Link>
+                    </Button>
+                </div>
             </div>
 
             <div className="flex items-center gap-6 p-6 border rounded-lg bg-white shadow-sm">
@@ -107,6 +119,11 @@ export default async function CoachDetailPage({ params }: PageProps) {
                     )}
                 </div>
             </div>
+
+            <CoachContractCard
+                contracts={coachContracts || []}
+                onboardingCompletedAt={coach.onboarding_completed_at}
+            />
 
             <div className="grid gap-6 md:grid-cols-2">
                 <Card>

@@ -101,6 +101,23 @@ export function AddCoachDialog() {
                                     required
                                 />
                             </div>
+                            <div className="grid grid-cols-4 items-center gap-4">
+                                <Label htmlFor="lineAdminInviteUrl" className="text-right text-xs">
+                                    公式LINE招待URL
+                                </Label>
+                                <Input
+                                    id="lineAdminInviteUrl"
+                                    name="lineAdminInviteUrl"
+                                    type="url"
+                                    placeholder="https://line.me/R/ti/p/... (任意)"
+                                    className="col-span-3 text-xs"
+                                />
+                            </div>
+                            <div className="col-span-4 text-right">
+                                <span className="text-[11px] text-muted-foreground">
+                                    ※設定するとコーチの初期設定画面で管理者追加ボタンが直接案内されます
+                                </span>
+                            </div>
                         </div>
                         {state.error && (
                             <p className="text-sm text-red-500 mb-4 text-center">{state.error}</p>

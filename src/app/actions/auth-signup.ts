@@ -9,19 +9,38 @@ import { revalidatePath } from 'next/cache'
 /**
  * Generates a generic invitation token for self-registration.
  */
-export async function createGenericInvitation(): Promise<{ success?: boolean; url?: string; error?: string }> {
+export async function createGenericInvitation(lineAdminInviteUrl?: string): Promise<{ success?: boolean; url?: string; error?: string }> {
     try {
+        const userClient = await createClient()
+        const { data: { user }, error: authError } = await userClient.auth.getUser()
+        if (authError || !user) {
+            return { error: '認証が必要です。再度ログインしてください。' }
+        }
+
+        const { data: profile } = await userClient
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single()
+
+        if (profile?.role !== 'admin') {
+            return { error: '管理者権限が必要です。' }
+        }
+
         const supabase = createAdminClient()
         const token = randomUUID()
         // Expires in 3 days
         const expiresAt = addDays(new Date(), 3).toISOString()
+
+        const trimmedLineUrl = lineAdminInviteUrl?.trim() || null
 
         const { error } = await supabase
             .from('coach_invitations')
             .insert({
                 token: token,
                 expires_at: expiresAt,
-                is_used: false
+                is_used: false,
+                line_admin_invite_url: trimmedLineUrl
             })
 
         if (error) {
@@ -41,13 +60,13 @@ export async function createGenericInvitation(): Promise<{ success?: boolean; ur
 /**
  * Verifies if a signup token is valid.
  */
-export async function verifySignupToken(token: string): Promise<{ valid: boolean; isUsed?: boolean; error?: string }> {
+export async function verifySignupToken(token: string): Promise<{ valid: boolean; isUsed?: boolean; lineAdminInviteUrl?: string | null; error?: string }> {
     if (!token) return { valid: false, error: 'トークンがありません。' }
 
     const supabase = createAdminClient()
     const { data, error } = await supabase
         .from('coach_invitations')
-        .select('expires_at, is_used')
+        .select('expires_at, is_used, line_admin_invite_url')
         .eq('token', token)
         .single()
 
@@ -63,7 +82,7 @@ export async function verifySignupToken(token: string): Promise<{ valid: boolean
         return { valid: false, error: 'リンクの有効期限が切れています。' }
     }
 
-    return { valid: true }
+    return { valid: true, lineAdminInviteUrl: data.line_admin_invite_url }
 }
 
 /**
@@ -91,7 +110,7 @@ export async function registerCoachWithToken(prevState: any, formData: FormData)
     const supabase = createAdminClient()
 
     // 1. Verify Token Again
-    const { valid, error: tokenError } = await verifySignupToken(token)
+    const { valid, lineAdminInviteUrl, error: tokenError } = await verifySignupToken(token)
     if (!valid) return { error: tokenError }
 
     try {
@@ -118,7 +137,8 @@ export async function registerCoachWithToken(prevState: any, formData: FormData)
                 full_name: fullName,
                 role: 'coach',
                 status: 'active', // Active immediately
-                must_change_password: false
+                must_change_password: false,
+                line_admin_invite_url: lineAdminInviteUrl || null
             })
 
         if (profileError) {

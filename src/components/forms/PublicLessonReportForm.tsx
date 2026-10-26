@@ -114,13 +114,19 @@ export function PublicLessonReportForm() {
             if (mastersError) console.error("Error fetching masters (public):", mastersError)
 
             // Fetch Coaches (Public Profiles)
-            const { data: profiles } = await supabase
-                .from('profiles')
-                .select('id, full_name')
-                .eq('role', 'coach')
-                .order('full_name')
+            // 安全な公開用RPC get_public_coaches を優先（フォールバック対応）
+            const { data: rpcData, error: rpcError } = await supabase.rpc('get_public_coaches')
+            if (rpcData && !rpcError) {
+                setCoaches(rpcData)
+            } else {
+                const { data: profiles } = await supabase
+                    .from('profiles')
+                    .select('id, full_name')
+                    .eq('role', 'coach')
+                    .order('full_name')
 
-            if (profiles) setCoaches(profiles)
+                if (profiles) setCoaches(profiles)
+            }
         }
         fetchData()
     }, [])
@@ -151,6 +157,16 @@ export function PublicLessonReportForm() {
 
         const supabase = createClient()
         const searchId = `C${coachNumber}`
+
+        // キャッシュされたcoachesリスト（RPC取得済み）から先に検索
+        const matched = coaches.find((c: any) => c.coach_number === searchId)
+        if (matched) {
+            setFoundCoach(matched)
+            form.setValue('coach_id', matched.id)
+            toast.success(`担当コーチ: ${matched.full_name}`)
+            setIsLoadingCoach(false)
+            return
+        }
 
         const { data, error } = await supabase
             .from('profiles')

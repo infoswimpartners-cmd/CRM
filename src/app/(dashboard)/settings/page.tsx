@@ -8,6 +8,8 @@ import { Lock } from 'lucide-react'
 import Link from 'next/link'
 import { BankInfoForm } from '@/components/settings/BankInfoForm'
 import { GoogleCalendarSettings } from '@/components/settings/GoogleCalendarSettings'
+import { CoachContractModal } from '@/components/coach/CoachContractModal'
+import { FileText } from 'lucide-react'
 
 export default async function SettingsPage() {
     const supabase = await createClient()
@@ -99,6 +101,33 @@ export default async function SettingsPage() {
                     initialIsLinked={!!profile.google_refresh_token} 
                     redirectPath="/settings"
                 />
+
+                {profile.role === 'coach' && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <FileText className="h-5 w-5 text-blue-600" />
+                                業務委託契約・覚書
+                            </CardTitle>
+                            <CardDescription>
+                                初回登録時に同意された業務委託基本契約および報酬に関する覚書の内容を確認できます。
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="flex items-center justify-between p-4 border rounded-xl bg-slate-50/50">
+                                <div>
+                                    <div className="font-semibold text-slate-800 text-sm">
+                                        業務委託契約書 ＆ 報酬に関する覚書（2026年6月改定）
+                                    </div>
+                                    <div className="text-xs text-slate-500 mt-0.5">
+                                        {profile.onboarding_completed_at ? '同意済み' : '未完了'}
+                                    </div>
+                                </div>
+                                <CoachContractModal agreedAt={profile.onboarding_completed_at} />
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
 
                 <BankInfoForm />
             </div>

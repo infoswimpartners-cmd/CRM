@@ -27,6 +27,7 @@ interface ProfileFormProps {
         role?: string
         override_coach_rank?: number | null
         line_friend_url?: string | null
+        line_admin_invite_url?: string | null
         base_area?: string | null
     }
     redirectPath: string
@@ -46,6 +47,7 @@ export function ProfileForm({ profileId, initialData, redirectPath, title = "プ
         role: initialData.role || 'coach',
         override_coach_rank: initialData.override_coach_rank ?? 'auto', // use string 'auto' for null in select
         line_friend_url: initialData.line_friend_url || '',
+        line_admin_invite_url: initialData.line_admin_invite_url || '',
         base_area: initialData.base_area || '',
     })
 
@@ -113,6 +115,7 @@ export function ProfileForm({ profileId, initialData, redirectPath, title = "プ
                 full_name_kana: formData.full_name_kana || null,
                 avatar_url: formData.avatar_url || null,
                 line_friend_url: formData.line_friend_url || null,
+                line_admin_invite_url: formData.line_admin_invite_url || null,
                 base_area: formData.base_area || null,
             }
 
@@ -182,9 +185,16 @@ export function ProfileForm({ profileId, initialData, redirectPath, title = "プ
                         <Input id="full_name_kana" value={formData.full_name_kana} onChange={handleChange} placeholder="ヤマダ タロウ" />
                     </div>
                     <div className="space-y-2">
-                        <Label htmlFor="line_friend_url">LINE友達追加URL</Label>
+                        <Label htmlFor="line_friend_url">LINE友達追加URL（顧客向け）</Label>
                         <Input id="line_friend_url" value={formData.line_friend_url} onChange={handleChange} placeholder="https://line.me/ti/p/..." />
                     </div>
+                    {enableRoleEdit && (
+                        <div className="space-y-2">
+                            <Label htmlFor="line_admin_invite_url">公式LINE管理者招待URL（オンボーディング用）</Label>
+                            <Input id="line_admin_invite_url" value={formData.line_admin_invite_url} onChange={handleChange} placeholder="https://line.me/R/ti/p/..." />
+                            <p className="text-xs text-muted-foreground">※設定するとコーチの初期設定画面で管理者追加ボタンが直接案内されます</p>
+                        </div>
+                    )}
 
                     {enableRoleEdit && (
                         <div className="space-y-2">

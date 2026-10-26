@@ -15,6 +15,7 @@ interface CreateCoachState {
 export async function createCoach(prevState: CreateCoachState, formData: FormData): Promise<CreateCoachState> {
     const email = formData.get('email') as string
     const fullName = formData.get('fullName') as string
+    const lineAdminInviteUrl = (formData.get('lineAdminInviteUrl') as string)?.trim() || null
 
     if (!email || !fullName) {
         return { error: 'メールアドレスと氏名は必須です。' }
@@ -71,7 +72,8 @@ export async function createCoach(prevState: CreateCoachState, formData: FormDat
                 status: 'pending',
                 invitation_token: invitationToken,
                 invitation_expires_at: expiresAt,
-                must_change_password: false // They set it initially, so no need to force change immediately after
+                must_change_password: false, // They set it initially, so no need to force change immediately after
+                line_admin_invite_url: lineAdminInviteUrl
             })
 
         if (profileError) {
