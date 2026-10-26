@@ -119,7 +119,7 @@ export async function agreeToCoachContracts(input: AgreeContractsInput) {
  * 初回オンボーディング完了をマークする
  * セキュリティ検証: DB内に基本契約・覚書の両方の同意ログが実在することを検証した上で完了を認める
  */
-export async function completeCoachOnboarding() {
+export async function completeCoachOnboarding(googleChatEmail?: string) {
     try {
         const supabase = await createClient()
         const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -152,12 +152,17 @@ export async function completeCoachOnboarding() {
 
         const now = new Date().toISOString()
 
+        const updates: any = {
+            onboarding_completed_at: now
+        }
+        if (googleChatEmail?.trim()) {
+            updates.google_chat_email = googleChatEmail.trim()
+        }
+
         // Service Role 経由で onboarding_completed_at を安全に更新
         const { error: updateError } = await adminClient
             .from('profiles')
-            .update({
-                onboarding_completed_at: now
-            })
+            .update(updates)
             .eq('id', user.id)
 
         if (updateError) {
@@ -171,6 +176,45 @@ export async function completeCoachOnboarding() {
         return { success: true }
     } catch (err: any) {
         console.error('completeCoachOnboarding error:', err)
+        return { success: false, error: err?.message || '処理中にエラーが発生しました。' }
+    }
+}
+
+/**
+ * コーチのGoogleチャット招待用Gmailアドレスを保存する
+ */
+export async function updateCoachGoogleChatEmail(email: string) {
+    try {
+        const supabase = await createClient()
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+        if (authError || !user) {
+            return { success: false, error: '認証情報が見つかりません。' }
+        }
+
+        const trimmed = email.trim()
+        if (!trimmed) {
+            return { success: false, error: 'メールアドレスを入力してください。' }
+        }
+
+        const adminClient = createAdminClient()
+        const { error } = await adminClient
+            .from('profiles')
+            .update({
+                google_chat_email: trimmed
+            })
+            .eq('id', user.id)
+
+        if (error) {
+            console.error('Failed to update google_chat_email:', error)
+            return { success: false, error: 'Googleチャット用メールアドレスの保存に失敗しました。' }
+        }
+
+        revalidatePath('/coach/onboarding')
+        revalidatePath('/admin/coaches')
+        return { success: true }
+    } catch (err: any) {
+        console.error('updateCoachGoogleChatEmail error:', err)
         return { success: false, error: err?.message || '処理中にエラーが発生しました。' }
     }
 }

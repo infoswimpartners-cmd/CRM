@@ -29,7 +29,9 @@ import {
     MessageSquare,
     Smartphone,
     ExternalLink,
-    ShieldAlert
+    ShieldAlert,
+    Mail,
+    Check
 } from 'lucide-react'
 import {
     BASIC_AGREEMENT,
@@ -38,7 +40,8 @@ import {
 } from '@/lib/constants/agreements'
 import {
     agreeToCoachContracts,
-    completeCoachOnboarding
+    completeCoachOnboarding,
+    updateCoachGoogleChatEmail
 } from '@/actions/coach-contract'
 import { AreaStationPicker } from '@/components/forms/AreaStationPicker'
 
@@ -53,6 +56,7 @@ interface CoachOnboardingWizardProps {
         avatar_url: string | null
         base_area?: string | null
         line_admin_invite_url?: string | null
+        google_chat_email?: string | null
     }
     isDemo?: boolean
 }
@@ -90,7 +94,20 @@ export function CoachOnboardingWizard({ profile, isDemo = false }: CoachOnboardi
         account_holder_name: profile.full_name_kana || ''
     })
 
-    // --- STEP 4: LINE管理者参加確認 ---
+    // --- STEP 4: 連絡ツール (Googleチャット & LINE) ---
+    const defaultIsGmail = (profile.email || '').toLowerCase().trim().endsWith('@gmail.com')
+    const [useAccountEmail, setUseAccountEmail] = useState<boolean>(
+        !profile.google_chat_email ? defaultIsGmail : profile.google_chat_email.toLowerCase().trim() === profile.email.toLowerCase().trim()
+    )
+    const [googleChatEmail, setGoogleChatEmail] = useState<string>(
+        profile.google_chat_email || (defaultIsGmail ? profile.email : '')
+    )
+    const [customGmail, setCustomGmail] = useState<string>(
+        profile.google_chat_email && profile.google_chat_email.toLowerCase().trim() !== profile.email.toLowerCase().trim()
+            ? profile.google_chat_email
+            : (!defaultIsGmail ? profile.email : '')
+    )
+    const [googleChatAppConfirmed, setGoogleChatAppConfirmed] = useState(false)
     const [lineAdminConfirmed, setLineAdminConfirmed] = useState(false)
     const rawLineAdminUrl = profile.line_admin_invite_url || (isDemo ? 'https://line.me/R/ti/p/demo-invite-admin' : null)
     // 安全なhttp/httpsスキームのみ許可（javascript: などの悪意あるURLスキームを遮断）
@@ -247,6 +264,55 @@ export function CoachOnboardingWizard({ profile, isDemo = false }: CoachOnboardi
         }
     }
 
+    // 決定されたGoogleチャット用Gmailアドレスを取得
+    const getEffectiveGoogleChatEmail = () => {
+        if (defaultIsGmail && useAccountEmail) {
+            return profile.email.trim()
+        }
+        return (customGmail || googleChatEmail).trim()
+    }
+
+    // STEP 4 の送信（GoogleチャットGmail保存 & LINE確認）
+    const handleProceedFromStep4 = async () => {
+        const finalEmail = getEffectiveGoogleChatEmail()
+        if (!finalEmail) {
+            toast.error('Googleチャット用のアカウント（Gmail）を入力してください。')
+            return
+        }
+        if (!finalEmail.includes('@')) {
+            toast.error('有効なメールアドレス形式で入力してください。')
+            return
+        }
+        if (!googleChatAppConfirmed) {
+            toast.error('「Google Chatアプリをインストール・ログインしました」の確認チェックをお願いいたします。')
+            return
+        }
+        if (effectiveLineAdminUrl && !lineAdminConfirmed) {
+            toast.info('公式LINEへの管理者参加がまだの場合は、ボタンから参加をお願いいたします。')
+        }
+
+        if (isDemo) {
+            setGoogleChatEmail(finalEmail)
+            setCurrentStep(5)
+            return
+        }
+
+        setLoading(true)
+        try {
+            const res = await updateCoachGoogleChatEmail(finalEmail)
+            if (!res.success) {
+                toast.error(res.error || 'Googleチャット用メールアドレスの保存に失敗しました')
+                return
+            }
+            setGoogleChatEmail(finalEmail)
+            setCurrentStep(5)
+        } catch (err: any) {
+            toast.error('保存時にエラーが発生しました: ' + err.message)
+        } finally {
+            setLoading(false)
+        }
+    }
+
     // STEP 5 の完了 (オンボーディング完了)
     const handleFinishOnboarding = async () => {
         if (isDemo) {
@@ -257,7 +323,8 @@ export function CoachOnboardingWizard({ profile, isDemo = false }: CoachOnboardi
 
         setLoading(true)
         try {
-            const res = await completeCoachOnboarding()
+            const finalChatEmail = getEffectiveGoogleChatEmail()
+            const res = await completeCoachOnboarding(finalChatEmail || undefined)
             if (res.success) {
                 toast.success('初期設定が完了しました！Swim Partnersへようこそ。')
                 router.push('/coach')
@@ -861,40 +928,184 @@ export function CoachOnboardingWizard({ profile, isDemo = false }: CoachOnboardi
                     </CardHeader>
 
                     <CardContent className="pt-5 sm:pt-6 px-4 sm:px-6 space-y-5 sm:space-y-6">
-                        {/* ① Googleチャット案内 */}
-                        <div className="p-4 sm:p-5 rounded-xl border border-blue-100 bg-blue-50/30 space-y-3">
+                        {/* ① Googleチャット案内 ＆ Gmail確認 */}
+                        <div className="p-4 sm:p-5 rounded-xl border border-blue-200 bg-blue-50/40 space-y-4 shadow-sm">
                             <div className="flex items-center gap-2.5">
-                                <div className="p-2 rounded-lg bg-blue-100 text-blue-700 shrink-0">
+                                <div className="p-2 rounded-lg bg-blue-600 text-white shadow-sm shrink-0">
                                     <MessageSquare className="h-5 w-5" />
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-slate-800 text-sm sm:text-base leading-snug">
-                                        1. 【本部連絡用】Googleチャット
+                                    <h3 className="font-bold text-slate-800 text-sm sm:text-base flex flex-wrap items-center gap-1.5 leading-snug">
+                                        <span>1. 【本部連絡用】Googleチャット</span>
+                                        <Badge className="bg-blue-600 hover:bg-blue-700 text-white text-[10px] whitespace-nowrap">
+                                            必須ステップ
+                                        </Badge>
                                     </h3>
                                     <p className="text-[11px] sm:text-xs text-slate-500 leading-tight">
-                                        レッスン依頼・スケジュール調整・緊急連絡に使用
+                                        レッスン依頼・スケジュール調整・本部緊急連絡に使用
                                     </p>
                                 </div>
                             </div>
 
-                            <div className="text-xs sm:text-sm text-slate-600 pl-0.5 space-y-2 leading-relaxed">
+                            <div className="text-xs sm:text-sm text-slate-600 space-y-3 leading-relaxed">
                                 <p>
-                                    面談完了後、事務局よりGoogleチャットの専用スペース招待をお送りいたします。<br />
-                                    急な依頼を見逃さないよう、スマートフォンに<strong>「Google Chat」アプリ</strong>を入れ、通知を「常に許可」に設定してください。
+                                    面談完了後、本部事務局よりGoogleチャットの専用スペースへご招待をお送りいたします。<br />
+                                    確実にスペースへご参加いただくため、<strong>Googleアカウント（Gmailアドレス）</strong>のご確認・ご入力をお願いいたします。
                                 </p>
-                                <div className="flex flex-wrap gap-2 pt-1">
-                                    <Button variant="outline" size="sm" asChild className="bg-white gap-1 text-xs whitespace-nowrap">
-                                        <a href="https://apps.apple.com/jp/app/google-chat/id1163852619" target="_blank" rel="noopener noreferrer">
-                                            <ExternalLink className="h-3.5 w-3.5 text-blue-600 shrink-0" />
-                                            iOS（App Store）
-                                        </a>
-                                    </Button>
-                                    <Button variant="outline" size="sm" asChild className="bg-white gap-1 text-xs whitespace-nowrap">
-                                        <a href="https://play.google.com/store/apps/details?id=com.google.android.apps.dynamite" target="_blank" rel="noopener noreferrer">
-                                            <ExternalLink className="h-3.5 w-3.5 text-blue-600 shrink-0" />
-                                            Android（Google Play）
-                                        </a>
-                                    </Button>
+
+                                {/* Gmail入力・選択カード */}
+                                <div className="p-3.5 sm:p-4 bg-white rounded-xl border border-blue-200 shadow-sm space-y-3">
+                                    <div className="font-semibold text-slate-800 text-xs sm:text-sm flex items-center gap-1.5">
+                                        <Mail className="h-4 w-4 text-blue-600 shrink-0" />
+                                        <span>Googleチャット用Gmailアドレスの確認</span>
+                                    </div>
+
+                                    {defaultIsGmail ? (
+                                        <div className="space-y-3">
+                                            <p className="text-[11px] sm:text-xs text-slate-600 leading-relaxed">
+                                                現在ログイン中のメールアドレス（Gmail）をそのままチャット連絡用として使用できます。
+                                            </p>
+
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setUseAccountEmail(true)}
+                                                    className={`p-3 rounded-xl border text-left flex items-start justify-between transition-all ${
+                                                        useAccountEmail
+                                                            ? 'border-blue-600 bg-blue-50/60 ring-2 ring-blue-500/20'
+                                                            : 'border-slate-200 hover:border-slate-300 bg-white'
+                                                    }`}
+                                                >
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="text-xs font-bold text-slate-800">
+                                                                現在のGmailを使用
+                                                            </span>
+                                                            <Badge variant="secondary" className="bg-blue-100 text-blue-700 text-[10px] py-0 px-1.5">
+                                                                推奨
+                                                            </Badge>
+                                                        </div>
+                                                        <div className="text-xs font-mono text-slate-600 break-all">
+                                                            {profile.email}
+                                                        </div>
+                                                    </div>
+                                                    {useAccountEmail && (
+                                                        <div className="h-5 w-5 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0">
+                                                            <Check className="h-3 w-3 stroke-[3]" />
+                                                        </div>
+                                                    )}
+                                                </button>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setUseAccountEmail(false)}
+                                                    className={`p-3 rounded-xl border text-left flex items-start justify-between transition-all ${
+                                                        !useAccountEmail
+                                                            ? 'border-blue-600 bg-blue-50/60 ring-2 ring-blue-500/20'
+                                                            : 'border-slate-200 hover:border-slate-300 bg-white'
+                                                    }`}
+                                                >
+                                                    <div className="space-y-1">
+                                                        <span className="text-xs font-bold text-slate-800">
+                                                            別のGmailを使用する
+                                                        </span>
+                                                        <p className="text-[11px] text-slate-500">
+                                                            別のアカウントで参加したい場合
+                                                        </p>
+                                                    </div>
+                                                    {!useAccountEmail && (
+                                                        <div className="h-5 w-5 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0">
+                                                            <Check className="h-3 w-3 stroke-[3]" />
+                                                        </div>
+                                                    )}
+                                                </button>
+                                            </div>
+
+                                            {!useAccountEmail && (
+                                                <div className="pt-1 space-y-1.5">
+                                                    <Label htmlFor="custom_gmail_input" className="text-xs font-semibold text-slate-700">
+                                                        Googleチャットで使用するGmailアドレス
+                                                    </Label>
+                                                    <Input
+                                                        id="custom_gmail_input"
+                                                        type="email"
+                                                        value={customGmail}
+                                                        onChange={(e) => setCustomGmail(e.target.value)}
+                                                        placeholder="例: yourname@gmail.com"
+                                                        className="text-xs sm:text-sm"
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            <p className="text-[11px] sm:text-xs text-slate-600 leading-relaxed">
+                                                現在の登録メールアドレス（<span className="font-mono">{profile.email}</span>）はGmail以外のため、Googleチャット用のアカウント（Gmail）をご指定ください。
+                                            </p>
+                                            <div className="space-y-1.5">
+                                                <Label htmlFor="custom_gmail_input" className="text-xs font-semibold text-slate-700">
+                                                    Googleチャット用Gmailアドレス <span className="text-red-500">*</span>
+                                                </Label>
+                                                <Input
+                                                    id="custom_gmail_input"
+                                                    type="email"
+                                                    value={customGmail}
+                                                    onChange={(e) => setCustomGmail(e.target.value)}
+                                                    placeholder="例: yourname@gmail.com"
+                                                    className="text-xs sm:text-sm"
+                                                />
+                                            </div>
+                                            <div className="pt-1">
+                                                <a
+                                                    href="https://accounts.google.com/signup"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-flex items-center gap-1 text-[11px] sm:text-xs text-blue-600 hover:text-blue-700 hover:underline"
+                                                >
+                                                    <ExternalLink className="h-3 w-3 shrink-0" />
+                                                    Googleアカウント（Gmail）をお持ちでない方はこちら（新規作成・無料）
+                                                </a>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Google Chatアプリダウンロード */}
+                                    <div className="pt-3 border-t border-slate-100 space-y-2">
+                                        <div className="font-semibold text-slate-800 text-xs sm:text-sm">
+                                            アプリのダウンロード（通知を「常に許可」にしてください）
+                                        </div>
+                                        <div className="flex flex-wrap gap-2">
+                                            <Button variant="outline" size="sm" asChild className="bg-white gap-1 text-xs border-blue-200 hover:bg-blue-50 whitespace-nowrap">
+                                                <a href="https://apps.apple.com/jp/app/google-chat/id1163852619" target="_blank" rel="noopener noreferrer">
+                                                    <ExternalLink className="h-3.5 w-3.5 text-blue-600 shrink-0" />
+                                                    iOS（App Store）
+                                                </a>
+                                            </Button>
+                                            <Button variant="outline" size="sm" asChild className="bg-white gap-1 text-xs border-blue-200 hover:bg-blue-50 whitespace-nowrap">
+                                                <a href="https://play.google.com/store/apps/details?id=com.google.android.apps.dynamite" target="_blank" rel="noopener noreferrer">
+                                                    <ExternalLink className="h-3.5 w-3.5 text-blue-600 shrink-0" />
+                                                    Android（Google Play）
+                                                </a>
+                                            </Button>
+                                        </div>
+                                    </div>
+
+                                    {/* アプリログイン確認チェックボックス */}
+                                    <div className="flex items-start space-x-2 pt-2 border-t border-slate-100">
+                                        <Checkbox
+                                            id="google-chat-confirm"
+                                            checked={googleChatAppConfirmed}
+                                            onCheckedChange={(checked) => setGoogleChatAppConfirmed(checked === true)}
+                                            className="mt-0.5 shrink-0 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                                        />
+                                        <label
+                                            htmlFor="google-chat-confirm"
+                                            className="text-xs font-semibold text-slate-800 cursor-pointer select-none leading-relaxed"
+                                        >
+                                            <span className="inline-block">Google Chatアプリをインストールし、</span>
+                                            <span className="inline-block">上記のGmailアカウントでログインを完了しました</span>
+                                        </label>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1022,21 +1233,27 @@ export function CoachOnboardingWizard({ profile, isDemo = false }: CoachOnboardi
                             type="button"
                             variant="ghost"
                             onClick={() => setCurrentStep(3)}
+                            disabled={loading}
                             className="w-full sm:w-auto text-xs sm:text-sm"
                         >
                             戻る
                         </Button>
                         <Button
-                            onClick={() => {
-                                if (effectiveLineAdminUrl && !lineAdminConfirmed) {
-                                    toast.info('公式LINEへの管理者参加がまだの場合は、ボタンから参加をお願いいたします。')
-                                }
-                                setCurrentStep(5)
-                            }}
+                            onClick={handleProceedFromStep4}
+                            disabled={loading}
                             className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold h-11 px-6 rounded-xl shadow-sm whitespace-nowrap text-sm"
                         >
-                            確認しました（完了画面へ）
-                            <ChevronRight className="ml-2 h-4 w-4" />
+                            {loading ? (
+                                <>
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    登録中...
+                                </>
+                            ) : (
+                                <>
+                                    確認・次へ（完了画面へ）
+                                    <ChevronRight className="ml-2 h-4 w-4" />
+                                </>
+                            )}
                         </Button>
                     </CardFooter>
                 </Card>
@@ -1069,6 +1286,7 @@ export function CoachOnboardingWizard({ profile, isDemo = false }: CoachOnboardi
                             <div>・報酬に関する覚書: <span className="text-emerald-600 font-semibold">同意完了</span></div>
                             <div>・受託者氏名: <span className="font-medium text-slate-800">{signerName}</span></div>
                             <div>・振込口座: <span className="font-medium text-slate-800">{bankData.bank_name ? `${bankData.bank_name} ${bankData.branch_name}` : '未登録（後からマイページで設定可能）'}</span></div>
+                            <div>・本部Googleチャット: <span className="font-medium text-slate-800">{googleChatEmail || '登録完了'}</span></div>
                             <div>・業務連絡ツール: <span className="text-emerald-600 font-semibold">Googleチャット ＆ 公式LINE準備完了</span></div>
                         </div>
 

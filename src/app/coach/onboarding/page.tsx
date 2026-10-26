@@ -51,7 +51,8 @@ export default async function CoachOnboardingPage({ searchParams }: PageProps) {
                     address: profile.address,
                     avatar_url: profile.avatar_url,
                     base_area: profile.base_area,
-                    line_admin_invite_url: profile.line_admin_invite_url
+                    line_admin_invite_url: profile.line_admin_invite_url,
+                    google_chat_email: profile.google_chat_email
                 }}
             />
         </div>

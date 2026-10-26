@@ -13,6 +13,7 @@ import { CoachRewardSettingsForm } from '@/components/admin/CoachRewardSettingsF
 import { CoachLineSettingsForm } from '@/components/admin/CoachLineSettingsForm'
 import { CoachAvailabilitySettings } from '@/components/admin/CoachAvailabilitySettings'
 import { CoachContractCard } from '@/components/admin/CoachContractCard'
+import { CoachContactToolsCard } from '@/components/admin/CoachContactToolsCard'
 import { CoachOnboardingGuideDialog } from '@/components/admin/CoachOnboardingGuideDialog'
 
 export const dynamic = 'force-dynamic'
@@ -119,6 +120,13 @@ export default async function CoachDetailPage({ params }: PageProps) {
                     )}
                 </div>
             </div>
+
+            <CoachContactToolsCard
+                googleChatEmail={coach.google_chat_email}
+                loginEmail={coach.email}
+                lineAdminInviteUrl={coach.line_admin_invite_url}
+                coachName={coach.full_name || ''}
+            />
 
             <CoachContractCard
                 contracts={coachContracts || []}

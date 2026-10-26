@@ -46,6 +46,7 @@ export default async function EditCoachPage({ params }: PageProps) {
                     override_coach_rank: coach.override_coach_rank,
                     line_friend_url: coach.line_friend_url,
                     line_admin_invite_url: coach.line_admin_invite_url,
+                    google_chat_email: coach.google_chat_email,
                     base_area: coach.base_area
                 }}
                 enableRoleEdit={true}
