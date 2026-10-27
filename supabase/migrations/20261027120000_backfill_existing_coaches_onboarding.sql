@@ -1,9 +1,11 @@
 -- 既存コーチのアカウント救済用マイグレーション
--- 2026年10月25日 17:00（オンボーディング機能リリース日時）以前に登録された既存コーチについて、
--- onboarding_completed_at が未設定（NULL）のものを created_at にて一括補完し、ログイン時の強制リダイレクトを回避します。
+-- 必要なカラムを安全に追加した上で、現在登録されている既存コーチの onboarding_completed_at を完了日時に更新します。
+
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS onboarding_completed_at TIMESTAMPTZ;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS google_chat_email TEXT;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS phone_number TEXT;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS address TEXT;
 
 UPDATE profiles
-SET onboarding_completed_at = created_at
-WHERE role = 'coach'
-  AND onboarding_completed_at IS NULL
-  AND created_at < '2026-10-25 17:00:00+09';
+SET onboarding_completed_at = COALESCE(onboarding_completed_at, NOW())
+WHERE role = 'coach';

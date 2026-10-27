@@ -45,11 +45,14 @@ export default async function DashboardLayout({
     }
 
     // オンボーディング機能の適用開始日時（2026年10月25日 17:00 JST）
-    // 機能リリース以前に登録されていた既存コーチは締め出さず通常通りアクセスを許可
+    // ユーザー作成日時（user.created_at）が機能リリース以前の既存コーチは締め出さず通常通りアクセスを許可
     const ONBOARDING_FEATURE_RELEASED_AT = new Date('2026-10-25T17:00:00+09:00').getTime()
-    const isExistingCoach = (profile as any).created_at
-        ? new Date((profile as any).created_at).getTime() < ONBOARDING_FEATURE_RELEASED_AT
-        : false
+    const userCreatedAt = user.created_at
+        ? new Date(user.created_at).getTime()
+        : (profile as any).created_at
+        ? new Date((profile as any).created_at).getTime()
+        : 0
+    const isExistingCoach = userCreatedAt > 0 && userCreatedAt < ONBOARDING_FEATURE_RELEASED_AT
 
     // 新規コーチ（リリース日時以降に登録）でオンボーディング未完了の場合のみオンボーディング画面へ誘導
     if (
