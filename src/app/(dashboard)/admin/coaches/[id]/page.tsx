@@ -131,6 +131,7 @@ export default async function CoachDetailPage({ params }: PageProps) {
             <CoachContractCard
                 contracts={coachContracts || []}
                 onboardingCompletedAt={coach.onboarding_completed_at}
+                coachId={coach.id}
             />
 
             <div className="grid gap-6 md:grid-cols-2">

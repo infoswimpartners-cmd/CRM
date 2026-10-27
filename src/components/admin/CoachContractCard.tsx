@@ -1,6 +1,12 @@
+'use client'
+
+import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { FileCheck, ShieldCheck, AlertCircle, Clock, Globe } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { FileCheck, ShieldCheck, AlertCircle, Clock, Globe, Check, RotateCcw, Loader2 } from "lucide-react"
+import { toast } from 'sonner'
+import { toggleCoachOnboardingStatusByAdmin } from '@/actions/coach-contract'
 
 interface ContractRecord {
     id: string
@@ -16,9 +22,11 @@ interface ContractRecord {
 interface CoachContractCardProps {
     contracts: ContractRecord[]
     onboardingCompletedAt?: string | null
+    coachId?: string
 }
 
-export function CoachContractCard({ contracts, onboardingCompletedAt }: CoachContractCardProps) {
+export function CoachContractCard({ contracts, onboardingCompletedAt, coachId }: CoachContractCardProps) {
+    const [loading, setLoading] = useState(false)
     const basicContract = contracts.find(c => c.contract_type === 'basic_agreement')
     const memoContract = contracts.find(c => c.contract_type === 'compensation_memorandum')
 
@@ -37,28 +45,76 @@ export function CoachContractCard({ contracts, onboardingCompletedAt }: CoachCon
         }
     }
 
+    const handleToggleStatus = async (targetCompleted: boolean) => {
+        if (!coachId) return
+        const confirmMsg = targetCompleted
+            ? 'このコーチを「初期セットアップ完了済み」としてダッシュボード利用を許可しますか？'
+            : 'このコーチのセットアップ完了を解除し、初期設定画面（オンボーディング）へ誘導するように戻しますか？'
+
+        if (!window.confirm(confirmMsg)) return
+
+        setLoading(true)
+        try {
+            const res = await toggleCoachOnboardingStatusByAdmin(coachId, targetCompleted)
+            if (res.success) {
+                toast.success(targetCompleted ? '初期セットアップを完了扱いに設定しました' : 'セットアップ完了を解除しました')
+            } else {
+                toast.error(res.error || '更新に失敗しました')
+            }
+        } catch (err: any) {
+            toast.error('エラーが発生しました: ' + err.message)
+        } finally {
+            setLoading(false)
+        }
+    }
+
     return (
         <Card>
             <CardHeader>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <CardTitle className="flex items-center gap-2 text-base">
                         <FileCheck className="h-5 w-5 text-blue-600" />
                         契約締結・規約同意ログ
                     </CardTitle>
-                    {onboardingCompletedAt ? (
-                        <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 gap-1">
-                            <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-                            初期セットアップ完了
-                        </Badge>
-                    ) : (
-                        <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 gap-1">
-                            <AlertCircle className="h-3.5 w-3.5 text-amber-600" />
-                            セットアップ未完了
-                        </Badge>
-                    )}
+                    <div className="flex items-center gap-2">
+                        {onboardingCompletedAt ? (
+                            <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 gap-1">
+                                <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+                                初期セットアップ完了
+                            </Badge>
+                        ) : (
+                            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 gap-1">
+                                <AlertCircle className="h-3.5 w-3.5 text-amber-600" />
+                                セットアップ未完了
+                            </Badge>
+                        )}
+                        {coachId && (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={loading}
+                                onClick={() => handleToggleStatus(!onboardingCompletedAt)}
+                                className="h-7 text-xs px-2.5 gap-1 border-slate-300 hover:bg-slate-50"
+                            >
+                                {loading ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : onboardingCompletedAt ? (
+                                    <>
+                                        <RotateCcw className="h-3 w-3 text-slate-500" />
+                                        未完了に戻す
+                                    </>
+                                ) : (
+                                    <>
+                                        <Check className="h-3 w-3 text-emerald-600" />
+                                        手動で完了済みにする
+                                    </>
+                                )}
+                            </Button>
+                        )}
+                    </div>
                 </div>
                 <CardDescription>
-                    コーチ初回ログイン時のWeb規約同意ログ（電磁的記録）です。
+                    コーチ初回ログイン時のWeb規約同意ログ（電磁的記録）です。既存コーチなど個別事情がある場合は右上のボタンから手動で完了扱いに切り替えることも可能です。
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">

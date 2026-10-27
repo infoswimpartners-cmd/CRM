@@ -44,10 +44,18 @@ export default async function DashboardLayout({
         redirect('/change-password')
     }
 
-    // コーチロールでオンボーディング未完了の場合、オンボーディング画面へ誘導
+    // オンボーディング機能の適用開始日時（2026年10月25日 17:00 JST）
+    // 機能リリース以前に登録されていた既存コーチは締め出さず通常通りアクセスを許可
+    const ONBOARDING_FEATURE_RELEASED_AT = new Date('2026-10-25T17:00:00+09:00').getTime()
+    const isExistingCoach = (profile as any).created_at
+        ? new Date((profile as any).created_at).getTime() < ONBOARDING_FEATURE_RELEASED_AT
+        : false
+
+    // 新規コーチ（リリース日時以降に登録）でオンボーディング未完了の場合のみオンボーディング画面へ誘導
     if (
         profile.role === 'coach' &&
         !profile.onboarding_completed_at &&
+        !isExistingCoach &&
         !pathname.includes('/change-password')
     ) {
         redirect('/coach/onboarding')

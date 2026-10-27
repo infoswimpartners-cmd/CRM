@@ -28,6 +28,7 @@ interface Coach {
     coach_number?: string | null
     status?: string // Added status
     onboarding_completed_at?: string | null
+    created_at?: string | null
 }
 
 interface CoachTableProps {
@@ -129,7 +130,7 @@ export function CoachTable({ coaches, studentCounts }: CoachTableProps) {
                             <TableCell>
                                 {coach.status === 'pending' ? (
                                     <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">招待中</Badge>
-                                ) : !coach.onboarding_completed_at && coach.role === 'coach' ? (
+                                ) : !coach.onboarding_completed_at && coach.role === 'coach' && (!coach.created_at || new Date(coach.created_at).getTime() >= new Date('2026-10-25T17:00:00+09:00').getTime()) ? (
                                     <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">設定・契約中</Badge>
                                 ) : (
                                     <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">有効</Badge>

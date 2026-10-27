@@ -241,3 +241,51 @@ export async function getCoachContractStatus(coachId: string) {
         return { success: false, contracts: [] as ContractAgreementRecord[], error: err?.message }
     }
 }
+
+/**
+ * 【管理者専用】コーチのオンボーディング完了ステータスを手動で切り替える
+ * （既存コーチの救済や、面談済みコーチの個別対応用）
+ */
+export async function toggleCoachOnboardingStatusByAdmin(coachId: string, completed: boolean) {
+    try {
+        const supabase = await createClient()
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+        if (authError || !user) {
+            return { success: false, error: '認証エラーが発生しました。' }
+        }
+
+        // 管理者権限チェック
+        const { data: adminProfile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single()
+
+        if (!adminProfile || adminProfile.role !== 'admin') {
+            return { success: false, error: 'この操作には管理者権限が必要です。' }
+        }
+
+        const adminClient = createAdminClient()
+        const { error: updateError } = await adminClient
+            .from('profiles')
+            .update({
+                onboarding_completed_at: completed ? new Date().toISOString() : null
+            })
+            .eq('id', coachId)
+
+        if (updateError) {
+            console.error('Failed to toggle onboarding status:', updateError)
+            return { success: false, error: 'オンボーディング状態の更新に失敗しました。' }
+        }
+
+        revalidatePath(`/admin/coaches/${coachId}`)
+        revalidatePath('/admin/coaches')
+        revalidatePath('/coach')
+        revalidatePath('/coach/onboarding')
+        return { success: true }
+    } catch (err: any) {
+        console.error('toggleCoachOnboardingStatusByAdmin error:', err)
+        return { success: false, error: err?.message || '処理中にエラーが発生しました。' }
+    }
+}
