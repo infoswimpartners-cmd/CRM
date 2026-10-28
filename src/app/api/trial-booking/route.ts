@@ -403,28 +403,135 @@ SWIM PARTNERS/スイムパートナーズ事務局`;
         const adjustUrl = savedLeadId ? `${siteUrl}/admin/leads?adjust_lead=${savedLeadId}` : `${siteUrl}/admin/leads`;
         const approveUrl = savedLeadId ? `${siteUrl}/api/leads/approve?id=${savedLeadId}` : '';
 
+        // 年齢の算出
+        let ageText = '未入力';
+        if (payload.dob) {
+          const birthDate = new Date(payload.dob);
+          if (!isNaN(birthDate.getTime())) {
+            const today = new Date();
+            let calcAge = today.getFullYear() - birthDate.getFullYear();
+            const m = today.getMonth() - birthDate.getMonth();
+            if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) calcAge--;
+            ageText = `${calcAge}歳 (${payload.dob})`;
+          } else {
+            ageText = payload.dob;
+          }
+        }
+
+        // 2人目生徒の年齢
+        let ageText2 = '';
+        if (payload.dob2) {
+          const birthDate2 = new Date(payload.dob2);
+          if (!isNaN(birthDate2.getTime())) {
+            const today = new Date();
+            let calcAge2 = today.getFullYear() - birthDate2.getFullYear();
+            const m2 = today.getMonth() - birthDate2.getMonth();
+            if (m2 < 0 || (m2 === 0 && today.getDate() < birthDate2.getDate())) calcAge2--;
+            ageText2 = `${calcAge2}歳`;
+          }
+        }
+
+        // 女性コーチ希望などの特定要件検知
+        const notesContent = combinedNotes || payload.notes || '特になし';
+        const hasFemaleCoachRequest = /女性|女の方|女性コーチ|指名/i.test(notesContent);
+
         const gchatMessage = 
-          `🏊‍♂️ *【体験レッスンお申し込みを受信しました】*\n` +
-          `・氏名: *${payload.name || '未入力'}* 様（${payload.kana || ''}）\n` +
-          (referrer ? `・🎁 *ご紹介者様*: *${referrer}* 様（*お友達紹介特別価格 3,500円適用*）\n` : '') +
-          `・希望エリア/最寄駅: ${payload.station || '未指定'}\n` +
-          `・予定プール（自動選定候補）: ${autoCandidateLocation}\n` +
-          `・第1希望: ${payload.datetime1 || '未指定'}\n` +
-          `・第2希望: ${payload.datetime2 || '未指定'}\n` +
-          `・第3希望: ${payload.datetime3 || '未指定'}\n` +
+          `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+          `🏊‍♂️ *【体験レッスンお申し込み・承認リクエスト】*\n` +
+          `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+          (hasFemaleCoachRequest 
+            ? `🚨 *【要確認】ご要望に「女性コーチ」または「指名」が含まれています！*\n※全コーチへの一括配信ではなく、個別アサイン（調整）を推奨します。\n\n` 
+            : '') +
+          `*■ 顧客基本情報*\n` +
+          `・氏名: *${payload.name || '未入力'}* 様（${payload.kana || '未入力'}）\n` +
+          `・性別 / 年齢: ${payload.gender || '未選択'} / ${ageText}\n` +
+          (referrer ? `・🎁 *ご紹介者様*: *${referrer}* 様（お友達紹介特別価格 3,500円適用）\n` : '') +
           `・電話番号: ${payload.phone || '未入力'}\n` +
           `・メール: ${payload.email || '未入力'}\n` +
-          `・泳力・目標: ${payload.skillLevel || 'なし'}\n` +
-          (payload.name2 ? `・2人目: ${payload.name2} 様\n` : '') +
-          `\n────────────────\n` +
-          `*【事務局 承認・調整フロー】*\n` +
-          `※女性コーチ希望や直接問合せなど条件調整が必要な場合は [調整してアサイン]、\n` +
-          `※調整不要でコーチ陣へ案内する場合は [ワンクリック承認] をタップしてください。\n\n` +
-          `👉 *【内容確認・調整してアサイン】*:\n${adjustUrl}\n\n` +
-          (approveUrl ? `✅ *【ワンクリック承認・コーチ一斉案内】*:\n${approveUrl}\n` : '') +
-          `────────────────`;
+          (payload.name2 ? `・2人目生徒: ${payload.name2} 様（${payload.gender2 || ''} / ${ageText2 || payload.dob2 || ''}）\n` : '') +
+          `\n` +
+          `*■ 希望レッスン条件*\n` +
+          `・希望エリア / 駅: *${payload.station || '未指定'}*\n` +
+          `・予定プール（自動選定候補）: *${autoCandidateLocation || '近隣施設より選定'}*\n` +
+          `・第1希望日時: *${payload.datetime1 || '未指定'}*\n` +
+          `・第2希望日時: ${payload.datetime2 || '未指定'}\n` +
+          `・第3希望日時: ${payload.datetime3 || '未指定'}\n` +
+          (payload.availableTimes ? `・可能な曜日・時間帯: ${payload.availableTimes}\n` : '') +
+          (payload.frequency ? `・希望頻度: ${payload.frequency}\n` : '') +
+          `\n` +
+          `*■ 泳力・目標・ご要望*\n` +
+          `・泳力・目標: ${payload.skillLevel || '未入力'}\n` +
+          `・【備考・ご要望】:\n` +
+          `👉 *${notesContent}*\n` +
+          `\n` +
+          `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+          `*▼ Google Chatからワンクリックで承認・操作できます*\n` +
+          `━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+          (approveUrl ? `【1】この内容で承認してコーチ全員へ一斉配信（ワンクリック）:\n👉 <${approveUrl}|✅ 【ワンクリック承認】全コーチへ一斉案内を配信する>\n\n` : '') +
+          `【2】女性コーチ指名やレッスン場所・条件を調整してアサイン:\n👉 <${adjustUrl}|🔍 【内容確認・調整して直接アサイン】>\n\n` +
+          `────────────────────────`;
 
-        await sendGoogleChatMessage(gchatWebhookUrl, gchatMessage);
+        // Card v2（ボタン付きカード）
+        const cardsV2 = [
+          {
+            cardId: `trial-lead-${savedLeadId || 'new'}`,
+            card: {
+              header: {
+                title: `🏊‍♂️ 体験レッスンお申込（${payload.name || 'お客様'} 様）`,
+                subtitle: `${payload.station || 'エリア未指定'} / ${autoCandidateLocation || 'プール選定中'}`,
+                imageUrl: 'https://cdn-icons-png.flaticon.com/512/3048/3048384.png',
+                imageType: 'CIRCLE'
+              },
+              sections: [
+                {
+                  header: '申込内容の確認',
+                  widgets: [
+                    {
+                      decoratedText: {
+                        topLabel: '第1希望日時',
+                        text: payload.datetime1 || '未指定'
+                      }
+                    },
+                    {
+                      decoratedText: {
+                        topLabel: '備考・ご要望（女性コーチ希望など）',
+                        text: notesContent
+                      }
+                    }
+                  ]
+                },
+                {
+                  widgets: [
+                    {
+                      buttonList: {
+                        buttons: [
+                          ...(approveUrl ? [{
+                            text: '✅ ワンクリック承認して配信',
+                            onClick: {
+                              openLink: {
+                                url: approveUrl
+                              }
+                            }
+                          }] : []),
+                          {
+                            text: '🔍 条件確認・直接アサイン',
+                            onClick: {
+                              openLink: {
+                                url: adjustUrl
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ];
+
+        await sendGoogleChatMessage(gchatWebhookUrl, gchatMessage, undefined, cardsV2);
       }
     } catch (chatErr) {
       console.error('[Trial Booking] Failed to send Google Chat notification:', chatErr);

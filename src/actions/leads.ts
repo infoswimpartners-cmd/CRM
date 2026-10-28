@@ -3000,18 +3000,81 @@ export async function testSendLeadApprovalMessageAction(webhookId: string) {
 
         const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://crm.swim-partners.com'
         const testMessage = 
-            `🏊‍♂️ *【体験申込・承認通知テスト】*\n` +
-            `これは「${webhook.space_name}」への接続テスト通知です。\n\n` +
-            `お客様から体験レッスンのお申し込みが入ると、このスペースに以下の承認メニュー付き通知が届きます。\n\n` +
-            `────────────────\n` +
-            `*【事務局 承認・調整フロー】*\n` +
-            `👉 *【内容確認・調整してアサイン】*:\n${siteUrl}/admin/leads\n\n` +
-            `✅ *【ワンクリック承認・コーチ一斉案内】*:\n${siteUrl}/admin/leads\n` +
-            `────────────────\n\n` +
+            `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+            `🏊‍♂️ *【体験申込・承認通知テスト（接続確認）】*\n` +
+            `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+            `これは「*${webhook.space_name}*」への接続テスト通知です。\n\n` +
+            `お客様から体験レッスンのお申し込みが入ると、このスペースに以下の内容確認およびワンクリック承認ボタンが届きます。\n\n` +
+            `*■ 顧客基本情報（サンプル）*\n` +
+            `・氏名: *テスト 太郎* 様（テスト タロウ）\n` +
+            `・性別 / 年齢: 男性 / 30歳\n` +
+            `・希望エリア / 駅: 渋谷駅\n` +
+            `・予定プール: 渋谷区立代々木西原温水プール\n` +
+            `・第1希望日時: 今週土曜日 10:00〜11:00\n` +
+            `・【備考・ご要望】: *※女性コーチ希望などの特記事項がここに表示されます*\n\n` +
+            `━━━━━━━━━━━━━━━━━━━━━━━━\n` +
+            `*▼ Google Chatからワンクリックで承認・操作できます*\n` +
+            `━━━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+            `【1】この内容で承認してコーチ全員へ一斉配信（ワンクリック）:\n👉 <${siteUrl}/admin/leads|✅ 【ワンクリック承認】全コーチへ一斉案内を配信する>\n\n` +
+            `【2】女性コーチ指名やレッスン場所・条件を調整してアサイン:\n👉 <${siteUrl}/admin/leads|🔍 【内容確認・調整して直接アサイン】>\n\n` +
+            `────────────────────────\n` +
             `※このスペースで承認メッセージを受信できることが正常に確認できました。`
 
+        const testCardsV2 = [
+            {
+                cardId: `test-card-${Date.now()}`,
+                card: {
+                    header: {
+                        title: '🏊‍♂️ 体験レッスンお申込・承認通知テスト',
+                        subtitle: `${webhook.space_name} 接続テスト`,
+                        imageUrl: 'https://cdn-icons-png.flaticon.com/512/3048/3048384.png',
+                        imageType: 'CIRCLE'
+                    },
+                    sections: [
+                        {
+                            header: '接続テスト結果',
+                            widgets: [
+                                {
+                                    decoratedText: {
+                                        topLabel: 'ステータス',
+                                        text: '✅ 承認通知先スペースとして正常に接続されています'
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            widgets: [
+                                {
+                                    buttonList: {
+                                        buttons: [
+                                            {
+                                                text: '✅ ワンクリック承認（動作確認）',
+                                                onClick: {
+                                                    openLink: {
+                                                        url: `${siteUrl}/admin/leads`
+                                                    }
+                                                }
+                                            },
+                                            {
+                                                text: '🔍 条件確認・調整画面',
+                                                onClick: {
+                                                    openLink: {
+                                                        url: `${siteUrl}/admin/leads`
+                                                    }
+                                                }
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        ]
+
         const { sendGoogleChatMessage } = await import('@/lib/google-chat')
-        const sent = await sendGoogleChatMessage(webhook.webhook_url, testMessage)
+        const sent = await sendGoogleChatMessage(webhook.webhook_url, testMessage, undefined, testCardsV2)
 
         if (!sent) {
             return { success: false, error: 'Google Chatへの送信に失敗しました。Webhook URLが正しいかご確認ください。' }

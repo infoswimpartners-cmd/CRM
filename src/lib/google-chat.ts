@@ -12,16 +12,21 @@ export interface GoogleChatCardSection {
 }
 
 /**
- * シンプルなテキストメッセージを送信する
+ * シンプルなテキストメッセージ（および任意のカード）を送信する
  */
 export async function sendGoogleChatMessage(
     webhookUrl: string,
     text: string,
-    threadKey?: string
+    threadKey?: string,
+    cardsV2?: any[]
 ): Promise<boolean> {
     try {
         let targetUrl = webhookUrl
         const payload: any = { text }
+
+        if (cardsV2 && cardsV2.length > 0) {
+            payload.cardsV2 = cardsV2
+        }
 
         if (threadKey) {
             const separator = targetUrl.includes('?') ? '&' : '?'
