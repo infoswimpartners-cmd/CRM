@@ -142,10 +142,10 @@ export async function registerCoachWithToken(prevState: any, formData: FormData)
 
         if (!authUser.user) return { error: 'ユーザー作成に失敗しました。' }
 
-        // 3. Create Profile
+        // 3. Create / Upsert Profile（トリガーによる重複エラーを防ぐためupsertを使用）
         const { error: profileError } = await supabase
             .from('profiles')
-            .insert({
+            .upsert({
                 id: authUser.user.id,
                 email: sanitizedEmail,
                 full_name: fullName,
@@ -153,12 +153,17 @@ export async function registerCoachWithToken(prevState: any, formData: FormData)
                 status: 'active', // Active immediately
                 must_change_password: false,
                 line_admin_invite_url: lineAdminInviteUrl || null
-            })
+            }, { onConflict: 'id' })
 
         if (profileError) {
-            // Cleanup Auth User if allowed, or manual cleanup needed.
+            // プロフィール作成に失敗した場合は孤立防止のためAuthユーザーをロールバック
             console.error('Profile creation failed:', profileError)
-            return { error: 'プロフィール作成に失敗しました。管理者に問い合わせてください。' }
+            try {
+                await supabase.auth.admin.deleteUser(authUser.user.id)
+            } catch (cleanupErr) {
+                console.error('Failed to cleanup auth user:', cleanupErr)
+            }
+            return { error: 'プロフィールの保存に失敗しました。お手数ですが再度お試しいただくか、管理者に問い合わせてください。' }
         }
 
         // 4. Mark Token as Used

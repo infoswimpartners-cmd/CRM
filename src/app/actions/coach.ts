@@ -67,10 +67,10 @@ export async function createCoach(prevState: CreateCoachState, formData: FormDat
         const invitationToken = randomUUID()
         const expiresAt = addHours(new Date(), 24).toISOString() // 24 hours validity
 
-        // 4. Create Profile with Pending Status
+        // 4. Create / Upsert Profile with Pending Status（トリガー重複防止のためupsertを使用）
         const { error: profileError } = await supabase
             .from('profiles')
-            .insert({
+            .upsert({
                 id: userId,
                 email: email,
                 full_name: fullName,
@@ -80,12 +80,16 @@ export async function createCoach(prevState: CreateCoachState, formData: FormDat
                 invitation_expires_at: expiresAt,
                 must_change_password: false, // They set it initially, so no need to force change immediately after
                 line_admin_invite_url: lineAdminInviteUrl
-            })
+            }, { onConflict: 'id' })
 
         if (profileError) {
-            // Cleanup: Delete auth user if profile creation fails? 
-            // Ideally yes, but for now just report error. Admin can delete manually.
-            console.error('Profile Insert Error:', profileError)
+            // プロフィール作成に失敗した場合は孤立防止のためAuthユーザーをロールバック
+            console.error('Profile Upsert Error:', profileError)
+            try {
+                await supabase.auth.admin.deleteUser(userId)
+            } catch (cleanupErr) {
+                console.error('Failed to cleanup auth user:', cleanupErr)
+            }
             return { error: `プロフィール作成エラー: ${profileError.message}` }
         }
 
