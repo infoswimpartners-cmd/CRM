@@ -86,13 +86,21 @@ export async function approveAndDispatchLead(
         // 5. 全体募集用 Google Chat スペースへの一斉通知
         let sentGeneralCount = 0
         try {
-            // activeなWebhookを取得（案件共有・全体共有など）
+            // activeなWebhookを取得（案件共有・エリア共有スペースなど）
             const { data: webhooks } = await supabase
                 .from('google_chat_webhooks')
                 .select('id, webhook_url, space_name')
                 .eq('active', true)
 
-            if (webhooks && webhooks.length > 0) {
+            // 有効なWebhook URLかつ設定用レコードや申込通知専用スペースを除外
+            const targetWebhooks = (webhooks || []).filter(wh => 
+                wh.webhook_url?.startsWith('http') && 
+                !wh.space_name.startsWith('SP_') &&
+                !wh.space_name.includes('公式ライン') &&
+                !wh.space_name.includes('SP-Tracker')
+            )
+
+            if (targetWebhooks.length > 0) {
                 // 通知テンプレート取得
                 const { data: configData } = await supabase
                     .from('app_configs')
@@ -175,8 +183,8 @@ export async function approveAndDispatchLead(
                     .replace(/\{\{second_student_info\}\}/g, secondStudentInfo)
                     .replace(/\{\{available_times\}\}/g, lead.available_times || '未設定')
 
-                // 全体スペースまたは案件スペースへ送信
-                for (const wh of webhooks) {
+                // 全体スペースまたは案件共有スペースへ送信
+                for (const wh of targetWebhooks) {
                     try {
                         const ok = await sendGoogleChatMessage(wh.webhook_url, message)
                         if (ok) sentGeneralCount++
