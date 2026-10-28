@@ -13,18 +13,19 @@ import {
     ChevronDown,
     ChevronUp,
     Layers,
-    Globe,
-    Eye,
+    Send,
     Trash2,
-    ToggleLeft,
-    ToggleRight,
+    Database,
+    BookOpen,
+    Info,
 } from 'lucide-react';
 import {
     triggerDailySeoArticleAction,
     previewNextDailyKeywordAction,
     getLatestStudioArticlesAction,
     getStudioExportBundleAction,
-    toggleStudioArticleStatusAction,
+    getNotionConnectionStatusAction,
+    syncArticleToNotionAction,
 } from '@/actions/studio-seo-article-actions';
 import { deleteArticleAction } from '@/actions/seo-content-actions';
 import { StudioCmsArticle, StudioExportBundle } from '@/lib/studio-cms-types';
@@ -33,18 +34,24 @@ export function StudioDailySeoArticleCard() {
     const [isExpanded, setIsExpanded] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [isGenerating, setIsGenerating] = useState(false);
+    const [isSyncingNotion, setIsSyncingNotion] = useState<string | null>(null);
     const [nextCandidate, setNextCandidate] = useState<any>(null);
     const [articles, setArticles] = useState<StudioCmsArticle[]>([]);
-    const [selectedArticle, setSelectedArticle] = useState<StudioCmsArticle | null>(null);
-    const [copiedField, setCopiedField] = useState<string | null>(null);
+    const [notionStatus, setNotionStatus] = useState<{ isConfigured: boolean; hasApiKey: boolean; hasDatabaseId: boolean }>({
+        isConfigured: false,
+        hasApiKey: false,
+        hasDatabaseId: false,
+    });
+    const [showNotionGuide, setShowNotionGuide] = useState(false);
 
     // 初期データ読み込み
     const loadData = async () => {
         setIsLoading(true);
         try {
-            const [candRes, articlesRes] = await Promise.all([
+            const [candRes, articlesRes, notionRes] = await Promise.all([
                 previewNextDailyKeywordAction(),
                 getLatestStudioArticlesAction(),
+                getNotionConnectionStatusAction(),
             ]);
 
             if (candRes.success && candRes.candidate) {
@@ -53,7 +60,10 @@ export function StudioDailySeoArticleCard() {
 
             if (articlesRes && articlesRes.length > 0) {
                 setArticles(articlesRes);
-                setSelectedArticle(articlesRes[0]);
+            }
+
+            if (notionRes) {
+                setNotionStatus(notionRes);
             }
         } catch (err) {
             console.warn('Failed to load daily article data:', err);
@@ -74,7 +84,7 @@ export function StudioDailySeoArticleCard() {
         try {
             const res = await triggerDailySeoArticleAction();
             if (res.success && res.article) {
-                toast.success('本日のSEO記事が即時公開されました！', { id: toastId });
+                toast.success('本日のSEO記事が生成されました！（Notion自動同期中）', { id: toastId });
                 await loadData();
                 setIsExpanded(true);
             } else {
@@ -87,19 +97,25 @@ export function StudioDailySeoArticleCard() {
         }
     };
 
-    // 公開ステータスの切り替え
-    const handleToggleStatus = async (article: StudioCmsArticle) => {
-        const newStatus = article.status === 'published' ? 'draft' : 'published';
+    // Notionデータベースへ手動送信
+    const handleSyncToNotion = async (article: StudioCmsArticle) => {
+        setIsSyncingNotion(article.id);
+        const toastId = toast.loading(`Notionデータベースへ送信中...`);
+
         try {
-            const res = await toggleStudioArticleStatusAction(article.id, newStatus);
+            const res = await syncArticleToNotionAction(article.id);
             if (res.success) {
-                toast.success(`ステータスを「${newStatus === 'published' ? '公開' : '下書き'}」に変更しました`);
-                await loadData();
+                toast.success(`Notionへ投稿完了！STUDIOへ自動同期されます`, { id: toastId });
+                if (res.url) {
+                    window.open(res.url, '_blank');
+                }
             } else {
-                toast.error('更新に失敗しました');
+                toast.error(res.message, { id: toastId });
             }
         } catch {
-            toast.error('エラーが発生しました');
+            toast.error('Notion送信中にエラーが発生しました', { id: toastId });
+        } finally {
+            setIsSyncingNotion(null);
         }
     };
 
@@ -127,9 +143,7 @@ export function StudioDailySeoArticleCard() {
             if (!bundle) throw new Error('データが見つかりませんでした');
 
             await navigator.clipboard.writeText(bundle.fullStudioClipboardText);
-            setCopiedField('all');
             toast.success('STUDIO用テキストを一括コピーしました！');
-            setTimeout(() => setCopiedField(null), 3000);
         } catch {
             toast.error('コピーに失敗しました');
         }
@@ -148,49 +162,45 @@ export function StudioDailySeoArticleCard() {
                     <div>
                         <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-sm font-bold text-zinc-900 tracking-tight">
-                                毎日自動SEO記事生成＆公開システム
+                                日次SEO記事自動生成＆Notion同期システム
                             </span>
                             <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                毎日 4:00 (JST) 完全自動公開中
+                                毎日 4:00 (JST) 自律生成
                             </span>
+                            {notionStatus.isConfigured ? (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-100 text-indigo-800 border border-indigo-200 flex items-center gap-1">
+                                    <Database className="w-3 h-3 text-indigo-600" />
+                                    Notion・STUDIO連携稼働中
+                                </span>
+                            ) : (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-200 flex items-center gap-1">
+                                    <Info className="w-3 h-3 text-amber-600" />
+                                    Notion環境変数 設定待ち
+                                </span>
+                            )}
                         </div>
                         <p className="text-xs text-zinc-500 mt-0.5">
-                            GSC・商圏診断から高CVRキーワードを自律選定し、SEO記事を自動執筆・即時公開します（全 {articles.length} 件管理中）。
+                            GSC・商圏データから高CVRキーワードを自律選定し、STUDIO Businessプラン（Notion連携）向けに記事を自動投稿します。
                         </p>
                     </div>
                 </div>
 
                 <div className="flex items-center gap-2 self-end md:self-center flex-wrap">
-                    <a
-                        href="/test"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-3 py-2 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-700 text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs"
-                        title="トップページLP（プレビュー）を新規タブで開く"
+                    <button
+                        onClick={() => setShowNotionGuide(!showNotionGuide)}
+                        className="px-3 py-2 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-700 text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
+                        title="Notion・STUDIO連携の設定ガイドを表示"
                     >
-                        <Eye className="w-3.5 h-3.5 text-sky-600" />
-                        <span>トップページ確認</span>
-                        <ExternalLink className="w-3 h-3 text-zinc-400" />
-                    </a>
-
-                    <a
-                        href="/articles"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-3 py-2 rounded-xl border border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-700 text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs"
-                        title="公開中の記事一覧ページを新規タブで開く"
-                    >
-                        <Globe className="w-3.5 h-3.5 text-blue-600" />
-                        <span>公開サイト一覧</span>
-                        <ExternalLink className="w-3 h-3 text-zinc-400" />
-                    </a>
+                        <Database className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>連携ガイド</span>
+                    </button>
 
                     <button
                         onClick={handleTriggerGenerate}
                         disabled={isGenerating}
                         className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
-                        title="今すぐ新しいキーワードを自律分析し、SEO記事を1本即時作成・公開します"
+                        title="今すぐ新しいキーワードを自律分析し、SEO記事を1本即時作成してNotionへ送信します"
                     >
                         <RefreshCw className={`w-3.5 h-3.5 text-amber-300 ${isGenerating ? 'animate-spin' : ''}`} />
                         <span>{isGenerating ? '自律生成中...' : '⚡ 今日の記事を今すぐ生成'}</span>
@@ -209,19 +219,40 @@ export function StudioDailySeoArticleCard() {
                 </div>
             </div>
 
+            {/* Notion・STUDIO連携ガイド（アコーディオン） */}
+            {showNotionGuide && (
+                <div className="p-4 bg-indigo-50/70 border-t border-indigo-100 text-xs text-indigo-950 space-y-3">
+                    <div className="font-bold flex items-center gap-1.5 text-indigo-900">
+                        <BookOpen className="w-4 h-4 text-indigo-600" />
+                        STUDIO Businessプラン × Notion連携の手順
+                    </div>
+                    <ol className="list-decimal list-inside space-y-1.5 pl-1 text-indigo-900/90 leading-relaxed">
+                        <li>
+                            <strong>Notionでデータベースを作成</strong>: タイトル（名前）、<code>Slug</code>（テキスト）、<code>Description</code>（テキスト）を含むDBを用意します。
+                        </li>
+                        <li>
+                            <strong>Notionインテグレーション作成</strong>: Notion開発者ポータルでトークンを発行し、作成したDBに接続します。
+                        </li>
+                        <li>
+                            <strong>環境変数を設定</strong>: Vercelに <code>NOTION_API_KEY</code> と <code>NOTION_DATABASE_ID</code> を設定します。
+                        </li>
+                        <li>
+                            <strong>STUDIO側でNotion連携</strong>: STUDIO BusinessプランのCMS画面で「Notionと連携」を選択し、上記DBを紐付けると完全自動公開が開始されます。
+                        </li>
+                    </ol>
+                </div>
+            )}
+
             {/* サマリーバー（未展開時も最新記事情報を1行表示） */}
             {latest && (
                 <div className="px-4 py-2.5 bg-zinc-50/80 border-t border-zinc-100 flex flex-wrap items-center justify-between text-xs gap-2">
                     <div className="flex items-center gap-2 text-zinc-600 truncate max-w-xl">
                         <span className="font-semibold text-zinc-800 flex items-center gap-1">
                             <FileText className="w-3.5 h-3.5 text-blue-600" />
-                            最新公開:
+                            最新生成:
                         </span>
                         <span className="text-zinc-900 font-medium truncate">
                             {latest.title}
-                        </span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">
-                            {latest.status === 'published' ? '公開中' : '下書き'}
                         </span>
                     </div>
 
@@ -232,15 +263,13 @@ export function StudioDailySeoArticleCard() {
                                 次回自動分析: <strong className="text-zinc-700">{nextCandidate.keyword}</strong>
                             </span>
                         )}
-                        <a
-                            href={`/articles/${latest.slug}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:underline flex items-center gap-1 font-semibold"
+                        <button
+                            onClick={() => handleCopyBundle(latest)}
+                            className="text-blue-600 hover:underline flex items-center gap-1 font-semibold cursor-pointer"
                         >
-                            <span>記事を確認</span>
-                            <ExternalLink className="w-3 h-3" />
-                        </a>
+                            <Copy className="w-3 h-3" />
+                            <span>STUDIO用コピー</span>
+                        </button>
                     </div>
                 </div>
             )}
@@ -256,7 +285,7 @@ export function StudioDailySeoArticleCard() {
                             </h4>
                         </div>
                         <div className="text-[11px] text-zinc-500">
-                            ※公開ステータスが「公開中」の記事は、検索エンジン向けサイトマップに自動登録されます
+                            ※Notionへ送信すると、STUDIO BusinessのNotion同期機能で自動反映されます
                         </div>
                     </div>
 
@@ -268,7 +297,6 @@ export function StudioDailySeoArticleCard() {
                                     <th className="py-2.5 px-3">キーワード / タイトル</th>
                                     <th className="py-2.5 px-3">スラッグ</th>
                                     <th className="py-2.5 px-3">作成日時</th>
-                                    <th className="py-2.5 px-3 text-center">公開ステータス</th>
                                     <th className="py-2.5 px-3 text-right">アクション</th>
                                 </tr>
                             </thead>
@@ -286,45 +314,22 @@ export function StudioDailySeoArticleCard() {
                                             </p>
                                         </td>
                                         <td className="py-3 px-3 font-mono text-[11px] text-zinc-500 truncate max-w-[120px]">
-                                            /articles/{art.slug}
+                                            {art.slug}
                                         </td>
                                         <td className="py-3 px-3 text-zinc-500 font-mono text-[11px] whitespace-nowrap">
                                             {new Date(art.createdAt).toLocaleDateString('ja-JP')}
                                         </td>
-                                        <td className="py-3 px-3 text-center whitespace-nowrap">
-                                            <button
-                                                onClick={() => handleToggleStatus(art)}
-                                                className={`px-2 py-1 rounded-full text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer transition-all ${
-                                                    art.status === 'published'
-                                                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
-                                                        : 'bg-zinc-100 text-zinc-600 border border-zinc-200 hover:bg-zinc-200'
-                                                }`}
-                                                title="クリックして公開/下書きを切り替え"
-                                            >
-                                                {art.status === 'published' ? (
-                                                    <>
-                                                        <ToggleRight className="w-3.5 h-3.5 text-emerald-600" />
-                                                        <span>公開中</span>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <ToggleLeft className="w-3.5 h-3.5 text-zinc-400" />
-                                                        <span>下書き</span>
-                                                    </>
-                                                )}
-                                            </button>
-                                        </td>
                                         <td className="py-3 px-3 text-right whitespace-nowrap">
                                             <div className="flex items-center justify-end gap-1.5">
-                                                <a
-                                                    href={`/articles/${art.slug}`}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="p-1.5 rounded-lg border border-zinc-200 hover:bg-zinc-50 text-zinc-700 transition-colors"
-                                                    title="公開ページを確認"
+                                                <button
+                                                    onClick={() => handleSyncToNotion(art)}
+                                                    disabled={isSyncingNotion === art.id}
+                                                    className="px-2.5 py-1 rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
+                                                    title="Notionデータベースへ送信"
                                                 >
-                                                    <Eye className="w-3.5 h-3.5 text-blue-600" />
-                                                </a>
+                                                    <Send className={`w-3 h-3 ${isSyncingNotion === art.id ? 'animate-spin' : ''}`} />
+                                                    <span>Notion送信</span>
+                                                </button>
                                                 <button
                                                     onClick={() => handleCopyBundle(art)}
                                                     className="p-1.5 rounded-lg border border-zinc-200 hover:bg-zinc-50 text-zinc-700 transition-colors cursor-pointer"
