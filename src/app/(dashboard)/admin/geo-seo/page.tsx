@@ -4,6 +4,7 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { toast } from 'sonner';
 import { SpTrackerStatusMeters } from '@/components/admin/geo-seo/SpTrackerStatusMeters';
 import { SpTrackerAreaSeoAuditCard } from '@/components/admin/geo-seo/SpTrackerAreaSeoAuditCard';
+import { StudioDailySeoArticleCard } from '@/components/admin/geo-seo/StudioDailySeoArticleCard';
 import {
     getSpTrackerDashboard,
     fetchLivePageAuditAction,
@@ -113,7 +114,10 @@ function SpTrackerContent() {
                 internalHealthScore={data.statusMeters.internalHealthScore}
             />
 
-            {/* 3. メインビュー: 商圏エリア別SEO診断・実測検証カード */}
+            {/* 3. STUDIO CMS 向け 毎日自動キーワード分析＆記事生成カード */}
+            <StudioDailySeoArticleCard />
+
+            {/* 4. メインビュー: 商圏エリア別SEO診断・実測検証カード */}
             <div className="pt-2">
                 <SpTrackerAreaSeoAuditCard />
             </div>
