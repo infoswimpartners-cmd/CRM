@@ -13,9 +13,10 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { PlusCircle, Loader2, Check, Copy, Link2 } from 'lucide-react'
+import { PlusCircle, Loader2, Check, Copy, Link2, Sparkles } from 'lucide-react'
 import { useFormStatus } from 'react-dom'
 import { createCoach } from '@/app/actions/coach'
+import { detectDomainTypo } from '@/lib/utils/emailValidation'
 
 function SubmitButton() {
     const { pending } = useFormStatus()
@@ -30,7 +31,11 @@ function SubmitButton() {
 export function AddCoachDialog() {
     const [open, setOpen] = useState(false)
     const [state, setState] = useState<{ success?: boolean; error?: string; invitationUrl?: string }>({})
+    const [email, setEmail] = useState('')
     const [copied, setCopied] = useState(false)
+
+    // ドメインタイポ検知
+    const typoInfo = email ? detectDomainTypo(email) : { hasTypo: false }
 
     const handleSubmit = async (formData: FormData) => {
         const result = await createCoach({}, formData)
@@ -50,6 +55,7 @@ export function AddCoachDialog() {
     const handleClose = () => {
         setOpen(false)
         setState({}) // Reset on close
+        setEmail('')
         setCopied(false)
     }
 
@@ -92,14 +98,33 @@ export function AddCoachDialog() {
                                 <Label htmlFor="email" className="text-right">
                                     Email
                                 </Label>
-                                <Input
-                                    id="email"
-                                    name="email"
-                                    type="email"
-                                    placeholder="coach@example.com"
-                                    className="col-span-3"
-                                    required
-                                />
+                                <div className="col-span-3 space-y-1.5">
+                                    <Input
+                                        id="email"
+                                        name="email"
+                                        type="email"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        placeholder="coach@example.com"
+                                        required
+                                        autoCapitalize="none"
+                                        className="font-mono"
+                                    />
+                                    {typoInfo.hasTypo && typoInfo.suggestedEmail && (
+                                        <div className="p-2 rounded bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-center justify-between gap-1">
+                                            <span className="truncate">もしかして: <strong>{typoInfo.suggestedEmail}</strong></span>
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => setEmail(typoInfo.suggestedEmail || '')}
+                                                className="h-6 text-[11px] px-2 bg-white border-amber-300 text-amber-800 shrink-0"
+                                            >
+                                                反映
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                             <div className="grid grid-cols-4 items-center gap-4">
                                 <Label htmlFor="lineAdminInviteUrl" className="text-right text-xs">

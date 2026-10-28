@@ -15,6 +15,7 @@ import { CoachAvailabilitySettings } from '@/components/admin/CoachAvailabilityS
 import { CoachContractCard } from '@/components/admin/CoachContractCard'
 import { CoachContactToolsCard } from '@/components/admin/CoachContactToolsCard'
 import { CoachOnboardingGuideDialog } from '@/components/admin/CoachOnboardingGuideDialog'
+import { AdminChangeCoachEmailDialog } from '@/components/admin/AdminChangeCoachEmailDialog'
 
 export const dynamic = 'force-dynamic'
 
@@ -88,6 +89,11 @@ export default async function CoachDetailPage({ params }: PageProps) {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
+                    <AdminChangeCoachEmailDialog
+                        coachId={coach.id}
+                        coachName={coach.full_name || ''}
+                        currentEmail={coach.email || ''}
+                    />
                     <CoachOnboardingGuideDialog defaultCoachName={coach.full_name || ''} />
                     <Button variant="outline" asChild>
                         <Link href={`/admin/coaches/${id}/edit`}>
@@ -104,9 +110,17 @@ export default async function CoachDetailPage({ params }: PageProps) {
                 </Avatar>
                 <div className="space-y-1">
                     <h2 className="text-2xl font-bold">{coach.full_name}</h2>
-                    <div className="flex items-center text-gray-500 gap-2">
-                        <Mail className="h-4 w-4" />
-                        <span>{coach.email}</span>
+                    <div className="flex items-center text-gray-500 gap-2 flex-wrap">
+                        <Mail className="h-4 w-4 shrink-0" />
+                        <span className="font-mono">{coach.email}</span>
+                        <AdminChangeCoachEmailDialog
+                            coachId={coach.id}
+                            coachName={coach.full_name || ''}
+                            currentEmail={coach.email || ''}
+                            triggerVariant="ghost"
+                            triggerSize="sm"
+                            showLabel={true}
+                        />
                     </div>
                     {coach.role === 'admin' && (
                         <div className="mt-2">

@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { Loader2, CheckCircle, AlertCircle, Eye, EyeOff } from 'lucide-react'
+import { Loader2, CheckCircle, AlertCircle, Eye, EyeOff, Sparkles, Mail } from 'lucide-react'
 import { registerCoachWithToken } from '@/app/actions/auth-signup'
+import { detectDomainTypo, sanitizeEmail } from '@/lib/utils/emailValidation'
 import Link from 'next/link'
 
 interface CoachSignupFormProps {
@@ -15,21 +16,52 @@ interface CoachSignupFormProps {
 
 export function CoachSignupForm({ token }: CoachSignupFormProps) {
     const [isPending, startTransition] = useTransition()
-    const [state, setState] = useState<{ success?: boolean; error?: string; autoLoginFailed?: boolean }>({})
+    const [state, setState] = useState<{ success?: boolean; error?: string; autoLoginFailed?: boolean; registeredEmail?: string }>({})
+    const [email, setEmail] = useState('')
+    const [confirmEmail, setConfirmEmail] = useState('')
+    const [emailError, setEmailError] = useState<string | null>(null)
     const [showPassword, setShowPassword] = useState(false)
     const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+
+    // ドメインタイポ検知
+    const typoInfo = email ? detectDomainTypo(email) : { hasTypo: false }
+
+    const handleApplySuggestion = () => {
+        if (typoInfo.suggestedEmail) {
+            setEmail(typoInfo.suggestedEmail)
+            setConfirmEmail(typoInfo.suggestedEmail)
+            setEmailError(null)
+        }
+    }
 
     useEffect(() => {
         if (state.success && !state.autoLoginFailed) {
             const timer = setTimeout(() => {
                 window.location.href = '/coach'
-            }, 1500)
+            }, 1800)
             return () => clearTimeout(timer)
         }
     }, [state.success, state.autoLoginFailed])
 
     const handleSubmit = (formData: FormData) => {
-        // Append token manually or ensure it's in a hidden field
+        setEmailError(null)
+
+        const sanitized = sanitizeEmail(email)
+        const sanitizedConfirm = sanitizeEmail(confirmEmail)
+
+        if (!sanitized) {
+            setEmailError('メールアドレスを入力してください。')
+            return
+        }
+
+        if (sanitized !== sanitizedConfirm) {
+            setEmailError('メールアドレスが一致しません。誤字がないかご確認ください。')
+            return
+        }
+
+        // サニタイズ済みメールをセット
+        formData.set('email', sanitized)
+        formData.set('confirmEmail', sanitizedConfirm)
         formData.append('token', token)
 
         startTransition(async () => {
@@ -51,6 +83,22 @@ export function CoachSignupForm({ token }: CoachSignupFormProps) {
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4 text-center text-sm text-slate-600 pb-6">
+                    {/* 登録されたメールアドレスの明示 */}
+                    {state.registeredEmail && (
+                        <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl text-left space-y-1">
+                            <span className="text-[11px] font-bold text-blue-900 block flex items-center gap-1">
+                                <Mail className="h-3.5 w-3.5 text-blue-600" />
+                                登録されたログインメールアドレス:
+                            </span>
+                            <span className="font-mono text-xs sm:text-sm font-semibold text-slate-800 break-all block">
+                                {state.registeredEmail}
+                            </span>
+                            <span className="text-[10px] text-slate-500 block">
+                                ※次回以降のログイン時にこのメールアドレスを使用します。
+                            </span>
+                        </div>
+                    )}
+
                     {!state.autoLoginFailed ? (
                         <div className="space-y-3">
                             <p className="font-medium text-slate-700">ご登録ありがとうございます！</p>
@@ -94,8 +142,70 @@ export function CoachSignupForm({ token }: CoachSignupFormProps) {
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="email">メールアドレス</Label>
-                        <Input id="email" name="email" type="email" placeholder="example@swim-partners.com" required />
+                        <Input
+                            id="email"
+                            name="email"
+                            type="email"
+                            value={email}
+                            onChange={(e) => {
+                                setEmail(e.target.value)
+                                setEmailError(null)
+                            }}
+                            placeholder="example@swim-partners.com"
+                            required
+                            autoCapitalize="none"
+                            autoComplete="email"
+                            className="font-mono"
+                        />
                     </div>
+
+                    {/* ドメインタイポ検知サジェスト */}
+                    {typoInfo.hasTypo && typoInfo.suggestedEmail && (
+                        <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5">
+                                <Sparkles className="h-4 w-4 text-amber-600 shrink-0" />
+                                <span>もしかして: <strong>{typoInfo.suggestedEmail}</strong> ですか？</span>
+                            </div>
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={handleApplySuggestion}
+                                className="h-7 text-xs px-2 bg-white border-amber-300 text-amber-800 hover:bg-amber-100 shrink-0"
+                            >
+                                反映する
+                            </Button>
+                        </div>
+                    )}
+
+                    <div className="space-y-2">
+                        <Label htmlFor="confirmEmail">メールアドレス（確認用再入力）</Label>
+                        <Input
+                            id="confirmEmail"
+                            name="confirmEmail"
+                            type="email"
+                            value={confirmEmail}
+                            onChange={(e) => {
+                                setConfirmEmail(e.target.value)
+                                setEmailError(null)
+                            }}
+                            placeholder="もう一度入力してください"
+                            required
+                            autoCapitalize="none"
+                            autoComplete="off"
+                            className="font-mono"
+                        />
+                        <p className="text-[11px] text-muted-foreground">
+                            ※誤登録を防ぐため、確認用の再入力をお願いいたします
+                        </p>
+                    </div>
+
+                    {emailError && (
+                        <div className="bg-red-50 text-red-600 p-2.5 rounded-md text-xs flex items-center gap-2">
+                            <AlertCircle className="h-4 w-4 shrink-0" />
+                            <span>{emailError}</span>
+                        </div>
+                    )}
                     <div className="space-y-2">
                         <Label htmlFor="password">パスワード</Label>
                         <div className="relative">

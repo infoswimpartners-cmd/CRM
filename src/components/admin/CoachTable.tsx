@@ -17,6 +17,7 @@ import { CoachDeleteButton } from '@/components/admin/CoachDeleteButton'
 import { CoachResendButton } from '@/components/admin/CoachResendButton'
 import { CoachInviteLinkButton } from '@/components/admin/CoachInviteLinkButton'
 import { AdminResetPasswordDialog } from '@/components/admin/AdminResetPasswordDialog'
+import { AdminChangeCoachEmailDialog } from '@/components/admin/AdminChangeCoachEmailDialog'
 import { useState } from 'react'
 
 interface Coach {
@@ -170,6 +171,14 @@ export function CoachTable({ coaches, studentCounts }: CoachTableProps) {
                                             <ChevronRight className="h-4 w-4" />
                                         </Link>
                                     </Button>
+                                    <AdminChangeCoachEmailDialog
+                                        coachId={coach.id}
+                                        coachName={coach.full_name || '名称未設定'}
+                                        currentEmail={coach.email || ''}
+                                        triggerVariant="ghost"
+                                        triggerSize="icon"
+                                        showLabel={false}
+                                    />
                                     <AdminResetPasswordDialog coachId={coach.id} coachName={coach.full_name || '名称未設定'} />
                                     <CoachDeleteButton coachId={coach.id} coachName={coach.full_name || '名称未設定'} />
                                 </div>

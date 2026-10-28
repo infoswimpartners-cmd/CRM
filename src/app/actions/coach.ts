@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { emailService } from '@/lib/email'
 import { randomUUID } from 'crypto'
 import { addHours } from 'date-fns'
+import { sanitizeEmail, isValidEmailFormat } from '@/lib/utils/emailValidation'
 
 interface CreateCoachState {
     success?: boolean
@@ -13,12 +14,17 @@ interface CreateCoachState {
 }
 
 export async function createCoach(prevState: CreateCoachState, formData: FormData): Promise<CreateCoachState> {
-    const email = formData.get('email') as string
-    const fullName = formData.get('fullName') as string
+    const rawEmail = (formData.get('email') as string) || ''
+    const fullName = (formData.get('fullName') as string)?.trim() || ''
     const lineAdminInviteUrl = (formData.get('lineAdminInviteUrl') as string)?.trim() || null
 
-    if (!email || !fullName) {
+    if (!rawEmail || !fullName) {
         return { error: 'メールアドレスと氏名は必須です。' }
+    }
+
+    const email = sanitizeEmail(rawEmail)
+    if (!isValidEmailFormat(email)) {
+        return { error: '正しいメールアドレスの形式で入力してください。' }
     }
 
     try {

@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { randomUUID } from 'crypto'
 import { addDays } from 'date-fns'
 import { revalidatePath } from 'next/cache'
+import { sanitizeEmail, isValidEmailFormat } from '@/lib/utils/emailValidation'
 
 /**
  * Generates a generic invitation token for self-registration.
@@ -88,15 +89,28 @@ export async function verifySignupToken(token: string): Promise<{ valid: boolean
 /**
  * Registers a coach using a generic invitation token.
  */
-export async function registerCoachWithToken(prevState: any, formData: FormData): Promise<{ success?: boolean; error?: string; autoLoginFailed?: boolean }> {
+export async function registerCoachWithToken(prevState: any, formData: FormData): Promise<{ success?: boolean; error?: string; autoLoginFailed?: boolean; registeredEmail?: string }> {
     const token = formData.get('token') as string
-    const fullName = formData.get('fullName') as string
-    const email = formData.get('email') as string
+    const fullName = (formData.get('fullName') as string)?.trim() || ''
+    const rawEmail = (formData.get('email') as string) || ''
+    const rawConfirmEmail = (formData.get('confirmEmail') as string) || ''
     const password = formData.get('password') as string
     const confirmPassword = formData.get('confirmPassword') as string
 
-    if (!token || !fullName || !email || !password) {
+    if (!token || !fullName || !rawEmail || !password) {
         return { error: '必須項目が未入力です。' }
+    }
+
+    // メールアドレスのサニタイズ（全角英数・スペース除去、小文字化）
+    const sanitizedEmail = sanitizeEmail(rawEmail)
+    const sanitizedConfirmEmail = sanitizeEmail(rawConfirmEmail)
+
+    if (rawConfirmEmail && sanitizedEmail !== sanitizedConfirmEmail) {
+        return { error: '入力されたメールアドレスが一致しません。' }
+    }
+
+    if (!isValidEmailFormat(sanitizedEmail)) {
+        return { error: '正しいメールアドレスの形式で入力してください。' }
     }
 
     if (password !== confirmPassword) {
@@ -116,7 +130,7 @@ export async function registerCoachWithToken(prevState: any, formData: FormData)
     try {
         // 2. Create Auth User
         const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
-            email: email,
+            email: sanitizedEmail,
             password: password,
             email_confirm: true,
             user_metadata: { full_name: fullName }
@@ -133,7 +147,7 @@ export async function registerCoachWithToken(prevState: any, formData: FormData)
             .from('profiles')
             .insert({
                 id: authUser.user.id,
-                email: email,
+                email: sanitizedEmail,
                 full_name: fullName,
                 role: 'coach',
                 status: 'active', // Active immediately
@@ -157,19 +171,19 @@ export async function registerCoachWithToken(prevState: any, formData: FormData)
         try {
             const userSupabase = await createClient()
             const { error: signInError } = await userSupabase.auth.signInWithPassword({
-                email,
+                email: sanitizedEmail,
                 password
             })
             if (signInError) {
                 console.error('Auto login failed:', signInError)
-                return { success: true, autoLoginFailed: true }
+                return { success: true, autoLoginFailed: true, registeredEmail: sanitizedEmail }
             }
             
             revalidatePath('/coach', 'layout')
-            return { success: true }
+            return { success: true, registeredEmail: sanitizedEmail }
         } catch (loginErr) {
             console.error('Auto login exception:', loginErr)
-            return { success: true, autoLoginFailed: true }
+            return { success: true, autoLoginFailed: true, registeredEmail: sanitizedEmail }
         }
 
     } catch (err: any) {
