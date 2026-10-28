@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { headers } from 'next/headers'
 import { revalidatePath } from 'next/cache'
+import { sanitizeEmail } from '@/lib/utils/emailValidation'
 
 export interface AgreeContractsInput {
     signerName: string
@@ -192,16 +193,16 @@ export async function updateCoachGoogleChatEmail(email: string) {
             return { success: false, error: '認証情報が見つかりません。' }
         }
 
-        const trimmed = email.trim()
-        if (!trimmed) {
-            return { success: false, error: 'メールアドレスを入力してください。' }
+        const sanitized = sanitizeEmail(email)
+        if (!sanitized) {
+            return { success: false, error: '有効なメールアドレスを入力してください。' }
         }
 
         const adminClient = createAdminClient()
         const { error } = await adminClient
             .from('profiles')
             .update({
-                google_chat_email: trimmed
+                google_chat_email: sanitized
             })
             .eq('id', user.id)
 
