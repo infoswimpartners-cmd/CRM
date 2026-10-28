@@ -2936,5 +2936,93 @@ export async function approveAndDispatchLeadAction(leadId: string, customLocatio
     }
 }
 
+/**
+ * 事務局向け承認確認メッセージ送信先スペース（Webhook ID）の取得
+ */
+export async function getLeadApprovalWebhookConfigAction() {
+    try {
+        const supabase = await createClient()
+        const { data, error } = await supabase
+            .from('app_configs')
+            .select('value')
+            .eq('key', 'lead_approval_webhook_id')
+            .maybeSingle()
+
+        if (error) {
+            console.error('Failed to get lead approval webhook config:', error)
+            return { success: false, webhookId: null }
+        }
+
+        return { success: true, webhookId: data?.value || null }
+    } catch (error: any) {
+        return { success: false, error: error.message || '設定の取得に失敗しました', webhookId: null }
+    }
+}
+
+/**
+ * 事務局向け承認確認メッセージ送信先スペース（Webhook ID）の保存
+ */
+export async function saveLeadApprovalWebhookConfigAction(webhookId: string) {
+    try {
+        const supabaseAdmin = createAdminClient()
+        const { error } = await supabaseAdmin
+            .from('app_configs')
+            .upsert({
+                key: 'lead_approval_webhook_id',
+                value: webhookId,
+                description: '体験レッスン申込時に承認確認・調整リンクを通知するGoogle Chat Webhook ID'
+            }, { onConflict: 'key' })
+
+        if (error) throw error
+
+        revalidatePath('/admin/leads')
+        return { success: true }
+    } catch (error: any) {
+        return { success: false, error: error.message || '送信先スペースの保存に失敗しました' }
+    }
+}
+
+/**
+ * 事務局向け承認確認メッセージのテスト送信
+ */
+export async function testSendLeadApprovalMessageAction(webhookId: string) {
+    try {
+        const supabase = createAdminClient()
+        const { data: webhook, error } = await supabase
+            .from('google_chat_webhooks')
+            .select('webhook_url, space_name')
+            .eq('id', webhookId)
+            .single()
+
+        if (error || !webhook?.webhook_url) {
+            return { success: false, error: '指定されたスペース（Webhook）が見つかりません' }
+        }
+
+        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://crm.swim-partners.com'
+        const testMessage = 
+            `🏊‍♂️ *【体験申込・承認通知テスト】*\n` +
+            `これは「${webhook.space_name}」への接続テスト通知です。\n\n` +
+            `お客様から体験レッスンのお申し込みが入ると、このスペースに以下の承認メニュー付き通知が届きます。\n\n` +
+            `────────────────\n` +
+            `*【事務局 承認・調整フロー】*\n` +
+            `👉 *【内容確認・調整してアサイン】*:\n${siteUrl}/admin/leads\n\n` +
+            `✅ *【ワンクリック承認・コーチ一斉案内】*:\n${siteUrl}/admin/leads\n` +
+            `────────────────\n\n` +
+            `※このスペースで承認メッセージを受信できることが正常に確認できました。`
+
+        const { sendGoogleChatMessage } = await import('@/lib/google-chat')
+        const sent = await sendGoogleChatMessage(webhook.webhook_url, testMessage)
+
+        if (!sent) {
+            return { success: false, error: 'Google Chatへの送信に失敗しました。Webhook URLが正しいかご確認ください。' }
+        }
+
+        return { success: true, spaceName: webhook.space_name }
+    } catch (error: any) {
+        return { success: false, error: error.message || 'テスト送信中にエラーが発生しました' }
+    }
+}
+
+
 
 

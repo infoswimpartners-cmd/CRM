@@ -48,7 +48,10 @@ import {
     adminAssignLeadAction,
     getLeadWebhookMappingsAction,
     getOrCreateTrialPaymentUrlAction,
-    approveAndDispatchLeadAction
+    approveAndDispatchLeadAction,
+    getLeadApprovalWebhookConfigAction,
+    saveLeadApprovalWebhookConfigAction,
+    testSendLeadApprovalMessageAction
 } from '@/actions/leads'
 import { suggestCandidateLocations } from '@/lib/location-matcher'
 import {
@@ -257,6 +260,11 @@ export default function AdminLeadsPage() {
     const [newSpaceName, setNewSpaceName] = useState('')
     const [newWebhookUrl, setNewWebhookUrl] = useState('')
     const [creatingWebhook, setCreatingWebhook] = useState(false)
+
+    // 事務局 承認確認通知先Webhookのステート
+    const [approvalWebhookId, setApprovalWebhookId] = useState<string>('')
+    const [savingApprovalWebhook, setSavingApprovalWebhook] = useState(false)
+    const [testingApprovalWebhook, setTestingApprovalWebhook] = useState(false)
 
     // ポップオーバーの開閉制御
     const [openPopoverId, setOpenPopoverId] = useState<string | null>(null)
@@ -678,6 +686,7 @@ export default function AdminLeadsPage() {
                 getLeadAssignedCoachNotificationTemplateAction(),
                 getDisplaySettingsAction(),
                 getLineConfigAction(),
+                getLeadApprovalWebhookConfigAction(),
             ])
 
             // 最優先のリード一覧データを待機
@@ -741,7 +750,12 @@ export default function AdminLeadsPage() {
                 assignedCoachTemplateRes,
                 settingsRes,
                 lineConfigRes,
+                approvalWebhookRes,
             ] = await secondaryPromise
+
+            if (approvalWebhookRes?.success && approvalWebhookRes.webhookId) {
+                setApprovalWebhookId(approvalWebhookRes.webhookId)
+            }
 
             if (studentsRes.data) setStudents(studentsRes.data)
             if (templateRes.success) {
@@ -945,6 +959,51 @@ export default function AdminLeadsPage() {
         } catch (error) {
             console.error(error)
             toast.error('エラーが発生しました')
+        }
+    }
+
+    const handleSaveApprovalWebhook = async () => {
+        if (!approvalWebhookId) {
+            toast.error('承認通知先のスペースを選択してください')
+            return
+        }
+
+        setSavingApprovalWebhook(true)
+        try {
+            const res = await saveLeadApprovalWebhookConfigAction(approvalWebhookId)
+            if (res.success) {
+                toast.success('事務局 承認確認通知先スペースを登録・保存しました！')
+                await fetchData()
+            } else {
+                toast.error(res.error || '保存に失敗しました')
+            }
+        } catch (error) {
+            console.error(error)
+            toast.error('エラーが発生しました')
+        } finally {
+            setSavingApprovalWebhook(false)
+        }
+    }
+
+    const handleTestApprovalWebhook = async () => {
+        if (!approvalWebhookId) {
+            toast.error('テスト送信先のスペースを選択してください')
+            return
+        }
+
+        setTestingApprovalWebhook(true)
+        try {
+            const res = await testSendLeadApprovalMessageAction(approvalWebhookId)
+            if (res.success) {
+                toast.success(`「${res.spaceName}」へテスト通知を送信しました。Google Chatをご確認ください。`)
+            } else {
+                toast.error(res.error || 'テスト送信に失敗しました')
+            }
+        } catch (error) {
+            console.error(error)
+            toast.error('エラーが発生しました')
+        } finally {
+            setTestingApprovalWebhook(false)
         }
     }
 
@@ -2641,7 +2700,78 @@ export default function AdminLeadsPage() {
                     </div>
                 </TabsContent>
 
-                <TabsContent value="webhooks" className="outline-none">
+                <TabsContent value="webhooks" className="outline-none space-y-6">
+                    {/* 事務局 承認確認メッセージ送信先スペース設定カード */}
+                    <div className="bg-gradient-to-r from-blue-50/90 via-white to-indigo-50/70 p-5 rounded-lg border border-blue-200 shadow-xs space-y-4">
+                        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+                            <div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="p-1 rounded-md bg-blue-600 text-white text-xs">🔔</span>
+                                    <h2 className="text-sm font-bold text-gray-900">
+                                        事務局 承認確認通知先スペース（体験申込受信時の通知先）
+                                    </h2>
+                                    <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded-full border border-blue-200">
+                                        最優先設定
+                                    </span>
+                                </div>
+                                <p className="text-xs text-gray-600 mt-1">
+                                    お客様がWebフォーム等から体験レッスンを申し込んだ際に、<strong>「承認・調整メニュー（ワンクリック承認リンク等）」</strong>が届くGoogle Chatスペースを特定・指定します。
+                                </p>
+                            </div>
+                            {approvalWebhookId && (
+                                <div className="text-right shrink-0">
+                                    <span className="text-[11px] text-gray-500 font-medium">現在の設定先: </span>
+                                    <span className="text-xs font-bold text-blue-700 bg-white px-2.5 py-1 rounded-md border border-blue-200 shadow-2xs inline-block">
+                                        {webhooks.find(w => w.id === approvalWebhookId)?.space_name || '設定済み'}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-1">
+                            <div className="flex-1">
+                                <Select value={approvalWebhookId} onValueChange={setApprovalWebhookId}>
+                                    <SelectTrigger className="h-9 text-xs bg-white border-blue-300 focus:ring-blue-500">
+                                        <SelectValue placeholder="承認メッセージを受信するスペースを選択してください" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {webhooks.filter(w => w.webhook_url?.startsWith('http') && !w.space_name.startsWith('SP_')).map((w) => (
+                                            <SelectItem key={w.id} value={w.id} className="text-xs">
+                                                {w.space_name} {w.active ? '' : '（現在無効）'}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    className="h-9 text-xs px-4 font-semibold bg-blue-600 hover:bg-blue-700 text-white gap-1.5 shadow-2xs cursor-pointer"
+                                    disabled={savingApprovalWebhook || !approvalWebhookId}
+                                    onClick={handleSaveApprovalWebhook}
+                                >
+                                    {savingApprovalWebhook ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5" />}
+                                    送信先として保存
+                                </Button>
+
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-9 text-xs px-3 font-semibold border-blue-200 text-blue-700 hover:bg-blue-50 gap-1.5 shadow-2xs cursor-pointer"
+                                    disabled={testingApprovalWebhook || !approvalWebhookId}
+                                    onClick={handleTestApprovalWebhook}
+                                    title="選択したスペースへテストメッセージを送信して受信確認します"
+                                >
+                                    {testingApprovalWebhook ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                                    テスト通知を送信
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         {/* 新規追加フォーム */}
                         <div className="lg:col-span-1 bg-white p-5 rounded-lg border border-gray-200 shadow-xs h-fit space-y-4">
@@ -2689,7 +2819,7 @@ export default function AdminLeadsPage() {
                                 <Table className="min-w-[650px]">
                                     <TableHeader className="bg-gray-50/70 border-b border-gray-100">
                                         <TableRow>
-                                            <TableHead className="w-[150px]">スペース名</TableHead>
+                                            <TableHead className="w-[180px]">スペース名</TableHead>
                                             <TableHead>Webhook URL</TableHead>
                                             <TableHead className="w-[100px] text-center">有効/無効</TableHead>
                                             <TableHead className="w-[80px] text-right">操作</TableHead>
@@ -2711,7 +2841,16 @@ export default function AdminLeadsPage() {
                                         ) : (
                                             webhooks.map((w) => (
                                                 <TableRow key={w.id} className="hover:bg-gray-50/30 border-b border-gray-100 last:border-b-0">
-                                                    <TableCell className="font-semibold text-xs text-gray-950 align-middle">{w.space_name}</TableCell>
+                                                    <TableCell className="font-semibold text-xs text-gray-950 align-middle">
+                                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                                            <span>{w.space_name}</span>
+                                                            {w.id === approvalWebhookId && (
+                                                                <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-300 shadow-2xs">
+                                                                    👑 承認通知先
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </TableCell>
                                                     <TableCell className="font-mono text-[10px] text-gray-400 break-all select-all align-middle">
                                                         {maskUrl(w.webhook_url)}
                                                     </TableCell>

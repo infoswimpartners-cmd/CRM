@@ -344,17 +344,40 @@ SWIM PARTNERS/スイムパートナーズ事務局`;
       }
     }
 
-    // 4. 管理者へGoogle Chat通知
+    // 4. 管理者・事務局へGoogle Chat通知（承認・調整メニュー付き）
     try {
       let gchatWebhookUrl: string | null = null;
-      const { data: adminTrigger } = await supabase
-        .from('email_triggers')
-        .select('google_chat_webhook_url, google_chat_enabled')
-        .eq('id', 'line_schedule_detected')
+
+      // 4.0. 管理画面で明示的に登録・特定された承認通知先Webhook（lead_approval_webhook_id）を最優先
+      const { data: approvalConfig } = await supabase
+        .from('app_configs')
+        .select('value')
+        .eq('key', 'lead_approval_webhook_id')
         .maybeSingle();
 
-      if (adminTrigger && adminTrigger.google_chat_enabled !== false && adminTrigger.google_chat_webhook_url) {
-        gchatWebhookUrl = adminTrigger.google_chat_webhook_url;
+      if (approvalConfig?.value) {
+        const { data: targetWebhook } = await supabase
+          .from('google_chat_webhooks')
+          .select('webhook_url')
+          .eq('id', approvalConfig.value)
+          .maybeSingle();
+
+        if (targetWebhook?.webhook_url) {
+          gchatWebhookUrl = targetWebhook.webhook_url;
+        }
+      }
+
+      // 4.1. フォールバック（email_triggers または 公式ラインスペース名、環境変数）
+      if (!gchatWebhookUrl) {
+        const { data: adminTrigger } = await supabase
+          .from('email_triggers')
+          .select('google_chat_webhook_url, google_chat_enabled')
+          .eq('id', 'line_schedule_detected')
+          .maybeSingle();
+
+        if (adminTrigger && adminTrigger.google_chat_enabled !== false && adminTrigger.google_chat_webhook_url) {
+          gchatWebhookUrl = adminTrigger.google_chat_webhook_url;
+        }
       }
 
       if (!gchatWebhookUrl) {
