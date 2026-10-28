@@ -47,7 +47,8 @@ import {
     cancelLeadAssignmentAction,
     adminAssignLeadAction,
     getLeadWebhookMappingsAction,
-    getOrCreateTrialPaymentUrlAction
+    getOrCreateTrialPaymentUrlAction,
+    approveAndDispatchLeadAction
 } from '@/actions/leads'
 import { suggestCandidateLocations } from '@/lib/location-matcher'
 import {
@@ -358,6 +359,21 @@ export default function AdminLeadsPage() {
     useEffect(() => {
         fetchData()
     }, [])
+
+    // Google Chatからの調整リンク（?adjust_lead=xxx）でアクセス時に自動的に詳細・調整モーダルを開く
+    useEffect(() => {
+        if (typeof window !== 'undefined' && leads.length > 0) {
+            const params = new URLSearchParams(window.location.search)
+            const adjustLeadId = params.get('adjust_lead')
+            if (adjustLeadId) {
+                const targetLead = leads.find(l => l.id === adjustLeadId)
+                if (targetLead && !isEditDialogOpen && !editingLeadId) {
+                    handleOpenEditDialog(targetLead)
+                    window.history.replaceState({}, '', window.location.pathname)
+                }
+            }
+        }
+    }, [leads, isEditDialogOpen, editingLeadId])
 
     const handleSelectStudent = (studentId: string) => {
         const student = students.find(s => s.id === studentId)
@@ -944,6 +960,30 @@ export default function AdminLeadsPage() {
         } catch (error) {
             console.error(error)
             toast.error('エラーが発生しました')
+        }
+    }
+
+    const handleApproveAndDispatch = async (leadId: string, customLoc?: string) => {
+        setSendingStates(prev => ({ ...prev, [leadId]: true }))
+
+        try {
+            const res = await approveAndDispatchLeadAction(leadId, customLoc)
+            if (res.success) {
+                toast.success(
+                    `コーチ陣へ案内を配信しました！（個別: ${res.sentIndividualCount}件 / 全体: ${res.sentGeneralCount}件）`
+                )
+                await fetchData()
+                if (isEditDialogOpen && editingLeadId === leadId) {
+                    setIsEditDialogOpen(false)
+                }
+            } else {
+                toast.error(res.error || '案件の案内配信に失敗しました')
+            }
+        } catch (error) {
+            toast.error('エラーが発生しました')
+            console.error(error)
+        } finally {
+            setSendingStates(prev => ({ ...prev, [leadId]: false }))
         }
     }
 
@@ -2050,24 +2090,49 @@ export default function AdminLeadsPage() {
                                         </Label>
                                     </div>
 
-                                    <DialogFooter className="border-t pt-4">
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            className="text-xs h-9 px-4 font-semibold"
-                                            onClick={() => setIsEditDialogOpen(false)}
-                                        >
-                                            キャンセル
-                                        </Button>
-                                        <Button
-                                            type="submit"
-                                            size="sm"
-                                            disabled={updatingLead}
-                                            className="text-xs h-9 px-5 font-semibold"
-                                        >
-                                            {updatingLead ? '更新中...' : '案件を更新する'}
-                                        </Button>
+                                    <DialogFooter className="border-t pt-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+                                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                                            {(() => {
+                                                const currentLead = leads.find(l => l.id === editingLeadId)
+                                                if (!currentLead || currentLead.assigned_coach_id) return null
+                                                const isSending = sendingStates[currentLead.id]
+                                                return (
+                                                    <Button
+                                                        type="button"
+                                                        size="sm"
+                                                        className="text-xs h-9 px-4 font-semibold bg-blue-600 hover:bg-blue-700 text-white gap-1 w-full sm:w-auto"
+                                                        disabled={isSending}
+                                                        onClick={() => handleApproveAndDispatch(currentLead.id, editFormLessonLocation)}
+                                                    >
+                                                        {isSending ? (
+                                                            <Loader2 className="h-3 w-3 animate-spin" />
+                                                        ) : (
+                                                            <Send className="h-3 w-3" />
+                                                        )}
+                                                        {currentLead.status === '募集開始' ? 'コーチへ再案内する' : 'コーチ陣へ一斉案内（承認）'}
+                                                    </Button>
+                                                )
+                                            })()}
+                                        </div>
+                                        <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                className="text-xs h-9 px-4 font-semibold"
+                                                onClick={() => setIsEditDialogOpen(false)}
+                                            >
+                                                キャンセル
+                                            </Button>
+                                            <Button
+                                                type="submit"
+                                                size="sm"
+                                                disabled={updatingLead}
+                                                className="text-xs h-9 px-5 font-semibold"
+                                            >
+                                                {updatingLead ? '更新中...' : '案件を更新する'}
+                                            </Button>
+                                        </div>
                                     </DialogFooter>
                                 </form>
                             </DialogContent>
@@ -2345,28 +2410,27 @@ export default function AdminLeadsPage() {
 
                     <div className="border rounded-lg bg-white shadow-xs overflow-hidden">
                         <div className="overflow-x-auto">
-                            <Table className="min-w-[1170px] table-fixed">
+                            <Table className="min-w-[1080px] table-fixed">
                                 <TableHeader className="bg-gray-50/70 border-b border-gray-100">
                                     <TableRow>
-                                        <TableHead className="w-[180px] min-w-[180px]">顧客情報</TableHead>
-                                        <TableHead className="w-[220px] min-w-[220px]">希望日時/エリア</TableHead>
+                                        <TableHead className="w-[190px] min-w-[190px]">顧客情報</TableHead>
+                                        <TableHead className="w-[240px] min-w-[240px]">希望日時/エリア</TableHead>
+                                        <TableHead className="w-[210px] min-w-[210px]">予定プール（候補）</TableHead>
                                         <TableHead className="w-[100px] min-w-[100px]">ステータス</TableHead>
-                                        <TableHead className="w-[150px] min-w-[150px]">アサインコーチ</TableHead>
-                                        <TableHead className="w-[240px] min-w-[240px]">レッスン予定場所の選定 (複数選択可)</TableHead>
-                                        <TableHead className="w-[170px] min-w-[170px]">通知先スペース</TableHead>
-                                        <TableHead className="text-right w-[140px] min-w-[140px]">アクション</TableHead>
+                                        <TableHead className="w-[160px] min-w-[160px]">アサインコーチ</TableHead>
+                                        <TableHead className="text-right w-[150px] min-w-[150px]">アクション</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {loading ? (
                                         <TableRow>
-                                            <TableCell colSpan={7} className="h-24 text-center text-xs text-gray-500">
+                                            <TableCell colSpan={6} className="h-24 text-center text-xs text-gray-500">
                                                 読み込み中...
                                             </TableCell>
                                         </TableRow>
                                     ) : filteredLeads.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={7} className="h-24 text-center text-gray-500 text-xs">
+                                            <TableCell colSpan={6} className="h-24 text-center text-gray-500 text-xs">
                                                 体験申込リードはありません
                                             </TableCell>
                                         </TableRow>
@@ -2374,7 +2438,7 @@ export default function AdminLeadsPage() {
                                         filteredLeads.map((lead) => (
                                             <TableRow key={lead.id} className="hover:bg-gray-50/30 border-b border-gray-100 last:border-b-0">
                                                 <TableCell className="align-middle whitespace-normal">
-                                                    <div className="flex flex-col gap-0.5 w-[164px] min-w-[164px]">
+                                                    <div className="flex flex-col gap-0.5 w-[174px] min-w-[174px]">
                                                         <div className="flex items-center gap-1.5 flex-wrap">
                                                             <span className="font-semibold text-xs text-gray-950">{lead.name}</span>
                                                             {lead.notes?.includes('【ご紹介者様】') && (
@@ -2397,7 +2461,7 @@ export default function AdminLeadsPage() {
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="align-middle whitespace-normal">
-                                                    <div className="text-[10px] space-y-1 w-[204px] min-w-[204px]">
+                                                    <div className="text-[10px] space-y-1 w-[224px] min-w-[224px]">
                                                         <div className="flex items-center gap-1 text-gray-600">
                                                             <MapPin className="h-3 w-3 shrink-0 text-gray-400" />
                                                             <span className="truncate">エリア: {lead.area || '未設定'}</span>
@@ -2408,6 +2472,25 @@ export default function AdminLeadsPage() {
                                                             ③ {lead.datetime3 || '-'}
                                                         </div>
                                                     </div>
+                                                </TableCell>
+                                                <TableCell className="align-middle whitespace-normal">
+                                                    {(() => {
+                                                        const facilityNames = facilities.map(f => f.name.trim())
+                                                        const autoLoc = lead.lesson_location?.trim() || suggestCandidateLocations(lead.area, facilityNames)
+                                                        return (
+                                                            <div className="w-[194px] min-w-[194px] flex items-start gap-1.5 text-xs text-gray-800 bg-gray-50/80 border border-gray-200/80 rounded-md p-2">
+                                                                <MapPin className="h-3.5 w-3.5 text-blue-600 shrink-0 mt-0.5" />
+                                                                <div className="flex flex-col gap-0.5 overflow-hidden">
+                                                                    <span className="font-medium text-[11px] leading-tight break-words">
+                                                                        {autoLoc || '近隣施設より自動選定中'}
+                                                                    </span>
+                                                                    <span className="text-[9px] text-gray-400">
+                                                                        {lead.lesson_location ? '（指定・選定済）' : '（エリアから自動推定）'}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        )
+                                                    })()}
                                                 </TableCell>
                                                 <TableCell className="align-middle whitespace-normal">
                                                     <div className="w-[84px] min-w-[84px]">
@@ -2421,7 +2504,7 @@ export default function AdminLeadsPage() {
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="align-middle whitespace-normal">
-                                                    <div className="w-[140px] min-w-[140px]">
+                                                    <div className="w-[150px] min-w-[150px]">
                                                         {lead.assigned_coach_id ? (
                                                             (() => {
                                                                 const coach = coaches.find(c => c.id === lead.assigned_coach_id)
@@ -2501,179 +2584,24 @@ export default function AdminLeadsPage() {
                                                         )}
                                                     </div>
                                                 </TableCell>
-                                                <TableCell className="align-middle whitespace-normal">
-                                                    <div className="w-[224px] min-w-[224px]">
-                                                        <Popover 
-                                                            open={openPopoverId === lead.id} 
-                                                            onOpenChange={(open) => setOpenPopoverId(open ? lead.id : null)}
-                                                        >
-                                                            <PopoverTrigger asChild>
-                                                                <div className="relative">
-                                                                    <Input
-                                                                        placeholder="場所を入力（候補から選択可）"
-                                                                        className="h-8 text-xs bg-gray-50/50 border-gray-200 focus:bg-white pr-8 w-full"
-                                                                        value={selectedLocations[lead.id] || ''}
-                                                                        onChange={(e) => {
-                                                                            setSelectedLocations(prev => ({ ...prev, [lead.id]: e.target.value }))
-                                                                            if (openPopoverId !== lead.id) {
-                                                                                setOpenPopoverId(lead.id)
-                                                                            }
-                                                                        }}
-                                                                    />
-                                                                    <MapPin className="absolute right-2.5 top-2.5 h-3.5 w-3.5 text-gray-400 pointer-events-none" />
-                                                                </div>
-                                                            </PopoverTrigger>
-                                                            <PopoverContent className="w-[224px] p-0" align="start">
-                                                                <Command>
-                                                                    <CommandInput 
-                                                                        placeholder="施設を検索..." 
-                                                                        className="h-8 text-xs"
-                                                                    />
-                                                                    <CommandList>
-                                                                        <CommandEmpty className="py-2 text-center text-xs text-gray-500">
-                                                                            見つかりません
-                                                                        </CommandEmpty>
-                                                                        <CommandGroup heading="施設候補" className="text-[10px]">
-                                                                            {facilities.map((facility) => {
-                                                                                const currentVal = selectedLocations[lead.id] || ''
-                                                                                const selectedList = currentVal.split(',').map(s => s.trim()).filter(Boolean)
-                                                                                const isChecked = selectedList.includes(facility.name)
-
-                                                                                return (
-                                                                                    <CommandItem
-                                                                                        key={facility.id}
-                                                                                        value={facility.name}
-                                                                                        onSelect={() => {
-                                                                                            let newList = [...selectedList]
-                                                                                            if (isChecked) {
-                                                                                                newList = newList.filter(name => name !== facility.name)
-                                                                                            } else {
-                                                                                                if (!newList.includes(facility.name)) {
-                                                                                                    newList.push(facility.name)
-                                                                                                }
-                                                                                            }
-                                                                                            const newVal = newList.join(', ')
-                                                                                            setSelectedLocations(prev => ({ ...prev, [lead.id]: newVal }))
-                                                                                        }}
-                                                                                        className="text-xs flex items-center justify-between cursor-pointer py-1.5 px-2"
-                                                                                    >
-                                                                                        <span>{facility.name}</span>
-                                                                                        {isChecked && (
-                                                                                            <span className="text-primary text-[10px] font-bold">✓</span>
-                                                                                        )}
-                                                                                    </CommandItem>
-                                                                                )
-                                                                            })}
-                                                                        </CommandGroup>
-                                                                    </CommandList>
-                                                                </Command>
-                                                            </PopoverContent>
-                                                        </Popover>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="align-middle whitespace-normal">
-                                                     <div className="w-[154px] min-w-[154px]">
-                                                         {activeWebhooks.length === 0 ? (
-                                                             <div className="flex items-center gap-1 text-[11px] text-amber-600 font-medium bg-amber-50 border border-amber-200/50 rounded px-2 py-1 whitespace-nowrap">
-                                                                 <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                                                                 <span>Webhook未設定</span>
-                                                             </div>
-                                                         ) : (
-                                                             <Popover
-                                                                 open={openWebhookPopoverId === lead.id}
-                                                                 onOpenChange={(open) => setOpenWebhookPopoverId(open ? lead.id : null)}
-                                                             >
-                                                                 <PopoverTrigger asChild>
-                                                                     <Button
-                                                                         variant="outline"
-                                                                         size="sm"
-                                                                         className="h-8 w-full justify-between text-xs bg-gray-50/50 border-gray-200 px-2 font-normal hover:bg-white"
-                                                                     >
-                                                                         <span className="truncate">
-                                                                             {(() => {
-                                                                                 const currentList = selectedWebhooks[lead.id] || []
-                                                                                 if (currentList.length === 0) return 'スペースを選択'
-                                                                                 if (currentList.length === 1) {
-                                                                                     const matched = activeWebhooks.find(w => w.id === currentList[0])
-                                                                                     return matched ? matched.space_name : '1件選択中'
-                                                                                 }
-                                                                                 if (currentList.length === activeWebhooks.length) return '全スペース選択中'
-                                                                                 return `${currentList.length}件選択中`
-                                                                             })()}
-                                                                         </span>
-                                                                         <span className="text-[10px] text-gray-400 shrink-0 ml-1">▼</span>
-                                                                     </Button>
-                                                                 </PopoverTrigger>
-                                                                 <PopoverContent className="w-[200px] p-0" align="start">
-                                                                     <Command>
-                                                                         <div className="flex items-center justify-between p-1.5 border-b border-gray-100 bg-gray-50/60">
-                                                                             <span className="text-[11px] font-semibold text-gray-600">通知先スペース</span>
-                                                                             <button
-                                                                                 type="button"
-                                                                                 className="text-[10px] text-blue-600 hover:text-blue-800 font-medium px-1 py-0.5 rounded hover:bg-blue-50 cursor-pointer"
-                                                                                 onClick={() => {
-                                                                                     const currentList = selectedWebhooks[lead.id] || []
-                                                                                     if (currentList.length === activeWebhooks.length) {
-                                                                                         setSelectedWebhooks(prev => ({ ...prev, [lead.id]: [] }))
-                                                                                     } else {
-                                                                                         setSelectedWebhooks(prev => ({ ...prev, [lead.id]: activeWebhooks.map(w => w.id) }))
-                                                                                     }
-                                                                                 }}
-                                                                             >
-                                                                                 {(selectedWebhooks[lead.id] || []).length === activeWebhooks.length ? '全解除' : 'すべて選択'}
-                                                                             </button>
-                                                                         </div>
-                                                                         <CommandList>
-                                                                             <CommandEmpty className="py-2 text-center text-xs text-gray-500">
-                                                                                 スペースが見つかりません
-                                                                             </CommandEmpty>
-                                                                             <CommandGroup className="p-1">
-                                                                                 {activeWebhooks.map((w) => {
-                                                                                     const currentList = selectedWebhooks[lead.id] || []
-                                                                                     const isChecked = currentList.includes(w.id)
-
-                                                                                     return (
-                                                                                         <CommandItem
-                                                                                             key={w.id}
-                                                                                             value={w.space_name}
-                                                                                             onSelect={() => {
-                                                                                                 let newList = [...currentList]
-                                                                                                 if (isChecked) {
-                                                                                                     newList = newList.filter(id => id !== w.id)
-                                                                                                 } else {
-                                                                                                     newList.push(w.id)
-                                                                                                 }
-                                                                                                 setSelectedWebhooks(prev => ({ ...prev, [lead.id]: newList }))
-                                                                                             }}
-                                                                                             className="text-xs flex items-center justify-between cursor-pointer py-1.5 px-2 rounded hover:bg-gray-100"
-                                                                                         >
-                                                                                             <span className="truncate">{w.space_name}</span>
-                                                                                             {isChecked && (
-                                                                                                 <span className="text-primary text-[11px] font-bold shrink-0 ml-1">✓</span>
-                                                                                             )}
-                                                                                         </CommandItem>
-                                                                                     )
-                                                                                 })}
-                                                                             </CommandGroup>
-                                                                         </CommandList>
-                                                                     </Command>
-                                                                 </PopoverContent>
-                                                             </Popover>
-                                                         )}
-                                                     </div>
-                                                 </TableCell>
                                                 <TableCell className="text-right align-middle whitespace-normal">
-                                                    <div className="w-[124px] min-w-[124px] inline-flex flex-col gap-1.5">
-                                                        {/* 案件通知ボタン */}
-                                                        <Button
-                                                            size="sm"
-                                                            className="h-8 w-full gap-1 text-xs font-medium whitespace-nowrap"
-                                                            disabled={sendingStates[lead.id] || activeWebhooks.length === 0}
-                                                            onClick={() => handleSendNotification(lead.id)}
-                                                        >
-                                                            <Send className="h-3 w-3" />
-                                                            {lead.status === '募集開始' ? '再通知' : '案件通知'}
-                                                        </Button>
+                                                    <div className="w-[134px] min-w-[134px] inline-flex flex-col gap-1.5">
+                                                        {/* コーチ陣へ案内（承認・一括配信）ボタン */}
+                                                        {!lead.assigned_coach_id && (
+                                                            <Button
+                                                                size="sm"
+                                                                className="h-8 w-full gap-1 text-xs font-semibold whitespace-nowrap bg-blue-600 hover:bg-blue-700 text-white shadow-2xs"
+                                                                disabled={sendingStates[lead.id]}
+                                                                onClick={() => handleApproveAndDispatch(lead.id)}
+                                                            >
+                                                                {sendingStates[lead.id] ? (
+                                                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                                                ) : (
+                                                                    <Send className="h-3 w-3" />
+                                                                )}
+                                                                {lead.status === '募集開始' ? 'コーチへ再案内' : '承認して案内'}
+                                                            </Button>
+                                                        )}
                                                         {/* 手動完了ボタン */}
                                                         <Button
                                                             size="sm"

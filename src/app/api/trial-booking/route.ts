@@ -376,6 +376,10 @@ SWIM PARTNERS/スイムパートナーズ事務局`;
       }
 
       if (gchatWebhookUrl && !isDuplicateSubmission) {
+        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://crm.swim-partners.com';
+        const adjustUrl = savedLeadId ? `${siteUrl}/admin/leads?adjust_lead=${savedLeadId}` : `${siteUrl}/admin/leads`;
+        const approveUrl = savedLeadId ? `${siteUrl}/api/leads/approve?id=${savedLeadId}` : '';
+
         const gchatMessage = 
           `🏊‍♂️ *【体験レッスンお申し込みを受信しました】*\n` +
           `・氏名: *${payload.name || '未入力'}* 様（${payload.kana || ''}）\n` +
@@ -389,7 +393,13 @@ SWIM PARTNERS/スイムパートナーズ事務局`;
           `・メール: ${payload.email || '未入力'}\n` +
           `・泳力・目標: ${payload.skillLevel || 'なし'}\n` +
           (payload.name2 ? `・2人目: ${payload.name2} 様\n` : '') +
-          `※管理画面の「体験レッスン案件（/admin/leads）」に登録されました。コーチのアサインをお願いします。`;
+          `\n────────────────\n` +
+          `*【事務局 承認・調整フロー】*\n` +
+          `※女性コーチ希望や直接問合せなど条件調整が必要な場合は [調整してアサイン]、\n` +
+          `※調整不要でコーチ陣へ案内する場合は [ワンクリック承認] をタップしてください。\n\n` +
+          `👉 *【内容確認・調整してアサイン】*:\n${adjustUrl}\n\n` +
+          (approveUrl ? `✅ *【ワンクリック承認・コーチ一斉案内】*:\n${approveUrl}\n` : '') +
+          `────────────────`;
 
         await sendGoogleChatMessage(gchatWebhookUrl, gchatMessage);
       }
@@ -397,16 +407,8 @@ SWIM PARTNERS/スイムパートナーズ事務局`;
       console.error('[Trial Booking] Failed to send Google Chat notification:', chatErr);
     }
 
-    // 4.2. 対応可能コーチの自動選定 ＆ 各コーチ個別スペースへの自動送信（パターンA ＋ 2名以下全員送信）
-    // ※ 短時間連打・重複時は二重配信を防止
-    if (savedLeadId && !isDuplicateSubmission) {
-      try {
-        const dispatchResult = await dispatchNewLeadToMatchingCoaches(savedLeadId);
-        console.log(`[Trial Booking] Coach matching dispatch result:`, dispatchResult);
-      } catch (dispatchErr) {
-        console.error('[Trial Booking] Failed to dispatch lead to matching coaches:', dispatchErr);
-      }
-    }
+    // 4.2. コーチへの即時自動配信は停止し、事務局による事前確認・承認フロー（Google Chat上のリンク or 管理画面）へ移行
+    // ※ 事務局のワンクリック承認または管理画面での承認時に dispatchNewLeadToMatchingCoaches が実行されます
 
     // 5. Make Webhook へ転送（既存連携を完全維持）
     const webhookUrl = process.env.NEXT_PUBLIC_MAKE_WEBHOOK_URL;

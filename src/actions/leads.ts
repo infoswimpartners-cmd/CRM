@@ -2915,4 +2915,26 @@ export async function dispatchLeadToMatchingCoachesAction(leadId: string) {
     }
 }
 
+/**
+ * 事務局による案件承認・一斉案内配信 Server Action
+ * （マスタ施設からの自動場所補完＋マッチングコーチ個別スペース＋全体スペースへ送信）
+ */
+export async function approveAndDispatchLeadAction(leadId: string, customLocation?: string) {
+    try {
+        const { approveAndDispatchLead } = await import('@/lib/lead-approval')
+        const result = await approveAndDispatchLead(leadId, { customLocation })
+        revalidatePath('/admin/leads')
+        return result
+    } catch (error: any) {
+        return {
+            success: false,
+            sentIndividualCount: 0,
+            sentGeneralCount: 0,
+            location: '',
+            error: error.message || '案件の承認・案内の配信に失敗しました',
+        }
+    }
+}
+
+
 
