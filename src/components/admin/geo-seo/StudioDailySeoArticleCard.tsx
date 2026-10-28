@@ -82,16 +82,52 @@ export function StudioDailySeoArticleCard() {
         const toastId = toast.loading('キーワードを自律分析し、SEO記事を自動執筆中...');
 
         try {
-            const res = await triggerDailySeoArticleAction();
-            if (res.success && res.article) {
-                toast.success('本日のSEO記事が生成されました！（Notion自動同期中）', { id: toastId });
+            // 1. まずServer Actionを試行
+            let res = await triggerDailySeoArticleAction();
+
+            // 2. 万が一通信エラーやタイムアウト等で失敗した場合は、専用APIルートで再試行
+            if (!res || !res.success) {
+                console.warn('[Article Generate] Server action returned error, trying direct API route...', res?.message);
+                try {
+                    const apiRes = await fetch('/api/admin/generate-daily-seo-article', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                    });
+                    if (apiRes.ok) {
+                        res = await apiRes.json();
+                    }
+                } catch (apiErr) {
+                    console.warn('[Article Generate] Direct API route failed as well:', apiErr);
+                }
+            }
+
+            if (res && res.success && res.article) {
+                toast.success('本日のSEO記事が正常に生成されました！', { id: toastId });
                 await loadData();
                 setIsExpanded(true);
             } else {
-                toast.error(res.message || '記事生成に失敗しました。', { id: toastId });
+                toast.error(res?.message || '記事生成処理でエラーが発生しました。再度お試しください。', { id: toastId });
             }
         } catch (err: any) {
-            toast.error(err?.message || 'エラーが発生しました。', { id: toastId });
+            console.error('[Article Generate Catch]:', err);
+            // APIルートへの緊急フォールバック
+            try {
+                const apiRes = await fetch('/api/admin/generate-daily-seo-article', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                });
+                if (apiRes.ok) {
+                    const res = await apiRes.json();
+                    if (res.success && res.article) {
+                        toast.success('本日のSEO記事が正常に生成されました！', { id: toastId });
+                        await loadData();
+                        setIsExpanded(true);
+                        return;
+                    }
+                }
+            } catch {}
+
+            toast.error(err?.message || '記事生成中にエラーが発生しました。再度お試しください。', { id: toastId });
         } finally {
             setIsGenerating(false);
         }

@@ -125,9 +125,8 @@ ${customPrompt ? `- ユーザーからの追加リクエスト: ${customPrompt}`
 
     const userPrompt = `キーワード「${keyword}」${isRewrite ? `および対象パス「${targetPath}」のリライト記事` : ''}に関するプロ品質の記事を、指定のJSON形式で出力してください。一般的な抽象論ではなく、水泳指導のプロならではの生体力学的な理由（重心、頭の位置、浮力、脱力等）と、マンツーマン個別指導の優位性、および指定の4社徹底比較表を確実に含めて書いてください。`;
 
-    // 利用可能な高速Geminiモデルの自動フォールバック候補（公式の有効モデル）
+    // 利用可能な高速Geminiモデルの自動フォールバック候補（Google公式の有効モデル）
     const candidateModels = [
-        'gemini-2.5-flash',
         'gemini-2.0-flash',
         'gemini-1.5-flash',
     ];
@@ -160,7 +159,8 @@ ${customPrompt ? `- ユーザーからの追加リクエスト: ${customPrompt}`
     for (const model of candidateModels) {
         const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 6000);
+        // タイムアウトを12秒に設定（Vercelの全体タイムアウト前に完了またはフォールバック）
+        const timeoutId = setTimeout(() => controller.abort(), 12000);
 
         try {
             const res = await fetch(endpoint, {

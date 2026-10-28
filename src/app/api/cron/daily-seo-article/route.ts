@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { executeDailySeoArticlePipeline } from '@/lib/daily-seo-article-engine';
 
+export const maxDuration = 60; // 実行制限を60秒に拡大
+
 /**
  * 毎日自動キーワード分析＆STUDIO CMS記事自動作成 Cron API
  * 実行タイミング: 毎日 4:00 (JST)

@@ -325,11 +325,21 @@ export async function executeDailySeoArticlePipeline(): Promise<{
         await saveGeneratedArticle(updatedGeneratedArticle);
 
         // ステップ 7: STUDIO CMS Webhook または API への自動同期（設定されている場合）
-        const studioSyncResult = await syncArticleToStudioCms(studioArticle);
+        let studioSyncResult = { success: false, message: '未同期' };
+        try {
+            studioSyncResult = await syncArticleToStudioCms(studioArticle);
+        } catch (studioErr) {
+            console.warn('[Daily SEO Engine] Studio CMS sync failed gracefully:', studioErr);
+        }
 
         // ステップ 8: Notion データベースへの自動投稿（STUDIO公式Notion同期連携）
-        const notionResult: NotionSyncResult = await syncArticleToNotionDatabase(studioArticle);
-        console.log('[Daily SEO Engine] Notion Sync Result:', notionResult.message);
+        let notionResult: NotionSyncResult = { success: false, message: '未設定' };
+        try {
+            notionResult = await syncArticleToNotionDatabase(studioArticle);
+            console.log('[Daily SEO Engine] Notion Sync Result:', notionResult.message);
+        } catch (notionErr) {
+            console.warn('[Daily SEO Engine] Notion sync failed gracefully:', notionErr);
+        }
 
         // ステップ 9: Google Chat への日次完了通知（Webhook URLがある場合）
         const gchatWebhookUrl = process.env.GOOGLE_CHAT_WEBHOOK_URL;

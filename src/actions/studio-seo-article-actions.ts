@@ -20,14 +20,15 @@ export async function triggerDailySeoArticleAction(): Promise<{
     try {
         const result = await executeDailySeoArticlePipeline();
         return {
-            success: result.success,
-            article: result.article,
-            message: result.message,
+            success: Boolean(result?.success),
+            article: result?.article,
+            message: result?.message || '日次記事生成が完了しました。',
         };
     } catch (err: any) {
+        console.error('[Action triggerDailySeoArticleAction Error]:', err);
         return {
             success: false,
-            message: err?.message || '日次SEO記事の生成に失敗しました。',
+            message: String(err?.message || '日次SEO記事の生成処理中にエラーが発生しました。'),
         };
     }
 }
