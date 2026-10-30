@@ -393,6 +393,20 @@ export async function submitLessonReport(values: FormValues) {
             console.error('Error sending coach report notification:', coachChatError)
         }
 
+        // 4.6 生徒へのLINEフィードバック自動通知（LINE連携済みの場合）
+        if (data.student_id && newLessonId) {
+            await sendLessonReportLineNotification({
+                supabaseAdmin,
+                studentId: data.student_id,
+                studentName: data.student_name,
+                coachId: user.id,
+                lessonDate: data.lesson_date,
+                location: data.location,
+                comment: data.menu_description || data.coach_comment || '',
+                lessonId: newLessonId,
+            })
+        }
+
         // 5. 体験レッスンの場合、生徒のステータスを更新
         if (data.student_id) {
             const { createAdminClient } = await import('@/lib/supabase/admin')
@@ -428,6 +442,20 @@ export async function submitLessonReport(values: FormValues) {
                         price: data.price,
                         description: data.menu_description || ''
                     });
+                }
+
+                // 5.5 体験レッスン終了後フォローメッセージを生徒のLINEへ自動送信
+                try {
+                    const { sendTrialLessonFollowupLineMessage } = await import('@/lib/line-trial-followup');
+                    await sendTrialLessonFollowupLineMessage({
+                        studentId: data.student_id,
+                        coachId: user.id,
+                        lessonId: newLessonId,
+                        lessonDate: data.lesson_date,
+                        location: data.location,
+                    });
+                } catch (followupErr) {
+                    console.error('[Lesson Report] Failed to send trial followup LINE message:', followupErr);
                 }
             }
         }
@@ -764,6 +792,20 @@ export async function submitPublicLessonReport(values: PublicFormValues) {
                         description: data.menu_description || ''
                     });
                 }
+
+                // 体験レッスン終了後フォローメッセージを生徒のLINEへ自動送信
+                try {
+                    const { sendTrialLessonFollowupLineMessage } = await import('@/lib/line-trial-followup');
+                    await sendTrialLessonFollowupLineMessage({
+                        studentId: data.student_id,
+                        coachId: data.coach_id,
+                        lessonId: newId,
+                        lessonDate: data.lesson_date,
+                        location: data.location,
+                    });
+                } catch (followupErr) {
+                    console.error('[Public Lesson Report] Failed to send trial followup LINE message:', followupErr);
+                }
             }
         }
 
@@ -1057,6 +1099,34 @@ export async function submitAdminProxyReport(values: AdminProxyValues) {
                     description: data.menu_description || ''
                 });
             }
+
+            // 体験レッスン終了後フォローメッセージを生徒のLINEへ自動送信
+            try {
+                const { sendTrialLessonFollowupLineMessage } = await import('@/lib/line-trial-followup');
+                await sendTrialLessonFollowupLineMessage({
+                    studentId: data.student_id,
+                    coachId: data.coach_id,
+                    lessonId: insertedLesson?.id,
+                    lessonDate: data.lesson_date,
+                    location: data.location,
+                });
+            } catch (followupErr) {
+                console.error('[Admin Proxy Report] Failed to send trial followup LINE message:', followupErr);
+            }
+        }
+
+        // 8.5 生徒へのLINEフィードバック自動通知（LINE連携済みの場合）
+        if (data.student_id && insertedLesson?.id) {
+            await sendLessonReportLineNotification({
+                supabaseAdmin,
+                studentId: data.student_id,
+                studentName: data.student_name,
+                coachId: data.coach_id,
+                lessonDate: data.lesson_date,
+                location: data.location,
+                comment: data.menu_description || data.coach_comment || '',
+                lessonId: insertedLesson.id,
+            })
         }
 
         // 9. Googleスプレッドシートへのレッスン報告記録（非ブロッキング）
@@ -1215,5 +1285,75 @@ async function triggerMakeTrialDoneWebhook(studentId: string, coachId: string, l
         }
     } catch (error) {
         console.error("Error triggering Make Trial Done Webhook:", error);
+    }
+}
+
+/**
+ * 生徒へのレッスン報告LINE自動通知
+ * 生徒がLINE連携済み（line_user_idあり）の場合、コーチからのコメントとマイページURLをLINEプッシュ送信
+ */
+export async function sendLessonReportLineNotification(params: {
+    supabaseAdmin: any;
+    studentId?: string | null;
+    studentName: string;
+    coachId: string;
+    lessonDate: string;
+    location: string;
+    comment?: string;
+    lessonId: string;
+}) {
+    if (!params.studentId) return;
+
+    try {
+        const { data: student } = await params.supabaseAdmin
+            .from('students')
+            .select('student_number, full_name, line_user_id')
+            .eq('id', params.studentId)
+            .maybeSingle();
+
+        if (!student?.line_user_id) {
+            console.log(`[LessonReport LINE] Student ${params.studentId} has no LINE user ID. Skipping LINE notification.`);
+            return;
+        }
+
+        const { data: coachProfile } = await params.supabaseAdmin
+            .from('profiles')
+            .select('full_name')
+            .eq('id', params.coachId)
+            .maybeSingle();
+
+        const coachName = coachProfile?.full_name || '担当コーチ';
+
+        const { sendSingleLineMessage } = await import('@/lib/line-marketing-service');
+        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://manager.swim-partners.com';
+        const reportUrl = `${siteUrl}/member/reports/${params.lessonId}`;
+
+        const formattedDate = new Date(params.lessonDate).toLocaleDateString('ja-JP', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            weekday: 'short',
+        });
+
+        const feedbackText = (params.comment || '').trim();
+        const feedbackPreview = feedbackText
+            ? `【コーチからのコメント】\n${feedbackText}`
+            : '（フィードバック詳細はマイページをご確認ください）';
+
+        const lineMessage = `${params.studentName} 様\n\nスイムパートナーズの ${coachName} です🏊‍♂️✨\n本日はレッスンへのご参加、誠にありがとうございました！\n\n本日のレッスンフィードバックをお届けいたします。\n\n━━━━━━━━━━━━━━━\n🏊‍♂️ レッスンレポート\n━━━━━━━━━━━━━━━\n【日時】${formattedDate}\n【場所】${params.location}\n\n${feedbackPreview}\n━━━━━━━━━━━━━━━\n\nマイページからも詳細なレポートをご確認いただけます。\n▼ レポート詳細はこちら\n${reportUrl}\n\n次回もよろしくお願いいたします😊`;
+
+        await sendSingleLineMessage({
+            studentId: params.studentId,
+            studentNumber: student.student_number,
+            studentName: params.studentName,
+            lineUserId: student.line_user_id,
+            rawMessage: lineMessage,
+            deliveryType: 'direct_chat',
+            stepName: 'レッスン報告（フィードバック）',
+        });
+
+        console.log(`[LessonReport LINE] Successfully sent lesson report LINE notification to ${params.studentName} (${student.student_number})`);
+    } catch (lineErr) {
+        console.error('[LessonReport LINE] Failed to send LINE notification:', lineErr);
     }
 }

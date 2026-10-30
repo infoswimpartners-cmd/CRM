@@ -65,6 +65,7 @@ import {
     Sparkles
 } from 'lucide-react'
 import { TagStepSettingsPanel } from './components/TagStepSettingsPanel'
+import { TrialFollowupSettingsCard } from './components/TrialFollowupSettingsCard'
 
 /**
  * LINEメッセージから日付と時刻を簡易パースします
@@ -1524,6 +1525,9 @@ export default function LineMonitoringPage() {
                             </Button>
                         </div>
                     </div>
+
+                    {/* 体験レッスン報告直後 LINE自動フォロー設定（Make内製化） */}
+                    <TrialFollowupSettingsCard />
 
                     {/* 配信メッセージ文面エディタ */}
                     <Card className="border-indigo-100 shadow-sm overflow-hidden bg-white">

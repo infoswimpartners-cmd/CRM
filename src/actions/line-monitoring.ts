@@ -900,6 +900,113 @@ export async function previewGeminiStepMessageAction(params: {
     }
 }
 
+/**
+ * 体験レッスン終了後フォロー設定（ON/OFFおよびテンプレート文面）を取得
+ */
+export async function getTrialFollowupConfigAction() {
+    const { isAuthorized } = await verifyAdminRole()
+    if (!isAuthorized) {
+        return { success: false, error: 'Unauthorized', enabled: true, template: '' }
+    }
+
+    try {
+        const { getTrialFollowupConfig } = await import('@/lib/line-trial-followup')
+        const config = await getTrialFollowupConfig()
+        return { success: true, ...config }
+    } catch (e: any) {
+        console.error('getTrialFollowupConfigAction Error:', e)
+        return { success: false, error: e.message, enabled: true, template: '' }
+    }
+}
+
+/**
+ * 体験レッスン終了後フォロー設定を保存
+ */
+export async function saveTrialFollowupConfigAction(params: {
+    enabled: boolean
+    template: string
+}) {
+    const { isAuthorized } = await verifyAdminRole()
+    if (!isAuthorized) {
+        return { success: false, error: 'Unauthorized' }
+    }
+
+    try {
+        const { saveTrialFollowupConfig } = await import('@/lib/line-trial-followup')
+        const res = await saveTrialFollowupConfig(params)
+        revalidatePath('/admin/line-monitoring')
+        return res
+    } catch (e: any) {
+        console.error('saveTrialFollowupConfigAction Error:', e)
+        return { success: false, error: e.message }
+    }
+}
+
+/**
+ * 体験レッスン終了後フォローメッセージのテスト送信（厳格ルール: 会員番号0035、テスト太郎様限定）
+ */
+export async function testSendTrialFollowupAction(params?: {
+    template?: string
+}) {
+    const { isAuthorized } = await verifyAdminRole()
+    if (!isAuthorized) {
+        return { success: false, error: 'Unauthorized' }
+    }
+
+    try {
+        const { createAdminClient } = await import('@/lib/supabase/admin')
+        const { sendTrialLessonFollowupLineMessage, TEST_TARO_STUDENT_NUMBER } = await import('@/lib/line-trial-followup')
+        const supabaseAdmin = createAdminClient()
+
+        // 厳格ルール: テスト太郎（会員番号0035）のみを取得
+        const { data: testStudent, error: findErr } = await supabaseAdmin
+            .from('students')
+            .select('id, full_name, student_number, line_user_id')
+            .eq('student_number', TEST_TARO_STUDENT_NUMBER)
+            .maybeSingle()
+
+        if (findErr || !testStudent) {
+            return {
+                success: false,
+                error: `テスト対象顧客（会員番号: ${TEST_TARO_STUDENT_NUMBER}、テスト太郎）が見つかりませんでした`,
+            }
+        }
+
+        if (!testStudent.line_user_id) {
+            return {
+                success: false,
+                error: `テスト太郎（会員番号: ${TEST_TARO_STUDENT_NUMBER}）にLINE User IDが連携されていません`,
+            }
+        }
+
+        const sendResult = await sendTrialLessonFollowupLineMessage({
+            studentId: testStudent.id,
+            forceSend: true,
+            customTemplate: params?.template,
+            lessonDate: new Date().toISOString(),
+            location: '東京体育館プール',
+        })
+
+        if (!sendResult.success) {
+            return {
+                success: false,
+                error: sendResult.error || sendResult.skipReason || 'テスト送信に失敗しました',
+            }
+        }
+
+        revalidatePath('/admin/line-monitoring')
+        return {
+            success: true,
+            messageText: sendResult.messageText,
+            recipient: `${testStudent.full_name} 様 (${testStudent.student_number})`,
+        }
+    } catch (e: any) {
+        console.error('testSendTrialFollowupAction Error:', e)
+        return { success: false, error: e.message }
+    }
+}
+
+
 
 
 

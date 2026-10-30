@@ -27,6 +27,7 @@ export const STANDARD_TAGS = {
     REFERRAL: 'referral_lead',             // お友達紹介キャンペーン経由
     CART_RECOVERY_SENT: 'cart_recovery_sent', // カゴ落ちフォロー送信済
     CONFIRM_ABANDON_RECOVERY_SENT: 'confirm_abandon_recovery_sent', // フォーム確認後未申込の即時フォロー送信済
+    TRIAL_FOLLOWUP_SENT: 'trial_followup_sent', // 体験レッスン終了後フォロー送信済
     AUDIENCE_KIDS: 'audience:kids',        // 対象: キッズ/ジュニア
     AUDIENCE_ADULT: 'audience:adult',      // 対象: 大人/マスターズ
 } as const;
@@ -71,6 +72,11 @@ export const TAG_LABELS: Record<string, { label: string; category: string; descr
         label: '確認後即時フォロー送信済',
         category: 'automation',
         description: 'フォーム確認後未申込の離脱者へ即時フォローメッセージを送信完了したユーザー'
+    },
+    [STANDARD_TAGS.TRIAL_FOLLOWUP_SENT]: {
+        label: '体験後フォロー送信済',
+        category: 'automation',
+        description: '体験レッスン報告完了後のアンケート・入会案内メッセージを送信完了したユーザー'
     },
     [STANDARD_TAGS.AUDIENCE_KIDS]: {
         label: '対象: キッズ/ジュニア',
