@@ -906,16 +906,16 @@ export async function previewGeminiStepMessageAction(params: {
 export async function getTrialFollowupConfigAction() {
     const { isAuthorized } = await verifyAdminRole()
     if (!isAuthorized) {
-        return { success: false, error: 'Unauthorized', enabled: true, template: '' }
+        return { success: false as const, error: 'Unauthorized', enabled: true, template: '', gchatWebhookUrl: null as string | null }
     }
 
     try {
         const { getTrialFollowupConfig } = await import('@/lib/line-trial-followup')
         const config = await getTrialFollowupConfig()
-        return { success: true, ...config }
+        return { success: true as const, ...config }
     } catch (e: any) {
         console.error('getTrialFollowupConfigAction Error:', e)
-        return { success: false, error: e.message, enabled: true, template: '' }
+        return { success: false as const, error: e.message, enabled: true, template: '', gchatWebhookUrl: null as string | null }
     }
 }
 
@@ -925,6 +925,7 @@ export async function getTrialFollowupConfigAction() {
 export async function saveTrialFollowupConfigAction(params: {
     enabled: boolean
     template: string
+    gchatWebhookUrl?: string | null
 }) {
     const { isAuthorized } = await verifyAdminRole()
     if (!isAuthorized) {
@@ -1005,6 +1006,102 @@ export async function testSendTrialFollowupAction(params?: {
         return { success: false, error: e.message }
     }
 }
+
+/**
+ * 体験レッスンフォロー未送信時のGoogle Chat手動送信用通知テスト（厳格ルール: 会員番号0035、テスト太郎様限定）
+ */
+export async function testSendTrialFollowupGChatAction(params?: {
+    template?: string
+    gchatWebhookUrl?: string | null
+}) {
+    const { isAuthorized } = await verifyAdminRole()
+    if (!isAuthorized) {
+        return { success: false, error: 'Unauthorized' }
+    }
+
+    try {
+        const { createAdminClient } = await import('@/lib/supabase/admin')
+        const {
+            notifyTrialFollowupExclusionToGoogleChat,
+            DEFAULT_TRIAL_FOLLOWUP_TEMPLATE,
+            TEST_TARO_STUDENT_NUMBER,
+        } = await import('@/lib/line-trial-followup')
+        const supabaseAdmin = createAdminClient()
+
+        // 厳格ルール: テスト太郎（会員番号0035）のみを検索
+        const { data: testStudent, error: findErr } = await supabaseAdmin
+            .from('students')
+            .select(`
+                id,
+                full_name,
+                student_number,
+                contact_email,
+                contact_phone,
+                coach:coach_id(full_name)
+            `)
+            .eq('student_number', TEST_TARO_STUDENT_NUMBER)
+            .maybeSingle()
+
+        if (findErr || !testStudent) {
+            return {
+                success: false,
+                error: `テスト対象顧客（会員番号: ${TEST_TARO_STUDENT_NUMBER}、テスト太郎）が見つかりませんでした`,
+            }
+        }
+
+        const rawTemplate = params?.template || DEFAULT_TRIAL_FOLLOWUP_TEMPLATE
+        const coachName = (testStudent.coach as any)?.full_name || '担当コーチ'
+        const lessonDate = new Date().toISOString()
+        const location = '東京体育館プール（テスト）'
+
+        const variables: Record<string, string> = {
+            name: testStudent.full_name,
+            student_name: testStudent.full_name,
+            student_number: testStudent.student_number || '',
+            coach_name: coachName,
+            lesson_date: new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' }),
+            location,
+            enroll_url: 'https://liff.line.me/2009159689-Ugq1NLXe',
+            survey_url: 'https://forms.gle/nNJMpU9TwQ4hkmPR7',
+        }
+
+        let renderedMessage = rawTemplate
+        for (const [k, v] of Object.entries(variables)) {
+            renderedMessage = renderedMessage.replace(new RegExp(`[{｛]{1,2}\\s*${k}\\s*[}｝]{1,2}`, 'gi'), v)
+        }
+
+        const sent = await notifyTrialFollowupExclusionToGoogleChat({
+            studentName: testStudent.full_name,
+            studentNumber: testStudent.student_number,
+            studentId: testStudent.id,
+            lineUserId: null,
+            contactPhone: testStudent.contact_phone,
+            contactEmail: testStudent.contact_email,
+            coachName,
+            lessonDate,
+            location,
+            reason: '【テスト通知】LINE送信除外時のGoogle Chat通知テスト（会員番号: 0035 テスト太郎様）',
+            messageText: renderedMessage,
+        })
+
+        if (!sent) {
+            return {
+                success: false,
+                error: 'Google Chatへの通知送信に失敗しました。Webhook URLが正しく設定されているかご確認ください。',
+            }
+        }
+
+        return {
+            success: true,
+            recipient: `${testStudent.full_name} 様 (${testStudent.student_number})`,
+            messageText: renderedMessage,
+        }
+    } catch (e: any) {
+        console.error('testSendTrialFollowupGChatAction Error:', e)
+        return { success: false, error: e.message }
+    }
+}
+
 
 
 

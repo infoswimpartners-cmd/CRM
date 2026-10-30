@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import {
@@ -18,23 +19,31 @@ import {
     ShieldCheck,
     Sparkles,
     FileText,
+    BellRing,
 } from 'lucide-react';
 import {
     getTrialFollowupConfigAction,
     saveTrialFollowupConfigAction,
     testSendTrialFollowupAction,
+    testSendTrialFollowupGChatAction,
 } from '@/actions/line-monitoring';
 import { DEFAULT_TRIAL_FOLLOWUP_TEMPLATE } from '@/lib/line-trial-followup';
 
 export function TrialFollowupSettingsCard() {
     const [enabled, setEnabled] = useState(true);
     const [template, setTemplate] = useState(DEFAULT_TRIAL_FOLLOWUP_TEMPLATE);
+    const [gchatWebhookUrl, setGchatWebhookUrl] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [isTesting, setIsTesting] = useState(false);
+    const [isTestingGChat, setIsTestingGChat] = useState(false);
     const [testResult, setTestResult] = useState<{
         recipient?: string;
         messageText?: string;
+        timestamp?: string;
+    } | null>(null);
+    const [gchatTestResult, setGchatTestResult] = useState<{
+        recipient?: string;
         timestamp?: string;
     } | null>(null);
 
@@ -48,6 +57,9 @@ export function TrialFollowupSettingsCard() {
                     setEnabled(res.enabled);
                     if (res.template) {
                         setTemplate(res.template);
+                    }
+                    if (res.gchatWebhookUrl) {
+                        setGchatWebhookUrl(res.gchatWebhookUrl);
                     }
                 }
             } catch (err) {
@@ -66,7 +78,11 @@ export function TrialFollowupSettingsCard() {
     const handleSave = async () => {
         setIsSaving(true);
         try {
-            const res = await saveTrialFollowupConfigAction({ enabled, template });
+            const res = await saveTrialFollowupConfigAction({
+                enabled,
+                template,
+                gchatWebhookUrl: gchatWebhookUrl.trim() || null,
+            });
             if (res.success) {
                 toast.success('体験レッスン終了後フォロー設定を保存しました');
             } else {
@@ -87,7 +103,7 @@ export function TrialFollowupSettingsCard() {
         }
     };
 
-    // テスト送信（厳格ルール: 会員番号0035、テスト太郎様限定）
+    // LINEテスト送信（厳格ルール: 会員番号0035、テスト太郎様限定）
     const handleTestSend = async () => {
         setIsTesting(true);
         setTestResult(null);
@@ -107,6 +123,31 @@ export function TrialFollowupSettingsCard() {
             toast.error(err.message || 'テスト送信エラーが発生しました');
         } finally {
             setIsTesting(false);
+        }
+    };
+
+    // Google Chat通知テスト（厳格ルール: 会員番号0035、テスト太郎様限定）
+    const handleTestGChat = async () => {
+        setIsTestingGChat(true);
+        setGchatTestResult(null);
+        try {
+            const res = await testSendTrialFollowupGChatAction({
+                template,
+                gchatWebhookUrl: gchatWebhookUrl.trim() || null,
+            });
+            if (res.success) {
+                toast.success('Google Chatへ未送信通知のテストを送信しました！');
+                setGchatTestResult({
+                    recipient: res.recipient,
+                    timestamp: new Date().toLocaleTimeString('ja-JP'),
+                });
+            } else {
+                toast.error(res.error || 'Google Chat通知テストに失敗しました');
+            }
+        } catch (err: any) {
+            toast.error(err.message || 'Google Chatテスト送信エラーが発生しました');
+        } finally {
+            setIsTestingGChat(false);
         }
     };
 
@@ -198,7 +239,69 @@ export function TrialFollowupSettingsCard() {
                             </div>
                         </div>
 
-                        {/* テスト送信結果の表示 */}
+                        {/* LINE未連携・送信除外時のGoogle Chat通知設定 */}
+                        <div className="p-4 rounded-xl bg-amber-50/60 border border-amber-200/80 space-y-3">
+                            <div className="flex items-start justify-between gap-2">
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-2 text-xs font-bold text-amber-900">
+                                        <BellRing className="w-4 h-4 text-amber-600 shrink-0" />
+                                        <span>LINE送信除外・未送信時のGoogle Chat手動送信用通知</span>
+                                        <Badge variant="outline" className="text-[10px] bg-white border-amber-300 text-amber-800">
+                                            手動フォロー支援
+                                        </Badge>
+                                    </div>
+                                    <p className="text-[11px] leading-relaxed text-amber-800/90">
+                                        生徒が「LINE未連携」の場合や、LINE月間配信枠上限超過（429エラー）等で送信除外・失敗した際、事務局スタッフが手動でメールやSMS等でご案内できるよう、Google Chatへ「未送信理由」「生徒連絡先」「コピー用メッセージ本文」を自動通知します。
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-1.5 pt-1">
+                                <label className="text-[11px] font-semibold text-amber-900 flex items-center justify-between">
+                                    <span>Google Chat Webhook URL（個別指定する場合のみ入力）</span>
+                                    <span className="text-[10px] font-normal text-amber-700">※未入力時は「公式ラインチャットグループ」等の登録済みWebhookを自動利用</span>
+                                </label>
+                                <Input
+                                    value={gchatWebhookUrl}
+                                    onChange={(e) => setGchatWebhookUrl(e.target.value)}
+                                    placeholder="https://chat.googleapis.com/v1/spaces/.../messages?key=... (空欄でデフォルト使用)"
+                                    className="text-xs font-mono bg-white border-amber-200 focus:border-amber-500 rounded-lg h-8"
+                                />
+                            </div>
+
+                            {/* Google Chatテスト結果 */}
+                            {gchatTestResult && (
+                                <div className="p-2.5 rounded-lg bg-white border border-amber-200 text-xs text-amber-900 flex items-center gap-2 animate-in fade-in">
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                                    <span>Google Chat通知テスト成功（{gchatTestResult.timestamp}）- 対象: {gchatTestResult.recipient}</span>
+                                </div>
+                            )}
+
+                            <div className="flex justify-end pt-1">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleTestGChat}
+                                    disabled={isTestingGChat || isSaving}
+                                    className="h-7 text-[11px] font-semibold border-amber-300 text-amber-900 hover:bg-amber-100 bg-white rounded-lg"
+                                >
+                                    {isTestingGChat ? (
+                                        <>
+                                            <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                                            Google Chat通知テスト送信中...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <BellRing className="w-3 h-3 mr-1 text-amber-600" />
+                                            Google Chat通知テスト（テスト太郎: 0035）
+                                        </>
+                                    )}
+                                </Button>
+                            </div>
+                        </div>
+
+                        {/* LINEテスト送信結果の表示 */}
                         {testResult && (
                             <div className="p-4 rounded-xl bg-emerald-50/70 border border-emerald-200 space-y-2 text-xs animate-in fade-in">
                                 <div className="flex items-center gap-2 text-emerald-800 font-bold">

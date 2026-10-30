@@ -18,6 +18,7 @@ export const TEST_TARO_LINE_USER_ID = 'U0e5a7654874369ca5e38deb47fd783aa';
 // 設定キー定数
 export const TRIAL_FOLLOWUP_CONFIG_KEY = 'line_trial_followup_template';
 export const TRIAL_FOLLOWUP_ENABLED_KEY = 'line_trial_followup_enabled';
+export const TRIAL_FOLLOWUP_GCHAT_WEBHOOK_KEY = 'trial_followup_gchat_webhook';
 
 // デフォルトメッセージテンプレート（ユーザー指定文面）
 export const DEFAULT_TRIAL_FOLLOWUP_TEMPLATE =
@@ -74,6 +75,7 @@ export interface SendTrialLessonFollowupResult {
 export async function getTrialFollowupConfig(): Promise<{
     enabled: boolean;
     template: string;
+    gchatWebhookUrl?: string | null;
 }> {
     const supabase = createAdminClient();
 
@@ -81,19 +83,21 @@ export async function getTrialFollowupConfig(): Promise<{
         const { data: configs } = await supabase
             .from('app_configs')
             .select('key, value')
-            .in('key', [TRIAL_FOLLOWUP_CONFIG_KEY, TRIAL_FOLLOWUP_ENABLED_KEY]);
+            .in('key', [TRIAL_FOLLOWUP_CONFIG_KEY, TRIAL_FOLLOWUP_ENABLED_KEY, TRIAL_FOLLOWUP_GCHAT_WEBHOOK_KEY]);
 
         const templateRow = configs?.find(c => c.key === TRIAL_FOLLOWUP_CONFIG_KEY);
         const enabledRow = configs?.find(c => c.key === TRIAL_FOLLOWUP_ENABLED_KEY);
+        const gchatRow = configs?.find(c => c.key === TRIAL_FOLLOWUP_GCHAT_WEBHOOK_KEY);
 
         const template = templateRow?.value?.trim() || DEFAULT_TRIAL_FOLLOWUP_TEMPLATE;
         // 未設定時はデフォルト有効 (true)
         const enabled = enabledRow ? enabledRow.value === 'true' : true;
+        const gchatWebhookUrl = gchatRow?.value?.trim() || null;
 
-        return { enabled, template };
+        return { enabled, template, gchatWebhookUrl };
     } catch (err) {
         console.error('[TrialFollowup] Error fetching config:', err);
-        return { enabled: true, template: DEFAULT_TRIAL_FOLLOWUP_TEMPLATE };
+        return { enabled: true, template: DEFAULT_TRIAL_FOLLOWUP_TEMPLATE, gchatWebhookUrl: null };
     }
 }
 
@@ -103,20 +107,133 @@ export async function getTrialFollowupConfig(): Promise<{
 export async function saveTrialFollowupConfig(params: {
     enabled: boolean;
     template: string;
+    gchatWebhookUrl?: string | null;
 }): Promise<{ success: boolean; error?: string }> {
     const supabase = createAdminClient();
 
     try {
-        await supabase.from('app_configs').upsert([
+        const upsertRows = [
             { key: TRIAL_FOLLOWUP_ENABLED_KEY, value: params.enabled ? 'true' : 'false' },
             { key: TRIAL_FOLLOWUP_CONFIG_KEY, value: params.template },
-        ], { onConflict: 'key' });
+        ];
+
+        if (params.gchatWebhookUrl !== undefined) {
+            upsertRows.push({
+                key: TRIAL_FOLLOWUP_GCHAT_WEBHOOK_KEY,
+                value: params.gchatWebhookUrl?.trim() || '',
+            });
+        }
+
+        await supabase.from('app_configs').upsert(upsertRows, { onConflict: 'key' });
 
         return { success: true };
     } catch (err: any) {
         console.error('[TrialFollowup] Error saving config:', err);
         return { success: false, error: err.message || '設定の保存に失敗しました' };
     }
+}
+
+/**
+ * 体験レッスンフォロー通知用のGoogle Chat Webhook URLを取得
+ */
+export async function getTrialFollowupGChatWebhookUrl(): Promise<string | null> {
+    const supabase = createAdminClient();
+
+    // 1. app_configs の trial_followup_gchat_webhook または schedule_monitoring_gchat_webhook
+    try {
+        const { data: configs } = await supabase
+            .from('app_configs')
+            .select('key, value')
+            .in('key', [TRIAL_FOLLOWUP_GCHAT_WEBHOOK_KEY, 'schedule_monitoring_gchat_webhook']);
+
+        const specific = configs?.find(c => c.key === TRIAL_FOLLOWUP_GCHAT_WEBHOOK_KEY)?.value?.trim();
+        if (specific) return specific;
+
+        const scheduleWh = configs?.find(c => c.key === 'schedule_monitoring_gchat_webhook')?.value?.trim();
+        if (scheduleWh) return scheduleWh;
+    } catch (err) {
+        console.warn('[TrialFollowup] App config fetch error:', err);
+    }
+
+    // 2. google_chat_webhooks から「公式ラインチャットグループ」または「日程調整」を検索
+    try {
+        const { data: webhooks } = await supabase
+            .from('google_chat_webhooks')
+            .select('webhook_url')
+            .or('space_name.ilike.%公式ライン%,space_name.ilike.%日程調整%')
+            .eq('active', true)
+            .limit(1)
+            .maybeSingle();
+
+        if (webhooks?.webhook_url) {
+            return webhooks.webhook_url;
+        }
+    } catch (whErr) {
+        console.warn('[TrialFollowup] Webhook table fetch error:', whErr);
+    }
+
+    // 3. 環境変数 GOOGLE_CHAT_WEBHOOK_URL
+    return process.env.GOOGLE_CHAT_WEBHOOK_URL || null;
+}
+
+/**
+ * LINE送信が除外・失敗した場合にGoogle Chatへ手動送信用メッセージを通知
+ */
+export async function notifyTrialFollowupExclusionToGoogleChat(params: {
+    studentName: string;
+    studentNumber?: string | null;
+    studentId?: string | null;
+    lineUserId?: string | null;
+    contactPhone?: string | null;
+    contactEmail?: string | null;
+    coachName?: string | null;
+    lessonDate?: string | null;
+    location?: string | null;
+    reason: string;
+    messageText: string;
+}): Promise<boolean> {
+    const webhookUrl = await getTrialFollowupGChatWebhookUrl();
+    if (!webhookUrl) {
+        console.warn('[TrialFollowup] Google Chat Webhook URL is not configured. Skipping fallback notification.');
+        return false;
+    }
+
+    const { sendGoogleChatMessage } = await import('@/lib/google-chat');
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://manager.swim-partners.com';
+    const customerUrl = params.studentId ? `${siteUrl}/customers/${params.studentId}` : `${siteUrl}/admin/leads`;
+
+    const formattedDate = params.lessonDate
+        ? new Date(params.lessonDate).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' })
+        : '未設定';
+
+    const chatNotification = 
+`⚠️ *【要手動対応】体験レッスン終了フォロー LINE未送信通知*
+────────────────────────
+コーチより体験レッスンの報告がありましたが、LINEでのメッセージ送信が除外または失敗したため、事務局より手動でのご連絡（メール・SMS等）をお願いいたします。
+
+*■ 未送信の理由*: ${params.reason}
+*■ 対象生徒*: ${params.studentName} 様（会員番号: ${params.studentNumber || '未登録'}）
+*■ 連絡先電話番号*: ${params.contactPhone || '(未登録)'}
+*■ 連絡先メール*: ${params.contactEmail || '(未登録)'}
+*■ 担当コーチ*: ${params.coachName || '担当コーチ'}
+*■ レッスン日時*: ${formattedDate}
+*■ レッスン場所*: ${params.location || '指定プール'}
+
+*■ 手動送信用メッセージ本文（コピーしてご使用ください）*:
+\`\`\`
+${params.messageText}
+\`\`\`
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+▼ 顧客詳細・個別チャットを開く
+${customerUrl}
+━━━━━━━━━━━━━━━━━━━━━━━━`;
+
+    const success = await sendGoogleChatMessage(webhookUrl, chatNotification);
+    if (success) {
+        console.log(`[TrialFollowup] Successfully notified Google Chat of un-sent followup for ${params.studentName}`);
+    }
+    return success;
 }
 
 /**
@@ -147,6 +264,8 @@ export async function sendTrialLessonFollowupLineMessage(
             student_number,
             full_name,
             line_user_id,
+            contact_email,
+            contact_phone,
             status,
             coach:coach_id(full_name)
         `)
@@ -163,18 +282,7 @@ export async function sendTrialLessonFollowupLineMessage(
         };
     }
 
-    // 3. LINE連携チェック
-    if (!student.line_user_id || student.line_user_id.trim() === '') {
-        console.log(`[TrialFollowup] Student ${student.full_name} (${student.student_number}) has no LINE user ID. Skipping.`);
-        return {
-            success: false,
-            skipped: true,
-            skipReason: 'no_line_user_id',
-            studentName: student.full_name,
-        };
-    }
-
-    // 4. コーチ情報の取得
+    // 3. コーチ情報の取得
     let coachName = (student.coach as any)?.full_name || '担当コーチ';
     if (coachId) {
         const { data: coachProfile } = await supabase
@@ -187,7 +295,57 @@ export async function sendTrialLessonFollowupLineMessage(
         }
     }
 
-    // 5. 二重送信ガード（forceSend = true の場合はバイパス）
+    // 4. メッセージ文面の確定と変数置換の準備
+    const rawTemplate = customTemplate || config.template;
+    const formattedDate = lessonDate
+        ? new Date(lessonDate).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' })
+        : '';
+
+    const variables: Record<string, string> = {
+        name: student.full_name,
+        student_name: student.full_name,
+        student_number: student.student_number || '',
+        coach_name: coachName,
+        lesson_date: formattedDate,
+        location: location || '',
+        enroll_url: 'https://liff.line.me/2009159689-Ugq1NLXe',
+        survey_url: 'https://forms.gle/nNJMpU9TwQ4hkmPR7',
+    };
+
+    // 置換後テキストの生成（LINE送信・チャットログ・Google Chat通知用）
+    let renderedMessage = rawTemplate;
+    for (const [k, v] of Object.entries(variables)) {
+        renderedMessage = renderedMessage.replace(new RegExp(`[{｛]{1,2}\\s*${k}\\s*[}｝]{1,2}`, 'gi'), v);
+    }
+
+    // 5. LINE連携チェック（未連携の場合は除外とし、Google Chatへ手動送信用通知を送信）
+    if (!student.line_user_id || student.line_user_id.trim() === '') {
+        console.log(`[TrialFollowup] Student ${student.full_name} (${student.student_number}) has no LINE user ID. Skipping LINE and notifying Google Chat.`);
+
+        await notifyTrialFollowupExclusionToGoogleChat({
+            studentName: student.full_name,
+            studentNumber: student.student_number,
+            studentId: student.id,
+            lineUserId: null,
+            contactPhone: student.contact_phone,
+            contactEmail: student.contact_email,
+            coachName,
+            lessonDate,
+            location,
+            reason: 'LINE未連携（公式LINEの連携情報が登録されていません）',
+            messageText: renderedMessage,
+        });
+
+        return {
+            success: false,
+            skipped: true,
+            skipReason: 'no_line_user_id',
+            studentName: student.full_name,
+            messageText: renderedMessage,
+        };
+    }
+
+    // 6. 二重送信ガード（forceSend = true の場合はバイパス）
     if (!forceSend) {
         try {
             const userTags = await getUserTags(student.line_user_id);
@@ -206,23 +364,6 @@ export async function sendTrialLessonFollowupLineMessage(
         }
     }
 
-    // 6. メッセージ文面の確定と変数置換
-    const rawTemplate = customTemplate || config.template;
-    const formattedDate = lessonDate
-        ? new Date(lessonDate).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' })
-        : '';
-
-    const variables: Record<string, string> = {
-        name: student.full_name,
-        student_name: student.full_name,
-        student_number: student.student_number || '',
-        coach_name: coachName,
-        lesson_date: formattedDate,
-        location: location || '',
-        enroll_url: 'https://liff.line.me/2009159689-Ugq1NLXe',
-        survey_url: 'https://forms.gle/nNJMpU9TwQ4hkmPR7',
-    };
-
     // 7. LINE Push送信実行
     const sendResult = await sendSingleLineMessage({
         studentId: student.id,
@@ -235,23 +376,38 @@ export async function sendTrialLessonFollowupLineMessage(
         stepName: '体験レッスン終了フォロー',
     });
 
+    // 8. LINE送信失敗時（月間上限超過など）: Google Chatへ手動送信用通知を送信
     if (!sendResult.success) {
         console.error(`[TrialFollowup] Failed to send LINE message to ${student.full_name}:`, sendResult.error);
+
+        const reasonDescription = sendResult.error?.includes('monthly limit')
+            ? 'LINE公式アカウントの月間配信枠上限超過（429: monthly limit）'
+            : `LINE送信エラー（${sendResult.error || '不明なエラー'}）`;
+
+        await notifyTrialFollowupExclusionToGoogleChat({
+            studentName: student.full_name,
+            studentNumber: student.student_number,
+            studentId: student.id,
+            lineUserId: student.line_user_id,
+            contactPhone: student.contact_phone,
+            contactEmail: student.contact_email,
+            coachName,
+            lessonDate,
+            location,
+            reason: reasonDescription,
+            messageText: renderedMessage,
+        });
+
         return {
             success: false,
             error: sendResult.error || 'LINE送信に失敗しました',
             lineUserId: student.line_user_id,
             studentName: student.full_name,
+            messageText: renderedMessage,
         };
     }
 
-    // 置換後テキストの生成（チャットログ保存用）
-    let renderedMessage = rawTemplate;
-    for (const [k, v] of Object.entries(variables)) {
-        renderedMessage = renderedMessage.replace(new RegExp(`[{｛]{1,2}\\s*${k}\\s*[}｝]{1,2}`, 'gi'), v);
-    }
-
-    // 8. 個別チャット履歴（line_chat_messages）へ記録
+    // 9. 個別チャット履歴（line_chat_messages）へ記録
     try {
         await recordLineChatMessage({
             lineUserId: student.line_user_id,
@@ -275,7 +431,7 @@ export async function sendTrialLessonFollowupLineMessage(
         console.error('[TrialFollowup] Failed to record message to chat history:', chatErr);
     }
 
-    // 9. trial_followup_sent および trial_done タグを付与
+    // 10. trial_followup_sent および trial_done タグを付与
     try {
         await addTagToUser(student.line_user_id, STANDARD_TAGS.TRIAL_FOLLOWUP_SENT, {
             category: 'automation',
@@ -309,3 +465,4 @@ export async function sendTrialLessonFollowupLineMessage(
         studentName: student.full_name,
     };
 }
+
