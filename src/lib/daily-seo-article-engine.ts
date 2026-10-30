@@ -16,6 +16,8 @@ import { AREA_SEO_AUDIT_DATA, AreaPublicFacility } from './area-seo-audit';
 import { generateArticleWithGeminiFlash, enrichArticleWithCompetitorIntelligence } from './gemini-article-service';
 import { generateSeoAioArticle } from './article-generator-engine';
 import { getSeedKeywordIntelligence, buildComparisonMarkdownTable } from './competitor-benchmark-data';
+import { generateArticleThumbnail } from './thumbnail-generator-service';
+import { appendArticleToSpreadsheet } from './article-spreadsheet-service';
 
 export interface KeywordCandidate {
     keyword: string;
@@ -283,7 +285,22 @@ export async function executeDailySeoArticlePipeline(): Promise<{
             faqItems: baseArticle.faq_items || [],
         });
 
-        // ステップ 5: StudioCmsArticle オブジェクトの構築
+        // ステップ 5: サムネイル画像の自動生成（Gemini Imagen / 水泳高品質フォト）
+        let generatedThumbnailUrl = '';
+        try {
+            const thumbResult = await generateArticleThumbnail({
+                title: baseArticle.title,
+                keyword: selectedCandidate.keyword,
+                category: selectedCandidate.category,
+                slug: selectedCandidate.slug,
+            });
+            generatedThumbnailUrl = thumbResult.thumbnailUrl;
+            console.log(`[Daily SEO Engine] Generated Thumbnail (${thumbResult.source}):`, generatedThumbnailUrl);
+        } catch (thumbErr) {
+            console.warn('[Daily SEO Engine] Thumbnail generation failed gracefully:', thumbErr);
+        }
+
+        // ステップ 6: StudioCmsArticle オブジェクトの構築
         const studioArticle: StudioCmsArticle = {
             id: baseArticle.id,
             keyword: selectedCandidate.keyword,
@@ -300,6 +317,7 @@ export async function executeDailySeoArticlePipeline(): Promise<{
             targetAudience: selectedCandidate.targetAudience,
             searchIntent: selectedCandidate.searchIntent,
             targetPath: `/articles/${selectedCandidate.slug}`,
+            thumbnailUrl: generatedThumbnailUrl,
             status: 'published',
             createdAt: new Date().toISOString(),
             publishedAt: new Date().toISOString(),
@@ -312,19 +330,39 @@ export async function executeDailySeoArticlePipeline(): Promise<{
             },
         };
 
-        // ステップ 6: 記事ストレージ（Supabase generated_articles & app_configs バックアップ）へ更新保存
+        // ステップ 7: 記事ストレージ（Supabase generated_articles & app_configs バックアップ）へ更新保存
         const updatedGeneratedArticle: GeneratedArticle = {
             ...baseArticle,
             title: studioArticle.title,
             meta_description: studioArticle.metaDescription,
             content_md: studioArticle.bodyMarkdown,
             json_ld: studioArticle.jsonLd,
+            thumbnail_url: studioArticle.thumbnailUrl,
             target_path: studioArticle.targetPath,
             status: 'published',
         };
         await saveGeneratedArticle(updatedGeneratedArticle);
 
-        // ステップ 7: STUDIO CMS Webhook または API への自動同期（設定されている場合）
+        // ステップ 8: Googleスプレッドシートへ自動追記（タイトル、本文、サムネイル画像）
+        let spreadsheetResult: { success: boolean; message: string; spreadsheetUrl?: string } = { success: false, message: '未設定' };
+        try {
+            spreadsheetResult = await appendArticleToSpreadsheet({
+                articleId: studioArticle.id,
+                title: studioArticle.title,
+                keyword: studioArticle.keyword,
+                bodyMarkdown: studioArticle.bodyMarkdown,
+                thumbnailUrl: studioArticle.thumbnailUrl || '',
+                slug: studioArticle.slug,
+                metaDescription: studioArticle.metaDescription,
+                categoryLabel: studioArticle.categoryLabel,
+                createdAt: studioArticle.createdAt,
+            });
+            console.log('[Daily SEO Engine] Spreadsheet Result:', spreadsheetResult.message);
+        } catch (sheetErr) {
+            console.warn('[Daily SEO Engine] Spreadsheet append failed gracefully:', sheetErr);
+        }
+
+        // ステップ 9: STUDIO CMS Webhook または API への自動同期（設定されている場合）
         let studioSyncResult = { success: false, message: '未同期' };
         try {
             studioSyncResult = await syncArticleToStudioCms(studioArticle);
@@ -332,7 +370,7 @@ export async function executeDailySeoArticlePipeline(): Promise<{
             console.warn('[Daily SEO Engine] Studio CMS sync failed gracefully:', studioErr);
         }
 
-        // ステップ 8: Notion データベースへの自動投稿（STUDIO公式Notion同期連携）
+        // ステップ 10: Notion データベースへの自動投稿（設定されている場合）
         let notionResult: NotionSyncResult = { success: false, message: '未設定' };
         try {
             notionResult = await syncArticleToNotionDatabase(studioArticle);
@@ -341,25 +379,25 @@ export async function executeDailySeoArticlePipeline(): Promise<{
             console.warn('[Daily SEO Engine] Notion sync failed gracefully:', notionErr);
         }
 
-        // ステップ 9: Google Chat への日次完了通知（Webhook URLがある場合）
+        // ステップ 11: Google Chat への日次完了通知（Webhook URLがある場合）
         const gchatWebhookUrl = process.env.GOOGLE_CHAT_WEBHOOK_URL;
         if (gchatWebhookUrl) {
             try {
-                const notionStatusLine = notionResult.success
-                    ? `📘 *Notion連携*: <${notionResult.url}|Notion DBへ自動投稿済み>（STUDIOへ自動同期）`
-                    : `📘 *Notion連携*: 未設定（管理画面からワンクリックコピー可能）`;
+                const sheetStatusLine = spreadsheetResult.success
+                    ? `📊 *スプレッドシート*: <${spreadsheetResult.spreadsheetUrl}|記事・本文・サムネイルを自動追記済み>`
+                    : `📊 *スプレッドシート*: 未設定（管理画面からURL設定可能）`;
 
                 const message = 
-`🏊‍♂️ *【日次SEO自動作成】本日のSTUDIO CMS記事が完成しました*
+`🏊‍♂️ *【日次SEO自動作成】本日のSEO記事＆サムネイルが完成しました*
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🎯 *分析キーワード*: *${selectedCandidate.keyword}*（月間検索: ${selectedCandidate.monthlySearchVolume} / CVRスコア: ${selectedCandidate.estimatedCvrScore}）
 📝 *記事タイトル*: ${studioArticle.title}
+🖼️ *サムネイル*: <${studioArticle.thumbnailUrl}|画像プレビューを開く>
 🔗 *スラッグ*: \`${selectedCandidate.slug}\`
 💡 *選定理由*: ${selectedCandidate.reasonForSelection}
-${notionStatusLine}
-🚀 *STUDIOエディタ*: <https://studio.design|STUDIOダッシュボードを開く>
+${sheetStatusLine}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-※管理画面「商圏SEOダッシュボード」からワンクリックでSTUDIO用テキストをコピー可能です。`;
+※スプレッドシートに記事タイトル・本文・サムネイル画像が自動蓄積されています。`;
 
                 await fetch(gchatWebhookUrl, {
                     method: 'POST',

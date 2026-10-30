@@ -15,6 +15,7 @@ export interface GeneratedArticle {
     content_html: string;
     faq_items?: { question: string; answer: string }[];
     json_ld?: string;
+    thumbnail_url?: string;
     target_path: string;
     status: ArticleStatus;
     created_at: string;

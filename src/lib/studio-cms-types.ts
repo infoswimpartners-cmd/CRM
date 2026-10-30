@@ -24,6 +24,7 @@ export interface StudioCmsArticle {
     targetAudience: string;
     searchIntent: string;
     targetPath: string; // 例: /zUHb45xV/adult-swimming-breathing-tips
+    thumbnailUrl?: string; // サムネイル・アイキャッチ画像URL
     status: 'draft' | 'published' | 'synced_to_studio';
     createdAt: string;
     publishedAt?: string | null;
