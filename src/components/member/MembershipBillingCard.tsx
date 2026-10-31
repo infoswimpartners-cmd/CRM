@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
-import { CreditCard, Calendar, Info, ShieldAlert, Sparkles, Crown, PlusCircle, MinusCircle } from 'lucide-react'
+import { CreditCard, Calendar, Info, ShieldAlert, Sparkles, Crown, PlusCircle, MinusCircle, MessageCircle } from 'lucide-react'
 import { submitMembershipChangeRequest } from '@/actions/member/membership'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
@@ -216,25 +216,25 @@ export default function MembershipBillingCard({
     }
 
     return (
-        <Card className="rounded-[2.5rem] border-none shadow-2xl bg-white/80 backdrop-blur-xl overflow-hidden mb-12 animate-fade-in-up">
-            <CardHeader className="bg-gradient-to-br from-indigo-50/50 to-white border-b border-indigo-50/50 p-8">
+        <Card className="rounded-[2.5rem] border border-sky-100 shadow-xl bg-white overflow-hidden mb-8 animate-fade-in-up">
+            <CardHeader className="bg-gradient-to-br from-sky-50/50 to-white border-b border-sky-50 p-8">
                 <div className="flex items-center gap-3">
-                    <CreditCard className="w-5 h-5 text-indigo-500" />
-                    <CardTitle className="text-xl font-black text-gray-800">ご契約状況・次回ご請求</CardTitle>
+                    <CreditCard className="w-5 h-5 text-sky-500" />
+                    <CardTitle className="text-xl font-black text-slate-800">ご契約状況・次回ご請求</CardTitle>
                 </div>
-                <CardDescription className="text-gray-500 font-medium">
-                    現在の契約内容と次回のご請求予定額をご確認いただけます。プランの追加や変更もこちらから申請できます。
+                <CardDescription className="text-slate-500 font-medium">
+                    現在の契約内容と次回のご請求予定額をご確認いただけます。
                 </CardDescription>
             </CardHeader>
             <CardContent className="p-8 md:p-10 space-y-8">
                 
                 {/* 契約プラン情報 */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 border-b border-slate-100 pb-8">
-                    {/* プライベートレッスン契約状況 */}
-                    <div className="space-y-3 bg-slate-50/40 p-6 rounded-[2rem] border border-slate-100">
+                <div className="border-b border-slate-100 pb-8">
+                    {/* ご契約プラン状況 */}
+                    <div className="space-y-3 bg-sky-50/40 p-6 rounded-2xl border border-sky-100">
                         <div className="flex items-center gap-2 text-slate-400">
                             <Calendar className="w-4 h-4 text-sky-500" />
-                            <span className="text-xs font-bold uppercase tracking-widest">プライベートレッスン</span>
+                            <span className="text-xs font-bold uppercase tracking-widest">ご契約プラン</span>
                         </div>
                         <div className="space-y-1">
                             <div className="flex items-center gap-2">
@@ -242,46 +242,22 @@ export default function MembershipBillingCard({
                                     {currentPrivatePlan?.name || '未加入 (単発受講のみ)'}
                                 </span>
                                 {currentPrivatePlan && currentPrivatePlan.fee > 0 && (
-                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-600 border border-indigo-100">
-                                        <Sparkles className="w-2.5 h-2.5 text-indigo-500" />
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-600 border border-sky-100">
+                                        <Sparkles className="w-2.5 h-2.5 text-sky-500" />
                                         月謝会員
                                     </span>
                                 )}
                             </div>
-                            <p className="text-sm font-bold text-indigo-600">
+                            <p className="text-sm font-bold text-sky-600">
                                 月額会費: ¥{currentPrivatePlan?.fee?.toLocaleString() || 0}
-                            </p>
-                        </div>
-                    </div>
-
-                    {/* Trio契約状況 */}
-                    <div className="space-y-3 bg-slate-50/40 p-6 rounded-[2rem] border border-slate-100">
-                        <div className="flex items-center gap-2 text-slate-400">
-                            <Crown className="w-4 h-4 text-amber-500" />
-                            <span className="text-xs font-bold uppercase tracking-widest">THE TRIO (グループレッスン)</span>
-                        </div>
-                        <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                                <span className="text-xl font-black text-slate-800">
-                                    {isTrioMember ? '加入中 (Trio会員)' : '未加入'}
-                                </span>
-                                {isTrioMember && (
-                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-100">
-                                        <Crown className="w-2.5 h-2.5 text-amber-500 animate-pulse" />
-                                        Trio会員
-                                    </span>
-                                )}
-                            </div>
-                            <p className="text-sm font-bold text-amber-600">
-                                {isTrioMember ? '月額会費: ¥0 (チケット都度払い)' : 'Trioの機能は制限されています'}
                             </p>
                         </div>
                     </div>
                 </div>
 
                 {/* 次回ご請求予定額 */}
-                <div className="bg-slate-50/50 border border-slate-100 p-6 rounded-[2rem] space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-4">
+                <div className="bg-sky-50/30 border border-sky-100 p-6 rounded-2xl space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-sky-100/60 pb-4">
                         <div className="space-y-0.5">
                             <h3 className="font-bold text-slate-800 text-sm flex items-center gap-1.5">
                                 次回ご請求予定額
@@ -303,7 +279,7 @@ export default function MembershipBillingCard({
                         {pendingSchedules.length > 0 ? (
                             <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
                                 {pendingSchedules.map((schedule) => (
-                                    <div key={schedule.id} className="flex justify-between items-center bg-white p-3.5 rounded-xl border border-slate-100 shadow-sm text-sm">
+                                    <div key={schedule.id} className="flex justify-between items-center bg-white p-3.5 rounded-xl border border-sky-100/60 shadow-sm text-sm">
                                         <div className="flex items-center gap-2.5">
                                             <Calendar className="w-4 h-4 text-sky-500 shrink-0" />
                                             <div>
@@ -320,19 +296,19 @@ export default function MembershipBillingCard({
                                 ))}
                             </div>
                         ) : (
-                            <div className="text-center py-4 bg-white/50 rounded-xl border border-dashed text-xs text-slate-400">
+                            <div className="text-center py-4 bg-white/60 rounded-xl border border-dashed border-sky-100 text-xs text-slate-400">
                                 未請求のレッスンはありません
                             </div>
                         )}
                     </div>
                 </div>
 
-                {/* プラン変更・追加セクション */}
-                <div className="pt-6 border-t border-slate-100 space-y-6">
+                {/* プラン変更について */}
+                <div className="pt-6 border-t border-slate-100 space-y-4">
                     <div className="space-y-1">
-                        <h3 className="font-bold text-slate-800 text-sm">プランの追加・変更・解約</h3>
+                        <h3 className="font-bold text-slate-800 text-sm">プランの変更について</h3>
                         <p className="text-xs text-slate-500 leading-relaxed">
-                            月会員プランは2ヶ月以上の継続契約が基本ルールとなります。プライベートレッスンを変更した場合、その時点から2ヶ月間は再変更・解約は原則行えません。
+                            月会員プランは2ヶ月以上の継続契約が基本ルールとなります。
                         </p>
                     </div>
 
@@ -340,65 +316,23 @@ export default function MembershipBillingCard({
                     {pendingRequest && (
                         <div className="flex items-center gap-2.5 p-4 bg-amber-50 text-amber-800 rounded-2xl border border-amber-100 text-xs font-bold">
                             <Info className="w-4 h-4 text-amber-500 shrink-0" />
-                            <span className="flex-1 min-w-0">現在、以下の申請を事務局にて審査中です：{getPendingRequestText()}</span>
+                            <span className="flex-1 min-w-0">現在、以下の申請を事務局にて審査・対応中です：{getPendingRequestText()}</span>
                         </div>
                     )}
 
-                    {/* プランロック警告 (表示は出すがボタンは押せるようにする) */}
-                    {isLocked && (
-                        <div className="flex items-start gap-2.5 p-4 bg-red-50 text-red-800 rounded-2xl border border-red-100 text-xs font-medium">
-                            <ShieldAlert className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
-                            <div className="flex-1 min-w-0">
-                                <span className="font-bold block mb-0.5">プライベートレッスン変更ロック中</span>
-                                現在、最小契約期間内（または前回の変更から2ヶ月以内）のロック期間中（制限解除日: {lockDateStr}）です。
-                                原則としてプランの変更や解約は行えませんが、特別な事情がある場合は申請フォームよりご申請ください。
-                            </div>
+                    {/* プラン変更の案内メッセージ（顧客からは直接変更不可、「ご連絡ください」を表示） */}
+                    <div className="p-5 rounded-2xl bg-gradient-to-br from-sky-50/80 to-blue-50/50 border border-sky-100 flex items-start gap-4 shadow-sm">
+                        <div className="w-10 h-10 rounded-xl bg-sky-500 text-white flex items-center justify-center shrink-0 shadow-sm shadow-sky-100">
+                            <MessageCircle className="w-5 h-5" />
                         </div>
-                    )}
-
-                    {/* アクションボタン群 */}
-                    {!pendingRequest && (
-                        <div className="flex flex-wrap gap-4">
-                            {/* 1. Trio関連アクション */}
-                            {!isTrioMember ? (
-                                <Button
-                                    onClick={() => setOpenDialogType('add_trio')}
-                                    className="bg-amber-500 hover:bg-amber-600 text-white font-bold h-12 rounded-xl px-6 shadow-md shadow-amber-100 flex items-center gap-2"
-                                    disabled={!trioPlanId}
-                                >
-                                    <PlusCircle className="w-4 h-4" />
-                                    THE TRIOプランを追加する
-                                </Button>
-                            ) : (
-                                <Button
-                                    onClick={() => setOpenDialogType('cancel_trio')}
-                                    variant="outline"
-                                    className="border-red-200 text-red-600 hover:bg-red-50 font-bold h-12 rounded-xl px-6 flex items-center gap-2"
-                                >
-                                    <MinusCircle className="w-4 h-4" />
-                                    THE TRIOプランを解約する
-                                </Button>
-                            )}
-
-                            {/* 2. プライベートレッスン関連アクション (ロック中もクリック可能) */}
-                            {!currentPrivatePlan ? (
-                                <Button
-                                    onClick={() => setOpenDialogType('add_private')}
-                                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold h-12 rounded-xl px-6 shadow-md shadow-indigo-100 flex items-center gap-2"
-                                >
-                                    <PlusCircle className="w-4 h-4" />
-                                    プライベートレッスンを追加する
-                                </Button>
-                            ) : (
-                                <Button
-                                    onClick={() => setOpenDialogType('change_private')}
-                                    className="bg-sky-600 hover:bg-sky-700 text-white font-bold h-12 rounded-xl px-6 shadow-md shadow-sky-100"
-                                >
-                                    プライベートレッスンのプランを変更する
-                                </Button>
-                            )}
+                        <div className="space-y-1">
+                            <h4 className="text-sm font-bold text-slate-800">プラン変更をご希望のお客様へ</h4>
+                            <p className="text-xs text-slate-600 leading-relaxed">
+                                ご契約プランの変更・追加をご希望の際は、担当コーチまたは公式LINE・事務局まで直接ご連絡ください。<br />
+                                状況をお伺いし、最適な受講プランやお手続きをご案内いたします。
+                            </p>
                         </div>
-                    )}
+                    </div>
                 </div>
 
                 {/* 各種アクションダイアログ */}

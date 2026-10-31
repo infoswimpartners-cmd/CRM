@@ -11,7 +11,7 @@ export default async function AdminReportsPage() {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', user?.id).single()
-    const isAdmin = profile?.role === 'admin'
+    const isAdmin = profile?.role === 'admin' || profile?.role === 'owner'
 
     return (
         <div className="space-y-6">

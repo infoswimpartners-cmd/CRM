@@ -20,9 +20,6 @@ export default function MemberBottomNav({
 
     const navItems = [
         { href: '/member/dashboard', icon: Home, label: 'ホーム' },
-        ...(isTrioMember ? [
-            { href: '/trio', icon: Crown, label: 'Trio', isTrio: true }
-        ] : []),
         ...(isMember ? [
             { href: '/member/billing', icon: CreditCard, label: '契約・支払い' }
         ] : []),
@@ -32,7 +29,7 @@ export default function MemberBottomNav({
     if (pathname === '/member/login' || pathname === '/member/signup') return null;
 
     return (
-        <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl border-t border-slate-200/80 pb-[env(safe-area-inset-bottom)] shadow-xs md:hidden">
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/85 backdrop-blur-xl border-t border-sky-100 pb-[env(safe-area-inset-bottom)] shadow-sm md:hidden">
             <nav className="max-w-lg mx-auto flex items-center justify-around h-16 px-2">
                 {navItems.map((item) => {
                     const isActive = pathname === item.href || (item.href !== '/member/dashboard' && pathname.startsWith(item.href + '/'))
@@ -44,16 +41,13 @@ export default function MemberBottomNav({
                             className={cn(
                                 "relative flex flex-col items-center justify-center flex-1 h-full py-1 transition-colors duration-200",
                                 isActive 
-                                    ? (item.isTrio ? "text-amber-600" : "text-sky-600")
+                                    ? "text-sky-600"
                                     : "text-slate-400 hover:text-slate-600"
                             )}
                         >
                             {/* アクティブ時の上部インジケーターライン */}
                             {isActive && (
-                                <span className={cn(
-                                    "absolute top-0 w-8 h-[2px] rounded-full",
-                                    item.isTrio ? "bg-amber-500" : "bg-sky-600"
-                                )} />
+                                <span className="absolute top-0 w-8 h-[2px] rounded-full bg-sky-500" />
                             )}
 
                             <item.icon 
@@ -63,7 +57,7 @@ export default function MemberBottomNav({
                             
                             <span className={cn(
                                 "text-[10px] mt-1 text-center truncate w-full px-1 tracking-tight",
-                                isActive ? "font-bold" : "font-medium"
+                                isActive ? "font-bold text-sky-600" : "font-medium"
                             )}>
                                 {item.label}
                             </span>

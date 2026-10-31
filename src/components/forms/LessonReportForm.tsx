@@ -717,7 +717,8 @@ export function LessonReportForm() {
                                         form.setValue('student_name', name)
                                     }}
                                     selectedName={field.value}
-                                    coachId={coachId}
+                                    coachId={isAdminRole ? undefined : coachId}
+                                    isAdmin={isAdminRole}
                                 />
                             </FormControl>
                             <FormDescription>
@@ -942,17 +943,20 @@ export function LessonReportForm() {
                         name="menu_description"
                         render={({ field }) => (
                             <FormItem>
-                                <FormLabel className="flex items-center gap-2">
-                                    メニュー内容 / メモ
-                                    <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-600 border-blue-100 font-normal">メンバーサイトに反映</Badge>
+                                <FormLabel className="flex items-center gap-2 font-bold text-slate-800">
+                                    レッスン内容・フィードバック
+                                    <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-600 border-blue-100 font-semibold">メンバーマイページに反映</Badge>
                                 </FormLabel>
                                 <FormControl>
                                     <Textarea
-                                        placeholder="実施したメニューや練習内容"
-                                        className="resize-none min-h-[100px]"
+                                        placeholder="当日の練習メニュー、お子様の様子や成長したポイント、次回へのアドバイス・目標などをまとめてご自由にご入力ください。"
+                                        className="resize-none min-h-[140px] leading-relaxed"
                                         {...field}
                                     />
                                 </FormControl>
+                                <FormDescription className="text-xs text-slate-400">
+                                    ※ 入力内容はそのまま生徒・保護者様のマイページに「レッスンレポート」として表示されます。
+                                </FormDescription>
                                 <FormMessage />
                             </FormItem>
                         )}

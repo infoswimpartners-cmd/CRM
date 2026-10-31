@@ -5,7 +5,6 @@ import NextLessonCard from '@/components/member/NextLessonCard';
 import LastReportCard from '@/components/member/LastReportCard';
 import LessonHistoryWidget from '@/components/member/LessonHistoryWidget';
 import MemberAnnouncementsCard from '@/components/member/MemberAnnouncementsCard';
-import TrioDashboardSection from '@/components/member/TrioDashboardSection';
 import { StudentScheduleSection } from '@/components/customers/StudentScheduleSection';
 import { linkStudentData, syncLineId, memberSignOut } from '@/actions/member/auth';
 import { MessageCircle, BellRing, Calendar, Crown, Sparkles, ArrowRight, LogOut, Settings } from 'lucide-react';
@@ -208,10 +207,7 @@ export default async function MemberDashboard({
                 </div>
             </div>
 
-            {/* Trio 予約状況 (最優先) */}
-            {student.is_trio && <TrioDashboardSection entries={trioEntries} />}
-
-            {/* 次回レッスン (個人) */}
+            {/* 次回のレッスン */}
             {student.membership_type_id && (
                 <div className="space-y-8">
                     <div className="flex items-center gap-6 px-2">
@@ -219,8 +215,8 @@ export default async function MemberDashboard({
                             <Calendar className="w-6 h-6 text-sky-500" />
                         </div>
                         <div className="space-y-1">
-                            <h3 className="text-2xl font-black text-slate-800 tracking-tighter">個人レッスン</h3>
-                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.3em]">Personal Training</p>
+                            <h3 className="text-2xl font-black text-slate-800 tracking-tighter">次回のレッスン</h3>
+                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.3em]">Next Lesson</p>
                         </div>
                     </div>
                     <NextLessonCard 
@@ -235,7 +231,9 @@ export default async function MemberDashboard({
                 {/* お知らせ */}
                 <div className="space-y-6">
                     <div className="flex items-center gap-4 px-2">
-                        <BellRing className="w-5 h-5 text-amber-500" />
+                        <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center">
+                            <BellRing className="w-5 h-5 text-amber-500" />
+                        </div>
                         <h3 className="text-lg font-black text-slate-800 tracking-tight">重要なお知らせ</h3>
                     </div>
                     <MemberAnnouncementsCard notifications={notifications} />
@@ -244,7 +242,9 @@ export default async function MemberDashboard({
                 {/* 最新のフィードバック */}
                 <div className="space-y-6">
                     <div className="flex items-center gap-4 px-2">
-                        <MessageCircle className="w-5 h-5 text-indigo-500" />
+                        <div className="w-10 h-10 rounded-xl bg-sky-50 border border-sky-100 flex items-center justify-center">
+                            <MessageCircle className="w-5 h-5 text-sky-500" />
+                        </div>
                         <h3 className="text-lg font-black text-slate-800 tracking-tight">前回のフィードバック</h3>
                     </div>
                     <LastReportCard report={lastReport} />
@@ -255,15 +255,15 @@ export default async function MemberDashboard({
             {student.membership_type_id && (
                 <div className="space-y-8">
                     <div className="flex items-center gap-6 px-2">
-                        <div className="w-14 h-14 rounded-2xl bg-white border border-slate-100 shadow-[0_8px_30px_rgba(0,0,0,0.03)] flex items-center justify-center">
-                            <div className="w-2 h-6 bg-slate-800 rounded-full" />
+                        <div className="w-14 h-14 rounded-2xl bg-white border border-sky-100 shadow-[0_8px_30px_rgba(56,189,248,0.06)] flex items-center justify-center">
+                            <div className="w-2 h-6 bg-sky-500 rounded-full" />
                         </div>
                         <div className="space-y-1">
                             <h3 className="text-2xl font-black text-slate-800 tracking-tighter">全スケジュール履歴</h3>
                             <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.3em]">Full History</p>
                         </div>
                     </div>
-                    <div className="bg-white/70 backdrop-blur-3xl border border-slate-100 rounded-[3rem] p-10 shadow-[0_30px_100px_rgba(0,0,0,0.03)]">
+                    <div className="bg-white/80 backdrop-blur-3xl border border-sky-100/60 rounded-[3rem] p-8 md:p-10 shadow-[0_30px_100px_rgba(56,189,248,0.05)]">
                         <StudentScheduleSection schedules={
                             schedules.map((s: any) => ({
                                 ...s,
@@ -276,7 +276,7 @@ export default async function MemberDashboard({
 
             {/* フッターアクション */}
             <div className="pt-24 pb-12 text-center flex flex-col items-center gap-10">
-                <div className="h-px w-24 bg-gradient-to-r from-transparent via-slate-100 to-transparent" />
+                <div className="h-px w-24 bg-gradient-to-r from-transparent via-sky-100 to-transparent" />
                 <form action="/api/auth/signout" method="POST">
                     <button type="submit" className="group flex items-center gap-4 px-10 py-4 rounded-full bg-white border border-slate-100 text-[11px] font-black text-slate-400 hover:text-slate-900 hover:border-sky-100 hover:shadow-[0_20px_50px_rgba(56,189,248,0.1)] transition-all uppercase tracking-[0.4em] active:scale-95 shadow-sm">
                         <LogOut className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />

@@ -55,11 +55,5 @@ export async function login(prevState: any, formData: FormData) {
 
     // Clear cache specifically for layouts to ensure fresh data
     revalidatePath('/member', 'layout')
-    revalidatePath('/trio', 'layout')
-
-    if (isTrioMember) {
-        redirect('/trio/dashboard')
-    } else {
-        redirect('/member/dashboard')
-    }
+    redirect('/member/dashboard')
 }

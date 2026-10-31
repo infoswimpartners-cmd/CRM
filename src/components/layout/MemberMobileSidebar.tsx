@@ -53,9 +53,6 @@ export default function MemberMobileSidebar({
 
     const navItems = [
         { href: '/member/dashboard', icon: Home, label: 'ホーム', subLabel: 'Dashboard' },
-        ...(isTrioMember ? [
-            { href: '/trio', icon: Crown, label: 'THE TRIO', subLabel: 'Premium Matching', isTrio: true }
-        ] : []),
         ...(isMember ? [
             { href: '/member/billing', icon: CreditCard, label: 'ご契約・お支払い', subLabel: 'Billing & Payments' }
         ] : []),
@@ -73,11 +70,11 @@ export default function MemberMobileSidebar({
             />
 
             <div className={cn(
-                "fixed top-0 left-0 h-full w-80 max-w-[85vw] bg-white z-[110] shadow-[0_0_100px_rgba(0,0,0,0.1)] transform transition-transform duration-700 cubic-bezier(0.16, 1, 0.3, 1)",
+                "fixed top-0 left-0 h-full w-80 max-w-[85vw] bg-white z-[110] shadow-2xl transform transition-transform duration-500 cubic-bezier(0.16, 1, 0.3, 1)",
                 isOpen ? "translate-x-0" : "-translate-x-full"
             )}>
                 {/* Header */}
-                <div className="p-10 flex flex-col gap-8">
+                <div className="p-8 flex flex-col gap-6">
                     <div className="flex items-center justify-between">
                         <div className="w-12 h-12 rounded-2xl bg-sky-50 border border-sky-100 flex items-center justify-center text-sky-500 shadow-sm">
                             <Sparkles className="w-6 h-6" />
@@ -88,8 +85,8 @@ export default function MemberMobileSidebar({
                     </div>
 
                     <div className="space-y-1">
-                        <p className="text-[10px] text-sky-500 font-black tracking-[0.3em] uppercase">Authenticated Member</p>
-                        <h2 className="font-black text-slate-900 text-2xl tracking-tighter">{studentName || 'Explorer'} <span className="text-slate-300 font-medium">様</span></h2>
+                        <p className="text-[10px] text-sky-500 font-bold tracking-[0.25em] uppercase">Authenticated Member</p>
+                        <h2 className="font-bold text-slate-900 text-2xl tracking-tight">{studentName || 'Explorer'} <span className="text-slate-300 font-normal">様</span></h2>
                     </div>
                 </div>
 
@@ -101,29 +98,29 @@ export default function MemberMobileSidebar({
                         return (
                             <Link key={item.href} href={item.href} onClick={onClose} className="block group">
                                 <div className={cn(
-                                    "flex items-center justify-between w-full p-5 rounded-[2rem] transition-all duration-500",
+                                    "flex items-center justify-between w-full p-4 rounded-2xl transition-all duration-300",
                                     isActive
-                                        ? (item.isTrio ? "bg-amber-500 text-white shadow-xl shadow-amber-100" : "bg-sky-600 text-white shadow-xl shadow-sky-100")
-                                        : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                                        ? "bg-sky-600 text-white font-semibold shadow-md shadow-sky-100"
+                                        : "text-slate-500 hover:bg-sky-50/60 hover:text-sky-900"
                                 )}>
-                                    <div className="flex items-center gap-5">
+                                    <div className="flex items-center gap-4">
                                         <div className={cn(
-                                            "w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-500",
-                                            isActive ? "bg-white/20" : "bg-slate-50 group-hover:bg-white border border-slate-100"
+                                            "w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300",
+                                            isActive ? "bg-white/20 text-white" : "bg-sky-50/80 group-hover:bg-white text-slate-500"
                                         )}>
                                             <item.icon className={cn("w-5 h-5", isActive && "stroke-[2.5px]")} />
                                         </div>
                                         <div>
-                                            <p className="font-black text-sm tracking-tight">{item.label}</p>
+                                            <p className="font-semibold text-sm tracking-tight">{item.label}</p>
                                             <p className={cn(
-                                                "text-[9px] font-black uppercase tracking-widest",
-                                                isActive ? "text-white/60" : "text-slate-300"
+                                                "text-[9px] uppercase tracking-wider",
+                                                isActive ? "text-white/80" : "text-slate-400"
                                             )}>{item.subLabel}</p>
                                         </div>
                                     </div>
                                     <ChevronRight className={cn(
-                                        "w-4 h-4 transition-transform duration-500 group-hover:translate-x-1",
-                                        isActive ? "text-white/40" : "text-slate-300"
+                                        "w-4 h-4 transition-transform duration-300 group-hover:translate-x-1",
+                                        isActive ? "text-white/60" : "text-slate-300"
                                     )} />
                                 </div>
                             </Link>
@@ -132,17 +129,17 @@ export default function MemberMobileSidebar({
                 </nav>
 
                 {/* Footer / Logout */}
-                <div className="absolute bottom-0 left-0 right-0 p-8 border-t border-slate-50">
+                <div className="absolute bottom-0 left-0 right-0 p-8 border-t border-slate-100">
                     <Button
                         variant="ghost"
                         onClick={() => {
                             onClose()
                             handleLogout()
                         }}
-                        className="w-full justify-start text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-[1.5rem] transition-all h-14 px-6 group"
+                        className="w-full justify-start text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-2xl transition-all h-12 px-4 group"
                     >
-                        <LogOut className="mr-4 h-5 w-5 group-hover:-translate-x-1 transition-transform" />
-                        <span className="font-black text-xs uppercase tracking-widest">Logout</span>
+                        <LogOut className="mr-3 h-5 w-5 group-hover:-translate-x-1 transition-transform" />
+                        <span className="font-bold text-xs uppercase tracking-widest">Logout</span>
                     </Button>
                 </div>
             </div>

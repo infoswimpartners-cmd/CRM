@@ -32,9 +32,10 @@ interface StudentSelectProps {
     onSelect: (studentId: string | null, studentName: string) => void
     selectedName?: string
     coachId?: string
+    isAdmin?: boolean
 }
 
-export function StudentSelect({ onSelect, selectedName, coachId }: StudentSelectProps) {
+export function StudentSelect({ onSelect, selectedName, coachId, isAdmin }: StudentSelectProps) {
     const [open, setOpen] = React.useState(false)
     const [students, setStudents] = React.useState<Student[]>([])
     const [search, setSearch] = React.useState("")
@@ -43,7 +44,8 @@ export function StudentSelect({ onSelect, selectedName, coachId }: StudentSelect
         const fetchStudents = async () => {
             const supabase = createClient()
 
-            if (coachId) {
+            // 管理者でない場合かつコーチIDが指定されている場合のみ担当生徒に絞り込む
+            if (coachId && !isAdmin) {
                 // Fetch direct associations
                 const { data: directData, error: directError } = await supabase
                     .from('students')
@@ -79,6 +81,7 @@ export function StudentSelect({ onSelect, selectedName, coachId }: StudentSelect
                 combined.sort((a, b) => a.full_name.localeCompare(b.full_name))
                 setStudents(combined)
             } else {
+                // 管理者の場合、またはコーチID未指定の場合は全生徒を取得
                 const { data, error } = await supabase
                     .from('students')
                     .select('id, full_name, full_name_kana, second_student_name, second_student_name_kana, status')
@@ -94,7 +97,7 @@ export function StudentSelect({ onSelect, selectedName, coachId }: StudentSelect
             }
         }
         fetchStudents()
-    }, [coachId])
+    }, [coachId, isAdmin])
 
     return (
         <Popover open={open} onOpenChange={setOpen}>
@@ -133,7 +136,7 @@ export function StudentSelect({ onSelect, selectedName, coachId }: StudentSelect
                             {students.map((student) => (
                                 <CommandItem
                                     key={student.id}
-                                    value={student.full_name}
+                                    value={`${student.full_name} ${student.full_name_kana || ''} ${student.second_student_name || ''} ${student.second_student_name_kana || ''}`}
                                     onSelect={() => {
                                         const displayName = student.second_student_name 
                                             ? `${student.full_name} & ${student.second_student_name}`

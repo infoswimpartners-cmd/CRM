@@ -89,12 +89,12 @@ export default async function MemberBillingPage() {
     return (
         <div className="container mx-auto px-4 py-8 pb-32 max-w-4xl min-h-screen">
             <div className="flex items-center gap-4 mb-8">
-                <div className="w-14 h-14 rounded-2xl bg-indigo-600 shadow-lg shadow-indigo-200 flex items-center justify-center text-white transform rotate-3">
+                <div className="w-14 h-14 rounded-2xl bg-sky-500 shadow-md shadow-sky-100 flex items-center justify-center text-white transform rotate-3">
                     <CreditCard className="w-7 h-7" />
                 </div>
                 <div>
-                    <h1 className="text-3xl font-black text-indigo-950 tracking-tight">ご契約・お支払い</h1>
-                    <p className="text-sm font-bold text-indigo-400 mt-1 uppercase tracking-widest">Billing & Payments</p>
+                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">ご契約・お支払い</h1>
+                    <p className="text-sm font-bold text-sky-500 mt-1 uppercase tracking-widest">Billing & Payments</p>
                 </div>
             </div>
 
@@ -109,13 +109,13 @@ export default async function MemberBillingPage() {
                 termsOfServiceText={termsOfServiceText}
             />
 
-            <Card className="rounded-[2.5rem] border-none shadow-xl bg-white/80 backdrop-blur-xl overflow-hidden">
-                <CardHeader className="bg-gradient-to-br from-indigo-50/50 to-white border-b border-indigo-50/50 p-8">
+            <Card className="rounded-[2.5rem] border border-sky-100 shadow-sm bg-white overflow-hidden mt-8">
+                <CardHeader className="bg-gradient-to-br from-sky-50/50 to-white border-b border-sky-50 p-8">
                     <div className="flex items-center gap-3">
-                        <CreditCard className="w-5 h-5 text-indigo-500" />
-                        <CardTitle className="text-xl font-black text-gray-800">クレジットカード情報</CardTitle>
+                        <CreditCard className="w-5 h-5 text-sky-500" />
+                        <CardTitle className="text-xl font-black text-slate-800">クレジットカード情報</CardTitle>
                     </div>
-                    <CardDescription className="text-gray-500 font-medium">
+                    <CardDescription className="text-slate-500 font-medium">
                         お支払い用のクレジットカードの登録・変更・確認を安全に行えます。
                     </CardDescription>
                 </CardHeader>

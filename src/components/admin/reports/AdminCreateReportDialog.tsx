@@ -65,7 +65,8 @@ export function AdminCreateReportDialog({ open, onOpenChange }: AdminCreateRepor
     const [loading, setLoading] = useState(false)
     const [coaches, setCoaches] = useState<any[]>([])
     const [lessonMasters, setLessonMasters] = useState<any[]>([])
-    const [students, setStudents] = useState<any[]>([])
+    const [allStudents, setAllStudents] = useState<any[]>([])
+    const [assignedStudentIds, setAssignedStudentIds] = useState<Set<string>>(new Set())
     const [restrictedLessonIds, setRestrictedLessonIds] = useState<string[] | null>(null)
     const [isTwoPersonLesson, setIsTwoPersonLesson] = useState(false)
     const [selectedStudent, setSelectedStudent] = useState<any>(null)
@@ -88,57 +89,50 @@ export function AdminCreateReportDialog({ open, onOpenChange }: AdminCreateRepor
         },
     })
 
-    // コーチ・レッスン種類をロード
+    // コーチ・レッスン種類・全生徒をロード
     useEffect(() => {
         if (!open) return
         const fetchInitialData = async () => {
             const supabase = createClient()
-            const [{ data: coachList }, { data: masters }] = await Promise.all([
+            const [{ data: coachList }, { data: masters }, { data: studentList }] = await Promise.all([
                 supabase.from('profiles').select('id, full_name').in('role', ['coach', 'admin', 'owner']).order('full_name'),
-                supabase.from('lesson_masters').select('id, name, unit_price').eq('active', true).order('display_order'),
+                supabase.from('lesson_masters').select('id, name, unit_price, pair_unit_price, is_trial').eq('active', true).order('display_order'),
+                supabase.from('students').select('id, full_name, second_student_name, coach_id, status').neq('status', 'withdrawn').order('full_name'),
             ])
             if (coachList) setCoaches(coachList)
             if (masters) setLessonMasters(masters)
+            if (studentList) setAllStudents(studentList)
         }
         fetchInitialData()
         form.reset()
-        setStudents([])
+        setAssignedStudentIds(new Set())
         setRestrictedLessonIds(null)
         setIsTwoPersonLesson(false)
         setSelectedStudent(null)
     }, [open, form])
 
-    // コーチが変わったら担当生徒を再フェッチ
+    // コーチが変わったら担当生徒IDを特定
     const selectedCoachId = form.watch('coach_id')
     useEffect(() => {
         if (!selectedCoachId) {
-            setStudents([])
+            setAssignedStudentIds(new Set())
             return
         }
-        const fetchStudents = async () => {
+        const fetchAssigned = async () => {
             const supabase = createClient()
-            // junction テーブルから生徒を取得
             const [{ data: directStudents }, { data: junctionStudents }] = await Promise.all([
-                supabase.from('students').select('id, full_name, second_student_name, status').eq('coach_id', selectedCoachId).neq('status', 'withdrawn').order('full_name'),
-                supabase.from('student_coaches').select('students(id, full_name, second_student_name, status)').eq('coach_id', selectedCoachId),
+                supabase.from('students').select('id').eq('coach_id', selectedCoachId).neq('status', 'withdrawn'),
+                supabase.from('student_coaches').select('student_id').eq('coach_id', selectedCoachId),
             ])
-            const combined: { id: string; full_name: string; second_student_name: string | null }[] = [...(directStudents || [])]
-            junctionStudents?.forEach((j: any) => {
-                const s = j.students
-                if (s && s.status !== 'withdrawn' && !combined.find(c => c.id === s.id)) combined.push(s)
-            })
-            combined.sort((a, b) => a.full_name.localeCompare(b.full_name, 'ja'))
-            setStudents(combined)
-            // コーチ変更時に生徒選択をリセット
-            form.setValue('student_id', '')
-            form.setValue('student_name', '')
-            setIsTwoPersonLesson(false)
-            setSelectedStudent(null)
+            const idSet = new Set<string>()
+            directStudents?.forEach(s => idSet.add(s.id))
+            junctionStudents?.forEach(j => { if (j.student_id) idSet.add(j.student_id) })
+            setAssignedStudentIds(idSet)
         }
-        fetchStudents()
-    }, [selectedCoachId, form])
+        fetchAssigned()
+    }, [selectedCoachId])
 
-    // 生徒が変わったら許可レッスンを制限
+    // 生徒が変わったら許可レッスンを判定
     const selectedStudentId = form.watch('student_id')
     useEffect(() => {
         if (!selectedStudentId) {
@@ -149,35 +143,62 @@ export function AdminCreateReportDialog({ open, onOpenChange }: AdminCreateRepor
             const supabase = createClient()
             const { data: student } = await supabase
                 .from('students')
-                .select('membership_type_id')
+                .select('status, membership_type_id')
                 .eq('id', selectedStudentId)
                 .single()
-            if (!student?.membership_type_id) { setRestrictedLessonIds(null); return }
+
+            const isTrialStudent = ['trial_pending', 'trial_confirmed', 'trial_billed', 'trial_done', 'applied', 'inquired'].includes(student?.status || '') ||
+                (!student?.membership_type_id && student?.status !== 'active' && student?.status !== 'withdrawn')
+
+            if (isTrialStudent) {
+                const trialMasters = lessonMasters.filter(m => m.is_trial)
+                const trialIds = trialMasters.map(m => m.id)
+                setRestrictedLessonIds(trialIds)
+                if (trialIds.length > 0) {
+                    const current = form.getValues('lesson_master_id')
+                    if (!current || !trialIds.includes(current)) {
+                        form.setValue('lesson_master_id', trialIds[0])
+                        handleLessonMasterChange(trialIds[0])
+                    }
+                }
+                return
+            }
+
+            if (!student?.membership_type_id) {
+                setRestrictedLessonIds(null)
+                return
+            }
+
             const { data: allowed } = await supabase
                 .from('membership_type_lessons')
                 .select('lesson_master_id')
                 .eq('membership_type_id', student.membership_type_id)
+
             if (allowed && allowed.length > 0) {
                 const ids = allowed.map((a: any) => a.lesson_master_id)
                 setRestrictedLessonIds(ids)
                 const current = form.getValues('lesson_master_id')
                 if (!current || !ids.includes(current)) {
-                    form.setValue('lesson_master_id', ids.length === 1 ? ids[0] : '')
-                    if (ids.length !== 1) form.setValue('price', 0)
+                    const nextId = ids.length === 1 ? ids[0] : (ids[0] || '')
+                    form.setValue('lesson_master_id', nextId)
+                    if (nextId) handleLessonMasterChange(nextId)
                 }
             } else {
-                setRestrictedLessonIds([])
-                form.setValue('lesson_master_id', '')
-                form.setValue('price', 0)
+                // 会員プランに個別レッスンが登録されていない場合は選択不能にせず全レッスンから選択可能にする
+                setRestrictedLessonIds(null)
             }
         }
         fetchAllowed()
-    }, [selectedStudentId, form])
+    }, [selectedStudentId, form, lessonMasters])
 
     // レッスン種別が変わったら金額を更新
     const handleLessonMasterChange = (value: string) => {
         const master = lessonMasters.find(m => m.id === value)
-        if (master) form.setValue('price', master.unit_price)
+        if (!master) return
+        const attType = form.getValues('attendance_type') || 'both'
+        const isPair = isTwoPersonLesson && (attType === 'both')
+        const price = (isPair && master.pair_unit_price) ? master.pair_unit_price : master.unit_price
+        form.setValue('price', price)
     }
 
     const displayMasters = restrictedLessonIds !== null
@@ -284,12 +305,17 @@ export function AdminCreateReportDialog({ open, onOpenChange }: AdminCreateRepor
                                                     setIsTwoPersonLesson(false)
                                                     setSelectedStudent(null)
                                                 } else {
-                                                    const s = students.find(s => s.id === val)
+                                                    const s = allStudents.find(s => s.id === val)
                                                     form.setValue('student_id', val)
                                                     const displayName = s?.second_student_name 
                                                         ? `${s.full_name} & ${s.second_student_name}`
                                                         : s?.full_name || ''
                                                     form.setValue('student_name', displayName)
+
+                                                    // コーチ未選択で生徒に主担当コーチが設定されている場合は自動補完
+                                                    if (!form.getValues('coach_id') && s?.coach_id) {
+                                                        form.setValue('coach_id', s.coach_id)
+                                                    }
 
                                                     const supabase = createClient()
                                                     const { data: studentData } = await supabase
@@ -307,19 +333,46 @@ export function AdminCreateReportDialog({ open, onOpenChange }: AdminCreateRepor
                                                     }
                                                 }
                                             }}
-                                            disabled={!selectedCoachId}
                                         >
                                             <SelectTrigger className="flex-1">
-                                                <SelectValue placeholder={selectedCoachId ? "生徒を選択" : "先にコーチを選択"} />
+                                                <SelectValue placeholder="生徒を選択（全生徒から選択可能）" />
                                             </SelectTrigger>
-                                            <SelectContent>
+                                            <SelectContent className="max-h-[300px]">
                                                 <SelectItem value="__manual__">手入力</SelectItem>
-                                                {students.map(s => (
-                                                    <SelectItem key={s.id} value={s.id}>
-                                                        {s.full_name}
-                                                        {s.second_student_name && ` & ${s.second_student_name}`}
-                                                    </SelectItem>
-                                                ))}
+                                                {assignedStudentIds.size > 0 && (
+                                                    <>
+                                                        <div className="px-2 py-1.5 text-xs font-semibold text-slate-500 bg-slate-50">
+                                                            選択中コーチの担当生徒
+                                                        </div>
+                                                        {allStudents
+                                                            .filter(s => assignedStudentIds.has(s.id))
+                                                            .map(s => (
+                                                                <SelectItem key={`assigned-${s.id}`} value={s.id}>
+                                                                    {s.full_name}
+                                                                    {s.second_student_name && ` & ${s.second_student_name}`}
+                                                                </SelectItem>
+                                                            ))}
+                                                        <div className="px-2 py-1.5 text-xs font-semibold text-slate-500 bg-slate-50 border-t mt-1">
+                                                            その他の生徒
+                                                        </div>
+                                                        {allStudents
+                                                            .filter(s => !assignedStudentIds.has(s.id))
+                                                            .map(s => (
+                                                                <SelectItem key={`other-${s.id}`} value={s.id}>
+                                                                    {s.full_name}
+                                                                    {s.second_student_name && ` & ${s.second_student_name}`}
+                                                                </SelectItem>
+                                                            ))}
+                                                    </>
+                                                )}
+                                                {assignedStudentIds.size === 0 && (
+                                                    allStudents.map(s => (
+                                                        <SelectItem key={s.id} value={s.id}>
+                                                            {s.full_name}
+                                                            {s.second_student_name && ` & ${s.second_student_name}`}
+                                                        </SelectItem>
+                                                    ))
+                                                )}
                                             </SelectContent>
                                         </Select>
                                     </div>

@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, MapPin, User, Clock, Play, Image as ImageIcon, MessageSquare } from 'lucide-react';
+import { ArrowLeft, MapPin, User, Clock, Play, MessageSquare } from 'lucide-react';
 import { LessonMediaGallery } from './_components/LessonMediaGallery';
 
 export default async function ReportDetailPage({ params }: { params: Promise<{ lessonId: string }> }) {
@@ -43,110 +43,119 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ l
     const date = new Date(lesson.lesson_date);
 
     return (
-        <div className="space-y-5 pb-24">
+        <div className="space-y-6 pb-24">
             {/* ヘッダー */}
             <div className="flex items-center gap-3">
-                <Link href="/member/dashboard" className="p-2 rounded-full hover:bg-gray-100 transition-colors">
-                    <ArrowLeft size={20} className="text-gray-600" />
+                <Link href="/member/dashboard" className="p-2.5 rounded-2xl bg-white border border-sky-100 hover:bg-sky-50 text-slate-600 hover:text-sky-600 transition-colors shadow-sm">
+                    <ArrowLeft size={18} />
                 </Link>
                 <div>
-                    <h1 className="text-xl font-bold text-gray-800">
+                    <h1 className="text-xl md:text-2xl font-bold text-slate-800 tracking-tight">
                         {date.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric' })} のレポート
                     </h1>
-                    <p className="text-xs text-gray-400 mt-0.5">
+                    <p className="text-xs text-slate-400 mt-0.5">
                         {date.getFullYear()}年 · {lesson.profiles?.full_name || '担当コーチ'}
                     </p>
                 </div>
             </div>
 
             {/* 基本情報カード */}
-            <div className="glass-card p-5 space-y-3">
+            <div className="glass-card p-5 space-y-3.5 border-sky-100/60 bg-white/80 rounded-2xl shadow-sm">
                 <div className="flex items-center gap-3 text-sm">
-                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                        <Clock className="w-4 h-4 text-blue-600" />
+                    <div className="w-8 h-8 rounded-xl bg-sky-50 flex items-center justify-center shrink-0 border border-sky-100">
+                        <Clock className="w-4 h-4 text-sky-600" />
                     </div>
-                    <span className="font-medium text-gray-800">
+                    <span className="font-medium text-slate-800">
                         {date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
                     </span>
                 </div>
                 <div className="flex items-center gap-3 text-sm">
-                    <div className="w-8 h-8 rounded-full bg-cyan-100 flex items-center justify-center shrink-0">
+                    <div className="w-8 h-8 rounded-xl bg-cyan-50 flex items-center justify-center shrink-0 border border-cyan-100">
                         <MapPin className="w-4 h-4 text-cyan-600" />
                     </div>
-                    <span className="text-gray-700">{lesson.location || '場所未定'}</span>
+                    <span className="text-slate-700">{lesson.location || '場所未定'}</span>
                 </div>
                 <div className="flex items-center gap-3 text-sm">
-                    <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
-                        <User className="w-4 h-4 text-indigo-600" />
+                    <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center shrink-0 border border-blue-100">
+                        <User className="w-4 h-4 text-blue-600" />
                     </div>
-                    <span className="text-gray-700">{lesson.profiles?.full_name || '担当コーチ'}</span>
+                    <span className="text-slate-700">{lesson.profiles?.full_name || '担当コーチ'}</span>
                 </div>
             </div>
 
-            {/* 動画・写真セクション */}
-            {mediaItems && mediaItems.length > 0 ? (
+            {/* 動画・写真セクション（メディアがある場合のみ表示） */}
+            {mediaItems && mediaItems.length > 0 && (
                 <section className="space-y-3">
-                    <h2 className="text-sm font-black text-gray-700 flex items-center gap-2 px-1">
-                        <Play className="w-4 h-4 text-blue-500" />
+                    <h2 className="text-sm font-bold text-slate-700 flex items-center gap-2 px-1">
+                        <Play className="w-4 h-4 text-sky-500" />
                         レッスン動画・写真
-                        <span className="text-xs font-normal text-gray-400">({mediaItems.length}件)</span>
+                        <span className="text-xs font-normal text-slate-400">({mediaItems.length}件)</span>
                     </h2>
                     <LessonMediaGallery mediaItems={mediaItems} />
                 </section>
-            ) : (
-                <div className="glass-card p-6 text-center bg-gradient-to-br from-gray-50/50 to-white/50">
-                    <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
-                        <ImageIcon className="w-6 h-6 text-gray-300" />
-                    </div>
-                    <p className="text-sm text-gray-400">まだ動画・写真はありません</p>
-                    <p className="text-xs text-gray-300 mt-1">コーチがアップロードするとここに表示されます</p>
-                </div>
             )}
 
-            {/* フィードバックセクション */}
+            {/* フィードバックセクション（1つのカードに統合） */}
             <section className="space-y-4">
-                <h2 className="text-sm font-black text-gray-700 flex items-center gap-2 px-1">
-                    <MessageSquare className="w-4 h-4 text-blue-500" />
+                <h2 className="text-sm font-bold text-slate-700 flex items-center gap-2 px-1">
+                    <MessageSquare className="w-4 h-4 text-sky-500" />
                     コーチからのフィードバック
                 </h2>
 
-                {/* 今回のメニュー */}
-                {lesson.menu_description && (
-                    <div className="glass-card overflow-hidden">
-                        <div className="px-5 py-3 bg-blue-500 text-white">
-                            <h3 className="text-sm font-black">今回のメニュー</h3>
+                {(lesson.coach_comment || lesson.menu_description || lesson.feedback_good || lesson.feedback_next) ? (
+                    <div className="glass-card overflow-hidden bg-white/90 border-sky-100 rounded-3xl shadow-sm">
+                        <div className="px-6 py-4 bg-gradient-to-r from-sky-600 to-blue-600 text-white flex items-center justify-between shadow-sm">
+                            <h3 className="text-sm font-bold flex items-center gap-2">
+                                <MessageSquare className="w-4 h-4" />
+                                レッスンレポート
+                            </h3>
+                            {lesson.profiles?.full_name && (
+                                <span className="text-xs font-semibold text-white bg-white/20 px-3 py-1 rounded-full">
+                                    {lesson.profiles.full_name} コーチ
+                                </span>
+                            )}
                         </div>
-                        <div className="p-5">
-                            <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700">
-                                {lesson.menu_description}
-                            </p>
+                        <div className="p-6 md:p-8 space-y-6">
+                            {/* メインのコメント・フィードバック */}
+                            <div className="whitespace-pre-wrap text-sm md:text-base leading-relaxed text-slate-800 font-medium">
+                                {lesson.coach_comment || lesson.menu_description}
+                            </div>
+
+                            {/* もしcoach_commentとmenu_descriptionの両方が別々に入力されている場合 */}
+                            {lesson.coach_comment && lesson.menu_description && lesson.coach_comment !== lesson.menu_description && (
+                                <div className="pt-4 border-t border-slate-100">
+                                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">実施メニュー</h4>
+                                    <div className="whitespace-pre-wrap text-sm leading-relaxed text-slate-600 bg-sky-50/40 p-4 rounded-2xl border border-sky-100/60">
+                                        {lesson.menu_description}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* 過去データの個別項目がある場合もここに集約 */}
+                            {lesson.feedback_good && (
+                                <div className="pt-4 border-t border-slate-100">
+                                    <h4 className="text-xs font-bold text-emerald-600 mb-1">【良かった点・成長したポイント】</h4>
+                                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
+                                        {lesson.feedback_good}
+                                    </p>
+                                </div>
+                            )}
+                            {lesson.feedback_next && (
+                                <div className="pt-4 border-t border-slate-100">
+                                    <h4 className="text-xs font-bold text-amber-600 mb-1">【次回へのアドバイス・目標】</h4>
+                                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">
+                                        {lesson.feedback_next}
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     </div>
-                )}
-
-                {/* コーチコメント */}
-                {lesson.coach_comment && (
-                    <div className="glass-card overflow-hidden">
-                        <div className="px-5 py-3 bg-indigo-500 text-white">
-                            <h3 className="text-sm font-black">コーチからのコメント</h3>
+                ) : (
+                    <div className="glass-card p-8 text-center bg-white/80 border-sky-100 rounded-3xl shadow-sm">
+                        <div className="w-12 h-12 rounded-2xl bg-sky-50 flex items-center justify-center mx-auto mb-3 text-sky-400">
+                            <MessageSquare className="w-5 h-5 opacity-60" />
                         </div>
-                        <div className="p-5">
-                            <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700">
-                                {lesson.coach_comment}
-                            </p>
-                        </div>
-                    </div>
-                )}
-
-
-
-                {/* フィードバックがない場合 */}
-                {!lesson.menu_description && !lesson.coach_comment && (
-                    <div className="glass-card p-8 text-center">
-                        <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
-                            <MessageSquare className="w-6 h-6 text-gray-300" />
-                        </div>
-                        <p className="text-sm text-gray-400">まだフィードバックはありません</p>
+                        <p className="text-sm text-slate-400">まだフィードバックはありません</p>
                     </div>
                 )}
             </section>

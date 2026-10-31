@@ -32,38 +32,38 @@ export default function LastReportCard({ report }: LastReportCardProps) {
     }
 
     return (
-        <Card className="group relative overflow-hidden bg-white border border-slate-100 rounded-[2.5rem] p-10 transition-all duration-1000 shadow-[0_30px_80px_rgba(0,0,0,0.05)] hover:shadow-[0_40px_100px_rgba(0,0,0,0.08)]">
+        <Card className="group relative overflow-hidden bg-white border border-slate-100 rounded-[2.5rem] p-10 transition-all duration-500 shadow-[0_30px_80px_rgba(0,0,0,0.05)] hover:shadow-[0_40px_100px_rgba(0,0,0,0.08)]">
             {/* Decoration */}
-            <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-full blur-[60px] -mr-16 -mt-16 opacity-60" />
+            <div className="absolute top-0 right-0 w-32 h-32 bg-sky-50 rounded-full blur-[60px] -mr-16 -mt-16 opacity-60" />
             
             <div className="relative z-10 space-y-6">
                 <div className="flex items-center justify-between">
-                    <div className="inline-flex items-center gap-2.5 px-4 py-2 bg-indigo-50 border border-indigo-100 rounded-full text-indigo-600">
-                        <Star className="w-3.5 h-3.5 fill-indigo-600" />
+                    <div className="inline-flex items-center gap-2.5 px-4 py-2 bg-sky-50 border border-sky-100 rounded-full text-sky-600">
+                        <Star className="w-3.5 h-3.5 fill-sky-500 text-sky-500" />
                         <span className="text-[10px] font-black uppercase tracking-widest">Latest Feedback</span>
                     </div>
                 </div>
 
                 <div className="space-y-4">
-                    <p className="text-base font-black text-slate-800 leading-relaxed line-clamp-3 tracking-tight">
-                        {report.feedback_text || 'フィードバックの準備中です。'}
+                    <p className="text-base font-bold text-slate-800 leading-relaxed line-clamp-3 tracking-tight">
+                        {report.coach_comment || report.feedback_good || report.menu_description || report.feedback_text || 'フィードバックの準備中です。'}
                     </p>
                     <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center">
-                            <span className="text-[10px] font-black text-slate-400 uppercase">Coach</span>
+                        <div className="w-8 h-8 rounded-lg bg-sky-50 border border-sky-100 flex items-center justify-center">
+                            <span className="text-[10px] font-black text-sky-600 uppercase">Coach</span>
                         </div>
-                        <span className="text-sm font-bold text-slate-500">{report.profiles?.full_name} コーチ</span>
+                        <span className="text-sm font-bold text-slate-600">{report.profiles?.full_name} コーチ</span>
                     </div>
                 </div>
 
                 <Button 
                     asChild 
                     variant="outline"
-                    className="w-full h-14 rounded-2xl border-slate-100 bg-slate-50 hover:bg-white hover:border-indigo-200 text-slate-600 font-black text-xs uppercase tracking-widest transition-all group/btn"
+                    className="w-full h-14 rounded-2xl border-slate-100 bg-slate-50 hover:bg-white hover:border-sky-200 text-slate-600 font-black text-xs uppercase tracking-widest transition-all group/btn"
                 >
                     <Link href={`/member/reports/${report.id}`}>
                         レポート詳細を見る
-                        <ArrowRight className="ml-2 w-4 h-4 group-hover/btn:translate-x-1 transition-transform text-indigo-500" />
+                        <ArrowRight className="ml-2 w-4 h-4 group-hover/btn:translate-x-1 transition-transform text-sky-500" />
                     </Link>
                 </Button>
             </div>

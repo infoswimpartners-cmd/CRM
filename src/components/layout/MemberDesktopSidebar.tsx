@@ -49,9 +49,6 @@ export default function MemberDesktopSidebar({
 
     const navItems = [
         { href: '/member/dashboard', icon: LayoutGrid, label: 'ホーム', subLabel: '予約の確認・キャンセル', external: false },
-        ...(isTrioMember ? [
-            { href: '/trio', icon: Crown, label: 'Trio', subLabel: 'グループレッスン募集一覧', external: false }
-        ] : []),
         ...(isMember ? [
             { href: '/member/billing', icon: CreditCard, label: 'ご契約・お支払い', subLabel: '契約内容・お支払い方法の変更', external: false }
         ] : []),
@@ -61,9 +58,9 @@ export default function MemberDesktopSidebar({
     if (pathname === '/member/login') return null;
 
     return (
-        <aside className="sticky top-0 h-screen bg-white/50 backdrop-blur-2xl border-r border-blue-100 flex flex-col w-72 flex-shrink-0 z-40 hidden lg:flex">
+        <aside className="sticky top-0 h-screen bg-white/70 backdrop-blur-2xl border-r border-sky-100 flex flex-col w-72 flex-shrink-0 z-40 hidden lg:flex">
             {/* Logo Section */}
-            <div className="p-6 border-b border-blue-50/50 flex justify-center">
+            <div className="p-6 border-b border-sky-50 flex justify-center">
                 <div className="relative w-36 h-10">
                     <img
                         src="/logo.png"
@@ -74,14 +71,14 @@ export default function MemberDesktopSidebar({
             </div>
 
             {/* Header / Profile section */}
-            <div className="p-8 pb-6 flex items-center justify-between border-b border-blue-50 bg-gradient-to-br from-blue-50/30 to-white/30">
+            <div className="p-8 pb-6 flex items-center justify-between border-b border-sky-50 bg-gradient-to-br from-sky-50/50 to-white/30">
                 <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-blue-600 shadow-lg shadow-blue-200 flex items-center justify-center text-white transform rotate-3">
+                    <div className="w-12 h-12 rounded-2xl bg-sky-500 shadow-md shadow-sky-100 flex items-center justify-center text-white transform rotate-3">
                         <User className="w-6 h-6" />
                     </div>
                     <div>
-                        <p className="text-[10px] text-blue-400 font-black tracking-widest uppercase">会員プロフィール</p>
-                        <h2 className="font-black text-gray-800 text-base">{studentName || 'ゲスト'} 様</h2>
+                        <p className="text-[10px] text-sky-500 font-black tracking-widest uppercase">会員プロフィール</p>
+                        <h2 className="font-bold text-slate-800 text-base">{studentName || 'ゲスト'} 様</h2>
                     </div>
                 </div>
             </div>
@@ -94,27 +91,27 @@ export default function MemberDesktopSidebar({
                         <div className={cn(
                             "flex items-center justify-between w-full p-4 rounded-2xl transition-all duration-300 group",
                             isActive
-                                ? "bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-xl shadow-blue-200"
-                                : "text-gray-500 hover:bg-blue-50/50 hover:text-blue-600"
+                                ? "bg-gradient-to-r from-sky-600 to-sky-500 text-white shadow-lg shadow-sky-100 font-semibold"
+                                : "text-slate-500 hover:bg-sky-50/60 hover:text-sky-600"
                         )}>
                             <div className="flex items-center gap-4">
                                 <div className={cn(
                                     "p-2.5 rounded-xl transition-all duration-300",
-                                    isActive ? "bg-white/20 shadow-inner" : "bg-gray-50 group-hover:bg-white group-hover:shadow-sm"
+                                    isActive ? "bg-white/20 shadow-inner" : "bg-sky-50/60 group-hover:bg-white group-hover:shadow-sm"
                                 )}>
-                                    <item.icon className={cn("w-5 h-5", isActive && "stroke-[2.5px]")} />
+                                    <item.icon className={cn("w-5 h-5", isActive ? "stroke-[2.5px] text-white" : "text-slate-400 group-hover:text-sky-600")} />
                                 </div>
                                 <div>
-                                    <p className="font-bold text-sm tracking-tight">{item.label}</p>
+                                    <p className="font-semibold text-sm tracking-tight">{item.label}</p>
                                     <p className={cn(
-                                        "text-[10px] font-bold uppercase tracking-tighter hidden xl:block",
-                                        isActive ? "text-blue-100/80" : "text-gray-400"
+                                        "text-[10px] uppercase tracking-tight hidden xl:block",
+                                        isActive ? "text-white/80" : "text-slate-400"
                                     )}>{item.subLabel}</p>
                                 </div>
                             </div>
                             <ChevronRight className={cn(
                                 "w-4 h-4 transition-transform group-hover:translate-x-1 hidden xl:block",
-                                isActive ? "text-white/60" : "text-gray-300"
+                                isActive ? "text-white/70" : "text-slate-300"
                             )} />
                         </div>
                     )
@@ -142,14 +139,14 @@ export default function MemberDesktopSidebar({
             </nav>
 
             {/* Footer / Logout */}
-            <div className="p-6 bg-gray-50/50 border-t border-gray-100">
+            <div className="p-6 bg-slate-50/40 border-t border-slate-100">
                 <Button
                     variant="ghost"
                     onClick={handleLogout}
-                    className="w-full justify-start text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all h-12"
+                    className="w-full justify-start text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all h-12"
                 >
                     <LogOut className="mr-3 h-5 w-5" />
-                    <span className="font-bold text-sm">ログアウト</span>
+                    <span className="font-semibold text-sm">ログアウト</span>
                 </Button>
             </div>
         </aside>

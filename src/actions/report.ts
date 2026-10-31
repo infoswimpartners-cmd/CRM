@@ -37,7 +37,7 @@ export async function getCalculatedLessonAmounts(
     // 3. レッスンマスタの取得
     const { data: master } = await supabaseAdmin
         .from('lesson_masters')
-        .select('id, unit_price, pair_unit_price, is_trial')
+        .select('id, name, unit_price, pair_unit_price, is_trial')
         .eq('id', lessonMasterId)
         .single()
 
@@ -395,16 +395,20 @@ export async function submitLessonReport(values: FormValues) {
 
         // 4.6 生徒へのLINEフィードバック自動通知（LINE連携済みの場合）
         if (data.student_id && newLessonId) {
-            await sendLessonReportLineNotification({
-                supabaseAdmin,
-                studentId: data.student_id,
-                studentName: data.student_name,
-                coachId: user.id,
-                lessonDate: data.lesson_date,
-                location: data.location,
-                comment: data.menu_description || data.coach_comment || '',
-                lessonId: newLessonId,
-            })
+            try {
+                await sendLessonReportLineNotification({
+                    supabaseAdmin,
+                    studentId: data.student_id,
+                    studentName: data.student_name,
+                    coachId: user.id,
+                    lessonDate: data.lesson_date,
+                    location: data.location,
+                    comment: data.menu_description || data.coach_comment || '',
+                    lessonId: newLessonId,
+                })
+            } catch (feedbackLineErr) {
+                console.error('[Lesson Report] Failed to send feedback LINE notification:', feedbackLineErr)
+            }
         }
 
         // 5. 体験レッスンの場合、生徒のステータスを更新
@@ -496,7 +500,7 @@ export async function deleteLessonReport(lessonId: string) {
 
     // Admin Check
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-    if (profile?.role !== 'admin') {
+    if (profile?.role !== 'admin' && profile?.role !== 'owner') {
         return { success: false, error: '権限がありません' }
     }
 
@@ -981,7 +985,7 @@ export async function submitAdminProxyReport(values: AdminProxyValues) {
 
     // 2. 管理者権限チェック
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-    if (profile?.role !== 'admin') {
+    if (profile?.role !== 'admin' && profile?.role !== 'owner') {
         return { success: false, error: '管理者のみが代理報告を作成できます' }
     }
 
@@ -1117,16 +1121,20 @@ export async function submitAdminProxyReport(values: AdminProxyValues) {
 
         // 8.5 生徒へのLINEフィードバック自動通知（LINE連携済みの場合）
         if (data.student_id && insertedLesson?.id) {
-            await sendLessonReportLineNotification({
-                supabaseAdmin,
-                studentId: data.student_id,
-                studentName: data.student_name,
-                coachId: data.coach_id,
-                lessonDate: data.lesson_date,
-                location: data.location,
-                comment: data.menu_description || data.coach_comment || '',
-                lessonId: insertedLesson.id,
-            })
+            try {
+                await sendLessonReportLineNotification({
+                    supabaseAdmin,
+                    studentId: data.student_id,
+                    studentName: data.student_name,
+                    coachId: data.coach_id,
+                    lessonDate: data.lesson_date,
+                    location: data.location,
+                    comment: data.menu_description || data.coach_comment || '',
+                    lessonId: insertedLesson.id,
+                })
+            } catch (adminFeedbackLineErr) {
+                console.error('[Admin Proxy Report] Failed to send feedback LINE notification:', adminFeedbackLineErr)
+            }
         }
 
         // 9. Googleスプレッドシートへのレッスン報告記録（非ブロッキング）
