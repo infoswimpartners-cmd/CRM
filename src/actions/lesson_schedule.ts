@@ -137,17 +137,19 @@ async function calculateMonthlyUsage(
         console.log(`[CalcUsage] canHaveRollover: ${canHaveRollover}, StartedAt: ${membershipStartedAt}, CreatedAt: ${createdAt}`)
 
         if (canHaveRollover) {
-            // A. Count from schedules
+            // A. Count from schedules（過去の月の未受講・キャンセル枠を誤カウントしないよう、報告済みのみ対象）
             const { data: prevSchedulesList, error: prevError } = await supabaseAdmin
                 .from('lesson_schedules')
                 .select(`
                     id,
                     lesson_master_id,
+                    is_reported,
                     lesson_master:lesson_masters (
                         is_trial
                     )
                 `)
                 .eq('student_id', studentId)
+                .eq('is_reported', true)
                 .gte('start_time', prevStart)
                 .lt('start_time', start)
 
