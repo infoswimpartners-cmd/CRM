@@ -74,6 +74,9 @@ const AGE_GROUP_PRESETS = [
   { label: "60代〜", defaultDob: "1961-01-01" },
 ];
 
+// 入力途中データの一時保存用LocalStorageキー（予定確認や画面切り替えによるリセット防止）
+const TRIAL_FORM_DRAFT_KEY = "swim_partners_trial_form_draft_v1";
+
 export default function BookingForm() {
   const [isLiffReady, setIsLiffReady] = useState(false);
   const [isLiffEnvironment, setIsLiffEnvironment] = useState(false);
@@ -136,6 +139,85 @@ export default function BookingForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isSubmittingRef = useRef(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // 下書き復元完了フラグ（初期ロード時の空データによる上書き保存を防止）
+  const [isDraftRestored, setIsDraftRestored] = useState(false);
+
+  // 1. 初回マウント時: 入力途中データ（下書き）の自動復元
+  useEffect(() => {
+    try {
+      if (typeof window !== "undefined") {
+        const savedDraft = localStorage.getItem(TRIAL_FORM_DRAFT_KEY);
+        if (savedDraft) {
+          const parsed = JSON.parse(savedDraft);
+          if (parsed && typeof parsed === "object") {
+            if (parsed.formData) {
+              setFormData(prev => ({
+                ...prev,
+                ...parsed.formData,
+              }));
+            }
+            if (Array.isArray(parsed.selectedTimeSlots)) {
+              setSelectedTimeSlots(parsed.selectedTimeSlots);
+            }
+            if (typeof parsed.showSecondStudent === "boolean") {
+              setShowSecondStudent(parsed.showSecondStudent);
+            }
+            if (typeof parsed.hasReferrer === "boolean") {
+              setHasReferrer(parsed.hasReferrer);
+            }
+            if (typeof parsed.customTimeMode1 === "boolean") setCustomTimeMode1(parsed.customTimeMode1);
+            if (typeof parsed.customTimeMode2 === "boolean") setCustomTimeMode2(parsed.customTimeMode2);
+            if (typeof parsed.customTimeMode3 === "boolean") setCustomTimeMode3(parsed.customTimeMode3);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("下書き復元をスキップしました:", e);
+    } finally {
+      setIsDraftRestored(true);
+    }
+  }, []);
+
+  // 2. 入力値変更時: 入力途中データを端末内（localStorage）へ自動保存
+  useEffect(() => {
+    if (!isDraftRestored || isSubmitted) return;
+    try {
+      if (typeof window !== "undefined") {
+        // いずれかの項目に値が入っている場合のみ保存
+        const hasValues = Object.entries(formData).some(([key, val]) => {
+          if (key === "agreed") return false;
+          return typeof val === "string" && val.trim().length > 0;
+        });
+
+        if (hasValues || selectedTimeSlots.length > 0) {
+          const draftPayload = {
+            formData,
+            selectedTimeSlots,
+            showSecondStudent,
+            hasReferrer,
+            customTimeMode1,
+            customTimeMode2,
+            customTimeMode3,
+            updatedAt: new Date().toISOString()
+          };
+          localStorage.setItem(TRIAL_FORM_DRAFT_KEY, JSON.stringify(draftPayload));
+        }
+      }
+    } catch (e) {
+      console.warn("下書き自動保存をスキップしました:", e);
+    }
+  }, [
+    formData,
+    selectedTimeSlots,
+    showSecondStudent,
+    hasReferrer,
+    customTimeMode1,
+    customTimeMode2,
+    customTimeMode3,
+    isDraftRestored,
+    isSubmitted
+  ]);
 
   // LIFF初期化 & Webハイブリッド対応
   useEffect(() => {
@@ -538,6 +620,13 @@ export default function BookingForm() {
       });
 
       if (response.ok) {
+        // 申込完了時に一時保存データを安全に削除
+        try {
+          if (typeof window !== "undefined") {
+            localStorage.removeItem(TRIAL_FORM_DRAFT_KEY);
+          }
+        } catch (_) {}
+
         setSubmittedName(formData.name.trim());
         setIsSubmitted(true);
         setIsConfirming(false);
@@ -681,9 +770,15 @@ export default function BookingForm() {
             <ArrowLeft className="h-4 w-4" />
             <span>トップページへ戻る</span>
           </Link>
-          <div className="flex items-center gap-1.5 text-xs text-slate-500">
-            <ShieldCheck className="h-4 w-4 text-emerald-600" />
-            <span>SSL暗号化通信</span>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1 text-[11px] font-medium text-slate-400" title="入力内容は自動保存されます。予定確認などで画面を閉じても消えません。">
+              <span>💾</span>
+              <span>入力自動保存中</span>
+            </div>
+            <div className="flex items-center gap-1 text-xs text-slate-500">
+              <ShieldCheck className="h-4 w-4 text-emerald-600" />
+              <span>SSL暗号化通信</span>
+            </div>
           </div>
         </div>
 
