@@ -101,7 +101,7 @@ export interface SendMessageOptions {
     lineUserId: string;
     rawMessage: string;
     variables?: Record<string, string | null | undefined>;
-    deliveryType: 'broadcast' | 'step_message' | 'test_preview' | 'cart_recovery' | 'confirm_abandon_recovery' | 'direct_chat';
+    deliveryType: 'broadcast' | 'step_message' | 'test_preview' | 'cart_recovery' | 'confirm_abandon_recovery' | 'inactive_follow_recovery' | 'direct_chat';
     campaignId?: string;
     stepId?: string;
     stepName?: string;

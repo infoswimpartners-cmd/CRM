@@ -9,7 +9,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Megaphone, Layers, History, Menu, Tag, MessageSquare } from 'lucide-react';
+import { Megaphone, Layers, History, Menu, Tag, MessageSquare, Activity } from 'lucide-react';
 import { toast } from 'sonner';
 import { LineMarketingHeader } from './components/LineMarketingHeader';
 import { MarketingKpiCards, MarketingKpiData } from './components/MarketingKpiCards';
@@ -19,11 +19,12 @@ import { DeliveryLogsTab } from './components/DeliveryLogsTab';
 import { LiffTrackingTab, preloadLiffTrackingData } from './components/LiffTrackingTab';
 import { RichMenuSettingsTab } from './components/RichMenuSettingsTab';
 import { IndividualChatTab } from './components/IndividualChatTab';
+import { UserActivityMonitoringTab } from './components/UserActivityMonitoringTab';
 import { getMarketingKpiSummaryAction, syncTrialDoneStudentsAction } from '@/actions/line-marketing';
 import { formatErrorToastMessage, sanitizeErrorMessage } from '@/lib/error-formatter';
 
 export default function LineMarketingPage() {
-    const [activeTab, setActiveTab] = useState<'chat' | 'broadcast' | 'steps' | 'tracking' | 'logs' | 'richmenu'>('broadcast');
+    const [activeTab, setActiveTab] = useState<'chat' | 'broadcast' | 'steps' | 'activity' | 'tracking' | 'logs' | 'richmenu'>('broadcast');
     const [selectedTagForBroadcast, setSelectedTagForBroadcast] = useState<string | null>(null);
     const [initialChatLineUserId, setInitialChatLineUserId] = useState<string | null>(null);
     const [chatBadgeCount, setChatBadgeCount] = useState(0);
@@ -65,7 +66,7 @@ export default function LineMarketingPage() {
             const tabParam = params.get('tab');
             const tagParam = params.get('tag');
             const lineUserParam = params.get('lineUserId');
-            if (tabParam && ['chat', 'broadcast', 'steps', 'tracking', 'logs', 'richmenu'].includes(tabParam)) {
+            if (tabParam && ['chat', 'broadcast', 'steps', 'activity', 'tracking', 'logs', 'richmenu'].includes(tabParam)) {
                 setActiveTab(tabParam as any);
             }
             if (tagParam) {
@@ -116,12 +117,12 @@ export default function LineMarketingPage() {
             {/* KPIサマリーカード（総配信数、成功率、エラー件数、ステップ配信中生徒数） */}
             <MarketingKpiCards kpi={kpi} isLoading={isLoadingKpi} />
 
-            {/* 6大タブ構成（個別トーク / セグメント一括配信 / カード型ステップ配信 / LIFFアクセス分析・タグ / 配信ログ / リッチメニュー設定） */}
+            {/* 7大タブ構成（個別トーク / セグメント一括配信 / カード型ステップ配信 / 行動監視ログ / LIFFアクセス分析・タグ / 配信ログ / リッチメニュー設定） */}
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="space-y-6">
-                <TabsList className="bg-slate-100 dark:bg-slate-800 p-1.5 rounded-xl grid grid-cols-2 sm:grid-cols-6 max-w-5xl h-auto border border-slate-200 dark:border-slate-700">
+                <TabsList className="bg-slate-100 dark:bg-slate-800 p-1.5 rounded-xl grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 max-w-6xl h-auto border border-slate-200 dark:border-slate-700 gap-1">
                     <TabsTrigger
                         value="chat"
-                        className="py-2.5 px-3 font-semibold text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#06C755] dark:data-[state=active]:bg-slate-900 dark:data-[state=active]:text-[#06C755] data-[state=active]:shadow-sm transition-all"
+                        className="py-2.5 px-2.5 font-semibold text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#06C755] dark:data-[state=active]:bg-slate-900 dark:data-[state=active]:text-[#06C755] data-[state=active]:shadow-sm transition-all"
                     >
                         <MessageSquare className="h-4 w-4 mr-1.5 text-[#06C755]" />
                         個別トーク
@@ -133,37 +134,44 @@ export default function LineMarketingPage() {
                     </TabsTrigger>
                     <TabsTrigger
                         value="broadcast"
-                        className="py-2.5 px-3 font-semibold text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:text-blue-600 dark:data-[state=active]:bg-slate-900 dark:data-[state=active]:text-blue-400 data-[state=active]:shadow-sm transition-all"
+                        className="py-2.5 px-2.5 font-semibold text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:text-blue-600 dark:data-[state=active]:bg-slate-900 dark:data-[state=active]:text-blue-400 data-[state=active]:shadow-sm transition-all"
                     >
                         <Megaphone className="h-4 w-4 mr-1.5" />
                         一括配信
                     </TabsTrigger>
                     <TabsTrigger
                         value="steps"
-                        className="py-2.5 px-3 font-semibold text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:text-blue-600 dark:data-[state=active]:bg-slate-900 dark:data-[state=active]:text-blue-400 data-[state=active]:shadow-sm transition-all"
+                        className="py-2.5 px-2.5 font-semibold text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:text-blue-600 dark:data-[state=active]:bg-slate-900 dark:data-[state=active]:text-blue-400 data-[state=active]:shadow-sm transition-all"
                     >
                         <Layers className="h-4 w-4 mr-1.5" />
                         ステップ配信
                     </TabsTrigger>
                     <TabsTrigger
+                        value="activity"
+                        className="py-2.5 px-2.5 font-semibold text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:text-emerald-600 dark:data-[state=active]:bg-slate-900 dark:data-[state=active]:text-emerald-400 data-[state=active]:shadow-sm transition-all"
+                    >
+                        <Activity className="h-4 w-4 mr-1.5 text-emerald-500" />
+                        行動監視ログ
+                    </TabsTrigger>
+                    <TabsTrigger
                         value="tracking"
-                        className="py-2.5 px-3 font-semibold text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:text-blue-600 dark:data-[state=active]:bg-slate-900 dark:data-[state=active]:text-blue-400 data-[state=active]:shadow-sm transition-all"
+                        className="py-2.5 px-2.5 font-semibold text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:text-blue-600 dark:data-[state=active]:bg-slate-900 dark:data-[state=active]:text-blue-400 data-[state=active]:shadow-sm transition-all"
                     >
                         <Tag className="h-4 w-4 mr-1.5 text-indigo-500" />
                         アクセス分析・タグ
                     </TabsTrigger>
                     <TabsTrigger
                         value="logs"
-                        className="py-2.5 px-3 font-semibold text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:text-blue-600 dark:data-[state=active]:bg-slate-900 dark:data-[state=active]:text-blue-400 data-[state=active]:shadow-sm transition-all"
+                        className="py-2.5 px-2.5 font-semibold text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:text-blue-600 dark:data-[state=active]:bg-slate-900 dark:data-[state=active]:text-blue-400 data-[state=active]:shadow-sm transition-all"
                     >
                         <History className="h-4 w-4 mr-1.5" />
                         配信ログ
                     </TabsTrigger>
                     <TabsTrigger
                         value="richmenu"
-                        className="py-2.5 px-3 font-semibold text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:text-blue-600 dark:data-[state=active]:bg-slate-900 dark:data-[state=active]:text-blue-400 data-[state=active]:shadow-sm transition-all"
+                        className="py-2.5 px-2.5 font-semibold text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:text-blue-600 dark:data-[state=active]:bg-slate-900 dark:data-[state=active]:text-blue-400 data-[state=active]:shadow-sm transition-all"
                     >
-                        <Menu className="h-4 w-4 mr-1.5 text-emerald-500" />
+                        <Menu className="h-4 w-4 mr-1.5 text-amber-500" />
                         リッチメニュー設定
                     </TabsTrigger>
                 </TabsList>
@@ -191,17 +199,27 @@ export default function LineMarketingPage() {
                     <StepScenarioEditorTab onUpdate={fetchKpi} />
                 </TabsContent>
 
-                {/* タブ3: LIFFアクセス分析・タグ管理 */}
+                {/* タブ3: LINE友だち行動監視・リアルタイムアクティビティログ */}
+                <TabsContent value="activity" forceMount className="data-[state=inactive]:hidden focus-visible:outline-none">
+                    <UserActivityMonitoringTab
+                        onNavigateToChat={(lineUserId) => {
+                            setInitialChatLineUserId(lineUserId);
+                            setActiveTab('chat');
+                        }}
+                    />
+                </TabsContent>
+
+                {/* タブ4: LIFFアクセス分析・タグ管理 */}
                 <TabsContent value="tracking" forceMount className="data-[state=inactive]:hidden focus-visible:outline-none">
                     <LiffTrackingTab onSelectTagForBroadcast={handleSelectTagForBroadcast} />
                 </TabsContent>
 
-                {/* タブ4: 配信ログ・トラッキング */}
+                {/* タブ5: 配信ログ・トラッキング */}
                 <TabsContent value="logs" forceMount className="data-[state=inactive]:hidden focus-visible:outline-none">
                     <DeliveryLogsTab />
                 </TabsContent>
 
-                {/* タブ5: リッチメニュー設定・切り替え */}
+                {/* タブ6: リッチメニュー設定・切り替え */}
                 <TabsContent value="richmenu" forceMount className="data-[state=inactive]:hidden focus-visible:outline-none">
                     <RichMenuSettingsTab />
                 </TabsContent>

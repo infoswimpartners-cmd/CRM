@@ -1720,3 +1720,82 @@ export async function updateLineChatUserProfileAction(
         return { success: false, error: err.message };
     }
 }
+
+/**
+ * LINE友だち追加後の行動・監視アクティビティ一覧を取得するアクション
+ */
+export async function getUserActivitiesAction(
+    limit = 100,
+    filterType?: string
+) {
+    try {
+        await assertAdminUser();
+        const { getUserActivities } = await import('@/lib/line-tracking-service');
+        const activities = await getUserActivities(limit, filterType);
+        return { success: true, activities };
+    } catch (err: any) {
+        console.error('[getUserActivitiesAction] Error:', err);
+        return { success: false, error: err.message, activities: [] };
+    }
+}
+
+/**
+ * 特定のLINEユーザーの個別行動タイムラインを取得するアクション
+ */
+export async function getUserActivitiesByUserIdAction(lineUserId: string) {
+    try {
+        await assertAdminUser();
+        const { getUserActivitiesByUserId } = await import('@/lib/line-tracking-service');
+        const activities = await getUserActivitiesByUserId(lineUserId);
+        return { success: true, activities };
+    } catch (err: any) {
+        console.error('[getUserActivitiesByUserIdAction] Error:', err);
+        return { success: false, error: err.message, activities: [] };
+    }
+}
+
+/**
+ * LINE友だち行動監視のKPI集計データを取得するアクション
+ */
+export async function getActivityKpiSummaryAction() {
+    try {
+        await assertAdminUser();
+        const { getActivityKpiSummary } = await import('@/lib/line-tracking-service');
+        const kpi = await getActivityKpiSummary();
+        return { success: true, kpi };
+    } catch (err: any) {
+        console.error('[getActivityKpiSummaryAction] Error:', err);
+        return {
+            success: false,
+            error: err.message,
+            kpi: {
+                totalActivities: 0,
+                todayActivities: 0,
+                followCount: 0,
+                messageCount: 0,
+                formViewCount: 0,
+                postbackCount: 0,
+            }
+        };
+    }
+}
+
+/**
+ * 友だち追加後1時間未アクション自動フォローを実行・検証するアクション
+ */
+export async function processInactiveFollowRecoveryAction(options?: {
+    dryRun?: boolean;
+    forceSend?: boolean;
+    targetLineUserId?: string;
+}) {
+    try {
+        await assertAdminUser();
+        const { processInactiveFollowRecovery } = await import('@/lib/line-marketing-service');
+        const result = await processInactiveFollowRecovery(options);
+        return { success: true, result };
+    } catch (err: any) {
+        console.error('[processInactiveFollowRecoveryAction] Error:', err);
+        return { success: false, error: err.message };
+    }
+}
+

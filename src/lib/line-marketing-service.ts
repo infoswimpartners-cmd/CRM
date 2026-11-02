@@ -271,7 +271,7 @@ export async function writeDeliveryLog(params: {
     studentNumber?: string | null;
     studentName?: string | null;
     lineUserId: string;
-    deliveryType: 'broadcast' | 'step_message' | 'test_preview' | 'cart_recovery' | 'confirm_abandon_recovery' | 'direct_chat';
+    deliveryType: 'broadcast' | 'step_message' | 'test_preview' | 'cart_recovery' | 'confirm_abandon_recovery' | 'inactive_follow_recovery' | 'direct_chat';
     campaignId?: string | null;
     stepId?: string | null;
     stepName?: string | null;
@@ -1766,6 +1766,414 @@ export async function processCartAbandonmentReminders(
         details,
     };
 }
+
+// ==============================================================================
+// 12. 友だち追加後1時間 未アクション（リッチメニュー未操作・未返信）自動フォロー機能
+// ==============================================================================
+
+export const DEFAULT_INACTIVE_FOLLOW_RECOVERY_TEMPLATE = `{{name}} 様
+
+スイムパートナーズ公式LINEへご登録いただき、誠にありがとうございます！🏊‍♂️
+
+「体験レッスンはどのような流れ？」「泳げない初心者や子どもでも大丈夫？」など、気になる点やご不安なことはございませんでしょうか？
+
+どんな些細なことでも構いませんので、こちらのトークルームにそのままお気軽にご返信ください😊
+専門の担当者が丁寧にご相談に乗らせていただきます！
+
+▼ 体験レッスンのお申し込み・空き状況の確認はこちら
+https://crm.swim-partners.com/booking/trial`;
+
+export interface ProcessInactiveFollowOptions {
+    dryRun?: boolean;
+    nowDate?: Date;
+    targetLineUserId?: string; // 特定ユーザー指定実行用
+    forceSend?: boolean; // 時間帯チェック・経過時間チェック等の強制バイパス
+}
+
+export interface ProcessInactiveFollowResult {
+    processedCount: number;
+    successCount: number;
+    skippedCount: number;
+    failedCount: number;
+    isOutsideHours?: boolean;
+    mode: 'active' | 'test_only';
+    details: Array<{
+        lineUserId: string;
+        studentName?: string;
+        action: 'sent' | 'skipped' | 'failed';
+        reason?: string;
+        elapsedMinutes?: number;
+    }>;
+}
+
+/**
+ * 友だち追加後、1時間経過してもリッチメニュー操作・メッセージ・フォーム閲覧がない未アクションユーザーへ
+ * 自動的にフォローメッセージを送信する処理
+ */
+export async function processInactiveFollowRecovery(
+    options: ProcessInactiveFollowOptions = {}
+): Promise<ProcessInactiveFollowResult> {
+    const { dryRun = false, nowDate = new Date(), targetLineUserId, forceSend = false } = options;
+    const supabase = createAdminClient();
+
+    // 1. 配信時間帯ガード判定 (JST 8:30〜21:30: 迷惑にならない時間帯に限定)
+    const jstDate = new Date(nowDate.getTime() + 9 * 60 * 60 * 1000);
+    const jstHour = jstDate.getUTCHours();
+    const jstMinute = jstDate.getUTCMinutes();
+    const jstMinutesOfDay = jstHour * 60 + jstMinute;
+
+    // 8:30 = 510分, 21:30 = 1290分
+    if (!forceSend && (jstMinutesOfDay < 510 || jstMinutesOfDay > 1290)) {
+        console.log(`[InactiveFollowRecovery] JST時間帯ガード作動: 現在JST ${jstHour}:${String(jstMinute).padStart(2, '0')}のため配信を停止します（配信許可: 8:30〜21:30）`);
+        return {
+            processedCount: 0,
+            successCount: 0,
+            skippedCount: 0,
+            failedCount: 0,
+            isOutsideHours: true,
+            mode: 'test_only',
+            details: [],
+        };
+    }
+
+    // 2. 稼働モードの取得（デフォルト: active で稼働）
+    const { data: modeConfig } = await supabase
+        .from('app_configs')
+        .select('value')
+        .eq('key', 'line_inactive_follow_recovery_mode')
+        .maybeSingle();
+
+    const rawMode = modeConfig?.value?.trim().toLowerCase();
+    // 明示的に inactive や test_only でなければ active
+    const recoveryMode = rawMode === 'test_only' ? 'test_only' : 'active';
+    const isTestOnly = recoveryMode === 'test_only';
+
+    // 3. メッセージテンプレート取得
+    const { data: templateConfig } = await supabase
+        .from('app_configs')
+        .select('value')
+        .eq('key', 'line_inactive_follow_recovery_template')
+        .maybeSingle();
+
+    const templateText = templateConfig?.value?.trim() || DEFAULT_INACTIVE_FOLLOW_RECOVERY_TEMPLATE;
+
+    // 4. 全ユーザータグの取得
+    const allUserTags = await getAllUserTags();
+    const userTagsMap = new Map<string, Set<string>>();
+    for (const tag of allUserTags) {
+        if (!tag.line_user_id) continue;
+        let set = userTagsMap.get(tag.line_user_id);
+        if (!set) {
+            set = new Set<string>();
+            userTagsMap.set(tag.line_user_id, set);
+        }
+        set.add(tag.tag_name);
+    }
+
+    // 5. 候補者（friend_only ステータスの生徒）を取得
+    let studentQuery = supabase
+        .from('students')
+        .select('id, full_name, line_user_id, status, created_at, notes')
+        .eq('status', 'friend_only')
+        .not('line_user_id', 'is', null);
+
+    if (targetLineUserId) {
+        studentQuery = studentQuery.eq('line_user_id', targetLineUserId);
+    }
+
+    const { data: candidates, error: candError } = await studentQuery;
+
+    if (candError) {
+        console.error('[InactiveFollowRecovery] Failed to fetch candidates:', candError);
+        return {
+            processedCount: 0,
+            successCount: 0,
+            skippedCount: 0,
+            failedCount: 0,
+            mode: recoveryMode,
+            details: [],
+        };
+    }
+
+    let successCount = 0;
+    let skippedCount = 0;
+    let failedCount = 0;
+    const details: ProcessInactiveFollowResult['details'] = [];
+
+    const nowTime = nowDate.getTime();
+
+    for (const student of candidates || []) {
+        const lineUserId = student.line_user_id;
+        const studentName = student.full_name || '公式LINE友だち';
+        if (!lineUserId) continue;
+
+        // A. テストモード制限（test_only 時は 会員番号0035 または TEST_TARO 以外スキップ）
+        if (isTestOnly && !forceSend && lineUserId !== TEST_TARO_LINE_USER_ID) {
+            skippedCount++;
+            details.push({
+                lineUserId,
+                studentName,
+                action: 'skipped',
+                reason: 'test_onlyモードのためスキップ（テスト対象外）',
+            });
+            continue;
+        }
+
+        // B. 既に送信済みかチェック
+        const tags = userTagsMap.get(lineUserId) || new Set<string>();
+        if (!forceSend && tags.has(STANDARD_TAGS.INACTIVE_FOLLOW_RECOVERY_SENT)) {
+            skippedCount++;
+            details.push({
+                lineUserId,
+                studentName,
+                action: 'skipped',
+                reason: '既に友だち追加1時間後フォローを送信済み',
+            });
+            continue;
+        }
+
+        // C. 既に申込完了または体験受講済みかチェック
+        if (!forceSend && (tags.has(STANDARD_TAGS.FORM_APPLIED) || tags.has(STANDARD_TAGS.TRIAL_DONE))) {
+            skippedCount++;
+            details.push({
+                lineUserId,
+                studentName,
+                action: 'skipped',
+                reason: '既に申込・受講済みのためスキップ',
+            });
+            continue;
+        }
+
+        // D. フォーム閲覧中・確認画面到達（カゴ落ちフォロー対象）かチェック
+        if (!forceSend && (tags.has(STANDARD_TAGS.FORM_VIEWED) || tags.has(STANDARD_TAGS.FORM_CONFIRMED))) {
+            skippedCount++;
+            details.push({
+                lineUserId,
+                studentName,
+                action: 'skipped',
+                reason: 'フォーム閲覧済み（カゴ落ちフォロー対象）のためスキップ',
+            });
+            continue;
+        }
+
+        // E. 経過時間の計算（友だち追加から1時間以上経過しているか）
+        const createdAtTime = new Date(student.created_at).getTime();
+        const elapsedMinutes = Math.floor((nowTime - createdAtTime) / (60 * 1000));
+
+        // 1時間（60分）未満の場合はまだ配信しない
+        if (!forceSend && elapsedMinutes < 60) {
+            skippedCount++;
+            details.push({
+                lineUserId,
+                studentName,
+                action: 'skipped',
+                reason: `友だち追加から1時間未経過（現在 ${elapsedMinutes}分経過）`,
+                elapsedMinutes,
+            });
+            continue;
+        }
+
+        // 3時間（180分）以上経過している過去ユーザーは違和感防止のためスキップ（直近の新規追加者に限定）
+        if (!forceSend && elapsedMinutes > 180) {
+            skippedCount++;
+            details.push({
+                lineUserId,
+                studentName,
+                action: 'skipped',
+                reason: `友だち追加から規定時間超過（現在 ${elapsedMinutes}分経過 / 180分超のためスキップ）`,
+                elapsedMinutes,
+            });
+            continue;
+        }
+
+        // F-1. ブロック中かチェック
+        const { data: stepConfig } = await supabase
+            .from('app_configs')
+            .select('value')
+            .eq('key', `line_step:${lineUserId}`)
+            .maybeSingle();
+
+        if (stepConfig?.value) {
+            try {
+                const parsed = JSON.parse(stepConfig.value);
+                if (parsed.is_blocked) {
+                    skippedCount++;
+                    details.push({
+                        lineUserId,
+                        studentName,
+                        action: 'skipped',
+                        reason: 'ブロック中のためスキップ',
+                        elapsedMinutes,
+                    });
+                    continue;
+                }
+            } catch {}
+        }
+
+        // F-2. アクティビティログで自発的アクション（メッセージ、リッチメニュー操作等）があるかチェック
+        const { data: userActs } = await supabase
+            .from('line_user_activities')
+            .select('activity_type')
+            .eq('line_user_id', lineUserId)
+            .in('activity_type', [
+                'message_text',
+                'message_sticker',
+                'message_media',
+                'postback_menu',
+                'postback_action',
+                'form_view',
+                'form_confirm',
+                'form_submit'
+            ])
+            .limit(1);
+
+        if (!forceSend && userActs && userActs.length > 0) {
+            skippedCount++;
+            details.push({
+                lineUserId,
+                studentName,
+                action: 'skipped',
+                reason: `自発的アクション確認済み (${userActs[0].activity_type}) のためスキップ`,
+                elapsedMinutes,
+            });
+            continue;
+        }
+
+        // F-3. 相手からのメッセージ送信履歴（個別チャット）があるかチェック
+        const { data: chatData } = await supabase
+            .from('app_configs')
+            .select('value')
+            .eq('key', `line_chat_history:${lineUserId}`)
+            .maybeSingle();
+
+        if (chatData?.value) {
+            try {
+                const history: any[] = JSON.parse(chatData.value);
+                const hasInboundUserMessage = history.some(m => m.direction === 'inbound' && m.senderType === 'user');
+                if (!forceSend && hasInboundUserMessage) {
+                    skippedCount++;
+                    details.push({
+                        lineUserId,
+                        studentName,
+                        action: 'skipped',
+                        reason: '顧客から既にメッセージを受信しているためスキップ',
+                        elapsedMinutes,
+                    });
+                    continue;
+                }
+            } catch {}
+        }
+
+        // G. シミュレーション（dryRun）の場合
+        if (dryRun) {
+            successCount++;
+            details.push({
+                lineUserId,
+                studentName,
+                action: 'sent',
+                reason: `[dry_run] 送信シミュレーション成功 (${elapsedMinutes}分経過)`,
+                elapsedMinutes,
+            });
+            continue;
+        }
+
+        // H. 実際のLINE送信処理
+        const personalizedMessage = templateText
+            .replace(/\{\{name\}\}/g, studentName)
+            .replace(/\{\{student_name\}\}/g, studentName);
+
+        const sendResult = await sendSingleLineMessage({
+            studentId: student?.id,
+            studentName,
+            lineUserId,
+            rawMessage: templateText,
+            variables: {
+                name: studentName,
+                student_name: studentName,
+            },
+            deliveryType: 'inactive_follow_recovery',
+            campaignId: 'inactive_follow_recovery_1h',
+            stepName: '友だち追加1時間後 未アクションフォロー',
+        });
+
+        if (sendResult.success) {
+            successCount++;
+
+            // 1. タグ付与
+            await addTagToUser(lineUserId, STANDARD_TAGS.INACTIVE_FOLLOW_RECOVERY_SENT, {
+                category: 'automation',
+                displayName: studentName,
+                metadata: {
+                    sent_at: new Date().toISOString(),
+                    elapsed_minutes: elapsedMinutes,
+                }
+            });
+
+            // 2. チャット履歴へアウトバウンドメッセージとして記録
+            try {
+                const { recordLineChatMessage } = await import('@/lib/line-chat-service');
+                await recordLineChatMessage({
+                    lineUserId,
+                    displayName: studentName,
+                    direction: 'outbound',
+                    senderType: 'system_auto',
+                    messageType: 'text',
+                    messageText: personalizedMessage,
+                    senderLabel: '追加1時間フォロー自動配信',
+                    isRead: true,
+                    status: 'sent',
+                });
+            } catch (chatErr) {
+                console.warn('[InactiveFollowRecovery] Failed to record chat message:', chatErr);
+            }
+
+            // 3. アクティビティログへ行動監視記録
+            try {
+                const { recordUserActivity } = await import('@/lib/line-tracking-service');
+                await recordUserActivity({
+                    lineUserId,
+                    displayName: studentName,
+                    activityType: 'message_text',
+                    activityTitle: '友だち追加1時間後 未アクション自動フォロー配信',
+                    activityDetail: personalizedMessage,
+                    metadata: { elapsed_minutes: elapsedMinutes }
+                });
+            } catch (actErr) {
+                console.warn('[InactiveFollowRecovery] Failed to record activity log:', actErr);
+            }
+
+            console.log(`[InactiveFollowRecovery] Sent 1-hour follow to: ${studentName} (${lineUserId}, ${elapsedMinutes}m elapsed)`);
+
+            details.push({
+                lineUserId,
+                studentName,
+                action: 'sent',
+                elapsedMinutes,
+            });
+        } else {
+            failedCount++;
+            details.push({
+                lineUserId,
+                studentName,
+                action: 'failed',
+                reason: sendResult.error,
+                elapsedMinutes,
+            });
+        }
+
+        await new Promise(r => setTimeout(r, 80));
+    }
+
+    return {
+        processedCount: (candidates || []).length,
+        successCount,
+        skippedCount,
+        failedCount,
+        mode: recoveryMode,
+        details,
+    };
+}
+
 
 // ==============================================================================
 // 15. フォーム確認後未申込（ホット離脱者）即時自動フォロー処理

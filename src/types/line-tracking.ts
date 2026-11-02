@@ -61,3 +61,39 @@ export interface RecordAccessParams {
     userAgent?: string | null;
     metadata?: Record<string, any>;
 }
+
+/**
+ * LINE友だち追加後の行動・アクティビティ監視 型定義
+ */
+export type LineActivityType =
+    | 'follow'            // 友だち追加
+    | 'unfollow'          // ブロック（友だち解除）
+    | 'message_text'      // テキストメッセージ送信
+    | 'message_sticker'   // スタンプ送信
+    | 'message_media'     // 画像・動画・音声・ファイル送信
+    | 'postback'          // リッチメニュー・ボタンタップ
+    | 'form_view'         // フォーム閲覧 (LIFF)
+    | 'form_confirm'      // フォーム確認画面到達 (LIFF)
+    | 'form_apply'        // 体験レッスン申込完了 (LIFF)
+    | 'form_abandon';     // フォーム離脱
+
+export interface LineUserActivity {
+    id: string;
+    created_at: string;
+    line_user_id: string;
+    display_name?: string | null;
+    activity_type: LineActivityType;
+    activity_title: string;          // 表示用タイトル（例: 「友だち追加」「メッセージ送信」「リッチメニュータップ」）
+    activity_detail?: string | null; // 詳細内容（メッセージ本文、スタンプ名、URL、ポストバック値など）
+    metadata?: Record<string, any>;
+}
+
+export interface ActivityKpiSummary {
+    totalActivities: number;
+    todayActivities: number;
+    followCount: number;
+    messageCount: number;
+    formViewCount: number;
+    postbackCount: number;
+}
+

@@ -177,10 +177,47 @@ export async function POST(req: NextRequest) {
             // A. 友だち追加イベント (follow)
             if (event.type === 'follow' && lineUserId) {
                 console.log(`[LINE Webhook] Follow event received from user: ${lineUserId}, destination: ${destination}`)
-                if (isOfficialBot) {
+                try {
                     const activeAccessToken = coachAccessToken || CHANNEL_ACCESS_TOKEN
                     const displayName = await getLineUserProfile(lineUserId, activeAccessToken)
-                    await handleOfficialLineFollow(lineUserId, displayName)
+                    
+                    // 1. 行動アクティビティログへ記録
+                    const { recordUserActivity, addTagToUser, STANDARD_TAGS } = await import('@/lib/line-tracking-service')
+                    await recordUserActivity({
+                        lineUserId,
+                        displayName,
+                        activityType: 'follow',
+                        activityTitle: '公式LINEを友だち追加しました',
+                        activityDetail: `ボット: ${botName} (${destination || '公式'})`,
+                        metadata: { destination, bot_name: botName }
+                    })
+
+                    // 2. 友だち追加のみタグ (friend_only) を付与
+                    await addTagToUser(lineUserId, STANDARD_TAGS.FRIEND_ONLY, {
+                        category: 'status',
+                        displayName: displayName || undefined,
+                        metadata: { followed_at: new Date().toISOString() }
+                    })
+
+                    // 3. 個別チャット履歴へシステムメッセージとして記録
+                    const { recordLineChatMessage } = await import('@/lib/line-chat-service')
+                    await recordLineChatMessage({
+                        lineUserId,
+                        displayName,
+                        direction: 'inbound',
+                        senderType: 'system_auto',
+                        messageType: 'text',
+                        messageText: '【公式LINEを友だち追加しました】',
+                        senderLabel: displayName ? `${displayName} (友だち追加)` : '公式LINE友だち追加',
+                        isRead: true,
+                        status: 'received',
+                    })
+
+                    if (isOfficialBot) {
+                        await handleOfficialLineFollow(lineUserId, displayName)
+                    }
+                } catch (followErr) {
+                    console.error('[LINE Webhook] Error in follow monitoring handler:', followErr)
                 }
                 continue
             }
@@ -188,13 +225,84 @@ export async function POST(req: NextRequest) {
             // B. ブロック（友だち解除）イベント (unfollow)
             if (event.type === 'unfollow' && lineUserId) {
                 console.log(`[LINE Webhook] Unfollow event received from user: ${lineUserId}`)
-                if (isOfficialBot) {
-                    await handleOfficialLineUnfollow(lineUserId)
+                try {
+                    // 1. 行動アクティビティログへ記録
+                    const { recordUserActivity } = await import('@/lib/line-tracking-service')
+                    await recordUserActivity({
+                        lineUserId,
+                        activityType: 'unfollow',
+                        activityTitle: '公式LINEをブロック（友だち解除）しました',
+                        activityDetail: `ボット: ${botName}`,
+                        metadata: { destination, bot_name: botName }
+                    })
+
+                    // 2. 個別チャット履歴へシステムメッセージとして記録
+                    const { recordLineChatMessage } = await import('@/lib/line-chat-service')
+                    await recordLineChatMessage({
+                        lineUserId,
+                        direction: 'inbound',
+                        senderType: 'system_auto',
+                        messageType: 'text',
+                        messageText: '【公式LINEをブロック（友だち解除）しました】',
+                        senderLabel: 'ブロック検知',
+                        isRead: true,
+                        status: 'received',
+                    })
+
+                    if (isOfficialBot) {
+                        await handleOfficialLineUnfollow(lineUserId)
+                    }
+                } catch (unfollowErr) {
+                    console.error('[LINE Webhook] Error in unfollow monitoring handler:', unfollowErr)
                 }
                 continue
             }
 
-            // C-0. スタンプ・画像等の非テキストメッセージも1対1チャット履歴に記録
+            // B-2. リッチメニュー・ボタン等のタップイベント (postback)
+            if (event.type === 'postback' && lineUserId) {
+                try {
+                    const postbackData = event.postback?.data || ''
+                    const postbackParams = event.postback?.params || null
+                    const activeAccessToken = coachAccessToken || CHANNEL_ACCESS_TOKEN
+                    const displayName = await getLineUserProfile(lineUserId, activeAccessToken)
+
+                    console.log(`[LINE Webhook] Postback event: ${postbackData} from ${lineUserId}`)
+
+                    // 1. 行動アクティビティログへ記録
+                    const { recordUserActivity } = await import('@/lib/line-tracking-service')
+                    await recordUserActivity({
+                        lineUserId,
+                        displayName,
+                        activityType: 'postback',
+                        activityTitle: 'リッチメニュー・ボタンをタップしました',
+                        activityDetail: postbackData || 'ボタンタップ（パラメータなし）',
+                        metadata: {
+                            data: postbackData,
+                            params: postbackParams,
+                            bot_name: botName
+                        }
+                    })
+
+                    // 2. 個別チャット履歴へシステムメッセージとして記録
+                    const { recordLineChatMessage } = await import('@/lib/line-chat-service')
+                    await recordLineChatMessage({
+                        lineUserId,
+                        displayName,
+                        direction: 'inbound',
+                        senderType: 'user',
+                        messageType: 'text',
+                        messageText: `【ボタンタップ】${postbackData}`,
+                        senderLabel: displayName ? `${displayName} (操作)` : 'ボタンタップ',
+                        isRead: false,
+                        status: 'received',
+                    })
+                } catch (postbackErr) {
+                    console.error('[LINE Webhook] Error in postback monitoring handler:', postbackErr)
+                }
+                continue
+            }
+
+            // C-0. スタンプ・画像等の非テキストメッセージも1対1チャット履歴および行動監視ログに記録
             if (event.type === 'message' && event.message && event.message.type !== 'text' && lineUserId) {
                 try {
                     const activeAccessToken = coachAccessToken || CHANNEL_ACCESS_TOKEN
@@ -208,6 +316,18 @@ export async function POST(req: NextRequest) {
                     const nonTextSenderLabel = isOfficialBot
                         ? (displayName || '公式LINEユーザー')
                         : (displayName ? `${displayName} (${botName})` : `顧客 (${botName})`)
+
+                    // 行動監視アクティビティログへ記録
+                    const { recordUserActivity } = await import('@/lib/line-tracking-service')
+                    await recordUserActivity({
+                        lineUserId,
+                        displayName,
+                        activityType: event.message.type === 'sticker' ? 'message_sticker' : 'message_media',
+                        activityTitle: event.message.type === 'sticker' ? 'スタンプを送信しました' : `${event.message.type}を送信しました`,
+                        activityDetail: labelText,
+                        metadata: { messageType: event.message.type, messageId: event.message.id }
+                    })
+
                     const { recordLineChatMessage } = await import('@/lib/line-chat-service')
                     await recordLineChatMessage({
                         lineUserId,
@@ -229,6 +349,25 @@ export async function POST(req: NextRequest) {
             if (event.type === 'message' && event.message && event.message.type === 'text') {
                 const messageText = event.message.text
                 const direction = event.source.type === 'user' ? 'customer_to_coach' : 'coach_to_customer'
+
+                // 行動監視アクティビティログへ記録
+                if (lineUserId && direction === 'customer_to_coach') {
+                    try {
+                        const activeAccessToken = coachAccessToken || CHANNEL_ACCESS_TOKEN
+                        const displayName = await getLineUserProfile(lineUserId, activeAccessToken)
+                        const { recordUserActivity } = await import('@/lib/line-tracking-service')
+                        await recordUserActivity({
+                            lineUserId,
+                            displayName,
+                            activityType: 'message_text',
+                            activityTitle: 'メッセージを送信しました',
+                            activityDetail: messageText,
+                            metadata: { messageId: event.message.id }
+                        })
+                    } catch (actErr) {
+                        console.warn('[LINE Webhook] Activity record error for message:', actErr)
+                    }
+                }
 
                 // 事務局公式LINE宛てのメッセージの場合、ステップ配信を即時停止＆管理者通知（内部でチャット履歴にも保存）
                 if (isOfficialBot && lineUserId && direction === 'customer_to_coach') {

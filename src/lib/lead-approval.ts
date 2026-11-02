@@ -1,5 +1,4 @@
 import { createAdminClient } from '@/lib/supabase/admin'
-import { dispatchNewLeadToMatchingCoaches } from '@/lib/coach-matching'
 import { autoDetectLocationForLead } from '@/lib/location-matcher'
 import { sendGoogleChatMessage } from '@/lib/google-chat'
 
@@ -82,33 +81,59 @@ export async function approveAndDispatchLead(
             })
             .eq('id', leadId)
 
-        // 4. マッチングコーチの個別スペースへ配信
+        // 4. 通知配信の実行
+        // ※ 案件通知の二重送信を防止するため、1つ目の個別優先案内は送信せず、
+        //    2つ目の「新規レッスン案件のお知らせ」のみを「コーチとの連絡スペース」に送信します。
         let sentIndividualCount = 0
-        try {
-            const dispatchRes = await dispatchNewLeadToMatchingCoaches(leadId, { siteUrl })
-            if (dispatchRes.success) {
-                sentIndividualCount = dispatchRes.sentCount
-            }
-        } catch (indErr) {
-            console.error('[approveAndDispatchLead] Error in dispatchNewLeadToMatchingCoaches:', indErr)
-        }
-
-        // 5. 全体募集用 Google Chat スペースへの一斉通知
         let sentGeneralCount = 0
+
         try {
-            // activeなWebhookを取得（案件共有・エリア共有スペースなど）
+            // アクティブなコーチ一覧を取得
+            const { data: coaches } = await supabase
+                .from('profiles')
+                .select('id, full_name')
+                .eq('role', 'coach')
+                .eq('status', 'active')
+
+            const coachNames = (coaches || [])
+                .map((c: any) => c.full_name?.replace(/[\s　]+/g, ''))
+                .filter(Boolean)
+
+            // activeなWebhookを取得
             const { data: webhooks } = await supabase
                 .from('google_chat_webhooks')
                 .select('id, webhook_url, space_name')
                 .eq('active', true)
 
-            // 有効なWebhook URLかつ設定用レコードや申込通知専用スペースを除外
-            const targetWebhooks = (webhooks || []).filter(wh => 
-                wh.webhook_url?.startsWith('http') && 
-                !wh.space_name.startsWith('SP_') &&
-                !wh.space_name.includes('公式ライン') &&
-                !wh.space_name.includes('SP-Tracker')
-            )
+            // コーチ連絡スペースの判定関数（エリアスペースやテスト用スペースを除外）
+            const isCoachSpace = (name: string) => {
+                if (!name) return false
+                // システム・テスト・エリア用スペースは明確に除外
+                if (
+                    name.includes('テスト') ||
+                    name.startsWith('SP_') ||
+                    name.includes('SP-Tracker') ||
+                    name.includes('公式ライン') ||
+                    name.includes('エリア')
+                ) {
+                    return false
+                }
+                // スペース名に「コーチ」が含まれているか、または登録コーチ名（フルネーム・姓）が含まれていること
+                if (name.includes('コーチ')) return true
+                return coachNames.some((cn: string) =>
+                    name.includes(cn) || (cn.length >= 2 && name.includes(cn.substring(0, 2)))
+                )
+            }
+
+            // コーチとの連絡スペースのみを抽出し、同一URLへの重複送信を防止
+            const seenUrls = new Set<string>()
+            const targetWebhooks = (webhooks || []).filter(wh => {
+                if (!wh.webhook_url?.startsWith('http')) return false
+                if (!isCoachSpace(wh.space_name)) return false
+                if (seenUrls.has(wh.webhook_url)) return false
+                seenUrls.add(wh.webhook_url)
+                return true
+            })
 
             if (targetWebhooks.length > 0) {
                 // 通知テンプレート取得

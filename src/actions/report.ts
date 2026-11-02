@@ -661,6 +661,21 @@ export async function updateLessonReport(lessonId: string, values: FormValues) {
             return { success: false, error: 'DBエラー: ' + error.message }
         }
 
+        // Googleスプレッドシートへのレッスン報告記録（非ブロッキング）
+        await recordLessonReportToSpreadsheetAsync({
+            lessonId,
+            lessonDate: data.lesson_date,
+            coachId: lesson?.coach_id || user.id,
+            studentId: data.student_id,
+            studentName: data.student_name,
+            lessonMasterId: data.lesson_master_id,
+            location: data.location,
+            price: data.price,
+            billingPrice,
+            attendanceType: data.attendance_type || 'both',
+            menuDescription: data.menu_description || '',
+        })
+
         revalidatePath('/admin/reports')
         revalidatePath('/admin/finance/payouts')
         revalidatePath('/coach')

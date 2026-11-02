@@ -15,6 +15,7 @@
  *   4. 【最重要安全制御】本入会（status: active）または退会（status: withdrawn）生徒の安全自動スキップ
  *   5. カゴ落ち自動フォロー（フォーム閲覧後離脱者）の実行
  *   6. フォーム確認後未申込（ホット離脱者）即時自動フォローの実行
+ *   7. 友だち追加後1時間未アクション自動フォローの実行
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -24,6 +25,7 @@ import {
     syncTrialDoneStudentsToProgress,
     processCartAbandonmentReminders,
     processConfirmAbandonmentReminders,
+    processInactiveFollowRecovery,
 } from '@/lib/line-marketing-service';
 
 export const dynamic = 'force-dynamic';
@@ -66,6 +68,14 @@ async function runMarketingDispatcher(options: { dryRun?: boolean } = {}) {
         console.error('[Dispatcher] Error in processConfirmAbandonmentReminders:', confirmRecoveryErr);
     }
 
+    // 7. 友だち追加後1時間未アクション自動フォローの判定・実行
+    let inactiveFollowResult: any = null;
+    try {
+        inactiveFollowResult = await processInactiveFollowRecovery({ dryRun });
+    } catch (inactiveFollowErr) {
+        console.error('[Dispatcher] Error in processInactiveFollowRecovery:', inactiveFollowErr);
+    }
+
     return {
         dryRun,
         timestamp: nowIso,
@@ -75,6 +85,7 @@ async function runMarketingDispatcher(options: { dryRun?: boolean } = {}) {
         leadStepReminders: leadStepResult,
         cartRecovery: cartRecoveryResult,
         confirmRecovery: confirmRecoveryResult,
+        inactiveFollowRecovery: inactiveFollowResult,
     };
 }
 

@@ -365,8 +365,20 @@ export interface LessonReportSpreadsheetRow {
     createdAt?: string;
 }
 
-// レッスン報告用のデフォルトスプレッドシートID
+// レッスン報告用のデフォルトスプレッドシートIDおよびGAS Webhook URL
 export const DEFAULT_LESSON_REPORT_SPREADSHEET_ID = '1DLMYid10VpYGPoHWkpqXcIku92oVkZ4Y9aMMtVKxq4s';
+export const DEFAULT_LESSON_REPORT_GAS_WEBHOOK_URL = 'https://script.google.com/macros/s/AKfycbxyilztaTGRzzNKN6EWnmnJd4PpYE4Bpf1_VpzX6hlvJcz62TjUJQBgjoHVKfgrIAfu/exec';
+
+/**
+ * 出欠区分の表示文字列を日本語にフォーマット
+ */
+function formatAttendanceType(type?: string): string {
+    if (!type) return '通常';
+    if (type === 'both') return '通常';
+    if (type === 'student_only') return '生徒のみ（1名受講）';
+    if (type === 'absent') return '欠席';
+    return type;
+}
 
 /**
  * レッスン報告データをGoogleスプレッドシートに自動追記する
@@ -376,7 +388,7 @@ export async function appendLessonReportToSpreadsheet(
     data: LessonReportSpreadsheetRow,
     explicitSpreadsheetId?: string
 ): Promise<{ success: boolean; error?: string }> {
-    const gasWebhookUrl = process.env.LESSON_REPORT_GAS_WEBHOOK_URL;
+    const gasWebhookUrl = process.env.LESSON_REPORT_GAS_WEBHOOK_URL || DEFAULT_LESSON_REPORT_GAS_WEBHOOK_URL;
 
     // 1. GAS Webhook が設定されている場合は優先して送信（組織ポリシーの影響を受けない確実な連携）
     if (gasWebhookUrl) {
@@ -388,6 +400,7 @@ export async function appendLessonReportToSpreadsheet(
             const payload = {
                 ...data,
                 lessonDate: dateStr,
+                attendanceType: formatAttendanceType(data.attendanceType),
                 createdAt: data.createdAt || new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }),
             };
 
@@ -482,7 +495,7 @@ export async function appendLessonReportToSpreadsheet(
             data.location || '',
             data.price ?? 0,
             data.billingPrice ?? 0,
-            data.attendanceType || '通常',
+            formatAttendanceType(data.attendanceType),
             data.menuDescription || '',
             data.createdAt || new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }),
         ];

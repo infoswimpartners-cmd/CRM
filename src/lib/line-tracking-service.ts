@@ -14,7 +14,10 @@ import {
     LineUserTag,
     TrackingKpiSummary,
     TagSummaryItem,
-    RecordAccessParams
+    RecordAccessParams,
+    LineActivityType,
+    LineUserActivity,
+    ActivityKpiSummary,
 } from '@/types/line-tracking';
 
 // 定数: デフォルト標準タグ
@@ -27,6 +30,7 @@ export const STANDARD_TAGS = {
     REFERRAL: 'referral_lead',             // お友達紹介キャンペーン経由
     CART_RECOVERY_SENT: 'cart_recovery_sent', // カゴ落ちフォロー送信済
     CONFIRM_ABANDON_RECOVERY_SENT: 'confirm_abandon_recovery_sent', // フォーム確認後未申込の即時フォロー送信済
+    INACTIVE_FOLLOW_RECOVERY_SENT: 'inactive_follow_recovery_sent', // 友だち追加1時間後未アクションフォロー送信済
     TRIAL_FOLLOWUP_SENT: 'trial_followup_sent', // 体験レッスン終了後フォロー送信済
     AUDIENCE_KIDS: 'audience:kids',        // 対象: キッズ/ジュニア
     AUDIENCE_ADULT: 'audience:adult',      // 対象: 大人/マスターズ
@@ -72,6 +76,11 @@ export const TAG_LABELS: Record<string, { label: string; category: string; descr
         label: '確認後即時フォロー送信済',
         category: 'automation',
         description: 'フォーム確認後未申込の離脱者へ即時フォローメッセージを送信完了したユーザー'
+    },
+    [STANDARD_TAGS.INACTIVE_FOLLOW_RECOVERY_SENT]: {
+        label: '追加1時間フォロー送信済',
+        category: 'automation',
+        description: '友だち追加後1時間未アクションのユーザーへ自動フォローメッセージを送信完了したユーザー'
     },
     [STANDARD_TAGS.TRIAL_FOLLOWUP_SENT]: {
         label: '体験後フォロー送信済',
@@ -167,6 +176,22 @@ export async function recordAccessLog(params: RecordAccessParams): Promise<LineA
                     metadata: { referrer_name: params.referrerName }
                 });
             }
+
+            // 3. アクティビティログへの行動監視記録
+            const isConfirm = params.step === 'confirm' || params.formType === 'trial_confirm';
+            await recordUserActivity({
+                lineUserId: params.lineUserId,
+                displayName: params.displayName || undefined,
+                activityType: isConfirm ? 'form_confirm' : 'form_view',
+                activityTitle: isConfirm ? '体験申込フォーム確認画面を閲覧' : '体験申込フォームを閲覧 (LIFF)',
+                activityDetail: params.pageUrl || `フォーム種別: ${params.formType}${params.referrerName ? ` (紹介者: ${params.referrerName})` : ''}`,
+                metadata: {
+                    form_type: params.formType,
+                    referrer_name: params.referrerName || null,
+                    page_url: params.pageUrl || null,
+                    utm_source: params.utmSource || null,
+                }
+            });
         } catch (tagErr) {
             console.error('[LineTrackingService] Tag assign error on access:', tagErr);
         }
@@ -271,6 +296,15 @@ export async function markConversionForUser(
                 metadata: { referrer_name: referrerName }
             });
         }
+
+        // 3. アクティビティログへの行動監視記録
+        await recordUserActivity({
+            lineUserId,
+            activityType: 'form_apply',
+            activityTitle: '体験レッスンの申込を完了 (CV)',
+            activityDetail: referrerName ? `ご紹介者様: ${referrerName}` : '体験予約フォームより正式申込完了',
+            metadata: { student_id: studentId || null, referrer_name: referrerName || null }
+        });
     } catch (tagErr) {
         console.error('[LineTrackingService] Failed to assign trial_applied tag:', tagErr);
     }
@@ -796,3 +830,171 @@ async function fallbackGetTrackingKpiSummary(limit: number): Promise<TrackingKpi
         };
     }
 }
+
+// ==============================================================================
+// 7. LINE友だち追加後の行動・アクティビティ全監視システム
+// ==============================================================================
+
+const FALLBACK_ACTIVITIES_KEY = 'line_user_activities_v1';
+const MAX_GLOBAL_ACTIVITIES = 1000;
+const MAX_USER_ACTIVITIES = 50;
+
+/**
+ * LINE友だちのアクション（友だち追加、メッセージ、スタンプ、ボタンタップ、フォーム閲覧等）を記録
+ */
+export async function recordUserActivity(params: {
+    lineUserId: string;
+    displayName?: string | null;
+    activityType: LineActivityType;
+    activityTitle: string;
+    activityDetail?: string | null;
+    metadata?: Record<string, any>;
+}): Promise<LineUserActivity> {
+    const supabase = createAdminClient();
+    const now = new Date().toISOString();
+    const id = crypto.randomUUID();
+
+    const activity: LineUserActivity = {
+        id,
+        created_at: now,
+        line_user_id: params.lineUserId,
+        display_name: params.displayName || null,
+        activity_type: params.activityType,
+        activity_title: params.activityTitle,
+        activity_detail: params.activityDetail || null,
+        metadata: params.metadata || {},
+    };
+
+    try {
+        // 1. 全体アクティビティログへの保存
+        const { data } = await supabase
+            .from('app_configs')
+            .select('value')
+            .eq('key', FALLBACK_ACTIVITIES_KEY)
+            .maybeSingle();
+
+        const activities: LineUserActivity[] = data?.value ? JSON.parse(data.value) : [];
+        activities.unshift(activity);
+
+        // 上限数でスライス
+        const trimmed = activities.slice(0, MAX_GLOBAL_ACTIVITIES);
+
+        await supabase
+            .from('app_configs')
+            .upsert({
+                key: FALLBACK_ACTIVITIES_KEY,
+                value: JSON.stringify(trimmed),
+                description: 'LINE友だちの全行動・監視アクティビティログ（最新1000件）'
+            }, { onConflict: 'key' });
+
+        // 2. 個別ユーザー単位のインデックスにも保存（高速タイムライン用）
+        const userKey = `line_user_activities:${params.lineUserId}`;
+        const { data: userData } = await supabase
+            .from('app_configs')
+            .select('value')
+            .eq('key', userKey)
+            .maybeSingle();
+
+        const userActs: LineUserActivity[] = userData?.value ? JSON.parse(userData.value) : [];
+        userActs.unshift(activity);
+        const userTrimmed = userActs.slice(0, MAX_USER_ACTIVITIES);
+
+        await supabase
+            .from('app_configs')
+            .upsert({
+                key: userKey,
+                value: JSON.stringify(userTrimmed),
+                description: `LINEユーザー ${params.lineUserId} の個別行動タイムライン`
+            }, { onConflict: 'key' });
+
+        console.log(`[LineActivity] Recorded: [${activity.activity_type}] ${activity.display_name || activity.line_user_id} - ${activity.activity_title}`);
+    } catch (e) {
+        console.error('[LineActivity] Failed to record user activity:', e);
+    }
+
+    return activity;
+}
+
+/**
+ * 全ユーザーのアクティビティ履歴を取得
+ */
+export async function getUserActivities(
+    limit = 100,
+    filterType?: string
+): Promise<LineUserActivity[]> {
+    const supabase = createAdminClient();
+    try {
+        const { data } = await supabase
+            .from('app_configs')
+            .select('value')
+            .eq('key', FALLBACK_ACTIVITIES_KEY)
+            .maybeSingle();
+
+        if (!data?.value) return [];
+        let activities: LineUserActivity[] = JSON.parse(data.value);
+
+        if (filterType && filterType !== 'all') {
+            activities = activities.filter(a => a.activity_type === filterType);
+        }
+
+        return activities.slice(0, limit);
+    } catch (e) {
+        console.error('[LineActivity] Failed to get user activities:', e);
+        return [];
+    }
+}
+
+/**
+ * 特定ユーザーの個別行動タイムラインを取得
+ */
+export async function getUserActivitiesByUserId(
+    lineUserId: string,
+    limit = 50
+): Promise<LineUserActivity[]> {
+    if (!lineUserId) return [];
+    const supabase = createAdminClient();
+    try {
+        const userKey = `line_user_activities:${lineUserId}`;
+        const { data } = await supabase
+            .from('app_configs')
+            .select('value')
+            .eq('key', userKey)
+            .maybeSingle();
+
+        if (data?.value) {
+            const list: LineUserActivity[] = JSON.parse(data.value);
+            return list.slice(0, limit);
+        }
+
+        // 個別キーにない場合は全体からフィルタ
+        const all = await getUserActivities(500);
+        return all.filter(a => a.line_user_id === lineUserId).slice(0, limit);
+    } catch (e) {
+        console.error('[LineActivity] Failed to get user activities by userId:', e);
+        return [];
+    }
+}
+
+/**
+ * アクティビティ集計KPIサマリーを取得
+ */
+export async function getActivityKpiSummary(): Promise<ActivityKpiSummary> {
+    const all = await getUserActivities(MAX_GLOBAL_ACTIVITIES);
+    const today = new Date().toISOString().split('T')[0];
+
+    const todayActivities = all.filter(a => a.created_at.startsWith(today)).length;
+    const followCount = all.filter(a => a.activity_type === 'follow').length;
+    const messageCount = all.filter(a => a.activity_type.startsWith('message_')).length;
+    const formViewCount = all.filter(a => a.activity_type === 'form_view' || a.activity_type === 'form_confirm').length;
+    const postbackCount = all.filter(a => a.activity_type === 'postback').length;
+
+    return {
+        totalActivities: all.length,
+        todayActivities,
+        followCount,
+        messageCount,
+        formViewCount,
+        postbackCount,
+    };
+}
+

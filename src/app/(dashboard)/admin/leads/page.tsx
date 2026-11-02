@@ -1029,7 +1029,7 @@ export default function AdminLeadsPage() {
             const res = await approveAndDispatchLeadAction(leadId, customLoc)
             if (res.success) {
                 toast.success(
-                    `コーチ陣へ案内を配信しました！（個別: ${res.sentIndividualCount}件 / 全体: ${res.sentGeneralCount}件）`
+                    `コーチ連絡スペースへ案件案内を配信しました！（${res.sentGeneralCount}件）`
                 )
                 await fetchData()
                 if (isEditDialogOpen && editingLeadId === leadId) {

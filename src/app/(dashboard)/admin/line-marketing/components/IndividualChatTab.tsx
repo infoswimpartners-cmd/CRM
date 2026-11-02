@@ -23,7 +23,9 @@ import {
     updateLineChatUserProfileAction,
     assignTagToUserAction,
     removeTagFromUserAction,
+    getUserActivitiesByUserIdAction,
 } from '@/actions/line-marketing';
+import { LineUserActivity } from '@/types/line-tracking';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -71,6 +73,7 @@ import {
     Volume2,
     VolumeX,
     Radio,
+    Activity,
 } from 'lucide-react';
 
 /**
@@ -261,6 +264,25 @@ export function IndividualChatTab({
     const [customTagInput, setCustomTagInput] = useState<string>('');
     const [isUpdatingTag, setIsUpdatingTag] = useState(false);
     const [copiedLineId, setCopiedLineId] = useState(false);
+    const [userActivities, setUserActivities] = useState<LineUserActivity[]>([]);
+    const [isLoadingActivities, setIsLoadingActivities] = useState(false);
+
+    // 選択中ユーザーの行動監視アクティビティ履歴を取得
+    useEffect(() => {
+        if (!selectedLineUserId) {
+            setUserActivities([]);
+            return;
+        }
+        setIsLoadingActivities(true);
+        getUserActivitiesByUserIdAction(selectedLineUserId)
+            .then((res) => {
+                if (res.success && res.activities) {
+                    setUserActivities(res.activities);
+                }
+            })
+            .catch((e) => console.error('[IndividualChatTab] Activities load error:', e))
+            .finally(() => setIsLoadingActivities(false));
+    }, [selectedLineUserId]);
 
     // リアルタイム自動更新・サウンド設定
     const [isAutoRefreshEnabled, setIsAutoRefreshEnabled] = useState(true);
@@ -1940,6 +1962,56 @@ export function IndividualChatTab({
                                         rows={4}
                                         className="text-xs bg-slate-50 dark:bg-slate-800"
                                     />
+                                </div>
+
+                                {/* 5. 友だち行動タイムライン（監視ログ） */}
+                                <div className="bg-white dark:bg-slate-900 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2.5 shadow-2xs">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                                            <Activity className="w-3.5 h-3.5 text-[#06C755]" />
+                                            友だち行動タイムライン
+                                        </span>
+                                        <Badge variant="secondary" className="text-[10px] font-mono">
+                                            {userActivities.length} 件
+                                        </Badge>
+                                    </div>
+
+                                    {isLoadingActivities ? (
+                                        <div className="py-4 text-center text-xs text-slate-400">
+                                            行動履歴を読み込み中...
+                                        </div>
+                                    ) : userActivities.length === 0 ? (
+                                        <div className="py-4 text-center text-[11px] text-slate-400">
+                                            記録された行動履歴はありません
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                                            {userActivities.map((act) => {
+                                                const d = new Date(act.created_at);
+                                                const timeStr = `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+                                                return (
+                                                    <div
+                                                        key={act.id}
+                                                        className="p-2 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-[11px] space-y-1"
+                                                    >
+                                                        <div className="flex items-center justify-between text-slate-500">
+                                                            <span className="font-semibold text-slate-800 dark:text-slate-200">
+                                                                {act.activity_title}
+                                                            </span>
+                                                            <span className="font-mono text-[10px] text-slate-400">
+                                                                {timeStr}
+                                                            </span>
+                                                        </div>
+                                                        {act.activity_detail && (
+                                                            <div className="text-[10px] text-slate-600 dark:text-slate-400 line-clamp-2 break-all bg-white dark:bg-slate-900 p-1 rounded border border-slate-100 dark:border-slate-800/80">
+                                                                {act.activity_detail}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}
