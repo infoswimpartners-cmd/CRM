@@ -28,11 +28,12 @@ export async function approveAndDispatchLead(
         // 1. リード情報の取得
         const { data: lead, error: leadError } = await supabase
             .from('leads')
-            .select('*, assigned_coach:profiles!leads_assigned_coach_id_fkey(name)')
+            .select('*')
             .eq('id', leadId)
             .single()
 
         if (leadError || !lead) {
+            console.error('[approveAndDispatchLead] Lead fetch error:', leadError)
             return {
                 success: false,
                 sentIndividualCount: 0,
@@ -44,7 +45,16 @@ export async function approveAndDispatchLead(
 
         // 既にアサイン済みの場合は配信を防止
         if (lead.assigned_coach_id) {
-            const coachName = (lead.assigned_coach as any)?.name || '他のコーチ'
+            let coachName = '他のコーチ'
+            const { data: coachProfile } = await supabase
+                .from('profiles')
+                .select('full_name')
+                .eq('id', lead.assigned_coach_id)
+                .maybeSingle()
+            if (coachProfile?.full_name) {
+                coachName = coachProfile.full_name
+            }
+
             return {
                 success: false,
                 alreadyAssigned: true,

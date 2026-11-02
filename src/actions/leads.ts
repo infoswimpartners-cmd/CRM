@@ -705,6 +705,7 @@ export async function sendLeadNotificationAction(
     webhookIds: string | string[]
 ) {
     const supabase = await createClient()
+    const supabaseAdmin = createAdminClient()
 
     try {
         const ids = (Array.isArray(webhookIds) ? webhookIds : [webhookIds]).filter(Boolean)
@@ -713,7 +714,7 @@ export async function sendLeadNotificationAction(
         }
 
         // リード情報の取得
-        const { data: lead, error: leadError } = await supabase
+        const { data: lead, error: leadError } = await supabaseAdmin
             .from('leads')
             .select('*')
             .eq('id', leadId)
@@ -724,7 +725,7 @@ export async function sendLeadNotificationAction(
         }
 
         // Webhook URLをすべて取得
-        const { data: webhooks, error: webhookError } = await supabase
+        const { data: webhooks, error: webhookError } = await supabaseAdmin
             .from('google_chat_webhooks')
             .select('id, webhook_url, space_name')
             .in('id', ids)
@@ -739,12 +740,11 @@ export async function sendLeadNotificationAction(
         // レッスン予定場所の選定（未入力の場合は顧客の希望エリアから自動選定）
         let finalLocation = location?.trim() || lead.lesson_location?.trim() || ''
         if (!finalLocation) {
-            const supabaseAdminForLoc = createAdminClient()
-            finalLocation = await autoDetectLocationForLead(supabaseAdminForLoc, lead.area)
+            finalLocation = await autoDetectLocationForLead(supabaseAdmin, lead.area)
         }
 
         // リードの場所を設定し、ステータスを「募集開始」に更新
-        const { error: updateError } = await supabase
+        const { error: updateError } = await supabaseAdmin
             .from('leads')
             .update({
                 lesson_location: finalLocation,
@@ -758,7 +758,6 @@ export async function sendLeadNotificationAction(
         }
 
         // 複数Webhook ID一覧を app_configs に保存
-        const supabaseAdmin = createAdminClient()
         await supabaseAdmin
             .from('app_configs')
             .upsert({
@@ -1324,7 +1323,8 @@ export async function adminAssignLeadAction(
         }
 
         // 2. リードの存在チェック
-        const { data: lead, error: leadError } = await supabase
+        const supabaseAdmin = createAdminClient()
+        const { data: lead, error: leadError } = await supabaseAdmin
             .from('leads')
             .select('*')
             .eq('id', leadId)
@@ -1333,8 +1333,6 @@ export async function adminAssignLeadAction(
         if (leadError || !lead) {
             throw new Error('案件が見つかりません')
         }
-
-        const supabaseAdmin = createAdminClient()
 
         // 旧アサインコーチの確認（再アサイン判定）
         const oldCoachId = lead.assigned_coach_id
@@ -1350,7 +1348,7 @@ export async function adminAssignLeadAction(
         }
 
         // 3. リードレコードをアサイン完了状態に更新
-        const { error: updateError } = await supabase
+        const { error: updateError } = await supabaseAdmin
             .from('leads')
             .update({
                 assigned_coach_id: targetCoach.id,
