@@ -426,49 +426,56 @@ export function AutomationScenariosTab() {
                                     </label>
                                     <div className="flex items-center gap-3">
                                         {editingScenario.id === 'lesson_report_feedback' ? (
-                                            <div className="grid grid-cols-3 gap-2 w-full text-xs">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setFormStatus('draft');
-                                                        setFormFeedbackMode('draft');
-                                                    }}
-                                                    className={`p-2 rounded-lg border text-center font-bold transition-all ${
-                                                        formFeedbackMode === 'draft'
-                                                            ? 'bg-amber-500 text-white border-amber-600 shadow-2xs'
-                                                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                                                    }`}
-                                                >
-                                                    📝 下書き保存 (準備中)
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setFormStatus('active');
-                                                        setFormFeedbackMode('auto_send');
-                                                    }}
-                                                    className={`p-2 rounded-lg border text-center font-bold transition-all ${
-                                                        formFeedbackMode === 'auto_send'
-                                                            ? 'bg-emerald-600 text-white border-emerald-700 shadow-2xs'
-                                                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                                                    }`}
-                                                >
-                                                    🚀 自動配信 (本番運用)
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setFormStatus('paused');
-                                                        setFormFeedbackMode('disabled');
-                                                    }}
-                                                    className={`p-2 rounded-lg border text-center font-bold transition-all ${
-                                                        formFeedbackMode === 'disabled'
-                                                            ? 'bg-slate-600 text-white border-slate-700 shadow-2xs'
-                                                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                                                    }`}
-                                                >
-                                                    ⏸ 停止 (送信しない)
-                                                </button>
+                                            <div className="space-y-2 w-full">
+                                                <div className="grid grid-cols-3 gap-2 w-full text-xs">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setFormStatus('draft');
+                                                            setFormFeedbackMode('draft');
+                                                        }}
+                                                        className={`p-2.5 rounded-xl border text-center font-bold transition-all cursor-pointer ${
+                                                            formFeedbackMode === 'draft'
+                                                                ? 'bg-amber-500 text-white border-amber-600 shadow-2xs'
+                                                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                                                        }`}
+                                                    >
+                                                        📝 シナリオ下書き (準備中)
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setFormStatus('active');
+                                                            setFormFeedbackMode('auto_send');
+                                                        }}
+                                                        className={`p-2.5 rounded-xl border text-center font-bold transition-all cursor-pointer ${
+                                                            formFeedbackMode === 'auto_send'
+                                                                ? 'bg-emerald-600 text-white border-emerald-700 shadow-2xs'
+                                                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                                                        }`}
+                                                    >
+                                                        🚀 稼働中 (自動送信開始)
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setFormStatus('paused');
+                                                            setFormFeedbackMode('disabled');
+                                                        }}
+                                                        className={`p-2.5 rounded-xl border text-center font-bold transition-all cursor-pointer ${
+                                                            formFeedbackMode === 'disabled'
+                                                                ? 'bg-slate-600 text-white border-slate-700 shadow-2xs'
+                                                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                                                        }`}
+                                                    >
+                                                        ⏸ 一時停止 (OFF)
+                                                    </button>
+                                                </div>
+                                                <p className="text-[11px] text-slate-500">
+                                                    {formFeedbackMode === 'draft' && '※「シナリオ下書き」状態です。コーチが報告を提出しても生徒へのLINE送信やチャット記録は一切行われません。'}
+                                                    {formFeedbackMode === 'auto_send' && '※「稼働中」です。コーチが報告を提出すると、生徒の公式LINEへフィードバックメッセージが自動送信されます。'}
+                                                    {formFeedbackMode === 'disabled' && '※「一時停止」です。送信処理は完全にスキップされます。'}
+                                                </p>
                                             </div>
                                         ) : (
                                             <div className="flex items-center gap-4 text-xs font-semibold">
