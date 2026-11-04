@@ -9,7 +9,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Megaphone, Layers, History, Menu, Tag, MessageSquare, Activity } from 'lucide-react';
+import { Megaphone, Layers, History, Menu, Tag, MessageSquare, Activity, Zap } from 'lucide-react';
 import { toast } from 'sonner';
 import { LineMarketingHeader } from './components/LineMarketingHeader';
 import { MarketingKpiCards, MarketingKpiData } from './components/MarketingKpiCards';
@@ -20,11 +20,12 @@ import { LiffTrackingTab, preloadLiffTrackingData } from './components/LiffTrack
 import { RichMenuSettingsTab } from './components/RichMenuSettingsTab';
 import { IndividualChatTab } from './components/IndividualChatTab';
 import { UserActivityMonitoringTab } from './components/UserActivityMonitoringTab';
+import { AutomationScenariosTab } from './components/AutomationScenariosTab';
 import { getMarketingKpiSummaryAction, syncTrialDoneStudentsAction } from '@/actions/line-marketing';
 import { formatErrorToastMessage, sanitizeErrorMessage } from '@/lib/error-formatter';
 
 export default function LineMarketingPage() {
-    const [activeTab, setActiveTab] = useState<'chat' | 'broadcast' | 'steps' | 'activity' | 'tracking' | 'logs' | 'richmenu'>('broadcast');
+    const [activeTab, setActiveTab] = useState<'chat' | 'scenarios' | 'broadcast' | 'steps' | 'activity' | 'tracking' | 'logs' | 'richmenu'>('broadcast');
     const [selectedTagForBroadcast, setSelectedTagForBroadcast] = useState<string | null>(null);
     const [initialChatLineUserId, setInitialChatLineUserId] = useState<string | null>(null);
     const [chatBadgeCount, setChatBadgeCount] = useState(0);
@@ -66,7 +67,7 @@ export default function LineMarketingPage() {
             const tabParam = params.get('tab');
             const tagParam = params.get('tag');
             const lineUserParam = params.get('lineUserId');
-            if (tabParam && ['chat', 'broadcast', 'steps', 'activity', 'tracking', 'logs', 'richmenu'].includes(tabParam)) {
+            if (tabParam && ['chat', 'scenarios', 'broadcast', 'steps', 'activity', 'tracking', 'logs', 'richmenu'].includes(tabParam)) {
                 setActiveTab(tabParam as any);
             }
             if (tagParam) {
@@ -117,9 +118,9 @@ export default function LineMarketingPage() {
             {/* KPIサマリーカード（総配信数、成功率、エラー件数、ステップ配信中生徒数） */}
             <MarketingKpiCards kpi={kpi} isLoading={isLoadingKpi} />
 
-            {/* 7大タブ構成（個別トーク / セグメント一括配信 / カード型ステップ配信 / 行動監視ログ / LIFFアクセス分析・タグ / 配信ログ / リッチメニュー設定） */}
+            {/* 8大タブ構成（個別トーク / 自動化シナリオ(Make風) / セグメント一括配信 / カード型ステップ配信 / 行動監視ログ / LIFFアクセス分析・タグ / 配信ログ / リッチメニュー設定） */}
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="space-y-6">
-                <TabsList className="bg-slate-100 dark:bg-slate-800 p-1.5 rounded-xl grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 max-w-6xl h-auto border border-slate-200 dark:border-slate-700 gap-1">
+                <TabsList className="bg-slate-100 dark:bg-slate-800 p-1.5 rounded-xl grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 max-w-7xl h-auto border border-slate-200 dark:border-slate-700 gap-1">
                     <TabsTrigger
                         value="chat"
                         className="py-2.5 px-2.5 font-semibold text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:text-[#06C755] dark:data-[state=active]:bg-slate-900 dark:data-[state=active]:text-[#06C755] data-[state=active]:shadow-sm transition-all"
@@ -131,6 +132,13 @@ export default function LineMarketingPage() {
                                 {chatBadgeCount}
                             </span>
                         )}
+                    </TabsTrigger>
+                    <TabsTrigger
+                        value="scenarios"
+                        className="py-2.5 px-2.5 font-semibold text-xs sm:text-sm rounded-lg data-[state=active]:bg-white data-[state=active]:text-violet-600 dark:data-[state=active]:bg-slate-900 dark:data-[state=active]:text-violet-400 data-[state=active]:shadow-sm transition-all"
+                    >
+                        <Zap className="h-4 w-4 mr-1.5 text-violet-600" />
+                        自動化シナリオ
                     </TabsTrigger>
                     <TabsTrigger
                         value="broadcast"
@@ -185,7 +193,12 @@ export default function LineMarketingPage() {
                     />
                 </TabsContent>
 
-                {/* タブ1: セグメント一括配信 */}
+                {/* タブ1: Make風 自動配信シナリオ統合管理ハブ */}
+                <TabsContent value="scenarios" forceMount className="data-[state=inactive]:hidden focus-visible:outline-none">
+                    <AutomationScenariosTab />
+                </TabsContent>
+
+                {/* タブ2: セグメント一括配信 */}
                 <TabsContent value="broadcast" forceMount className="data-[state=inactive]:hidden focus-visible:outline-none">
                     <SegmentBroadcastTab
                         initialTag={selectedTagForBroadcast}

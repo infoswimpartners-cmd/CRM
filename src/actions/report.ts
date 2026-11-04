@@ -1365,6 +1365,48 @@ export async function sendLessonReportLineNotification(params: {
 
         const lineMessage = `${params.studentName} 様\n\nスイムパートナーズの ${coachName} です🏊‍♂️✨\n本日はレッスンへのご参加、誠にありがとうございました！\n\n本日のレッスンフィードバックをお届けいたします。\n\n━━━━━━━━━━━━━━━\n🏊‍♂️ レッスンレポート\n━━━━━━━━━━━━━━━\n【日時】${formattedDate}\n【場所】${params.location}\n\n${feedbackPreview}\n━━━━━━━━━━━━━━━\n\nマイページからも詳細なレポートをご確認いただけます。\n▼ レポート詳細はこちら\n${reportUrl}\n\n次回もよろしくお願いいたします😊`;
 
+        // 配信モード設定を取得（デフォルトは 'draft': 生徒への自動プッシュ送信は行わず下書きとして保存）
+        const { data: modeConfig } = await params.supabaseAdmin
+            .from('app_configs')
+            .select('value')
+            .eq('key', 'line_lesson_report_feedback_mode')
+            .maybeSingle();
+
+        const feedbackMode = modeConfig?.value || 'draft';
+
+        if (feedbackMode === 'disabled') {
+            console.log(`[LessonReport LINE] Feedback notification is disabled. Skipping for ${params.studentName}`);
+            return;
+        }
+
+        // 下書き（draft）モードの場合: 生徒へはLINEプッシュ送信せず、個別チャットへ下書き保存
+        if (feedbackMode === 'draft') {
+            const { recordLineChatMessage } = await import('@/lib/line-chat-service');
+            await recordLineChatMessage({
+                lineUserId: student.line_user_id,
+                studentId: params.studentId,
+                displayName: params.studentName,
+                direction: 'outbound',
+                senderType: 'coach',
+                messageType: 'direct_chat',
+                messageText: lineMessage,
+                senderLabel: 'レッスン報告（下書き・準備中）',
+                status: 'draft',
+                metadata: {
+                    is_draft: true,
+                    pending_release: true,
+                    lesson_id: params.lessonId,
+                    coach_id: params.coachId,
+                    coach_name: coachName,
+                    created_at: new Date().toISOString(),
+                },
+            });
+
+            console.log(`[LessonReport LINE] Saved feedback as DRAFT for ${params.studentName} (${student.student_number}). Not sent to LINE (held as draft).`);
+            return;
+        }
+
+        // auto_send モードの場合のみ生徒のLINEへ実送信
         await sendSingleLineMessage({
             studentId: params.studentId,
             studentNumber: student.student_number,

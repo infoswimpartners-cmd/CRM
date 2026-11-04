@@ -1511,7 +1511,11 @@ export function IndividualChatTab({
                                                         </div>
                                                         <div className="flex items-end gap-1.5">
                                                             <div className="flex flex-col items-end text-[10px] text-slate-400 font-mono shrink-0">
-                                                                {msg.status === 'failed' ? (
+                                                                {msg.status === 'draft' ? (
+                                                                    <span className="text-amber-600 font-sans font-bold text-[9px] bg-amber-100 px-1.5 py-0.5 rounded border border-amber-200">
+                                                                        📝 下書き
+                                                                    </span>
+                                                                ) : msg.status === 'failed' ? (
                                                                     <span className="text-rose-600 font-sans font-bold">
                                                                         送信失敗
                                                                     </span>
@@ -1524,14 +1528,28 @@ export function IndividualChatTab({
                                                             </div>
                                                             <div
                                                                 className={`rounded-2xl rounded-tr-xs px-3.5 py-2.5 text-xs whitespace-pre-wrap leading-relaxed shadow-2xs ${
-                                                                    msg.status === 'failed'
-                                                                        ? 'bg-rose-100 text-rose-900 border border-rose-300'
-                                                                        : isDirectReply
-                                                                            ? 'bg-[#06C755] text-white'
-                                                                            : 'bg-emerald-700/90 text-white'
+                                                                    msg.status === 'draft'
+                                                                        ? 'bg-amber-50/90 text-amber-950 border-2 border-dashed border-amber-300'
+                                                                        : msg.status === 'failed'
+                                                                            ? 'bg-rose-100 text-rose-900 border border-rose-300'
+                                                                            : isDirectReply
+                                                                                ? 'bg-[#06C755] text-white'
+                                                                                : 'bg-emerald-700/90 text-white'
                                                                 }`}
                                                             >
                                                                 {msg.message_text}
+                                                                {msg.status === 'draft' && (
+                                                                    <div className="mt-2 pt-1.5 border-t border-amber-200/80 flex items-center justify-between text-[10px] text-amber-800">
+                                                                        <span className="font-semibold">※ 生徒へは未送信です</span>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => setMessageInput(msg.message_text)}
+                                                                            className="underline hover:text-amber-950 font-bold ml-2 cursor-pointer"
+                                                                        >
+                                                                            入力欄に反映
+                                                                        </button>
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     </div>

@@ -225,6 +225,8 @@ export interface LineMarketingKpiSummary {
 export interface ProcessCartAbandonmentOptions {
     dryRun?: boolean;
     nowDate?: Date;
+    targetLineUserId?: string;
+    forceSend?: boolean;
 }
 
 export interface CartAbandonmentDetail {
@@ -261,7 +263,7 @@ export interface LineChatMessage {
     message_text: string;
     sender_label?: string | null;
     is_read: boolean;
-    status: 'received' | 'sent' | 'success' | 'failed';
+    status: 'received' | 'sent' | 'success' | 'failed' | 'draft';
     metadata?: Record<string, any>;
 }
 
