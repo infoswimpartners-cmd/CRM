@@ -22,6 +22,66 @@ export async function getLineChannelAccessToken(): Promise<string | null> {
     }
 }
 
+export async function getOfficialLineRichMenuList(): Promise<{
+    success: boolean;
+    richmenus: Array<{
+        richMenuId: string;
+        name: string;
+        chatBarText: string;
+        selected: boolean;
+    }>;
+    error?: string;
+}> {
+    try {
+        const token = await getLineChannelAccessToken();
+        if (!token) {
+            return {
+                success: false,
+                richmenus: [],
+                error: 'LINE公式アクセストークンが設定されていません。',
+            };
+        }
+
+        const res = await fetch(`${LINE_API_BASE}/richmenu/list`, {
+            method: 'GET',
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+            cache: 'no-store',
+        });
+
+        if (!res.ok) {
+            const errBody = await res.text();
+            console.error('[LineRichMenu] fetch richmenu list failed:', res.status, errBody);
+            return {
+                success: false,
+                richmenus: [],
+                error: `LINE APIエラー (${res.status}): ${errBody}`,
+            };
+        }
+
+        const data = await res.json();
+        const richmenus = (data.richmenus || []).map((rm: any) => ({
+            richMenuId: rm.richMenuId,
+            name: rm.name || '(名称未設定)',
+            chatBarText: rm.chatBarText || '',
+            selected: !!rm.selected,
+        }));
+
+        return {
+            success: true,
+            richmenus,
+        };
+    } catch (err: any) {
+        console.error('[LineRichMenu] Error fetching richmenu list:', err);
+        return {
+            success: false,
+            richmenus: [],
+            error: err.message || 'リッチメニュー一覧の取得中にエラーが発生しました。',
+        };
+    }
+}
+
 /**
  * リッチメニュー設定を取得（会員用リッチメニューID等）
  */

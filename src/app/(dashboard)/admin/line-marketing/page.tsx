@@ -24,12 +24,17 @@ import { AutomationScenariosTab } from './components/AutomationScenariosTab';
 import { getMarketingKpiSummaryAction, syncTrialDoneStudentsAction } from '@/actions/line-marketing';
 import { formatErrorToastMessage, sanitizeErrorMessage } from '@/lib/error-formatter';
 
+// ページ内インメモリKPIキャッシュ（Stale-While-Revalidate: 即時表示用）
+let cachedMarketingKpi: MarketingKpiData | null = null;
+
 export default function LineMarketingPage() {
     const [activeTab, setActiveTab] = useState<'chat' | 'scenarios' | 'broadcast' | 'steps' | 'activity' | 'tracking' | 'logs' | 'richmenu'>('broadcast');
+    // オンデマンド読み込み用: 訪問済みタブのみをマウント＆メモリ保持（不要な一斉fetchを完全防止）
+    const [visitedTabs, setVisitedTabs] = useState<Set<string>>(() => new Set(['broadcast']));
     const [selectedTagForBroadcast, setSelectedTagForBroadcast] = useState<string | null>(null);
     const [initialChatLineUserId, setInitialChatLineUserId] = useState<string | null>(null);
     const [chatBadgeCount, setChatBadgeCount] = useState(0);
-    const [kpi, setKpi] = useState<MarketingKpiData>({
+    const [kpi, setKpi] = useState<MarketingKpiData>(() => cachedMarketingKpi || {
         totalSent: 0,
         successCount: 0,
         failedCount: 0,
@@ -37,30 +42,45 @@ export default function LineMarketingPage() {
         successRate: 0,
         inProgressStudentsCount: 0,
     });
-    const [isLoadingKpi, setIsLoadingKpi] = useState(true);
+    const [isLoadingKpi, setIsLoadingKpi] = useState(() => !cachedMarketingKpi);
     const [isSyncing, setIsSyncing] = useState(false);
 
-    // KPIサマリーデータ取得
+    // タブ切り替えハンドラ（オンデマンド訪問タブ登録）
+    const handleTabChange = useCallback((tab: string) => {
+        setActiveTab(tab as any);
+        setVisitedTabs(prev => {
+            if (prev.has(tab)) return prev;
+            const next = new Set(prev);
+            next.add(tab);
+            return next;
+        });
+
+        // LIFF分析タブを開いた時のみ事前ロードを実行
+        if (tab === 'tracking') {
+            preloadLiffTrackingData();
+        }
+    }, []);
+
+    // KPIサマリーデータ取得（非ブロッキング・バックグラウンド更新）
     const fetchKpi = useCallback(async () => {
-        setIsLoadingKpi(true);
         try {
             const res = await getMarketingKpiSummaryAction();
             if (res.success && res.data) {
                 setKpi(res.data);
+                cachedMarketingKpi = res.data;
             } else if (res.error) {
-                console.error('[LineMarketingPage] fetchKpi error:', res.error);
+                console.warn('[LineMarketingPage] fetchKpi notice:', res.error);
             }
         } catch (e: any) {
-            console.error('[LineMarketingPage] fetchKpi exception:', e);
+            console.warn('[LineMarketingPage] fetchKpi background notice:', e);
         } finally {
             setIsLoadingKpi(false);
         }
     }, []);
 
     useEffect(() => {
+        // 非同期バックグラウンドでKPI更新（画面描画は待たずに即時表示）
         fetchKpi();
-        // LIFFアクセス分析・タグデータを裏で事前ロード（タブを開いた瞬間に即時表示するため）
-        preloadLiffTrackingData();
 
         if (typeof window !== 'undefined') {
             const params = new URLSearchParams(window.location.search);
@@ -68,17 +88,17 @@ export default function LineMarketingPage() {
             const tagParam = params.get('tag');
             const lineUserParam = params.get('lineUserId');
             if (tabParam && ['chat', 'scenarios', 'broadcast', 'steps', 'activity', 'tracking', 'logs', 'richmenu'].includes(tabParam)) {
-                setActiveTab(tabParam as any);
+                handleTabChange(tabParam);
             }
             if (tagParam) {
                 setSelectedTagForBroadcast(tagParam);
             }
             if (lineUserParam) {
                 setInitialChatLineUserId(lineUserParam);
-                setActiveTab('chat');
+                handleTabChange('chat');
             }
         }
-    }, [fetchKpi]);
+    }, [fetchKpi, handleTabChange]);
 
     // 体験受講完了生徒の手動同期アクション
     const handleSyncTrialDone = async () => {
@@ -101,7 +121,7 @@ export default function LineMarketingPage() {
     // タグから一括配信への遷移ハンドラ
     const handleSelectTagForBroadcast = (tagName: string) => {
         setSelectedTagForBroadcast(tagName);
-        setActiveTab('broadcast');
+        handleTabChange('broadcast');
         toast.info(`タグ「${tagName}」を選択して一括配信タブに切り替えました`);
     };
 
@@ -119,7 +139,7 @@ export default function LineMarketingPage() {
             <MarketingKpiCards kpi={kpi} isLoading={isLoadingKpi} />
 
             {/* 8大タブ構成（個別トーク / 自動化シナリオ(Make風) / セグメント一括配信 / カード型ステップ配信 / 行動監視ログ / LIFFアクセス分析・タグ / 配信ログ / リッチメニュー設定） */}
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="space-y-6">
+            <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
                 <TabsList className="bg-slate-100 dark:bg-slate-800 p-1.5 rounded-xl grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 max-w-7xl h-auto border border-slate-200 dark:border-slate-700 gap-1">
                     <TabsTrigger
                         value="chat"
@@ -184,58 +204,74 @@ export default function LineMarketingPage() {
                     </TabsTrigger>
                 </TabsList>
 
-                {/* タブ0: Lステップ風 1対1 個別トーク・チャット管理 */}
-                <TabsContent value="chat" forceMount className="data-[state=inactive]:hidden focus-visible:outline-none">
-                    <IndividualChatTab
-                        initialLineUserId={initialChatLineUserId}
-                        onUnreadCountChange={(unread, needsReply) => setChatBadgeCount(unread || needsReply)}
-                        onDeliverySuccess={fetchKpi}
-                    />
-                </TabsContent>
+                {/* タブ0: Lステップ風 1対1 個別トーク・チャット管理（オンデマンド読み込み・キャッシュ保持） */}
+                {visitedTabs.has('chat') && (
+                    <TabsContent value="chat" className="data-[state=inactive]:hidden focus-visible:outline-none">
+                        <IndividualChatTab
+                            initialLineUserId={initialChatLineUserId}
+                            onUnreadCountChange={(unread, needsReply) => setChatBadgeCount(unread || needsReply)}
+                            onDeliverySuccess={fetchKpi}
+                        />
+                    </TabsContent>
+                )}
 
-                {/* タブ1: Make風 自動配信シナリオ統合管理ハブ */}
-                <TabsContent value="scenarios" forceMount className="data-[state=inactive]:hidden focus-visible:outline-none">
-                    <AutomationScenariosTab />
-                </TabsContent>
+                {/* タブ1: Make風 自動配信シナリオ統合管理ハブ（オンデマンド読み込み） */}
+                {visitedTabs.has('scenarios') && (
+                    <TabsContent value="scenarios" className="data-[state=inactive]:hidden focus-visible:outline-none">
+                        <AutomationScenariosTab />
+                    </TabsContent>
+                )}
 
-                {/* タブ2: セグメント一括配信 */}
-                <TabsContent value="broadcast" forceMount className="data-[state=inactive]:hidden focus-visible:outline-none">
-                    <SegmentBroadcastTab
-                        initialTag={selectedTagForBroadcast}
-                        onBroadcastSuccess={fetchKpi}
-                        onDeliveryDone={fetchKpi}
-                    />
-                </TabsContent>
+                {/* タブ2: セグメント一括配信（オンデマンド読み込み） */}
+                {visitedTabs.has('broadcast') && (
+                    <TabsContent value="broadcast" className="data-[state=inactive]:hidden focus-visible:outline-none">
+                        <SegmentBroadcastTab
+                            initialTag={selectedTagForBroadcast}
+                            onBroadcastSuccess={fetchKpi}
+                            onDeliveryDone={fetchKpi}
+                        />
+                    </TabsContent>
+                )}
 
-                {/* タブ2: カード型ステップ配信シナリオエディタ */}
-                <TabsContent value="steps" forceMount className="data-[state=inactive]:hidden focus-visible:outline-none">
-                    <StepScenarioEditorTab onUpdate={fetchKpi} />
-                </TabsContent>
+                {/* タブ3: カード型ステップ配信シナリオエディタ（オンデマンド読み込み） */}
+                {visitedTabs.has('steps') && (
+                    <TabsContent value="steps" className="data-[state=inactive]:hidden focus-visible:outline-none">
+                        <StepScenarioEditorTab onUpdate={fetchKpi} />
+                    </TabsContent>
+                )}
 
-                {/* タブ3: LINE友だち行動監視・リアルタイムアクティビティログ */}
-                <TabsContent value="activity" forceMount className="data-[state=inactive]:hidden focus-visible:outline-none">
-                    <UserActivityMonitoringTab
-                        onNavigateToChat={(lineUserId) => {
-                            setInitialChatLineUserId(lineUserId);
-                            setActiveTab('chat');
-                        }}
-                    />
-                </TabsContent>
+                {/* タブ4: LINE友だち行動監視・リアルタイムアクティビティログ（オンデマンド読み込み） */}
+                {visitedTabs.has('activity') && (
+                    <TabsContent value="activity" className="data-[state=inactive]:hidden focus-visible:outline-none">
+                        <UserActivityMonitoringTab
+                            onNavigateToChat={(lineUserId) => {
+                                setInitialChatLineUserId(lineUserId);
+                                handleTabChange('chat');
+                            }}
+                        />
+                    </TabsContent>
+                )}
 
-                {/* タブ4: LIFFアクセス分析・タグ管理 */}
-                <TabsContent value="tracking" forceMount className="data-[state=inactive]:hidden focus-visible:outline-none">
-                    <LiffTrackingTab onSelectTagForBroadcast={handleSelectTagForBroadcast} />
-                </TabsContent>
+                {/* タブ5: LIFFアクセス分析・タグ管理（オンデマンド読み込み） */}
+                {visitedTabs.has('tracking') && (
+                    <TabsContent value="tracking" className="data-[state=inactive]:hidden focus-visible:outline-none">
+                        <LiffTrackingTab onSelectTagForBroadcast={handleSelectTagForBroadcast} />
+                    </TabsContent>
+                )}
 
-                {/* タブ5: 配信ログ・トラッキング */}
-                <TabsContent value="logs" forceMount className="data-[state=inactive]:hidden focus-visible:outline-none">
-                    <DeliveryLogsTab />
-                </TabsContent>
+                {/* タブ6: 配信ログ・トラッキング（オンデマンド読み込み） */}
+                {visitedTabs.has('logs') && (
+                    <TabsContent value="logs" className="data-[state=inactive]:hidden focus-visible:outline-none">
+                        <DeliveryLogsTab />
+                    </TabsContent>
+                )}
 
-                {/* タブ6: リッチメニュー設定・切り替え */}
-                <TabsContent value="richmenu" forceMount className="data-[state=inactive]:hidden focus-visible:outline-none">
-                    <RichMenuSettingsTab />
-                </TabsContent>
+                {/* タブ7: リッチメニュー設定・切り替え（オンデマンド読み込み） */}
+                {visitedTabs.has('richmenu') && (
+                    <TabsContent value="richmenu" className="data-[state=inactive]:hidden focus-visible:outline-none">
+                        <RichMenuSettingsTab />
+                    </TabsContent>
+                )}
             </Tabs>
         </div>
     );

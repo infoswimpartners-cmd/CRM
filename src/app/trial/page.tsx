@@ -240,26 +240,22 @@ export default function BookingForm() {
 
         if (!isMounted) return;
 
-        if (liff.isLoggedIn()) {
-          setIsLiffEnvironment(true);
+        const urlParams = new URLSearchParams(window.location.search);
+        const refFromUrl = urlParams.get("ref") || urlParams.get("referrer") || "";
+        if (refFromUrl) {
+          setFormData(prev => prev.referrerName ? prev : { ...prev, referrerName: refFromUrl });
+          setHasReferrer(true);
+        }
+
+        // アクセストラッキング送信用ヘルパー関数
+        const trackViewAccess = (uid?: string, dName?: string) => {
           try {
-            const profile = await liff.getProfile();
-            setUserId(profile.userId);
-
-            // LIFFアクセスログの記録と閲覧タグの自動付与（非同期・ノンブロッキング）
-            const urlParams = new URLSearchParams(window.location.search);
-            const refFromUrl = urlParams.get("ref") || urlParams.get("referrer") || "";
-            if (refFromUrl) {
-              setFormData(prev => prev.referrerName ? prev : { ...prev, referrerName: refFromUrl });
-              setHasReferrer(true);
-            }
-
             fetch("/api/liff-tracking", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                userId: profile.userId,
-                displayName: profile.displayName || undefined,
+                userId: uid || undefined,
+                displayName: dName || undefined,
                 formType: "trial",
                 pageUrl: window.location.href,
                 utmSource: urlParams.get("utm_source") || undefined,
@@ -268,18 +264,32 @@ export default function BookingForm() {
                 referrerName: refFromUrl || undefined,
               }),
             }).catch(() => {});
+          } catch (_) {}
+        };
+
+        if (liff.isLoggedIn()) {
+          setIsLiffEnvironment(true);
+          try {
+            const profile = await liff.getProfile();
+            setUserId(profile.userId);
+
+            // LIFFアクセスログの記録と閲覧タグの自動付与（非同期・ノンブロッキング）
+            trackViewAccess(profile.userId, profile.displayName);
           } catch (profileErr) {
             console.warn("LIFF profile fetch error:", profileErr);
+            trackViewAccess();
           }
         } else {
           // LIFF環境下かつ未ログインの場合、LINE内ブラウザであればログイン遷移可能だが、
           // 通常のWebブラウザからのアクセスを遮断しないため、Webモードとして続行
           // URLパラメータからのuserId取得フォールバック
-          const urlParams = new URLSearchParams(window.location.search);
           const fallbackUid = urlParams.get("userId") || urlParams.get("line_user_id") || urlParams.get("uid");
           if (fallbackUid) {
             setUserId(fallbackUid);
           }
+
+          // 未ログイン・外部ブラウザ時でもトラッキングを送信
+          trackViewAccess(fallbackUid || undefined);
 
           if (liff.isInClient()) {
             const redirectUri = window.location.origin + window.location.pathname;
@@ -302,6 +312,21 @@ export default function BookingForm() {
             setFormData(prev => prev.referrerName ? prev : { ...prev, referrerName: refFromUrl });
             setHasReferrer(true);
           }
+
+          // 初期化エラー時もトラッキング記録
+          fetch("/api/liff-tracking", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userId: fallbackUid || undefined,
+              formType: "trial",
+              pageUrl: window.location.href,
+              utmSource: urlParams.get("utm_source") || undefined,
+              utmMedium: urlParams.get("utm_medium") || undefined,
+              utmCampaign: urlParams.get("utm_campaign") || undefined,
+              referrerName: refFromUrl || undefined,
+            }),
+          }).catch(() => {});
         } catch (_) {}
         // LIFFの初期化失敗時もWebブラウザとしてフォーム送信可能にする
         setIsLiffEnvironment(false);

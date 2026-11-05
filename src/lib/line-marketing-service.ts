@@ -1422,7 +1422,7 @@ export const DEFAULT_CART_RECOVERY_TEMPLATE = `{{name}} 様
 export async function processCartAbandonmentReminders(
     options: ProcessCartAbandonmentOptions = {}
 ): Promise<ProcessCartAbandonmentResult> {
-    const { dryRun = false, nowDate = new Date() } = options;
+    const { dryRun = false, nowDate = new Date(), targetLineUserId, forceSend = false } = options;
     const supabase = createAdminClient();
 
     // 1. 配信時間帯ガード判定 (JST 10:00〜20:30: 落ち着いてスケジュール確認・返信ができる時間帯)
@@ -1433,7 +1433,7 @@ export async function processCartAbandonmentReminders(
     const jstMinutesOfDay = jstHour * 60 + jstMinute;
 
     // 10:00 = 600分, 20:30 = 1230分
-    if (jstMinutesOfDay < 600 || jstMinutesOfDay > 1230) {
+    if (!forceSend && (jstMinutesOfDay < 600 || jstMinutesOfDay > 1230)) {
         console.log(`[CartRecovery] JST時間帯ガード作動: 現在JST ${jstHour}:${String(jstMinute).padStart(2, '0')}のため配信を停止します（配信許可: 10:00〜20:30）`);
         return {
             processedCount: 0,
@@ -1545,18 +1545,39 @@ export async function processCartAbandonmentReminders(
     let failedCount = 0;
     const details: ProcessCartAbandonmentResult['details'] = [];
 
-    const candidates = Array.from(userCandidateMap.values());
+    let candidates = Array.from(userCandidateMap.values());
+
+    if (targetLineUserId) {
+        if (!userCandidateMap.has(targetLineUserId)) {
+            const { data: directStudent } = await supabase
+                .from('students')
+                .select('line_user_id, full_name')
+                .eq('line_user_id', targetLineUserId)
+                .maybeSingle();
+
+            if (directStudent?.line_user_id) {
+                candidates = [{
+                    lineUserId: directStudent.line_user_id,
+                    tags: new Set<string>(),
+                    viewedAt: nowDate,
+                    displayName: directStudent.full_name || undefined,
+                }];
+            }
+        } else {
+            candidates = candidates.filter(c => c.lineUserId === targetLineUserId);
+        }
+    }
 
     for (const candidate of candidates) {
         const { lineUserId, tags, viewedAt } = candidate;
 
-        // 条件1: フォーム閲覧タグを保有していること
-        if (!tags.has(STANDARD_TAGS.FORM_VIEWED)) {
+        // 条件1: フォーム閲覧タグを保有していること（forceSend時はバイパス）
+        if (!forceSend && !tags.has(STANDARD_TAGS.FORM_VIEWED)) {
             continue;
         }
 
         // 条件2: 未申込であること（trial_applied 未保有）
-        if (tags.has(STANDARD_TAGS.FORM_APPLIED)) {
+        if (!forceSend && tags.has(STANDARD_TAGS.FORM_APPLIED)) {
             skippedCount++;
             details.push({
                 lineUserId,
@@ -1567,7 +1588,7 @@ export async function processCartAbandonmentReminders(
         }
 
         // 条件3: 未フォローであること（cart_recovery_sent 未保有）
-        if (tags.has(STANDARD_TAGS.CART_RECOVERY_SENT)) {
+        if (!forceSend && tags.has(STANDARD_TAGS.CART_RECOVERY_SENT)) {
             skippedCount++;
             details.push({
                 lineUserId,
@@ -1578,7 +1599,7 @@ export async function processCartAbandonmentReminders(
         }
 
         // 条件4: 閲覧日時の存在と経過時間（30分以上24時間以内: 熱量の高いタイミングを逃さずカバー）
-        if (!viewedAt) {
+        if (!forceSend && !viewedAt) {
             skippedCount++;
             details.push({
                 lineUserId,
@@ -1588,10 +1609,10 @@ export async function processCartAbandonmentReminders(
             continue;
         }
 
-        const elapsedMs = nowDate.getTime() - viewedAt.getTime();
+        const elapsedMs = viewedAt ? (nowDate.getTime() - viewedAt.getTime()) : 0;
         const elapsedHours = elapsedMs / (1000 * 60 * 60);
 
-        if (elapsedHours < 0.5 || elapsedHours > 24) {
+        if (!forceSend && (elapsedHours < 0.5 || elapsedHours > 24)) {
             skippedCount++;
             details.push({
                 lineUserId,
@@ -1638,8 +1659,8 @@ export async function processCartAbandonmentReminders(
             }
         }
 
-        // 【最重要安全ガード】: test_only モード時はテスト太郎（0035）以外を完全にスキップ
-        if (isTestOnly) {
+        // 【最重要安全ガード】: test_only モード時はテスト太郎（0035）以外を完全にスキップ（forceSend時は手動実行許可）
+        if (isTestOnly && !forceSend) {
             const isTestUserId = lineUserId === TEST_TARO_LINE_USER_ID;
             const isTestStudentNumber = student?.student_number === TEST_TARO_STUDENT_NUMBER;
 
@@ -1771,17 +1792,21 @@ export async function processCartAbandonmentReminders(
 // 12. 友だち追加後1時間 未アクション（リッチメニュー未操作・未返信）自動フォロー機能
 // ==============================================================================
 
-export const DEFAULT_INACTIVE_FOLLOW_RECOVERY_TEMPLATE = `{{name}} 様
+export const DEFAULT_INACTIVE_FOLLOW_RECOVERY_TEMPLATE = `{{name}} 様、こんにちは！
+スイムパートナーズ公式LINEへのご登録ありがとうございます😊🏊‍♂️
 
-スイムパートナーズ公式LINEへご登録いただき、誠にありがとうございます！🏊‍♂️
+「水泳のマンツーマンレッスンってどんな感じ？」
+「近くのプールに出張してくれるのかな？」
+「泳げない初心者や子どもでも大丈夫？」
 
-「体験レッスンはどのような流れ？」「泳げない初心者や子どもでも大丈夫？」など、気になる点やご不安なことはございませんでしょうか？
+など、何か気になっていることやご不安な点はございませんか？
 
-どんな些細なことでも構いませんので、こちらのトークルームにそのままお気軽にご返信ください😊
-専門の担当者が丁寧にご相談に乗らせていただきます！
+当スクールは、専任のプロコーチがご自宅近くの公営プールへお伺いする完全個別レッスンです✨
 
-▼ 体験レッスンのお申し込み・空き状況の確認はこちら
-https://crm.swim-partners.com/booking/trial`;
+気になることやご質問がありましたら、どんな些細なことでもこのチャットにそのままお気軽にご返信くださいね！専任スタッフが丁寧にお答えいたします。
+
+▼ レッスンの詳細やコーチ一覧はこちら
+https://liff.line.me/2009159689-dWjvcfS7`;
 
 export interface ProcessInactiveFollowOptions {
     dryRun?: boolean;
@@ -2197,6 +2222,8 @@ export const DEFAULT_CONFIRM_ABANDON_TEMPLATE =
 export interface ProcessConfirmAbandonmentOptions {
     dryRun?: boolean;
     nowDate?: Date;
+    targetLineUserId?: string;
+    forceSend?: boolean;
 }
 
 export interface ProcessConfirmAbandonmentResult {
@@ -2229,7 +2256,7 @@ export interface ProcessConfirmAbandonmentResult {
 export async function processConfirmAbandonmentReminders(
     options: ProcessConfirmAbandonmentOptions = {}
 ): Promise<ProcessConfirmAbandonmentResult> {
-    const { dryRun = false, nowDate = new Date() } = options;
+    const { dryRun = false, nowDate = new Date(), targetLineUserId, forceSend = false } = options;
     const supabase = createAdminClient();
 
     // 1. 配信時間帯ガード判定 (JST 8:00〜21:30: 入力直後のホットリードのため朝から夜まで幅広く即時対応)
@@ -2239,7 +2266,7 @@ export async function processConfirmAbandonmentReminders(
     const jstMinutesOfDay = jstHour * 60 + jstMinute;
 
     // 8:00 = 480分, 21:30 = 1290分
-    if (jstMinutesOfDay < 480 || jstMinutesOfDay > 1290) {
+    if (!forceSend && (jstMinutesOfDay < 480 || jstMinutesOfDay > 1290)) {
         console.log(`[ConfirmRecovery] JST時間帯ガード作動: 現在JST ${jstHour}:${String(jstMinute).padStart(2, '0')}のため配信を停止します（配信許可: 8:00〜21:30）`);
         return {
             processedCount: 0,
@@ -2426,8 +2453,8 @@ export async function processConfirmAbandonmentReminders(
             }
         }
 
-        // 【最重要安全ガード】: test_only モード時はテスト太郎（0035）以外を完全にスキップ
-        if (isTestOnly) {
+        // 【最重要安全ガード】: test_only モード時はテスト太郎（0035）以外を完全にスキップ（forceSend時は手動実行許可）
+        if (isTestOnly && !forceSend) {
             const isTestUserId = lineUserId === TEST_TARO_LINE_USER_ID;
             const isTestStudentNumber = student?.student_number === TEST_TARO_STUDENT_NUMBER;
 

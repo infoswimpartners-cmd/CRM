@@ -55,7 +55,7 @@ async function assertAdminUser(): Promise<{ userId: string }> {
                 .eq('id', user.id)
                 .single();
 
-            if (profile?.role === 'admin') {
+            if (profile?.role === 'admin' || profile?.role === 'owner') {
                 return { userId: user.id };
             }
             throw new Error('管理者権限が必要です。');
@@ -1798,4 +1798,24 @@ export async function processInactiveFollowRecoveryAction(options?: {
         return { success: false, error: err.message };
     }
 }
+
+/**
+ * カゴ落ち（フォーム離脱後）自動フォローを実行・検証するアクション
+ */
+export async function processCartAbandonmentAction(options?: {
+    dryRun?: boolean;
+    forceSend?: boolean;
+    targetLineUserId?: string;
+}) {
+    try {
+        await assertAdminUser();
+        const { processCartAbandonmentReminders } = await import('@/lib/line-marketing-service');
+        const result = await processCartAbandonmentReminders(options);
+        return { success: true, result };
+    } catch (err: any) {
+        console.error('[processCartAbandonmentAction] Error:', err);
+        return { success: false, error: err.message };
+    }
+}
+
 

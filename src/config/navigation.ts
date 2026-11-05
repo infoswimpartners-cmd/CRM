@@ -17,6 +17,7 @@ import {
     Receipt,
     Sparkles,
     Database,
+    Share2,
     type LucideIcon,
 } from 'lucide-react'
 
@@ -139,6 +140,13 @@ export const navigationConfig: NavigationConfig = {
                 domain: 'marketing',
                 title: 'マーケティング・SEO',
                 items: [
+                    {
+                        title: 'SNS一括配信 (swimmers device)',
+                        href: '/admin/swimmers-device',
+                        icon: Share2,
+                        badge: 'New',
+                        description: 'Instagram/TikTok/YouTube/X 一括同時投稿・予約',
+                    },
                     {
                         title: 'LINEマーケティング',
                         href: '/admin/line-marketing',

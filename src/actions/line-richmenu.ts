@@ -7,7 +7,12 @@ import {
     linkMemberRichMenuToUser,
     unlinkRichMenuFromUser,
     syncAllActiveMembersRichMenuAction,
+    getOfficialLineRichMenuList,
 } from '@/lib/line-richmenu'
+
+export async function getOfficialLineRichMenuListAction() {
+    return await getOfficialLineRichMenuList()
+}
 
 export async function getRichMenuSettingsAction() {
     return await getRichMenuSettings()

@@ -17,18 +17,27 @@ import {
     Users,
     Unlink,
     Info,
-    Sparkles
+    Sparkles,
+    Check,
 } from 'lucide-react'
 import {
     getRichMenuSettingsAction,
     saveRichMenuSettingsAction,
     syncAllActiveMembersRichMenu,
+    getOfficialLineRichMenuListAction,
 } from '@/actions/line-richmenu'
 import { unlinkAllUserRichMenusAction } from '@/actions/line-marketing'
 
 export function RichMenuSettingsTab() {
     const [memberRichMenuId, setMemberRichMenuId] = useState('')
+    const [availableRichMenus, setAvailableRichMenus] = useState<Array<{
+        richMenuId: string;
+        name: string;
+        chatBarText: string;
+        selected: boolean;
+    }>>([])
     const [isLoading, setIsLoading] = useState(true)
+    const [isLoadingMenus, setIsLoadingMenus] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
     const [isSyncing, setIsSyncing] = useState(false)
     const [isUnlinking, setIsUnlinking] = useState(false)
@@ -43,19 +52,34 @@ export function RichMenuSettingsTab() {
 
     useEffect(() => {
         loadSettings()
+        loadAvailableMenus()
     }, [])
 
     const loadSettings = async () => {
         setIsLoading(true)
         try {
             const settings = await getRichMenuSettingsAction()
-            if (settings.memberRichMenuId) {
+            if (settings?.memberRichMenuId) {
                 setMemberRichMenuId(settings.memberRichMenuId)
             }
         } catch (e: any) {
             console.error('Failed to load rich menu settings:', e)
         } finally {
             setIsLoading(false)
+        }
+    }
+
+    const loadAvailableMenus = async () => {
+        setIsLoadingMenus(true)
+        try {
+            const res = await getOfficialLineRichMenuListAction()
+            if (res.success && res.richmenus) {
+                setAvailableRichMenus(res.richmenus)
+            }
+        } catch (e: any) {
+            console.warn('Failed to fetch official LINE rich menu list:', e)
+        } finally {
+            setIsLoadingMenus(false)
         }
     }
 
@@ -157,10 +181,59 @@ export function RichMenuSettingsTab() {
                         </ul>
                     </div>
 
-                    <div className="space-y-2 max-w-xl">
-                        <Label htmlFor="memberRichMenuId" className="text-sm font-bold text-slate-700">
-                            会員用リッチメニューID <span className="text-rose-500">*</span>
-                        </Label>
+                    <div className="space-y-3 max-w-xl">
+                        <div className="flex items-center justify-between">
+                            <Label htmlFor="memberRichMenuId" className="text-sm font-bold text-slate-700">
+                                会員用リッチメニューID <span className="text-rose-500">*</span>
+                            </Label>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={loadAvailableMenus}
+                                disabled={isLoadingMenus}
+                                className="h-7 text-xs text-blue-600 hover:text-blue-800 gap-1"
+                            >
+                                <RefreshCw className={`h-3 w-3 ${isLoadingMenus ? 'animate-spin' : ''}`} />
+                                公式メニューを再取得
+                            </Button>
+                        </div>
+
+                        {/* LINE公式アカウントから取得したリッチメニュー一覧のクイック選択 */}
+                        {availableRichMenus.length > 0 && (
+                            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                                <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                                    <Menu className="h-3.5 w-3.5 text-blue-600" />
+                                    公式LINEのリッチメニューからワンクリック選択:
+                                </span>
+                                <div className="grid grid-cols-1 gap-1.5 max-h-40 overflow-y-auto">
+                                    {availableRichMenus.map((rm) => {
+                                        const isSelected = memberRichMenuId.trim() === rm.richMenuId;
+                                        return (
+                                            <button
+                                                key={rm.richMenuId}
+                                                type="button"
+                                                onClick={() => {
+                                                    setMemberRichMenuId(rm.richMenuId);
+                                                    toast.info(`「${rm.name}」を選択しました。「設定を保存」を押して確定してください。`);
+                                                }}
+                                                className={`text-left p-2 rounded-lg border text-xs flex items-center justify-between transition-all cursor-pointer ${
+                                                    isSelected
+                                                        ? 'bg-blue-50 border-blue-500 text-blue-900 font-bold'
+                                                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                                                }`}
+                                            >
+                                                <div className="truncate">
+                                                    <span className="font-semibold">{rm.name}</span>
+                                                    <span className="text-[10px] text-slate-400 block font-mono">{rm.richMenuId}</span>
+                                                </div>
+                                                {isSelected && <Check className="h-4 w-4 text-blue-600 shrink-0 ml-2" />}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
                         <div className="flex gap-2">
                             <Input
                                 id="memberRichMenuId"
