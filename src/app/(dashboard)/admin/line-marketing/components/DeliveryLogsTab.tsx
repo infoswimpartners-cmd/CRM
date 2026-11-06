@@ -35,17 +35,33 @@ import {
     Loader2,
 } from 'lucide-react';
 import { LogDetailModal } from './LogDetailModal';
+import { getStaleLocalCache, setLocalCache } from '@/lib/local-cache';
+
+const DELIVERY_LOGS_CACHE_KEY = 'line_delivery_logs_recent';
+
+interface DeliveryLogsCache {
+    logs: LineDeliveryLog[];
+    totalCount: number;
+    stats: {
+        totalSent: number;
+        successCount: number;
+        failedCount: number;
+        skippedCount: number;
+    };
+}
 
 export function DeliveryLogsTab() {
-    const [logs, setLogs] = useState<LineDeliveryLog[]>([]);
-    const [totalCount, setTotalCount] = useState(0);
-    const [stats, setStats] = useState({
+    const cachedInitial = getStaleLocalCache<DeliveryLogsCache>(DELIVERY_LOGS_CACHE_KEY);
+
+    const [logs, setLogs] = useState<LineDeliveryLog[]>(() => cachedInitial?.logs || []);
+    const [totalCount, setTotalCount] = useState<number>(() => cachedInitial?.totalCount || 0);
+    const [stats, setStats] = useState(() => cachedInitial?.stats || {
         totalSent: 0,
         successCount: 0,
         failedCount: 0,
         skippedCount: 0,
     });
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(() => !cachedInitial);
 
     // フィルタ・ページネーション状態
     const [page, setPage] = useState(1);
@@ -60,7 +76,10 @@ export function DeliveryLogsTab() {
 
     // ログ取得処理
     const fetchLogs = useCallback(async () => {
-        setIsLoading(true);
+        // キャッシュがない場合のみブロッキングスピナーを表示
+        if (!getStaleLocalCache(DELIVERY_LOGS_CACHE_KEY)) {
+            setIsLoading(true);
+        }
         try {
             const res: DeliveryLogsResult = await getDeliveryLogs({
                 page,
@@ -74,6 +93,15 @@ export function DeliveryLogsTab() {
                 setLogs(res.logs);
                 setTotalCount(res.totalCount);
                 setStats(res.stats);
+
+                // デフォルト一覧（1ページ目・絞り込みなし）時はローカルキャッシュを更新
+                if (page === 1 && deliveryType === 'all' && status === 'all' && !searchQuery.trim()) {
+                    setLocalCache<DeliveryLogsCache>(DELIVERY_LOGS_CACHE_KEY, {
+                        logs: res.logs,
+                        totalCount: res.totalCount,
+                        stats: res.stats,
+                    });
+                }
             } else {
                 toast.error(res.error || '配信ログの取得に失敗しました。');
             }

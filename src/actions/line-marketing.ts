@@ -1097,7 +1097,15 @@ export async function getDeliveryLogs(
 
         query = query.order('sent_at', { ascending: false }).range(offset, offset + pageSize - 1);
 
-        const { data: dataLogs, count, error } = await query;
+        // ログ一覧クエリと統計集計を Promise.all で並列一括取得（待機時間半減）
+        const [queryRes, statsRes] = await Promise.all([
+            query,
+            supabaseAdmin.from('line_delivery_logs').select('status'),
+        ]);
+
+        const dataLogs = queryRes.data;
+        const count = queryRes.count;
+        const error = queryRes.error;
 
         let logs: any[] = [];
         let totalCount = 0;
@@ -1148,11 +1156,7 @@ export async function getDeliveryLogs(
         } else {
             logs = dataLogs || [];
             totalCount = count || 0;
-
-            const { data: rawStats } = await supabaseAdmin
-                .from('line_delivery_logs')
-                .select('status');
-            allStats = rawStats || [];
+            allStats = statsRes.data || [];
         }
 
         let successCount = 0;

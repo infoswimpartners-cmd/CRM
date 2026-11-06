@@ -35,14 +35,21 @@ import {
 import { toast } from 'sonner';
 import { getUserActivitiesAction, getActivityKpiSummaryAction } from '@/actions/line-marketing';
 import { LineUserActivity, ActivityKpiSummary, LineActivityType } from '@/types/line-tracking';
+import { getStaleLocalCache, setLocalCache } from '@/lib/local-cache';
+
+const ACTIVITY_LOGS_CACHE_KEY = 'line_user_activities_recent';
+const ACTIVITY_KPI_CACHE_KEY = 'line_activity_kpi_summary';
 
 interface UserActivityMonitoringTabProps {
     onNavigateToChat?: (lineUserId: string) => void;
 }
 
 export function UserActivityMonitoringTab({ onNavigateToChat }: UserActivityMonitoringTabProps) {
-    const [activities, setActivities] = useState<LineUserActivity[]>([]);
-    const [kpi, setKpi] = useState<ActivityKpiSummary>({
+    const cachedActivities = getStaleLocalCache<LineUserActivity[]>(ACTIVITY_LOGS_CACHE_KEY);
+    const cachedKpi = getStaleLocalCache<ActivityKpiSummary>(ACTIVITY_KPI_CACHE_KEY);
+
+    const [activities, setActivities] = useState<LineUserActivity[]>(() => cachedActivities || []);
+    const [kpi, setKpi] = useState<ActivityKpiSummary>(() => cachedKpi || {
         totalActivities: 0,
         todayActivities: 0,
         followCount: 0,
@@ -50,14 +57,16 @@ export function UserActivityMonitoringTab({ onNavigateToChat }: UserActivityMoni
         formViewCount: 0,
         postbackCount: 0,
     });
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(() => !cachedActivities);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedType, setSelectedType] = useState<string>('all');
     const [autoRefresh, setAutoRefresh] = useState(true);
 
     const fetchData = useCallback(async (isSilent = false) => {
-        if (!isSilent) setIsRefreshing(true);
+        if (!isSilent && !getStaleLocalCache(ACTIVITY_LOGS_CACHE_KEY)) {
+            setIsRefreshing(true);
+        }
         try {
             const [actsRes, kpiRes] = await Promise.all([
                 getUserActivitiesAction(150, selectedType),
@@ -66,9 +75,13 @@ export function UserActivityMonitoringTab({ onNavigateToChat }: UserActivityMoni
 
             if (actsRes.success && actsRes.activities) {
                 setActivities(actsRes.activities);
+                if (selectedType === 'all') {
+                    setLocalCache(ACTIVITY_LOGS_CACHE_KEY, actsRes.activities);
+                }
             }
             if (kpiRes.success && kpiRes.kpi) {
                 setKpi(kpiRes.kpi);
+                setLocalCache(ACTIVITY_KPI_CACHE_KEY, kpiRes.kpi);
             }
         } catch (e) {
             console.error('[UserActivityMonitoringTab] Fetch error:', e);

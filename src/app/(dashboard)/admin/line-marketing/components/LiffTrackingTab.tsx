@@ -32,11 +32,15 @@ import {
 import { toast } from 'sonner';
 import { getTrackingSummaryAction, getTagsSummaryAction, assignTagToUserAction, removeTagFromUserAction } from '@/actions/line-marketing';
 import { TrackingKpiSummary, TagSummaryItem, LineAccessLog } from '@/types/line-tracking';
+import { getStaleLocalCache, setLocalCache } from '@/lib/local-cache';
 
 // インメモリキャッシュ＆プリフェッチ管理（タブ切り替えを瞬時にするため）
 let cachedTrackingSummary: TrackingKpiSummary | null = null;
 let cachedTagsSummary: TagSummaryItem[] | null = null;
 let prefetchPromise: Promise<void> | null = null;
+
+const LIFF_SUMMARY_CACHE_KEY = 'line_liff_tracking_summary';
+const LIFF_TAGS_CACHE_KEY = 'line_liff_tags_summary';
 
 /**
  * LIFFトラッキング＆タグデータの事前ロード関数
@@ -54,9 +58,11 @@ export async function preloadLiffTrackingData(): Promise<void> {
             ]);
             if (summaryRes.success && summaryRes.data) {
                 cachedTrackingSummary = summaryRes.data;
+                setLocalCache(LIFF_SUMMARY_CACHE_KEY, summaryRes.data);
             }
             if (tagsRes.success && tagsRes.tags) {
                 cachedTagsSummary = tagsRes.tags;
+                setLocalCache(LIFF_TAGS_CACHE_KEY, tagsRes.tags);
             }
         } catch (e) {
             console.error('[preloadLiffTrackingData] error:', e);
@@ -73,17 +79,22 @@ interface LiffTrackingTabProps {
 }
 
 export function LiffTrackingTab({ onSelectTagForBroadcast }: LiffTrackingTabProps) {
+    const localSummary = getStaleLocalCache<TrackingKpiSummary>(LIFF_SUMMARY_CACHE_KEY);
+    const localTags = getStaleLocalCache<TagSummaryItem[]>(LIFF_TAGS_CACHE_KEY);
+
     // キャッシュが存在する場合は初回から即時表示（isLoading: false）
-    const [summary, setSummary] = useState<TrackingKpiSummary | null>(cachedTrackingSummary);
-    const [tags, setTags] = useState<TagSummaryItem[]>(cachedTagsSummary || []);
-    const [isLoading, setIsLoading] = useState(!cachedTrackingSummary);
+    const [summary, setSummary] = useState<TrackingKpiSummary | null>(() => cachedTrackingSummary || localSummary);
+    const [tags, setTags] = useState<TagSummaryItem[]>(() => cachedTagsSummary || localTags || []);
+    const [isLoading, setIsLoading] = useState(() => !cachedTrackingSummary && !localSummary);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
     // データ取得（SWR: キャッシュ表示時はバックグラウンドでサイレント更新）
     const fetchData = useCallback(async (isSilent = false) => {
-        if (!isSilent) setIsRefreshing(true);
+        if (!isSilent && !getStaleLocalCache(LIFF_SUMMARY_CACHE_KEY)) {
+            setIsRefreshing(true);
+        }
         try {
             const [summaryRes, tagsRes] = await Promise.all([
                 getTrackingSummaryAction(100),
@@ -93,10 +104,12 @@ export function LiffTrackingTab({ onSelectTagForBroadcast }: LiffTrackingTabProp
             if (summaryRes.success && summaryRes.data) {
                 cachedTrackingSummary = summaryRes.data;
                 setSummary(summaryRes.data);
+                setLocalCache(LIFF_SUMMARY_CACHE_KEY, summaryRes.data);
             }
             if (tagsRes.success && tagsRes.tags) {
                 cachedTagsSummary = tagsRes.tags;
                 setTags(tagsRes.tags);
+                setLocalCache(LIFF_TAGS_CACHE_KEY, tagsRes.tags);
             }
         } catch (err: any) {
             console.error('[LiffTrackingTab] Fetch error:', err);
