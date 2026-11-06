@@ -33,7 +33,13 @@ export async function cancelSchedule(scheduleId: string) {
         // 3. Delete from Google Calendar if exists
         if (schedule.google_event_id) {
             try {
-                const { deleteCalendarEvent, getAdminRefreshToken, getCoachRefreshToken } = await import('@/lib/google-calendar')
+                const { 
+                    deleteCalendarEvent, 
+                    getAdminRefreshToken, 
+                    getCoachRefreshToken,
+                    isShinkichiOrAdminCoach,
+                    getShinkichiCalendarId
+                } = await import('@/lib/google-calendar')
                 // 優先的にそのコーチ自身のトークンを取得
                 let token = await getCoachRefreshToken(supabaseAdmin, schedule.coach_id)
                 
@@ -43,7 +49,9 @@ export async function cancelSchedule(scheduleId: string) {
                 }
 
                 if (token) {
-                    await deleteCalendarEvent(token, schedule.google_event_id)
+                    const isShinkichi = await isShinkichiOrAdminCoach(supabaseAdmin, schedule.coach_id)
+                    const calId = isShinkichi ? await getShinkichiCalendarId(supabaseAdmin) : null
+                    await deleteCalendarEvent(token, schedule.google_event_id, calId || 'primary')
                 }
             } catch (calErr) {
                 console.error(`[CancelSchedule] Failed to delete Google Calendar Event (${schedule.google_event_id}):`, calErr)
@@ -117,10 +125,26 @@ export async function updateScheduleWithCalendar(params: UpdateScheduleParams) {
 
         // 3. Googleカレンダーへ同期
         try {
-            const { updateCalendarEvent, createCalendarEvent, getAdminRefreshToken } = await import('@/lib/google-calendar')
-            const adminRefreshToken = await getAdminRefreshToken(supabaseAdmin)
+            const { 
+                updateCalendarEvent, 
+                createCalendarEvent, 
+                getAdminRefreshToken, 
+                getCoachRefreshToken,
+                isShinkichiOrAdminCoach,
+                getShinkichiCalendarId 
+            } = await import('@/lib/google-calendar')
+            
+            const coachId = existing?.coach_id || params.coachId
+            const isShinkichi = coachId ? await isShinkichiOrAdminCoach(supabaseAdmin, coachId) : false
+            const shinkichiCalendarId = isShinkichi ? await getShinkichiCalendarId(supabaseAdmin) : null
+            const targetCalId = shinkichiCalendarId || 'primary'
 
-            if (adminRefreshToken) {
+            let token = coachId ? await getCoachRefreshToken(supabaseAdmin, coachId) : null
+            if (!token) {
+                token = await getAdminRefreshToken(supabaseAdmin)
+            }
+
+            if (token) {
                 const calPayload = {
                     summary: params.title,
                     description: params.notes || '',
@@ -131,10 +155,10 @@ export async function updateScheduleWithCalendar(params: UpdateScheduleParams) {
 
                 if (existing?.google_event_id) {
                     // 既存イベントを更新
-                    await updateCalendarEvent(adminRefreshToken, existing.google_event_id, calPayload)
+                    await updateCalendarEvent(token, existing.google_event_id, calPayload, targetCalId)
                 } else {
                     // イベントが未作成の場合は新規作成してIDを保存
-                    const newEventId = await createCalendarEvent(adminRefreshToken, calPayload)
+                    const newEventId = await createCalendarEvent(token, calPayload, targetCalId)
                     if (newEventId) {
                         await supabaseAdmin
                             .from('lesson_schedules')

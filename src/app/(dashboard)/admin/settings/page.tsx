@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { CompanySettingsForm } from "@/components/admin/CompanySettingsForm"
 import { PaymentSlipTemplateForm } from "@/components/admin/PaymentSlipTemplateForm"
 import { TermsSettingsForm } from "@/components/admin/TermsSettingsForm"
+import { ShinkichiCalendarSettingsForm } from "@/components/admin/ShinkichiCalendarSettingsForm"
 
 export default async function SettingsPage() {
     const supabase = await createClient()
@@ -28,6 +29,14 @@ export default async function SettingsPage() {
     if (!profile) {
         return <div>Profile not found</div>
     }
+
+    // 新吉コーチの登録先Googleカレンダー設定を取得
+    const { data: shinkichiCalConfig } = await supabase
+        .from('app_configs')
+        .select('value')
+        .eq('key', 'shinkichi_calendar_id')
+        .maybeSingle()
+    const shinkichiCalendarId = shinkichiCalConfig?.value || ''
 
     return (
         <div className="space-y-6">
@@ -120,6 +129,8 @@ export default async function SettingsPage() {
                             </Button>
                         )}
                     </div>
+
+                    <ShinkichiCalendarSettingsForm initialCalendarId={shinkichiCalendarId} />
                 </CardContent>
             </Card>
 

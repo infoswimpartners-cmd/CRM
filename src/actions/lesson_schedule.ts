@@ -424,16 +424,56 @@ export async function createLessonSchedule(params: CreateLessonScheduleParams) {
 
                 if (insertError) throw insertError
 
-                // 5. Google Calendar Sync
+                // 5. Google Calendar Sync（新吉アサイン時は二重登録を抑止し任意カレンダーへ、他コーチは並列同期）
                 try {
-                    const { createCalendarEvent, getAdminRefreshToken, getCoachRefreshToken } = await import('@/lib/google-calendar')
+                    const { 
+                        createCalendarEvent, 
+                        getAdminRefreshToken, 
+                        getCoachRefreshToken,
+                        isShinkichiOrAdminCoach,
+                        getShinkichiCalendarId
+                    } = await import('@/lib/google-calendar')
                     
-                    // a) Coach's individual calendar sync
-                    let coachEventId: string | null = null;
-                    if (params.coach_id) {
-                        const coachRefreshToken = await getCoachRefreshToken(supabaseAdmin, params.coach_id)
-                        if (coachRefreshToken) {
-                            coachEventId = await createCalendarEvent(coachRefreshToken, {
+                    const isShinkichi = params.coach_id ? await isShinkichiOrAdminCoach(supabaseAdmin, params.coach_id) : false
+                    const shinkichiCalendarId = isShinkichi ? await getShinkichiCalendarId(supabaseAdmin) : null
+
+                    let finalEventId: string | null = null
+
+                    if (isShinkichi) {
+                        // 【新吉コーチ（代表・管理者）アサイン時】二重登録を防ぎ、指定カレンダー（または primary）へ1件のみ登録
+                        let token = await getCoachRefreshToken(supabaseAdmin, params.coach_id)
+                        if (!token) token = await getAdminRefreshToken(supabaseAdmin)
+                        if (token) {
+                            finalEventId = await createCalendarEvent(token, {
+                                summary: params.title,
+                                description: params.notes || '',
+                                location: params.location || '',
+                                start: params.start_time,
+                                end: params.end_time,
+                            }, shinkichiCalendarId || 'primary')
+                        }
+                    } else {
+                        // 【通常コーチアサイン時】コーチ個人カレンダーと管理者マスターカレンダーの双方へ登録
+                        // a) Coach's individual calendar sync
+                        let coachEventId: string | null = null;
+                        if (params.coach_id) {
+                            const coachRefreshToken = await getCoachRefreshToken(supabaseAdmin, params.coach_id)
+                            if (coachRefreshToken) {
+                                coachEventId = await createCalendarEvent(coachRefreshToken, {
+                                    summary: params.title,
+                                    description: params.notes || '',
+                                    location: params.location || '',
+                                    start: params.start_time,
+                                    end: params.end_time,
+                                })
+                            }
+                        }
+
+                        // b) Admin's master calendar sync
+                        const adminRefreshToken = await getAdminRefreshToken(supabaseAdmin)
+                        let adminEventId: string | null = null;
+                        if (adminRefreshToken) {
+                            adminEventId = await createCalendarEvent(adminRefreshToken, {
                                 summary: params.title,
                                 description: params.notes || '',
                                 location: params.location || '',
@@ -441,23 +481,11 @@ export async function createLessonSchedule(params: CreateLessonScheduleParams) {
                                 end: params.end_time,
                             })
                         }
+
+                        // Store event ID (prioritize coach's for their reference, or admin's if only that exists)
+                        finalEventId = coachEventId || adminEventId
                     }
 
-                    // b) Admin's master calendar sync
-                    const adminRefreshToken = await getAdminRefreshToken(supabaseAdmin)
-                    let adminEventId: string | null = null;
-                    if (adminRefreshToken) {
-                        adminEventId = await createCalendarEvent(adminRefreshToken, {
-                            summary: params.title,
-                            description: params.notes || '',
-                            location: params.location || '',
-                            start: params.start_time,
-                            end: params.end_time,
-                        })
-                    }
-
-                    // Store event ID (prioritize coach's for their reference, or admin's if only that exists)
-                    const finalEventId = coachEventId || adminEventId
                     if (finalEventId) {
                         await supabaseAdmin
                             .from('lesson_schedules')
@@ -692,7 +720,13 @@ export async function rejectLessonSchedule(scheduleId: string) {
 
         if (existing?.google_event_id) {
             try {
-                const { deleteCalendarEvent, getAdminRefreshToken, getCoachRefreshToken } = await import('@/lib/google-calendar')
+                const { 
+                    deleteCalendarEvent, 
+                    getAdminRefreshToken, 
+                    getCoachRefreshToken,
+                    isShinkichiOrAdminCoach,
+                    getShinkichiCalendarId
+                } = await import('@/lib/google-calendar')
                 // 優先的にそのコーチ自身のトークンを取得
                 let token = await getCoachRefreshToken(supabaseAdmin, existing.coach_id)
                 
@@ -702,7 +736,9 @@ export async function rejectLessonSchedule(scheduleId: string) {
                 }
 
                 if (token) {
-                    await deleteCalendarEvent(token, existing.google_event_id)
+                    const isShinkichi = await isShinkichiOrAdminCoach(supabaseAdmin, existing.coach_id)
+                    const calId = isShinkichi ? await getShinkichiCalendarId(supabaseAdmin) : null
+                    await deleteCalendarEvent(token, existing.google_event_id, calId || 'primary')
                 }
             } catch (calErr) {
                 console.error('[rejectLessonSchedule] Googleカレンダー削除失敗:', calErr)
