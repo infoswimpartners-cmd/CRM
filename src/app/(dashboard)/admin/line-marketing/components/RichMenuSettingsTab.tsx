@@ -27,16 +27,24 @@ import {
     getOfficialLineRichMenuListAction,
 } from '@/actions/line-richmenu'
 import { unlinkAllUserRichMenusAction } from '@/actions/line-marketing'
+import { getStaleLocalCache, setLocalCache } from '@/lib/local-cache'
+
+const MEMBER_RICHMENU_CACHE_KEY = 'line_member_rich_menu_id'
+const OFFICIAL_MENUS_CACHE_KEY = 'line_official_richmenus'
 
 export function RichMenuSettingsTab() {
-    const [memberRichMenuId, setMemberRichMenuId] = useState('')
+    const [memberRichMenuId, setMemberRichMenuId] = useState<string>(() => {
+        return getStaleLocalCache<string>(MEMBER_RICHMENU_CACHE_KEY) || ''
+    })
     const [availableRichMenus, setAvailableRichMenus] = useState<Array<{
         richMenuId: string;
         name: string;
         chatBarText: string;
         selected: boolean;
-    }>>([])
-    const [isLoading, setIsLoading] = useState(true)
+    }>>(() => {
+        return getStaleLocalCache<any>(OFFICIAL_MENUS_CACHE_KEY) || []
+    })
+    const [isLoading, setIsLoading] = useState(() => !getStaleLocalCache(MEMBER_RICHMENU_CACHE_KEY))
     const [isLoadingMenus, setIsLoadingMenus] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
     const [isSyncing, setIsSyncing] = useState(false)
@@ -56,11 +64,14 @@ export function RichMenuSettingsTab() {
     }, [])
 
     const loadSettings = async () => {
-        setIsLoading(true)
+        if (!getStaleLocalCache(MEMBER_RICHMENU_CACHE_KEY)) {
+            setIsLoading(true)
+        }
         try {
             const settings = await getRichMenuSettingsAction()
             if (settings?.memberRichMenuId) {
                 setMemberRichMenuId(settings.memberRichMenuId)
+                setLocalCache(MEMBER_RICHMENU_CACHE_KEY, settings.memberRichMenuId)
             }
         } catch (e: any) {
             console.error('Failed to load rich menu settings:', e)
@@ -75,6 +86,7 @@ export function RichMenuSettingsTab() {
             const res = await getOfficialLineRichMenuListAction()
             if (res.success && res.richmenus) {
                 setAvailableRichMenus(res.richmenus)
+                setLocalCache(OFFICIAL_MENUS_CACHE_KEY, res.richmenus)
             }
         } catch (e: any) {
             console.warn('Failed to fetch official LINE rich menu list:', e)

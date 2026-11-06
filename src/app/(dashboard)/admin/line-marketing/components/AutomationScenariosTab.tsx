@@ -56,10 +56,15 @@ import {
     saveScenarioConfigAction,
     testSendScenarioAction,
 } from '@/actions/automation-scenarios';
+import { getStaleLocalCache, setLocalCache } from '@/lib/local-cache';
+
+const SCENARIOS_CACHE_KEY = 'line_automation_scenarios';
 
 export function AutomationScenariosTab() {
-    const [scenarios, setScenarios] = useState<AutomationScenario[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const [scenarios, setScenarios] = useState<AutomationScenario[]>(() => {
+        return getStaleLocalCache<AutomationScenario[]>(SCENARIOS_CACHE_KEY) || [];
+    });
+    const [isLoading, setIsLoading] = useState(() => !getStaleLocalCache(SCENARIOS_CACHE_KEY));
     const [editingScenario, setEditingScenario] = useState<AutomationScenario | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [isTesting, setIsTesting] = useState(false);
@@ -77,11 +82,14 @@ export function AutomationScenariosTab() {
 
     // シナリオ一覧取得
     const fetchScenarios = useCallback(async () => {
-        setIsLoading(true);
+        if (!getStaleLocalCache(SCENARIOS_CACHE_KEY)) {
+            setIsLoading(true);
+        }
         try {
             const res = await getAutomationScenariosAction();
             if (res.success && res.data) {
                 setScenarios(res.data);
+                setLocalCache(SCENARIOS_CACHE_KEY, res.data);
             } else {
                 toast.error(res.error || 'シナリオ一覧の取得に失敗しました');
             }

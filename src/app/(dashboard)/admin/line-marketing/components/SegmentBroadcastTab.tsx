@@ -36,6 +36,7 @@ import { PhonePreviewModal } from './PhonePreviewModal';
 import { SafetyConfirmDialog } from './SafetyConfirmDialog';
 import { ScheduledCampaignsModal } from './ScheduledCampaignsModal';
 import { formatErrorToastMessage, sanitizeErrorMessage } from '@/lib/error-formatter';
+import { getStaleLocalCache, setLocalCache } from '@/lib/local-cache';
 
 export interface MasterDataProps {
     coaches: Array<{ id: string; fullName: string; baseArea: string | null }>;
@@ -43,6 +44,9 @@ export interface MasterDataProps {
     statuses: Array<{ id: string; name: string }>;
     areas: string[];
 }
+
+const MASTER_DATA_CACHE_KEY = 'marketing_master_data';
+const PREVIEW_CACHE_KEY = 'marketing_segment_preview';
 
 interface SegmentBroadcastTabProps {
     masterData?: MasterDataProps;
@@ -122,21 +126,24 @@ export const SegmentBroadcastTab: React.FC<SegmentBroadcastTabProps> = ({
     onDeliveryDone,
 }) => {
     // -------------------------------------------------------------
-    // 0. マスタデータ管理
+    // 0. マスタデータ管理（即時ローカルキャッシュ復元）
     // -------------------------------------------------------------
-    const [masterData, setMasterData] = useState<MasterDataProps>(
-        initialMasterData || {
+    const [masterData, setMasterData] = useState<MasterDataProps>(() => {
+        return initialMasterData || getStaleLocalCache<MasterDataProps>(MASTER_DATA_CACHE_KEY) || {
             coaches: [],
             plans: [],
             statuses: [],
             areas: ['東京都', '千葉県', '神奈川県', '目黒区', '港区', '品川区', '世田谷区'],
-        }
-    );
+        };
+    });
 
     useEffect(() => {
         if (!initialMasterData) {
             getLineMarketingMasterData().then(data => {
-                if (data) setMasterData(data);
+                if (data) {
+                    setMasterData(data);
+                    setLocalCache(MASTER_DATA_CACHE_KEY, data);
+                }
             }).catch(e => console.error('[SegmentBroadcastTab] Master data load error:', e));
         } else {
             setMasterData(initialMasterData);
@@ -166,10 +173,14 @@ export const SegmentBroadcastTab: React.FC<SegmentBroadcastTabProps> = ({
     }, [initialTag]);
 
     // -------------------------------------------------------------
-    // 2. プレビュー抽出データ & 個別除外状態
+    // 2. プレビュー抽出データ & 個別除外状態（即時0秒ロード）
     // -------------------------------------------------------------
-    const [isLoadingPreview, setIsLoadingPreview] = useState<boolean>(false);
-    const [previewResult, setPreviewResult] = useState<FilterPreviewResult | null>(null);
+    const cachedInitialPreview = useMemo(() => {
+        return getStaleLocalCache<FilterPreviewResult>(PREVIEW_CACHE_KEY);
+    }, []);
+
+    const [previewResult, setPreviewResult] = useState<FilterPreviewResult | null>(() => cachedInitialPreview);
+    const [isLoadingPreview, setIsLoadingPreview] = useState<boolean>(() => !cachedInitialPreview);
     const [excludedStudentIds, setExcludedStudentIds] = useState<Set<string>>(new Set());
 
     // -------------------------------------------------------------
@@ -216,6 +227,19 @@ export const SegmentBroadcastTab: React.FC<SegmentBroadcastTabProps> = ({
             const result = await previewSegmentStudents(filter);
             if (result.success) {
                 setPreviewResult(result);
+                // 初期・全件条件時は次回即時表示用にローカルキャッシュ保存
+                if (
+                    selectedStatus === 'all' &&
+                    selectedArea === 'all' &&
+                    selectedCoachId === 'all' &&
+                    selectedPlanId === 'all' &&
+                    selectedTag === 'all' &&
+                    !viewedNotAppliedOnly &&
+                    lineLinkedOnly &&
+                    !searchQuery.trim()
+                ) {
+                    setLocalCache(PREVIEW_CACHE_KEY, result);
+                }
                 // 抽出条件変更時、存在しない除外IDをクリーンアップ
                 setExcludedStudentIds(prev => {
                     const next = new Set<string>();

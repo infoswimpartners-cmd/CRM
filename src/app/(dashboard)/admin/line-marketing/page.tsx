@@ -23,9 +23,12 @@ import { UserActivityMonitoringTab } from './components/UserActivityMonitoringTa
 import { AutomationScenariosTab } from './components/AutomationScenariosTab';
 import { getMarketingKpiSummaryAction, syncTrialDoneStudentsAction } from '@/actions/line-marketing';
 import { formatErrorToastMessage, sanitizeErrorMessage } from '@/lib/error-formatter';
+import { getStaleLocalCache, setLocalCache } from '@/lib/local-cache';
 
 // ページ内インメモリKPIキャッシュ（Stale-While-Revalidate: 即時表示用）
 let cachedMarketingKpi: MarketingKpiData | null = null;
+
+const KPI_CACHE_KEY = 'line_marketing_kpi';
 
 export default function LineMarketingPage() {
     const [activeTab, setActiveTab] = useState<'chat' | 'scenarios' | 'broadcast' | 'steps' | 'activity' | 'tracking' | 'logs' | 'richmenu'>('broadcast');
@@ -34,15 +37,21 @@ export default function LineMarketingPage() {
     const [selectedTagForBroadcast, setSelectedTagForBroadcast] = useState<string | null>(null);
     const [initialChatLineUserId, setInitialChatLineUserId] = useState<string | null>(null);
     const [chatBadgeCount, setChatBadgeCount] = useState(0);
-    const [kpi, setKpi] = useState<MarketingKpiData>(() => cachedMarketingKpi || {
-        totalSent: 0,
-        successCount: 0,
-        failedCount: 0,
-        skippedCount: 0,
-        successRate: 0,
-        inProgressStudentsCount: 0,
+    const [kpi, setKpi] = useState<MarketingKpiData>(() => {
+        const localCached = getStaleLocalCache<MarketingKpiData>(KPI_CACHE_KEY);
+        return localCached || cachedMarketingKpi || {
+            totalSent: 0,
+            successCount: 0,
+            failedCount: 0,
+            skippedCount: 0,
+            successRate: 0,
+            inProgressStudentsCount: 0,
+        };
     });
-    const [isLoadingKpi, setIsLoadingKpi] = useState(() => !cachedMarketingKpi);
+    const [isLoadingKpi, setIsLoadingKpi] = useState(() => {
+        const localCached = getStaleLocalCache<MarketingKpiData>(KPI_CACHE_KEY);
+        return !localCached && !cachedMarketingKpi;
+    });
     const [isSyncing, setIsSyncing] = useState(false);
 
     // タブ切り替えハンドラ（オンデマンド訪問タブ登録）
@@ -68,6 +77,7 @@ export default function LineMarketingPage() {
             if (res.success && res.data) {
                 setKpi(res.data);
                 cachedMarketingKpi = res.data;
+                setLocalCache(KPI_CACHE_KEY, res.data);
             } else if (res.error) {
                 console.warn('[LineMarketingPage] fetchKpi notice:', res.error);
             }

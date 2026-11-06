@@ -545,33 +545,34 @@ export async function fetchAndFilterMarketingStudents(
 ): Promise<FilteredMarketingStudent[]> {
     const supabase = createAdminClient();
 
-    const { data: rawStudents, error } = await supabase
-        .from('students')
-        .select(`
-            id,
-            student_number,
-            full_name,
-            full_name_kana,
-            status,
-            line_user_id,
-            coach_id,
-            membership_type_id,
-            coach:profiles!coach_id (id, full_name, base_area),
-            membership_type:membership_types!membership_type_id (id, name),
-            lessons:lessons (id, location, lesson_date, lesson_masters(is_trial, name))
-        `)
-        .order('created_at', { ascending: false });
+    // 抽出に必要なデータを Promise.all で並列一括取得（待機時間を大幅短縮）
+    const [studentsResult, userTagsMap, leadsResult] = await Promise.all([
+        supabase
+            .from('students')
+            .select(`
+                id,
+                student_number,
+                full_name,
+                full_name_kana,
+                status,
+                line_user_id,
+                coach_id,
+                membership_type_id,
+                coach:profiles!coach_id (id, full_name, base_area),
+                membership_type:membership_types!membership_type_id (id, name),
+                lessons:lessons (id, location, lesson_date, lesson_masters(is_trial, name))
+            `)
+            .order('created_at', { ascending: false }),
+        getAllUserTagsMap(),
+        supabase
+            .from('leads')
+            .select('name, area, lesson_location, confirmed_location, line_user_id'),
+    ]);
 
-    if (error || !rawStudents) return [];
+    const rawStudents = studentsResult.data;
+    if (studentsResult.error || !rawStudents) return [];
 
-    // 全ユーザーのタグマップを取得
-    const userTagsMap = await getAllUserTagsMap();
-
-    // リード情報（体験申込・問合せ時の希望エリア・プール情報）を取得してマッピング
-    const { data: rawLeads } = await supabase
-        .from('leads')
-        .select('name, area, lesson_location, confirmed_location, line_user_id');
-
+    const rawLeads = leadsResult.data;
     const leadMapByLineId = new Map<string, any>();
     const leadMapByName = new Map<string, any>();
     if (rawLeads) {
