@@ -141,7 +141,9 @@ export async function previewSegmentStudents(
 /**
  * 互換エイリアス
  */
-export const previewSegmentFilter = previewSegmentStudents;
+export async function previewSegmentFilter(filter: SegmentFilterConditions = {}): Promise<FilterPreviewResult> {
+    return await previewSegmentStudents(filter);
+}
 
 // ==============================================================================
 // 2. 一括配信予約・即時配信実行

@@ -24,7 +24,7 @@ import {
 } from '@/lib/line-trial-followup';
 
 // レッスン報告フィードバックのデフォルトテンプレート
-export const DEFAULT_LESSON_REPORT_FEEDBACK_TEMPLATE =
+const DEFAULT_LESSON_REPORT_FEEDBACK_TEMPLATE =
 `{{name}} 様
 
 スイムパートナーズの {{coach_name}} です🏊‍♂️✨
@@ -49,7 +49,7 @@ export const DEFAULT_LESSON_REPORT_FEEDBACK_TEMPLATE =
 次回もよろしくお願いいたします😊`;
 
 // 離脱ステップ配信のデフォルトテンプレート
-export const DEFAULT_CART_RECOVERY_TEMPLATE =
+const DEFAULT_CART_RECOVERY_TEMPLATE =
 `{{name}} 様
 
 スイムパートナーズです🏊‍♂️
@@ -63,7 +63,7 @@ export const DEFAULT_CART_RECOVERY_TEMPLATE =
 {{form_url}}`;
 
 // ユーザーアクティビティ（1時間未返信）デフォルトテンプレート
-export const DEFAULT_ACTIVITY_RECOVERY_TEMPLATE =
+const DEFAULT_ACTIVITY_RECOVERY_TEMPLATE =
 `{{name}} 様
 
 スイムパートナーズ事務局です🏊‍♂️
@@ -74,7 +74,7 @@ export const DEFAULT_ACTIVITY_RECOVERY_TEMPLATE =
 些細なことでもお気軽にメッセージをお送りください😊`;
 
 // レッスンリマインダーデフォルトテンプレート
-export const DEFAULT_LESSON_REMINDER_TEMPLATE =
+const DEFAULT_LESSON_REMINDER_TEMPLATE =
 `{{name}} 様
 
 スイムパートナーズです🏊‍♂️
