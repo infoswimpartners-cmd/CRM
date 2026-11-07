@@ -95,10 +95,10 @@ export async function updateScheduleWithCalendar(params: UpdateScheduleParams) {
     try {
         const supabaseAdmin = createAdminClient()
 
-        // 1. 既存スケジュール（google_event_id）を取得
+        // 1. 既存スケジュール（google_event_id, coach_id）を取得
         const { data: existing, error: fetchError } = await supabaseAdmin
             .from('lesson_schedules')
-            .select('google_event_id')
+            .select('google_event_id, coach_id')
             .eq('id', params.scheduleId)
             .single()
 
@@ -458,6 +458,7 @@ export async function getPendingSchedulesAction(coachId: string) {
             })).filter(l => l.jst_lesson_date)
 
             // 報告が存在するスケジュールを除外
+            const schedulesToMarkReported: string[] = []
             const filteredSchedules = schedules.filter(s => {
                 if (!s.start_time) return true
                 const sDateStr = toJstDateString(s.start_time)
@@ -488,8 +489,23 @@ export async function getPendingSchedulesAction(coachId: string) {
                     return false
                 })
 
+                if (hasReport) {
+                    schedulesToMarkReported.push(s.id)
+                }
+
                 return !hasReport
             })
+
+            // バックグラウンドで is_reported = true を反映して不整合を解消
+            if (schedulesToMarkReported.length > 0) {
+                supabaseAdmin
+                    .from('lesson_schedules')
+                    .update({ is_reported: true })
+                    .in('id', schedulesToMarkReported)
+                    .then(({ error: updErr }) => {
+                        if (updErr) console.error('[getPendingSchedulesAction] Failed to sync is_reported:', updErr)
+                    })
+            }
 
             return { success: true, data: filteredSchedules }
         }

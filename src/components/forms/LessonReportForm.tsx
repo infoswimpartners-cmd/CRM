@@ -355,6 +355,9 @@ export function LessonReportForm() {
                 .single()
 
             if (schedule) {
+                if (schedule.is_reported) {
+                    toast.info('このレッスンは既に報告済みです。', { duration: 5000 })
+                }
                 fillFormFromSchedule(schedule)
             }
         }
@@ -712,7 +715,19 @@ export function LessonReportForm() {
                             <FormControl>
                                 <StudentSelect
                                     onSelect={(id, name) => {
-                                        form.setValue('schedule_id', '')
+                                        // 現在のスケジュールが別の生徒のものであれば解除、同じ生徒であれば維持
+                                        const currentSchedId = form.getValues('schedule_id')
+                                        const currentSched = pendingSchedules.find(s => s.id === currentSchedId)
+                                        if (currentSched && currentSched.student_id !== id) {
+                                            form.setValue('schedule_id', '')
+                                        } else if (!currentSchedId && id) {
+                                            // まだスケジュールが未選択の場合、この生徒の直近の未報告スケジュールがあれば自動反映
+                                            const candidate = pendingSchedules.find(s => s.student_id === id)
+                                            if (candidate) {
+                                                fillFormFromSchedule(candidate)
+                                                return
+                                            }
+                                        }
                                         form.setValue('student_id', id || '')
                                         form.setValue('student_name', name)
                                     }}

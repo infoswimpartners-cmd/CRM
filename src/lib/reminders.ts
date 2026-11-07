@@ -475,6 +475,41 @@ export async function processLessonReportRequests(options: ReminderProcessOption
             return { success: true, message: 'No unreported schedules', target_date: dateKey, processed: 0 }
         }
 
+        // 2.5 対象日（昨日）にすでに lessons テーブルへ報告データが登録されているかチェック
+        // レッスン報告が既に完了しているスケジュールについてはリマインド送信対象から除外し、
+        // lesson_schedules.is_reported を true に自動更新して不整合を解消する
+        const toJstDateString = (dateInput: string | Date | null | undefined): string => {
+            if (!dateInput) return ''
+            try {
+                const d = new Date(dateInput)
+                if (isNaN(d.getTime())) return ''
+                const formatter = new Intl.DateTimeFormat('ja-JP', {
+                    timeZone: 'Asia/Tokyo',
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit'
+                })
+                return formatter.format(d).replace(/\//g, '-')
+            } catch (e) {
+                return ''
+            }
+        }
+
+        // タイムゾーンの揺らぎ（UTC vs JST）をカバーするため、JST開始12時間前〜終了12時間後で検索
+        const searchStart = new Date(new Date(startOfDay).getTime() - 12 * 60 * 60 * 1000).toISOString()
+        const searchEnd = new Date(new Date(endOfDay).getTime() + 12 * 60 * 60 * 1000).toISOString()
+
+        const { data: reportedLessons } = await supabase
+            .from('lessons')
+            .select('id, student_id, student_name, coach_id, lesson_date')
+            .gte('lesson_date', searchStart)
+            .lte('lesson_date', searchEnd)
+
+        const reportedLessonsJst = (reportedLessons || []).map(l => ({
+            ...l,
+            jst_date: toJstDateString(l.lesson_date)
+        }))
+
         // 3. 送信済みフラグの取得
         const flagKeys = schedules.map(s => `report_request_sent:${s.id}`)
         const { data: sentFlags } = await supabase
@@ -517,6 +552,55 @@ export async function processLessonReportRequests(options: ReminderProcessOption
             const coach = schedule.profiles as any
             const flagKey = `report_request_sent:${schedule.id}`
             if (!student || sentSet.has(flagKey)) continue
+
+            // 既に lessons テーブルに報告が存在するか判定
+            const scheduleJstDate = toJstDateString(schedule.start_time)
+            const alreadyReported = reportedLessonsJst.some(l => {
+                // 日付が一致
+                if (l.jst_date !== scheduleJstDate) return false
+
+                // コーチが一致（両方設定されている場合）
+                if (schedule.coach_id && l.coach_id && schedule.coach_id !== l.coach_id) {
+                    return false
+                }
+
+                // 1. student_id が一致
+                if (schedule.student_id && l.student_id === schedule.student_id) {
+                    return true
+                }
+
+                // 2. 生徒名による一致判定
+                const sName = student.full_name || ''
+                const sSecondName = student.second_student_name || ''
+                const lName = l.student_name || ''
+                if (lName && sName) {
+                    if (lName === sName || lName.includes(sName) || sName.includes(lName)) {
+                        return true
+                    }
+                    if (sSecondName && (lName === sSecondName || lName.includes(sSecondName) || sSecondName.includes(lName))) {
+                        return true
+                    }
+                }
+
+                return false
+            })
+
+            if (alreadyReported) {
+                // すでに報告されているため、通知を送信せず、DB上の is_reported を true に修整
+                if (!dryRun) {
+                    await supabase
+                        .from('lesson_schedules')
+                        .update({ is_reported: true })
+                        .eq('id', schedule.id)
+                }
+                results.push({
+                    schedule_id: schedule.id,
+                    student_name: student.full_name,
+                    coach_name: coach?.full_name,
+                    skipped: 'already_reported'
+                })
+                continue
+            }
 
             const webhookId = schedule.coach_id ? botConfigMap.get(schedule.coach_id)?.gchat_webhook_id : null
             const webhookUrl = webhookId ? webhookMap.get(webhookId) : null
