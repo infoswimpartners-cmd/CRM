@@ -23,30 +23,8 @@ import {
     TEST_TARO_STUDENT_NUMBER,
 } from '@/lib/line-trial-followup';
 
-// レッスン報告フィードバックのデフォルトテンプレート
-const DEFAULT_LESSON_REPORT_FEEDBACK_TEMPLATE =
-`{{name}} 様
-
-スイムパートナーズの {{coach_name}} です🏊‍♂️✨
-本日はレッスンへのご参加、誠にありがとうございました！
-
-本日のレッスンフィードバックをお届けいたします。
-
-━━━━━━━━━━━━━━━
-🏊‍♂️ レッスンレポート
-━━━━━━━━━━━━━━━
-【日時】{{lesson_date}}
-【場所】{{location}}
-
-【コーチからのコメント】
-{{feedback_comment}}
-━━━━━━━━━━━━━━━
-
-マイページからも詳細なレポートをご確認いただけます。
-▼ レポート詳細はこちら
-{{report_url}}
-
-次回もよろしくお願いいたします😊`;
+// レッスン報告フィードバックのデフォルトテンプレート（コーチ入力本文のみ）
+const DEFAULT_LESSON_REPORT_FEEDBACK_TEMPLATE = `{{feedback_comment}}`;
 
 // 離脱ステップ配信のデフォルトテンプレート
 const DEFAULT_CART_RECOVERY_TEMPLATE =

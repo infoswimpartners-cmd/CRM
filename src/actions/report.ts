@@ -256,6 +256,7 @@ export async function submitLessonReport(values: FormValues) {
             lesson_date: data.lesson_date, // Already ISO string
             location: data.location,
             menu_description: data.menu_description || '',
+            coach_comment: data.coach_comment || '',
             price: data.price,
             billing_price: billingPrice,
             attendance_type: data.attendance_type || 'both',
@@ -273,40 +274,10 @@ export async function submitLessonReport(values: FormValues) {
         const newLessonId = insertedLesson?.id
 
         // Mark the original schedule as reported
-        let targetScheduleId = data.schedule_id
-
-        // schedule_id が直接指定されていない場合でも、同日・同生徒・同コーチの未報告スケジュールを自動検出して紐付ける
-        if (!targetScheduleId && (data.student_id || data.student_name)) {
-            try {
-                const lessonDateStr = data.lesson_date.split('T')[0]
-                const dayStart = new Date(`${lessonDateStr}T00:00:00+09:00`).toISOString()
-                const dayEnd = new Date(`${lessonDateStr}T23:59:59.999+09:00`).toISOString()
-
-                let schedQuery = supabaseAdmin
-                    .from('lesson_schedules')
-                    .select('id')
-                    .gte('start_time', dayStart)
-                    .lte('start_time', dayEnd)
-                    .or('is_reported.is.null,is_reported.eq.false')
-
-                if (data.student_id) {
-                    schedQuery = schedQuery.eq('student_id', data.student_id)
-                }
-                if (user?.id) {
-                    schedQuery = schedQuery.eq('coach_id', user.id)
-                }
-
-                const { data: matchedSchedules } = await schedQuery.limit(1)
-                if (matchedSchedules && matchedSchedules.length > 0) {
-                    targetScheduleId = matchedSchedules[0].id
-                    console.log(`[submitLessonReport] Auto-matched schedule ${targetScheduleId} for student ${data.student_id || data.student_name}`)
-                }
-            } catch (matchErr) {
-                console.error('[submitLessonReport] Error auto-matching schedule:', matchErr)
-            }
-        }
-
-        if (targetScheduleId) {
+        if (data.schedule_id) {
+            const { createAdminClient } = await import('@/lib/supabase/admin')
+            const supabaseAdmin = createAdminClient()
+            
             // スケジュールに設定する price を決定する
             // 月謝会員なら基本料 (base_price)、単発会員（isMonthlyMemberがfalse）なら総額 (billingPrice = data.price)
             const schedulePrice = isMonthlyMember ? base_price : billingPrice
@@ -315,7 +286,7 @@ export async function submitLessonReport(values: FormValues) {
                 is_reported: true,
                 price: schedulePrice,
                 lesson_master_id: data.lesson_master_id
-            }).eq('id', targetScheduleId)
+            }).eq('id', data.schedule_id)
 
             // 単発レッスン・追加レッスンの自動請求追加
             try {
@@ -324,11 +295,12 @@ export async function submitLessonReport(values: FormValues) {
                     .select(`
                         id,
                         is_overage,
+                        billing_status,
                         lesson_master:lesson_masters (
                             is_trial
                         )
                     `)
-                    .eq('id', targetScheduleId)
+                    .eq('id', data.schedule_id)
                     .single()
 
                 if (scheduleError) {
@@ -336,15 +308,17 @@ export async function submitLessonReport(values: FormValues) {
                 } else if (schedule) {
                     const isOverage = schedule.is_overage
                     const isTrial = (schedule.lesson_master as any)?.is_trial === true
+                    const isAlreadyPaid = schedule.billing_status === 'paid'
 
-                    console.log(`[Auto-Billing Check] Schedule ${targetScheduleId}: isOverage=${isOverage}, isTrial=${isTrial}`)
+                    console.log(`[Auto-Billing Check] Schedule ${data.schedule_id}: isOverage=${isOverage}, isTrial=${isTrial}, isAlreadyPaid=${isAlreadyPaid}`)
 
-                    if (isOverage && !isTrial) {
-                        console.log(`[Auto-Billing] Triggering createStripeInvoiceItemOnly for schedule ${targetScheduleId}`)
+                    // 二重請求防止: 既に事前決済済みのスケジュールや体験レッスンは自動請求から除外
+                    if (isOverage && !isTrial && !isAlreadyPaid) {
+                        console.log(`[Auto-Billing] Triggering createStripeInvoiceItemOnly for schedule ${data.schedule_id}`)
                         const { createStripeInvoiceItemOnly } = await import('@/actions/stripe')
-                        const billingResult = await createStripeInvoiceItemOnly(targetScheduleId)
+                        const billingResult = await createStripeInvoiceItemOnly(data.schedule_id)
                         if (billingResult.success) {
-                            console.log(`[Auto-Billing] Successfully registered invoice item for schedule ${targetScheduleId}`)
+                            console.log(`[Auto-Billing] Successfully registered invoice item for schedule ${data.schedule_id}`)
                             
                             // 単発会員の場合は、Stripeで作成された請求アイテムIDを lessons テーブル側にも保存して二重請求を防ぐ
                             if (!isMonthlyMember && billingResult.invoiceItemId) {
@@ -858,37 +832,6 @@ export async function submitPublicLessonReport(values: PublicFormValues) {
             }
         }
 
-        // 3.5 スケジュール連携: 同日の未報告スケジュールが存在すれば is_reported = true に自動更新
-        if (data.student_id || data.student_name) {
-            try {
-                const lessonDateStr = data.lesson_date.split('T')[0]
-                const dayStart = new Date(`${lessonDateStr}T00:00:00+09:00`).toISOString()
-                const dayEnd = new Date(`${lessonDateStr}T23:59:59.999+09:00`).toISOString()
-
-                let schedQuery = supabaseAdmin
-                    .from('lesson_schedules')
-                    .select('id')
-                    .gte('start_time', dayStart)
-                    .lte('start_time', dayEnd)
-                    .or('is_reported.is.null,is_reported.eq.false')
-
-                if (data.student_id) schedQuery = schedQuery.eq('student_id', data.student_id)
-                if (data.coach_id) schedQuery = schedQuery.eq('coach_id', data.coach_id)
-
-                const { data: matched } = await schedQuery.limit(1)
-                if (matched && matched.length > 0) {
-                    await supabaseAdmin.from('lesson_schedules').update({
-                        is_reported: true,
-                        price: billingPrice,
-                        lesson_master_id: data.lesson_master_id
-                    }).eq('id', matched[0].id)
-                    console.log(`[submitPublicLessonReport] Auto-marked schedule ${matched[0].id} as reported`)
-                }
-            } catch (e) {
-                console.error('Error auto-updating schedule in submitPublicLessonReport:', e)
-            }
-        }
-
         // 4. 管理者通知（メール設定のlesson_report_sentトリガー経由）
         const toAddress = process.env.REPORT_NOTIFICATION_EMAIL || process.env.SMTP_USER
 
@@ -1228,37 +1171,6 @@ export async function submitAdminProxyReport(values: AdminProxyValues) {
             menuDescription: data.menu_description || '',
         })
 
-        // 8.6 スケジュール連携: 同日の未報告スケジュールが存在すれば is_reported = true に自動更新
-        if (data.student_id || data.student_name) {
-            try {
-                const lessonDateStr = data.lesson_date.split('T')[0]
-                const dayStart = new Date(`${lessonDateStr}T00:00:00+09:00`).toISOString()
-                const dayEnd = new Date(`${lessonDateStr}T23:59:59.999+09:00`).toISOString()
-
-                let schedQuery = supabaseAdmin
-                    .from('lesson_schedules')
-                    .select('id')
-                    .gte('start_time', dayStart)
-                    .lte('start_time', dayEnd)
-                    .or('is_reported.is.null,is_reported.eq.false')
-
-                if (data.student_id) schedQuery = schedQuery.eq('student_id', data.student_id)
-                if (data.coach_id) schedQuery = schedQuery.eq('coach_id', data.coach_id)
-
-                const { data: matched } = await schedQuery.limit(1)
-                if (matched && matched.length > 0) {
-                    await supabaseAdmin.from('lesson_schedules').update({
-                        is_reported: true,
-                        price: billingPrice,
-                        lesson_master_id: data.lesson_master_id
-                    }).eq('id', matched[0].id)
-                    console.log(`[submitAdminProxyReport] Auto-marked schedule ${matched[0].id} as reported`)
-                }
-            } catch (e) {
-                console.error('Error auto-updating schedule in submitAdminProxyReport:', e)
-            }
-        }
-
         revalidatePath('/admin/reports')
         return { success: true }
     } catch (error: any) {
@@ -1451,11 +1363,14 @@ export async function sendLessonReportLineNotification(params: {
         });
 
         const feedbackText = (params.comment || '').trim();
-        const feedbackPreview = feedbackText
-            ? `【コーチからのコメント】\n${feedbackText}`
-            : '（フィードバック詳細はマイページをご確認ください）';
+        // フィードバック機能は任意のため、未入力の場合はLINE送信をスキップ
+        if (!feedbackText) {
+            console.log(`[LessonReport LINE] Feedback comment is empty for ${params.studentName}. Skipping LINE notification.`);
+            return;
+        }
 
-        const lineMessage = `${params.studentName} 様\n\nスイムパートナーズの ${coachName} です🏊‍♂️✨\n本日はレッスンへのご参加、誠にありがとうございました！\n\n本日のレッスンフィードバックをお届けいたします。\n\n━━━━━━━━━━━━━━━\n🏊‍♂️ レッスンレポート\n━━━━━━━━━━━━━━━\n【日時】${formattedDate}\n【場所】${params.location}\n\n${feedbackPreview}\n━━━━━━━━━━━━━━━\n\nマイページからも詳細なレポートをご確認いただけます。\n▼ レポート詳細はこちら\n${reportUrl}\n\n次回もよろしくお願いいたします😊`;
+        // 送信するのはコーチが入力したフィードバック本文のみ
+        const lineMessage = feedbackText;
 
         // 配信モード設定を取得（デフォルトは 'draft': シナリオ自体が下書き・準備中のためメッセージ送信・保存は行わない）
         const { data: modeConfig } = await params.supabaseAdmin

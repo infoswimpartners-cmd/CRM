@@ -232,15 +232,19 @@ async function createTrialScheduleForLead(params: {
 
         // コーチ名の取得
         let coachName = '担当コーチ'
+        let coachEmail: string | null = null
+        let coachGoogleChatEmail: string | null = null
         if (params.coachId) {
             const { data: coachProfile } = await supabaseAdmin
                 .from('profiles')
-                .select('full_name')
+                .select('full_name, email, google_chat_email')
                 .eq('id', params.coachId)
                 .single()
             if (coachProfile?.full_name) {
                 coachName = coachProfile.full_name
             }
+            if (coachProfile?.email) coachEmail = coachProfile.email
+            if (coachProfile?.google_chat_email) coachGoogleChatEmail = coachProfile.google_chat_email
         }
 
         // 既存スケジュールの確認
@@ -361,7 +365,9 @@ async function createTrialScheduleForLead(params: {
             // 【通常 / 2名同時ペアレッスンモード】
             // ==========================================
             const durationMinutes = Math.round((new Date(end).getTime() - new Date(start).getTime()) / (60 * 1000))
-            const is90Min = durationMinutes >= 80 || params.confirmedDate.includes('90分') || (params.leadNotes || '').includes('90分')
+            // 体験レッスンは原則60分（6,000円）。「9:00〜12:00」等の候補時間幅の入力で誤って90分判定されるのを防ぐため、
+            // 確定日時や備考に明示的に「90分」の記載がある場合のみ90分体験レッスンとして判定する
+            const is90Min = params.confirmedDate.includes('90分') || (params.leadNotes || '').includes('90分')
             const trialMaster = is90Min ? (trialMaster90 || trialMaster60) : trialMaster60
 
             let lessonPrice = trialMaster?.unit_price || (is90Min ? 9000 : 6000)
@@ -428,87 +434,77 @@ async function createTrialScheduleForLead(params: {
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://manager.swim-partners.com'
         const paymentLink = `${appUrl}/pay/trial/${targetScheduleId}`
 
-        // 4. Googleカレンダーへの同期（新吉アサイン時は二重登録を抑止し任意カレンダーへ、他コーチは並列同期）
+        // 4. Googleカレンダーへの同期（コーチと管理者を並列実行して高速化）
         try {
-            const { 
-                createCalendarEvent, 
-                getAdminRefreshToken, 
-                getCoachRefreshToken,
-                isShinkichiOrAdminCoach,
-                getShinkichiCalendarId
-            } = await import('@/lib/google-calendar')
+            const { createCalendarEvent, getAdminRefreshToken, getCoachRefreshToken } = await import('@/lib/google-calendar')
             const calSummary = `${params.studentName}様${params.hasSecondStudent ? ` & ${params.secondStudentName || '2人目'}様` : ''}　担当：${coachName}`
             const calDescription = `[体験レッスンスケジュール]\n案件ID: ${params.leadId}\n確定日時: ${params.confirmedDate}\n確定場所: ${params.confirmedLocation}\nご要望・備考: ${params.leadNotes || 'なし'}`
 
-            const isShinkichi = params.coachId ? await isShinkichiOrAdminCoach(supabaseAdmin, params.coachId) : false
-            const shinkichiCalendarId = isShinkichi ? await getShinkichiCalendarId(supabaseAdmin) : null
+            // コーチのGoogleカレンダーに反映させるためのattendees設定
+            const attendees: { email: string; displayName?: string }[] = []
+            const targetCoachEmail = coachGoogleChatEmail || coachEmail
+            if (targetCoachEmail) {
+                attendees.push({ email: targetCoachEmail, displayName: coachName })
+            }
+            if (coachEmail && targetCoachEmail !== coachEmail) {
+                attendees.push({ email: coachEmail, displayName: coachName })
+            }
 
             const calendarSyncTasks: Promise<string | null>[] = []
 
-            if (isShinkichi) {
-                // 【新吉コーチ（代表・管理者）アサイン時】
-                // 本部マスターカレンダーとの二重登録を抑止し、指定された任意カレンダー（未設定時はprimary）へ1件のみ登録
+            let coachRefreshToken: string | null = null
+            let adminRefreshToken: string | null = null
+
+            if (params.coachId) {
+                try {
+                    coachRefreshToken = await getCoachRefreshToken(supabaseAdmin, params.coachId)
+                } catch (cErr) {
+                    console.error('Coach calendar token error:', cErr)
+                }
+            }
+
+            try {
+                adminRefreshToken = await getAdminRefreshToken(supabaseAdmin)
+            } catch (aErr) {
+                console.error('Admin calendar token error:', aErr)
+            }
+
+            // a) 管理者カレンダー同期（attendees付きで登録することでコーチのカレンダーにも自動反映）
+            if (adminRefreshToken) {
                 calendarSyncTasks.push(
                     (async () => {
                         try {
-                            let token = await getCoachRefreshToken(supabaseAdmin, params.coachId)
-                            if (!token) token = await getAdminRefreshToken(supabaseAdmin)
-                            if (token) {
-                                return await createCalendarEvent(token, {
-                                    summary: calSummary,
-                                    description: calDescription,
-                                    location: params.confirmedLocation || '',
-                                    start: start,
-                                    end: end
-                                }, shinkichiCalendarId || 'primary')
-                            }
-                        } catch (sErr) {
-                            console.error('[Google Calendar] Shinkichi calendar sync error:', sErr)
+                            return await createCalendarEvent(adminRefreshToken, {
+                                summary: calSummary,
+                                description: calDescription,
+                                location: params.confirmedLocation || '',
+                                start: start,
+                                end: end,
+                                attendees: attendees.length > 0 ? attendees : undefined
+                            })
+                        } catch (aErr) {
+                            console.error('Admin calendar sync error:', aErr)
                         }
                         return null
                     })()
                 )
-            } else {
-                // 【通常コーチアサイン時】コーチ個人カレンダーと管理者マスターカレンダーの双方へ登録
-                // a) コーチのカレンダー同期タスク
-                if (params.coachId) {
-                    calendarSyncTasks.push(
-                        (async () => {
-                            try {
-                                const coachRefreshToken = await getCoachRefreshToken(supabaseAdmin, params.coachId)
-                                if (coachRefreshToken) {
-                                    return await createCalendarEvent(coachRefreshToken, {
-                                        summary: calSummary,
-                                        description: calDescription,
-                                        location: params.confirmedLocation || '',
-                                        start: start,
-                                        end: end
-                                    })
-                                }
-                            } catch (cErr) {
-                                console.error('Coach calendar sync error:', cErr)
-                            }
-                            return null
-                        })()
-                    )
-                }
+            }
 
-                // b) 管理者のカレンダー同期タスク
+            // b) コーチのカレンダー同期タスク
+            // ※ コーチのリフレッシュトークンが管理者と同じ場合（管理者が自身をアサインした場合）は重複を防止するためスキップ
+            if (coachRefreshToken && coachRefreshToken !== adminRefreshToken) {
                 calendarSyncTasks.push(
                     (async () => {
                         try {
-                            const adminRefreshToken = await getAdminRefreshToken(supabaseAdmin)
-                            if (adminRefreshToken) {
-                                return await createCalendarEvent(adminRefreshToken, {
-                                    summary: calSummary,
-                                    description: calDescription,
-                                    location: params.confirmedLocation || '',
-                                    start: start,
-                                    end: end
-                                })
-                            }
-                        } catch (aErr) {
-                            console.error('Admin calendar sync error:', aErr)
+                            return await createCalendarEvent(coachRefreshToken, {
+                                summary: calSummary,
+                                description: calDescription,
+                                location: params.confirmedLocation || '',
+                                start: start,
+                                end: end
+                            })
+                        } catch (cErr) {
+                            console.error('Coach calendar sync error:', cErr)
                         }
                         return null
                     })()
@@ -996,12 +992,24 @@ export async function assignLeadAction(leadId: string, confirmedDate: string, co
             if (!stripeCustomerId) {
                 try {
                     const { stripe } = await import('@/lib/stripe')
-                    const customer = await stripe.customers.create({
-                        email: lead.email || currentStd?.contact_email || undefined,
-                        name: lead.name || currentStd?.full_name || undefined,
-                        metadata: { studentId: studentId }
-                    })
-                    stripeCustomerId = customer.id
+                    const targetEmail = (lead.email || currentStd?.contact_email || '').trim()
+
+                    // 同一メールアドレスのStripe顧客が既に存在するか確認して再利用（二重作成を防止）
+                    if (targetEmail) {
+                        const existingCustomers = await stripe.customers.list({ email: targetEmail, limit: 1 })
+                        if (existingCustomers.data && existingCustomers.data.length > 0) {
+                            stripeCustomerId = existingCustomers.data[0].id
+                        }
+                    }
+
+                    if (!stripeCustomerId) {
+                        const customer = await stripe.customers.create({
+                            email: targetEmail || undefined,
+                            name: lead.name || currentStd?.full_name || undefined,
+                            metadata: { studentId: studentId }
+                        })
+                        stripeCustomerId = customer.id
+                    }
                 } catch (stripeErr) {
                     console.error('Failed to create Stripe customer on lead confirm:', stripeErr)
                 }
@@ -1031,6 +1039,13 @@ export async function assignLeadAction(leadId: string, confirmedDate: string, co
 
             if (studentUpdateError) {
                 console.error('Failed to update student coach_id and status:', studentUpdateError)
+                // フォールバック: Stripe顧客IDのみ単独で保存を試みる（二重作成防止の徹底）
+                if (stripeCustomerId) {
+                    await supabaseAdmin
+                        .from('students')
+                        .update({ stripe_customer_id: stripeCustomerId })
+                        .eq('id', studentId)
+                }
             }
 
             // student_coaches テーブルに確実に upsert
@@ -1452,12 +1467,24 @@ export async function adminAssignLeadAction(
             if (!stripeCustomerId) {
                 try {
                     const { stripe } = await import('@/lib/stripe')
-                    const customer = await stripe.customers.create({
-                        email: lead.email || currentStd?.contact_email || undefined,
-                        name: lead.name || currentStd?.full_name || undefined,
-                        metadata: { studentId: studentId }
-                    })
-                    stripeCustomerId = customer.id
+                    const targetEmail = (lead.email || currentStd?.contact_email || '').trim()
+
+                    // 同一メールアドレスのStripe顧客が既に存在するか確認して再利用（二重作成を防止）
+                    if (targetEmail) {
+                        const existingCustomers = await stripe.customers.list({ email: targetEmail, limit: 1 })
+                        if (existingCustomers.data && existingCustomers.data.length > 0) {
+                            stripeCustomerId = existingCustomers.data[0].id
+                        }
+                    }
+
+                    if (!stripeCustomerId) {
+                        const customer = await stripe.customers.create({
+                            email: targetEmail || undefined,
+                            name: lead.name || currentStd?.full_name || undefined,
+                            metadata: { studentId: studentId }
+                        })
+                        stripeCustomerId = customer.id
+                    }
                 } catch (stripeErr) {
                     console.error('Failed to create Stripe customer on admin assign:', stripeErr)
                 }
@@ -1487,6 +1514,13 @@ export async function adminAssignLeadAction(
 
             if (studentUpdateError) {
                 console.error('Failed to update student coach_id and status:', studentUpdateError)
+                // フォールバック: Stripe顧客IDのみ単独で保存を試みる（二重作成防止の徹底）
+                if (stripeCustomerId) {
+                    await supabaseAdmin
+                        .from('students')
+                        .update({ stripe_customer_id: stripeCustomerId })
+                        .eq('id', studentId)
+                }
             }
 
             // 旧コーチの紐付けが存在し再アサインされた場合は、旧コーチの紐付けを解除
@@ -2687,19 +2721,11 @@ export async function cancelLeadAssignmentAction(leadId: string) {
                 for (const ts of trialSchedules) {
                     if (ts.google_event_id) {
                         try {
-                            const { 
-                                deleteCalendarEvent, 
-                                getAdminRefreshToken, 
-                                getCoachRefreshToken,
-                                isShinkichiOrAdminCoach,
-                                getShinkichiCalendarId
-                            } = await import('@/lib/google-calendar')
+                            const { deleteCalendarEvent, getAdminRefreshToken, getCoachRefreshToken } = await import('@/lib/google-calendar')
                             let token = await getCoachRefreshToken(supabaseAdmin, ts.coach_id)
                             if (!token) token = await getAdminRefreshToken(supabaseAdmin)
                             if (token) {
-                                const isShinkichi = await isShinkichiOrAdminCoach(supabaseAdmin, ts.coach_id)
-                                const calId = isShinkichi ? await getShinkichiCalendarId(supabaseAdmin) : null
-                                await deleteCalendarEvent(token, ts.google_event_id, calId || 'primary')
+                                await deleteCalendarEvent(token, ts.google_event_id)
                             }
                         } catch (calErr) {
                             console.error('Failed to delete Google Calendar event on assign cancel:', calErr)

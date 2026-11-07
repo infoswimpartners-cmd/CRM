@@ -112,6 +112,8 @@ export interface CalendarEventPayload {
     location?: string;       // 場所
     start: string;           // ISO 8601 (例: 2026-03-15T10:00:00+09:00)
     end: string;             // ISO 8601
+    attendees?: { email: string; displayName?: string }[]; // 参加者（コーチなど）
+    calendarId?: string;     // 対象カレンダーID（デフォルト: primary）
 }
 
 /**
@@ -119,13 +121,13 @@ export interface CalendarEventPayload {
  */
 export async function createCalendarEvent(
     refreshToken: string,
-    payload: CalendarEventPayload,
-    calendarId: string = 'primary'
+    payload: CalendarEventPayload
 ): Promise<string | null> {
     try {
         const accessToken = await getValidAccessToken(refreshToken);
+        const targetCalId = encodeURIComponent(payload.calendarId || 'primary');
 
-        const body = {
+        const body: any = {
             summary: payload.summary,
             description: payload.description || '',
             location: payload.location || '',
@@ -133,9 +135,17 @@ export async function createCalendarEvent(
             end: { dateTime: payload.end, timeZone: 'Asia/Tokyo' },
         };
 
-        const targetCalId = encodeURIComponent(calendarId?.trim() || 'primary');
+        if (payload.attendees && payload.attendees.length > 0) {
+            body.attendees = payload.attendees;
+        }
+
+        const url = new URL(`https://www.googleapis.com/calendar/v3/calendars/${targetCalId}/events`);
+        if (payload.attendees && payload.attendees.length > 0) {
+            url.searchParams.set('sendUpdates', 'all');
+        }
+
         const res = await fetch(
-            `https://www.googleapis.com/calendar/v3/calendars/${targetCalId}/events`,
+            url.toString(),
             {
                 method: 'POST',
                 headers: {
@@ -166,13 +176,13 @@ export async function createCalendarEvent(
 export async function updateCalendarEvent(
     refreshToken: string,
     eventId: string,
-    payload: CalendarEventPayload,
-    calendarId: string = 'primary'
+    payload: CalendarEventPayload
 ): Promise<boolean> {
     try {
         const accessToken = await getValidAccessToken(refreshToken);
+        const targetCalId = encodeURIComponent(payload.calendarId || 'primary');
 
-        const body = {
+        const body: any = {
             summary: payload.summary,
             description: payload.description || '',
             location: payload.location || '',
@@ -180,9 +190,17 @@ export async function updateCalendarEvent(
             end: { dateTime: payload.end, timeZone: 'Asia/Tokyo' },
         };
 
-        const targetCalId = encodeURIComponent(calendarId?.trim() || 'primary');
+        if (payload.attendees && payload.attendees.length > 0) {
+            body.attendees = payload.attendees;
+        }
+
+        const url = new URL(`https://www.googleapis.com/calendar/v3/calendars/${targetCalId}/events/${eventId}`);
+        if (payload.attendees && payload.attendees.length > 0) {
+            url.searchParams.set('sendUpdates', 'all');
+        }
+
         const res = await fetch(
-            `https://www.googleapis.com/calendar/v3/calendars/${targetCalId}/events/${eventId}`,
+            url.toString(),
             {
                 method: 'PUT',
                 headers: {
@@ -212,15 +230,13 @@ export async function updateCalendarEvent(
  */
 export async function deleteCalendarEvent(
     refreshToken: string,
-    eventId: string,
-    calendarId: string = 'primary'
+    eventId: string
 ): Promise<boolean> {
     try {
         const accessToken = await getValidAccessToken(refreshToken);
 
-        const targetCalId = encodeURIComponent(calendarId?.trim() || 'primary');
         const res = await fetch(
-            `https://www.googleapis.com/calendar/v3/calendars/${targetCalId}/events/${eventId}`,
+            `https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`,
             {
                 method: 'DELETE',
                 headers: {
@@ -279,49 +295,6 @@ export async function getCoachRefreshToken(supabaseAdmin: any, coachId: string):
         return data?.google_refresh_token || null;
     } catch (e) {
         console.error('[getCoachRefreshToken] Error:', e);
-        return null;
-    }
-}
-
-/**
- * 指定されたコーチIDが新吉コーチ（代表・管理者ロールを含む）かどうかを判定する
- */
-export async function isShinkichiOrAdminCoach(supabaseAdmin: any, coachId: string | null | undefined): Promise<boolean> {
-    if (!coachId) return false;
-    try {
-        const { data: coach } = await supabaseAdmin
-            .from('profiles')
-            .select('id, full_name, role')
-            .eq('id', coachId)
-            .maybeSingle();
-
-        if (!coach) return false;
-
-        // 管理者ロール、または名前に「新吉」が含まれるコーチ
-        const cleanName = (coach.full_name || '').replace(/[\s　]+/g, '');
-        return coach.role === 'admin' || cleanName.includes('新吉');
-    } catch (e) {
-        console.error('[isShinkichiOrAdminCoach] Error:', e);
-        return false;
-    }
-}
-
-/**
- * 新吉コーチ（または管理者）専用の同期先GoogleカレンダーIDを取得する
- * 未設定の場合は null（呼び出し側で primary または通常同期へフォールバック）
- */
-export async function getShinkichiCalendarId(supabaseAdmin: any): Promise<string | null> {
-    try {
-        const { data } = await supabaseAdmin
-            .from('app_configs')
-            .select('value')
-            .eq('key', 'shinkichi_calendar_id')
-            .maybeSingle();
-
-        const val = data?.value?.trim();
-        return val ? val : null;
-    } catch (e) {
-        console.error('[getShinkichiCalendarId] Error:', e);
         return null;
     }
 }

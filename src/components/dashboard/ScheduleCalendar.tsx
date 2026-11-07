@@ -127,7 +127,7 @@ export function ScheduleCalendar({ adminView = false }: ScheduleCalendarProps) {
 
     // Admin Filter State
     const [selectedCoachFilter, setSelectedCoachFilter] = React.useState<string>('all')
-    const [coaches, setCoaches] = React.useState<{ id: string, full_name: string }[]>([])
+    const [coaches, setCoaches] = React.useState<{ id: string, full_name: string, role?: string }[]>([])
     const [isGoogleLinked, setIsGoogleLinked] = React.useState(false)
     const [currentUserProfile, setCurrentUserProfile] = React.useState<any>(null)
 
@@ -170,8 +170,12 @@ export function ScheduleCalendar({ adminView = false }: ScheduleCalendarProps) {
         if (!adminView) return
         const fetchCoaches = async () => {
             const supabase = createClient()
-            const { data } = await supabase.from('profiles').select('id, full_name').eq('role', 'coach') // or all?
-            if (data) setCoaches(data)
+            const { data } = await supabase
+                .from('profiles')
+                .select('id, full_name, role')
+                .in('role', ['coach', 'admin'])
+                .order('full_name', { ascending: true })
+            if (data) setCoaches(data as any)
         }
         fetchCoaches()
     }, [adminView])
@@ -471,7 +475,9 @@ export function ScheduleCalendar({ adminView = false }: ScheduleCalendarProps) {
                                 <SelectContent>
                                     <SelectItem value="all">全員を表示</SelectItem>
                                     {coaches.map(c => (
-                                        <SelectItem key={c.id} value={c.id}>{c.full_name}</SelectItem>
+                                        <SelectItem key={c.id} value={c.id}>
+                                            {c.full_name}{c.role === 'admin' ? '（管理者）' : ''}
+                                        </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>

@@ -310,17 +310,21 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
 
                         const lessons = res.availableLessons || []
 
-                        // Auto-select logic
+                        // Auto-select logic: 基本的に60分レッスンを最優先で自動選択
                         if (lessons.length > 0) {
                             let targetId = 'default'
 
-                            // 1. Try Default ID match
-                            if (res.defaultLessonId) {
+                            // 1. 基本的に60分のレッスンを最優先
+                            const sixtyMin = lessons.find((l: any) => l.name?.includes('60'))
+                            if (sixtyMin) {
+                                targetId = sixtyMin.id
+                            } else if (res.defaultLessonId) {
+                                // 2. 60分がない場合はプランのデフォルトID
                                 const match = lessons.find((l: any) => l.id === res.defaultLessonId)
                                 if (match) targetId = res.defaultLessonId
                             }
 
-                            // 2. Fallback to first item if still default
+                            // 3. Fallback to first item if still default
                             if (targetId === 'default') {
                                 targetId = lessons[0].id
                             }

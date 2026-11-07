@@ -13,6 +13,7 @@ import { createClient } from '@/lib/supabase/client'
 import { submitLessonReport } from '@/actions/report'
 import { getCurrentCoachRewardRate } from '@/actions/coaches'
 import { getPendingSchedulesAction } from '@/actions/schedule'
+import { checkStudentLessonStatus } from '@/actions/lesson_schedule'
 import { cn, formatCurrency } from '@/lib/utils'
 import { calculateLessonReward, DEFAULT_REWARD_SETTINGS, RewardSettings } from '@/lib/reward-system'
 import { Button } from '@/components/ui/button'
@@ -52,6 +53,7 @@ const formSchema = z.object({
     lesson_master_id: z.string().min(1, 'レッスンの種類を選択してください'),
     location: z.string().min(1, '場所は必須です'),
     menu_description: z.string().optional(),
+    coach_comment: z.string().optional(),
     price: z.coerce.number().min(0, '金額は0円以上である必要があります'),
     schedule_id: z.string().optional(),
     attendance_type: z.string().optional(),
@@ -134,7 +136,6 @@ export function LessonReportForm() {
     const [lessonMasters, setLessonMasters] = useState<LessonMaster[]>([])
     const [coachId, setCoachId] = useState<string>('')
     const [restrictedLessonIds, setRestrictedLessonIds] = useState<string[] | null>(null)
-    const [keepValues, setKeepValues] = useState(true)
     const [isCancellation, setIsCancellation] = useState(false)
     const [coachRate, setCoachRate] = useState<number>(0.5)
     const [isAdminRole, setIsAdminRole] = useState(false)
@@ -162,6 +163,7 @@ export function LessonReportForm() {
     const searchParams = useSearchParams()
     const scheduleIdFromUrl = searchParams.get('scheduleId')
     const isFillingFromScheduleRef = useRef(false)
+    const hasAutoSelectedRef = useRef(false)
 
     // Load lesson masters and current user on mount
     useEffect(() => {
@@ -228,6 +230,8 @@ export function LessonReportForm() {
             lesson_date: undefined,
             lesson_master_id: '',
             location: '',
+            menu_description: '',
+            coach_comment: '',
             price: 0,
             schedule_id: scheduleIdFromUrl || '',
             attendance_type: 'both',
@@ -296,7 +300,19 @@ export function LessonReportForm() {
             const ids = allowed.map((a: any) => a.lesson_master_id)
             if (ids.length > 0) {
                 setRestrictedLessonIds(ids)
-                if (schedule.lesson_master_id && ids.includes(schedule.lesson_master_id)) {
+
+                const allowedMasters = lessonMasters.filter(m => ids.includes(m.id))
+                const sixtyMinMaster = allowedMasters.find(m => m.name?.includes('60'))
+
+                // スケジュールに紐づくマスタが明示的に90分/120分等の場合を除き、基本的に60分レッスンを最優先
+                const linkedMaster = schedule.lesson_master_id ? lessonMasters.find(m => m.id === schedule.lesson_master_id) : null
+                const isExplicitLongLesson = linkedMaster && (linkedMaster.name?.includes('90') || linkedMaster.name?.includes('120'))
+
+                if (isExplicitLongLesson && schedule.lesson_master_id && ids.includes(schedule.lesson_master_id)) {
+                    form.setValue('lesson_master_id', schedule.lesson_master_id)
+                } else if (sixtyMinMaster) {
+                    form.setValue('lesson_master_id', sixtyMinMaster.id)
+                } else if (schedule.lesson_master_id && ids.includes(schedule.lesson_master_id)) {
                     form.setValue('lesson_master_id', schedule.lesson_master_id)
                 } else if (membership.default_lesson_master_id && ids.includes(membership.default_lesson_master_id)) {
                     form.setValue('lesson_master_id', membership.default_lesson_master_id)
@@ -305,14 +321,20 @@ export function LessonReportForm() {
                 }
             } else {
                 setRestrictedLessonIds(null)
+                const sixtyMin = lessonMasters.find(m => !m.is_trial && m.name?.includes('60'))
                 if (schedule.lesson_master_id) {
                     form.setValue('lesson_master_id', schedule.lesson_master_id)
+                } else if (sixtyMin) {
+                    form.setValue('lesson_master_id', sixtyMin.id)
                 }
             }
         } else {
             setRestrictedLessonIds(null)
+            const sixtyMin = lessonMasters.find(m => !m.is_trial && m.name?.includes('60'))
             if (schedule.lesson_master_id) {
                 form.setValue('lesson_master_id', schedule.lesson_master_id)
+            } else if (sixtyMin) {
+                form.setValue('lesson_master_id', sixtyMin.id)
             }
         }
     }
@@ -355,14 +377,22 @@ export function LessonReportForm() {
                 .single()
 
             if (schedule) {
-                if (schedule.is_reported) {
-                    toast.info('このレッスンは既に報告済みです。', { duration: 5000 })
-                }
                 fillFormFromSchedule(schedule)
             }
         }
         fetchSchedule()
     }, [scheduleIdFromUrl, coachId, lessonMasters])
+
+    // 未報告スケジュールが存在する場合、先頭の1件目を自動入力・表示する
+    useEffect(() => {
+        if (scheduleIdFromUrl) return
+        if (hasAutoSelectedRef.current) return
+
+        if (pendingSchedules.length > 0 && lessonMasters.length > 0) {
+            hasAutoSelectedRef.current = true
+            fillFormFromSchedule(pendingSchedules[0])
+        }
+    }, [pendingSchedules, lessonMasters, scheduleIdFromUrl])
 
     // Watch lesson_master_id and student to auto-update price
     const selectedMasterId = form.watch('lesson_master_id')
@@ -387,12 +417,14 @@ export function LessonReportForm() {
         if (isCancellation) {
             form.setValue('location', 'キャンセル')
             form.setValue('menu_description', '前日12時以降のキャンセル')
+            form.setValue('coach_comment', '')
             if (!form.getValues('lesson_date')) {
                 form.setValue('lesson_date', new Date())
             }
         } else {
             form.setValue('location', '')
             form.setValue('menu_description', '')
+            form.setValue('coach_comment', '')
         }
     }, [isCancellation, form])
 
@@ -483,8 +515,13 @@ export function LessonReportForm() {
                 // IMPORTANT: Only reset if the current selection is NOT allowed for this student
                 const currentMasterId = form.getValues('lesson_master_id')
                 if (!currentMasterId || !ids.includes(currentMasterId)) {
-                    // Auto-select if default lesson exists or fallback
-                    if (membership.default_lesson_master_id && ids.includes(membership.default_lesson_master_id)) {
+                    // 基本的に60分レッスンを最優先で自動選択
+                    const allowedMasters = lessonMasters.filter(m => ids.includes(m.id))
+                    const sixtyMinMaster = allowedMasters.find(m => m.name?.includes('60'))
+
+                    if (sixtyMinMaster) {
+                        form.setValue('lesson_master_id', sixtyMinMaster.id)
+                    } else if (membership.default_lesson_master_id && ids.includes(membership.default_lesson_master_id)) {
                         form.setValue('lesson_master_id', membership.default_lesson_master_id)
                     } else if (ids.length === 1) {
                         form.setValue('lesson_master_id', ids[0])
@@ -501,25 +538,38 @@ export function LessonReportForm() {
         fetchAllowedLessons()
     }, [selectedStudentId, form, lessonMasters])
 
-    // 生徒の受講回数・残り回数を取得
+    // 生徒の受講回数・残り回数を取得（キャッシュ保持による即時表示＋高速化）
     const lessonDateValue = form.watch('lesson_date')
+    const usageCacheRef = useRef<Map<string, any>>(new Map())
+
     useEffect(() => {
         if (!selectedStudentId) {
             setUsageStatus(null)
             return
         }
 
+        const dateStr = lessonDateValue 
+            ? format(lessonDateValue, 'yyyy-MM-dd')
+            : format(new Date(), 'yyyy-MM-dd')
+        const attType = form.getValues('attendance_type') || 'both'
+        const cacheKey = `${selectedStudentId}_${dateStr}_${attType}`
+
+        // キャッシュが存在する場合は即座に表示（ローディング待ちゼロ）
+        if (usageCacheRef.current.has(cacheKey)) {
+            setUsageStatus(usageCacheRef.current.get(cacheKey))
+            setLoadingUsage(false)
+            return
+        }
+
+        let isCancelled = false
         const fetchUsage = async () => {
             setLoadingUsage(true)
             try {
-                const { checkStudentLessonStatus } = await import('@/actions/lesson_schedule')
-                const dateStr = lessonDateValue 
-                    ? format(lessonDateValue, 'yyyy-MM-dd')
-                    : format(new Date(), 'yyyy-MM-dd')
-                const attType = form.getValues('attendance_type') || 'both'
                 const res = await checkStudentLessonStatus(selectedStudentId, dateStr, attType)
+                if (isCancelled) return
+
                 if (res.success) {
-                    setUsageStatus({
+                    const statusData = {
                         isPackage: res.isPackage,
                         packageTotalCount: res.packageTotalCount,
                         packageUsedCount: res.packageUsedCount,
@@ -530,18 +580,24 @@ export function LessonReportForm() {
                         rollover: res.rollover,
                         count: res.count,
                         currentTickets: res.currentTickets
-                    })
+                    }
+                    usageCacheRef.current.set(cacheKey, statusData)
+                    setUsageStatus(statusData)
                 } else {
                     setUsageStatus(null)
                 }
             } catch (err) {
                 console.error('Error fetching student usage status in LessonReportForm:', err)
-                setUsageStatus(null)
+                if (!isCancelled) setUsageStatus(null)
             } finally {
-                setLoadingUsage(false)
+                if (!isCancelled) setLoadingUsage(false)
             }
         }
         fetchUsage()
+
+        return () => {
+            isCancelled = true
+        }
     }, [selectedStudentId, lessonDateValue])
 
     // Watch location to update facility fee flag
@@ -639,27 +695,7 @@ export function LessonReportForm() {
                 duration: 5000,
             })
 
-            if (keepValues) {
-                // Keep Date, Location, Menu, Comment, Lesson Type. Reset only Student
-                const currentValues = form.getValues()
-                form.reset({
-                    ...currentValues,
-                    student_id: '',
-                    student_name: '',
-                    schedule_id: '',
-                }, { keepDefaultValues: false }) // Reset to these as new defaults
-
-                // Clear scheduleId from URL to prevent unwanted re-fills while staying on page
-                if (scheduleIdFromUrl) {
-                    router.replace('/coach/report', { scroll: false })
-                }
-
-                // Scroll to top to encourage next entry
-                window.scrollTo({ top: 0, behavior: 'smooth' })
-                setIsCancellation(false)
-            } else {
-                router.push('/coach')
-            }
+            router.push('/coach')
         } catch (error: any) {
             console.error('Error submitting report:', error)
             const message = error.message || '送信に失敗しました。もう一度お試しください。'
@@ -715,19 +751,7 @@ export function LessonReportForm() {
                             <FormControl>
                                 <StudentSelect
                                     onSelect={(id, name) => {
-                                        // 現在のスケジュールが別の生徒のものであれば解除、同じ生徒であれば維持
-                                        const currentSchedId = form.getValues('schedule_id')
-                                        const currentSched = pendingSchedules.find(s => s.id === currentSchedId)
-                                        if (currentSched && currentSched.student_id !== id) {
-                                            form.setValue('schedule_id', '')
-                                        } else if (!currentSchedId && id) {
-                                            // まだスケジュールが未選択の場合、この生徒の直近の未報告スケジュールがあれば自動反映
-                                            const candidate = pendingSchedules.find(s => s.student_id === id)
-                                            if (candidate) {
-                                                fillFormFromSchedule(candidate)
-                                                return
-                                            }
-                                        }
+                                        form.setValue('schedule_id', '')
                                         form.setValue('student_id', id || '')
                                         form.setValue('student_name', name)
                                     }}
@@ -953,24 +977,51 @@ export function LessonReportForm() {
                         )}
                     />
 
+                    {/* ボックス①: レッスン内容（カルテ用・社内記録） */}
                     <FormField
                         control={form.control as any}
                         name="menu_description"
                         render={({ field }) => (
                             <FormItem>
                                 <FormLabel className="flex items-center gap-2 font-bold text-slate-800">
-                                    レッスン内容・フィードバック
-                                    <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-600 border-blue-100 font-semibold">メンバーマイページに反映</Badge>
+                                    レッスン内容
+                                    <Badge variant="outline" className="text-[10px] bg-slate-50 text-slate-600 border-slate-200 font-semibold">カルテ用・社内記録（生徒非公開）</Badge>
                                 </FormLabel>
                                 <FormControl>
                                     <Textarea
-                                        placeholder="当日の練習メニュー、お子様の様子や成長したポイント、次回へのアドバイス・目標などをまとめてご自由にご入力ください。"
-                                        className="resize-none min-h-[140px] leading-relaxed"
+                                        placeholder={`【カルテ記入例】\n・水慣れ、けのび、バタ足 5m×4本\n・クロールの呼吸・腕回しのフォーム確認\n・呼吸時に右肩が下がる傾向あり。次回重点指導。`}
+                                        className="resize-none min-h-[130px] leading-relaxed text-sm placeholder:text-slate-400"
                                         {...field}
                                     />
                                 </FormControl>
                                 <FormDescription className="text-xs text-slate-400">
-                                    ※ 入力内容はそのまま生徒・保護者様のマイページに「レッスンレポート」として表示されます。
+                                    ※ コーチ・管理者のみが確認できるカルテ・受講履歴に記録されます（生徒様には表示されません）。
+                                </FormDescription>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+
+                    {/* ボックス②: お客様へのフィードバック（LINE送信用・カルテ反映・任意） */}
+                    <FormField
+                        control={form.control as any}
+                        name="coach_comment"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className="flex items-center gap-2 font-bold text-slate-800">
+                                    お客様へのフィードバック
+                                    <span className="text-xs text-slate-400 font-normal">（任意）</span>
+                                    <Badge variant="secondary" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200 font-semibold">カルテ反映・LINE自動送信</Badge>
+                                </FormLabel>
+                                <FormControl>
+                                    <Textarea
+                                        placeholder={`【お客様へのフィードバック記入例】\n本日はレッスンへのご参加ありがとうございました！\n息継ぎの際に頭が上がりすぎず、とても綺麗な姿勢をキープして泳げるようになりました！\n次回はこの調子でキックのリズムを保ちながら楽しく練習していきましょう！`}
+                                        className="resize-none min-h-[150px] leading-relaxed text-sm placeholder:text-slate-400"
+                                        {...field}
+                                    />
+                                </FormControl>
+                                <FormDescription className="text-xs text-slate-400">
+                                    ※ 任意項目です。入力した場合のみ、カルテに記録されLINE連携済みの生徒・保護者様へメッセージとして自動送信されます（未入力でも送信可能です）。
                                 </FormDescription>
                                 <FormMessage />
                             </FormItem>
@@ -978,73 +1029,16 @@ export function LessonReportForm() {
                     />
 
                 </div>
+                {/* 案A適用: 「金額(円)」は画面上は非表示にし、内部状態としてのみ保持 */}
                 <FormField
                     control={form.control as any}
                     name="price"
                     render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>金額 (円)</FormLabel>
-                            <FormControl>
-                                <Input
-                                    type="number"
-                                    {...field}
-                                    readOnly
-                                    className="bg-slate-50 text-slate-500 cursor-not-allowed"
-                                />
-                            </FormControl>
-                            <FormDescription>
-                                レッスンの種類に応じて自動的に計算されます。
-                            </FormDescription>
-                            <FormMessage />
-                        </FormItem>
+                        <input type="hidden" {...field} />
                     )}
                 />
 
-                <div className="bg-blue-50 border border-blue-100 p-4 rounded-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-sm">
-                    <div>
-                        <p className="text-xs text-blue-600 font-bold mb-1 italic">想定報酬単価（ランク計上分込）</p>
-                        <p className="text-2xl font-black text-blue-900 leading-none">
-                            {formatCurrency(estimatedReward)}
-                        </p>
-                    </div>
-                    <div className="flex flex-col items-start sm:items-end gap-1 w-full sm:w-auto border-t sm:border-t-0 pt-3 sm:pt-0 border-blue-100">
-                        <Badge variant="outline" className="bg-white text-blue-700 border-blue-200 py-1">
-                            適用レート: {isAdminRole ? '100% (管理者)' : `${(coachRate * 100).toFixed(0)}%`}
-                        </Badge>
-                        {!isAdminRole && isTwoPersonLesson && (
-                            <div className="text-[10px] text-blue-500 font-bold flex items-center gap-1">
-                                <span className="w-1 h-1 bg-blue-400 rounded-full" />
-                                ペア手当 (¥1,000) 適用中
-                            </div>
-                        )}
-                        {isDefaultDistantOption && (
-                            <div className="text-[10px] text-blue-500 font-bold flex items-center gap-1">
-                                <span className="w-1 h-1 bg-blue-400 rounded-full" />
-                                遠方対応手当 (¥{coachDistantFee.toLocaleString()}) 適用中
-                            </div>
-                        )}
-                        {isFacilityFeeApplied && (
-                            <div className="text-[10px] text-blue-500 font-bold flex items-center gap-1">
-                                <span className="w-1 h-1 bg-blue-400 rounded-full" />
-                                施設利用手当 (¥1,500) 適用中
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                <div className="flex items-center space-x-2 py-2 bg-slate-50 p-4 rounded-lg border border-slate-100">
-                    <Checkbox
-                        id="keepValues"
-                        checked={keepValues}
-                        onCheckedChange={(checked) => setKeepValues(checked as boolean)}
-                    />
-                    <label
-                        htmlFor="keepValues"
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-slate-700 cursor-pointer select-none"
-                    >
-                        続けて次の報告を作成する（日時・場所を保持）
-                    </label>
-                </div>
+                {/* 案A適用: 「想定報酬単価」ブロックは報告フォームからは削除（ダッシュボード・マイページ側に集約） */}
 
                 <Button type="submit" className="w-full" disabled={isSubmitting}>
                     {isSubmitting ? (

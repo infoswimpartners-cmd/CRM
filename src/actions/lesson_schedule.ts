@@ -424,68 +424,59 @@ export async function createLessonSchedule(params: CreateLessonScheduleParams) {
 
                 if (insertError) throw insertError
 
-                // 5. Google Calendar Sync（新吉アサイン時は二重登録を抑止し任意カレンダーへ、他コーチは並列同期）
+                // 5. Google Calendar Sync
                 try {
-                    const { 
-                        createCalendarEvent, 
-                        getAdminRefreshToken, 
-                        getCoachRefreshToken,
-                        isShinkichiOrAdminCoach,
-                        getShinkichiCalendarId
-                    } = await import('@/lib/google-calendar')
+                    const { createCalendarEvent, getAdminRefreshToken, getCoachRefreshToken } = await import('@/lib/google-calendar')
                     
-                    const isShinkichi = params.coach_id ? await isShinkichiOrAdminCoach(supabaseAdmin, params.coach_id) : false
-                    const shinkichiCalendarId = isShinkichi ? await getShinkichiCalendarId(supabaseAdmin) : null
-
-                    let finalEventId: string | null = null
-
-                    if (isShinkichi) {
-                        // 【新吉コーチ（代表・管理者）アサイン時】二重登録を防ぎ、指定カレンダー（または primary）へ1件のみ登録
-                        let token = await getCoachRefreshToken(supabaseAdmin, params.coach_id)
-                        if (!token) token = await getAdminRefreshToken(supabaseAdmin)
-                        if (token) {
-                            finalEventId = await createCalendarEvent(token, {
-                                summary: params.title,
-                                description: params.notes || '',
-                                location: params.location || '',
-                                start: params.start_time,
-                                end: params.end_time,
-                            }, shinkichiCalendarId || 'primary')
+                    // コーチ情報の取得（attendees用）
+                    const attendees: { email: string; displayName?: string }[] = []
+                    if (params.coach_id) {
+                        const { data: cProfile } = await supabaseAdmin
+                            .from('profiles')
+                            .select('full_name, email, google_chat_email')
+                            .eq('id', params.coach_id)
+                            .single()
+                        if (cProfile) {
+                            const cEmail = cProfile.google_chat_email || cProfile.email
+                            if (cEmail) attendees.push({ email: cEmail, displayName: cProfile.full_name })
+                            if (cProfile.email && cEmail !== cProfile.email) attendees.push({ email: cProfile.email, displayName: cProfile.full_name })
                         }
-                    } else {
-                        // 【通常コーチアサイン時】コーチ個人カレンダーと管理者マスターカレンダーの双方へ登録
-                        // a) Coach's individual calendar sync
-                        let coachEventId: string | null = null;
-                        if (params.coach_id) {
-                            const coachRefreshToken = await getCoachRefreshToken(supabaseAdmin, params.coach_id)
-                            if (coachRefreshToken) {
-                                coachEventId = await createCalendarEvent(coachRefreshToken, {
-                                    summary: params.title,
-                                    description: params.notes || '',
-                                    location: params.location || '',
-                                    start: params.start_time,
-                                    end: params.end_time,
-                                })
-                            }
-                        }
-
-                        // b) Admin's master calendar sync
-                        const adminRefreshToken = await getAdminRefreshToken(supabaseAdmin)
-                        let adminEventId: string | null = null;
-                        if (adminRefreshToken) {
-                            adminEventId = await createCalendarEvent(adminRefreshToken, {
-                                summary: params.title,
-                                description: params.notes || '',
-                                location: params.location || '',
-                                start: params.start_time,
-                                end: params.end_time,
-                            })
-                        }
-
-                        // Store event ID (prioritize coach's for their reference, or admin's if only that exists)
-                        finalEventId = coachEventId || adminEventId
                     }
 
+                    let coachRefreshToken: string | null = null
+                    if (params.coach_id) {
+                        coachRefreshToken = await getCoachRefreshToken(supabaseAdmin, params.coach_id)
+                    }
+
+                    const adminRefreshToken = await getAdminRefreshToken(supabaseAdmin)
+
+                    // a) Admin's master calendar sync (attendees付きでコーチにも通知・反映)
+                    let adminEventId: string | null = null;
+                    if (adminRefreshToken) {
+                        adminEventId = await createCalendarEvent(adminRefreshToken, {
+                            summary: params.title,
+                            description: params.notes || '',
+                            location: params.location || '',
+                            start: params.start_time,
+                            end: params.end_time,
+                            attendees: attendees.length > 0 ? attendees : undefined,
+                        })
+                    }
+
+                    // b) Coach's individual calendar sync (coachRefreshTokenとadminRefreshTokenが異なる場合のみ)
+                    let coachEventId: string | null = null;
+                    if (coachRefreshToken && coachRefreshToken !== adminRefreshToken) {
+                        coachEventId = await createCalendarEvent(coachRefreshToken, {
+                            summary: params.title,
+                            description: params.notes || '',
+                            location: params.location || '',
+                            start: params.start_time,
+                            end: params.end_time,
+                        })
+                    }
+
+                    // Store event ID (prioritize admin's or coach's)
+                    const finalEventId = adminEventId || coachEventId
                     if (finalEventId) {
                         await supabaseAdmin
                             .from('lesson_schedules')
@@ -539,12 +530,27 @@ export async function createLessonSchedule(params: CreateLessonScheduleParams) {
                 const adminRefreshToken = await getAdminRefreshToken(supabaseAdmin)
 
                 if (adminRefreshToken) {
+                    const attendees: { email: string; displayName?: string }[] = []
+                    if (params.coach_id) {
+                        const { data: cProfile } = await supabaseAdmin
+                            .from('profiles')
+                            .select('full_name, email, google_chat_email')
+                            .eq('id', params.coach_id)
+                            .single()
+                        if (cProfile) {
+                            const cEmail = cProfile.google_chat_email || cProfile.email
+                            if (cEmail) attendees.push({ email: cEmail, displayName: cProfile.full_name })
+                            if (cProfile.email && cEmail !== cProfile.email) attendees.push({ email: cProfile.email, displayName: cProfile.full_name })
+                        }
+                    }
+
                     const newEventId = await createCalendarEvent(adminRefreshToken, {
                         summary: params.title,
                         description: params.notes || '',
                         location: params.location || '',
                         start: params.start_time,
                         end: params.end_time,
+                        attendees: attendees.length > 0 ? attendees : undefined
                     })
                     if (newEventId) {
                         await supabaseAdmin
@@ -720,13 +726,7 @@ export async function rejectLessonSchedule(scheduleId: string) {
 
         if (existing?.google_event_id) {
             try {
-                const { 
-                    deleteCalendarEvent, 
-                    getAdminRefreshToken, 
-                    getCoachRefreshToken,
-                    isShinkichiOrAdminCoach,
-                    getShinkichiCalendarId
-                } = await import('@/lib/google-calendar')
+                const { deleteCalendarEvent, getAdminRefreshToken, getCoachRefreshToken } = await import('@/lib/google-calendar')
                 // 優先的にそのコーチ自身のトークンを取得
                 let token = await getCoachRefreshToken(supabaseAdmin, existing.coach_id)
                 
@@ -736,9 +736,7 @@ export async function rejectLessonSchedule(scheduleId: string) {
                 }
 
                 if (token) {
-                    const isShinkichi = await isShinkichiOrAdminCoach(supabaseAdmin, existing.coach_id)
-                    const calId = isShinkichi ? await getShinkichiCalendarId(supabaseAdmin) : null
-                    await deleteCalendarEvent(token, existing.google_event_id, calId || 'primary')
+                    await deleteCalendarEvent(token, existing.google_event_id)
                 }
             } catch (calErr) {
                 console.error('[rejectLessonSchedule] Googleカレンダー削除失敗:', calErr)
@@ -976,30 +974,32 @@ export async function checkStudentLessonStatus(studentId: string, dateStr: strin
                 }
             }
 
-            // 1. 体験レッスン（is_trial: true や 体験レッスン自動登録）を除外した全スケジュールを集計
-            const { data: allStudentSchedules } = await supabaseAdmin
-                .from('lesson_schedules')
-                .select(`
-                    id, start_time, notes, lesson_master_id,
-                    lesson_masters ( is_trial )
-                `)
-                .eq('student_id', studentId)
+            // 1. 体験レッスンとlessonsテーブルの集計をPromise.allで並列実行して高速化
+            const [schedulesRes, lessonsRes] = await Promise.all([
+                supabaseAdmin
+                    .from('lesson_schedules')
+                    .select(`
+                        id, start_time, notes, lesson_master_id,
+                        lesson_masters ( is_trial )
+                    `)
+                    .eq('student_id', studentId),
+                supabaseAdmin
+                    .from('lessons')
+                    .select(`
+                        id, lesson_date, coach_comment, menu_description, lesson_master_id,
+                        lesson_masters ( is_trial )
+                    `)
+                    .eq('student_id', studentId)
+            ])
 
+            const allStudentSchedules = schedulesRes.data
             const nonTrialSchedules = (allStudentSchedules || []).filter((s: any) => {
                 const isTrialMaster = s.lesson_masters?.is_trial === true
                 const isTrialNote = (s.notes || '').includes('体験レッスン') || (s.notes || '').includes('体験予約')
                 return !isTrialMaster && !isTrialNote
             })
 
-            // 2. lessons テーブル（指導報告・実績）からも体験除外のレッスンを集計
-            const { data: allStudentLessons } = await supabaseAdmin
-                .from('lessons')
-                .select(`
-                    id, lesson_date, coach_comment, menu_description, lesson_master_id,
-                    lesson_masters ( is_trial )
-                `)
-                .eq('student_id', studentId)
-
+            const allStudentLessons = lessonsRes.data
             const nonTrialLessons = (allStudentLessons || []).filter((l: any) => {
                 const isTrialMaster = l.lesson_masters?.is_trial === true
                 const isTrialContent = (l.coach_comment || '').includes('体験') || (l.menu_description || '').includes('体験')

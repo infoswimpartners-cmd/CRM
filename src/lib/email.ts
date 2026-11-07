@@ -249,7 +249,10 @@ export class EmailService {
                 }
             } else {
                 // LINE未連携、またはLINE対象外のトリガーの場合は通常通りメールを送信 (フォールバック)
-                if (actualOverrideTemplate) {
+                // ※ lesson_report_sent（レッスン報告の通知）はメールへの送信を行わない（Google Chat通知のみ実施）
+                if (triggerId === 'lesson_report_sent') {
+                    console.log(`[Notification] Skipping email for '${triggerId}' (email notification disabled per request).`)
+                } else if (actualOverrideTemplate) {
                     await this.sendEmail({
                         to,
                         subject: renderedSubject,

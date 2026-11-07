@@ -33,13 +33,7 @@ export async function cancelSchedule(scheduleId: string) {
         // 3. Delete from Google Calendar if exists
         if (schedule.google_event_id) {
             try {
-                const { 
-                    deleteCalendarEvent, 
-                    getAdminRefreshToken, 
-                    getCoachRefreshToken,
-                    isShinkichiOrAdminCoach,
-                    getShinkichiCalendarId
-                } = await import('@/lib/google-calendar')
+                const { deleteCalendarEvent, getAdminRefreshToken, getCoachRefreshToken } = await import('@/lib/google-calendar')
                 // 優先的にそのコーチ自身のトークンを取得
                 let token = await getCoachRefreshToken(supabaseAdmin, schedule.coach_id)
                 
@@ -49,9 +43,7 @@ export async function cancelSchedule(scheduleId: string) {
                 }
 
                 if (token) {
-                    const isShinkichi = await isShinkichiOrAdminCoach(supabaseAdmin, schedule.coach_id)
-                    const calId = isShinkichi ? await getShinkichiCalendarId(supabaseAdmin) : null
-                    await deleteCalendarEvent(token, schedule.google_event_id, calId || 'primary')
+                    await deleteCalendarEvent(token, schedule.google_event_id)
                 }
             } catch (calErr) {
                 console.error(`[CancelSchedule] Failed to delete Google Calendar Event (${schedule.google_event_id}):`, calErr)
@@ -125,40 +117,42 @@ export async function updateScheduleWithCalendar(params: UpdateScheduleParams) {
 
         // 3. Googleカレンダーへ同期
         try {
-            const { 
-                updateCalendarEvent, 
-                createCalendarEvent, 
-                getAdminRefreshToken, 
-                getCoachRefreshToken,
-                isShinkichiOrAdminCoach,
-                getShinkichiCalendarId 
-            } = await import('@/lib/google-calendar')
-            
-            const coachId = existing?.coach_id || params.coachId
-            const isShinkichi = coachId ? await isShinkichiOrAdminCoach(supabaseAdmin, coachId) : false
-            const shinkichiCalendarId = isShinkichi ? await getShinkichiCalendarId(supabaseAdmin) : null
-            const targetCalId = shinkichiCalendarId || 'primary'
+            const { updateCalendarEvent, createCalendarEvent, getAdminRefreshToken } = await import('@/lib/google-calendar')
+            const adminRefreshToken = await getAdminRefreshToken(supabaseAdmin)
 
-            let token = coachId ? await getCoachRefreshToken(supabaseAdmin, coachId) : null
-            if (!token) {
-                token = await getAdminRefreshToken(supabaseAdmin)
-            }
+            if (adminRefreshToken) {
+                const targetCoachId = params.coachId || existing?.coach_id
+                let attendees: { email: string; displayName?: string }[] | undefined = undefined
+                if (targetCoachId) {
+                    const { data: cProfile } = await supabaseAdmin
+                        .from('profiles')
+                        .select('full_name, email, google_chat_email')
+                        .eq('id', targetCoachId)
+                        .single()
+                    if (cProfile) {
+                        const atts: { email: string; displayName?: string }[] = []
+                        const cEmail = cProfile.google_chat_email || cProfile.email
+                        if (cEmail) atts.push({ email: cEmail, displayName: cProfile.full_name })
+                        if (cProfile.email && cEmail !== cProfile.email) atts.push({ email: cProfile.email, displayName: cProfile.full_name })
+                        if (atts.length > 0) attendees = atts
+                    }
+                }
 
-            if (token) {
                 const calPayload = {
                     summary: params.title,
                     description: params.notes || '',
                     location: params.location || '',
                     start: params.startTime,
                     end: params.endTime,
+                    attendees
                 }
 
                 if (existing?.google_event_id) {
                     // 既存イベントを更新
-                    await updateCalendarEvent(token, existing.google_event_id, calPayload, targetCalId)
+                    await updateCalendarEvent(adminRefreshToken, existing.google_event_id, calPayload)
                 } else {
                     // イベントが未作成の場合は新規作成してIDを保存
-                    const newEventId = await createCalendarEvent(token, calPayload, targetCalId)
+                    const newEventId = await createCalendarEvent(adminRefreshToken, calPayload)
                     if (newEventId) {
                         await supabaseAdmin
                             .from('lesson_schedules')
@@ -458,7 +452,6 @@ export async function getPendingSchedulesAction(coachId: string) {
             })).filter(l => l.jst_lesson_date)
 
             // 報告が存在するスケジュールを除外
-            const schedulesToMarkReported: string[] = []
             const filteredSchedules = schedules.filter(s => {
                 if (!s.start_time) return true
                 const sDateStr = toJstDateString(s.start_time)
@@ -489,23 +482,8 @@ export async function getPendingSchedulesAction(coachId: string) {
                     return false
                 })
 
-                if (hasReport) {
-                    schedulesToMarkReported.push(s.id)
-                }
-
                 return !hasReport
             })
-
-            // バックグラウンドで is_reported = true を反映して不整合を解消
-            if (schedulesToMarkReported.length > 0) {
-                supabaseAdmin
-                    .from('lesson_schedules')
-                    .update({ is_reported: true })
-                    .in('id', schedulesToMarkReported)
-                    .then(({ error: updErr }) => {
-                        if (updErr) console.error('[getPendingSchedulesAction] Failed to sync is_reported:', updErr)
-                    })
-            }
 
             return { success: true, data: filteredSchedules }
         }
