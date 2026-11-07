@@ -121,11 +121,13 @@ export interface CalendarEventPayload {
  */
 export async function createCalendarEvent(
     refreshToken: string,
-    payload: CalendarEventPayload
+    payload: CalendarEventPayload,
+    calendarId: string = 'primary'
 ): Promise<string | null> {
     try {
         const accessToken = await getValidAccessToken(refreshToken);
-        const targetCalId = encodeURIComponent(payload.calendarId || 'primary');
+        const resolvedCalId = payload.calendarId || calendarId || 'primary';
+        const targetCalId = encodeURIComponent(resolvedCalId.trim());
 
         const body: any = {
             summary: payload.summary,
@@ -176,11 +178,13 @@ export async function createCalendarEvent(
 export async function updateCalendarEvent(
     refreshToken: string,
     eventId: string,
-    payload: CalendarEventPayload
+    payload: CalendarEventPayload,
+    calendarId: string = 'primary'
 ): Promise<boolean> {
     try {
         const accessToken = await getValidAccessToken(refreshToken);
-        const targetCalId = encodeURIComponent(payload.calendarId || 'primary');
+        const resolvedCalId = payload.calendarId || calendarId || 'primary';
+        const targetCalId = encodeURIComponent(resolvedCalId.trim());
 
         const body: any = {
             summary: payload.summary,
@@ -230,13 +234,15 @@ export async function updateCalendarEvent(
  */
 export async function deleteCalendarEvent(
     refreshToken: string,
-    eventId: string
+    eventId: string,
+    calendarId: string = 'primary'
 ): Promise<boolean> {
     try {
         const accessToken = await getValidAccessToken(refreshToken);
+        const targetCalId = encodeURIComponent(calendarId?.trim() || 'primary');
 
         const res = await fetch(
-            `https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`,
+            `https://www.googleapis.com/calendar/v3/calendars/${targetCalId}/events/${eventId}`,
             {
                 method: 'DELETE',
                 headers: {
@@ -295,6 +301,49 @@ export async function getCoachRefreshToken(supabaseAdmin: any, coachId: string):
         return data?.google_refresh_token || null;
     } catch (e) {
         console.error('[getCoachRefreshToken] Error:', e);
+        return null;
+    }
+}
+
+/**
+ * 指定されたコーチIDが新吉コーチ（代表・管理者ロールを含む）かどうかを判定する
+ */
+export async function isShinkichiOrAdminCoach(supabaseAdmin: any, coachId: string | null | undefined): Promise<boolean> {
+    if (!coachId) return false;
+    try {
+        const { data: coach } = await supabaseAdmin
+            .from('profiles')
+            .select('id, full_name, role')
+            .eq('id', coachId)
+            .maybeSingle();
+
+        if (!coach) return false;
+
+        // 管理者ロール、または名前に「新吉」が含まれるコーチ
+        const cleanName = (coach.full_name || '').replace(/[\s　]+/g, '');
+        return coach.role === 'admin' || cleanName.includes('新吉');
+    } catch (e) {
+        console.error('[isShinkichiOrAdminCoach] Error:', e);
+        return false;
+    }
+}
+
+/**
+ * 新吉コーチ（または管理者）専用の同期先GoogleカレンダーIDを取得する
+ * 未設定の場合は null（呼び出し側で primary または通常同期へフォールバック）
+ */
+export async function getShinkichiCalendarId(supabaseAdmin: any): Promise<string | null> {
+    try {
+        const { data } = await supabaseAdmin
+            .from('app_configs')
+            .select('value')
+            .eq('key', 'shinkichi_calendar_id')
+            .maybeSingle();
+
+        const val = data?.value?.trim();
+        return val ? val : null;
+    } catch (e) {
+        console.error('[getShinkichiCalendarId] Error:', e);
         return null;
     }
 }

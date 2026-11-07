@@ -117,11 +117,26 @@ export async function updateScheduleWithCalendar(params: UpdateScheduleParams) {
 
         // 3. Googleカレンダーへ同期
         try {
-            const { updateCalendarEvent, createCalendarEvent, getAdminRefreshToken } = await import('@/lib/google-calendar')
-            const adminRefreshToken = await getAdminRefreshToken(supabaseAdmin)
+            const { 
+                updateCalendarEvent, 
+                createCalendarEvent, 
+                getAdminRefreshToken,
+                getCoachRefreshToken,
+                isShinkichiOrAdminCoach,
+                getShinkichiCalendarId
+            } = await import('@/lib/google-calendar')
 
-            if (adminRefreshToken) {
-                const targetCoachId = params.coachId || existing?.coach_id
+            const targetCoachId = params.coachId || existing?.coach_id
+            const isShinkichi = targetCoachId ? await isShinkichiOrAdminCoach(supabaseAdmin, targetCoachId) : false
+            const shinkichiCalendarId = isShinkichi ? await getShinkichiCalendarId(supabaseAdmin) : null
+            const targetCalId = shinkichiCalendarId || 'primary'
+
+            let token = targetCoachId ? await getCoachRefreshToken(supabaseAdmin, targetCoachId) : null
+            if (!token) {
+                token = await getAdminRefreshToken(supabaseAdmin)
+            }
+
+            if (token) {
                 let attendees: { email: string; displayName?: string }[] | undefined = undefined
                 if (targetCoachId) {
                     const { data: cProfile } = await supabaseAdmin
@@ -144,15 +159,16 @@ export async function updateScheduleWithCalendar(params: UpdateScheduleParams) {
                     location: params.location || '',
                     start: params.startTime,
                     end: params.endTime,
-                    attendees
+                    attendees,
+                    calendarId: targetCalId
                 }
 
                 if (existing?.google_event_id) {
                     // 既存イベントを更新
-                    await updateCalendarEvent(adminRefreshToken, existing.google_event_id, calPayload)
+                    await updateCalendarEvent(token, existing.google_event_id, calPayload, targetCalId)
                 } else {
                     // イベントが未作成の場合は新規作成してIDを保存
-                    const newEventId = await createCalendarEvent(adminRefreshToken, calPayload)
+                    const newEventId = await createCalendarEvent(token, calPayload, targetCalId)
                     if (newEventId) {
                         await supabaseAdmin
                             .from('lesson_schedules')

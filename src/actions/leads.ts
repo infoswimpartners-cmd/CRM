@@ -434,9 +434,15 @@ async function createTrialScheduleForLead(params: {
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://manager.swim-partners.com'
         const paymentLink = `${appUrl}/pay/trial/${targetScheduleId}`
 
-        // 4. Googleカレンダーへの同期（コーチと管理者を並列実行して高速化）
+        // 4. Googleカレンダーへの同期（新吉アサイン時は二重登録を抑止し任意カレンダーへ、他コーチは並列同期）
         try {
-            const { createCalendarEvent, getAdminRefreshToken, getCoachRefreshToken } = await import('@/lib/google-calendar')
+            const { 
+                createCalendarEvent, 
+                getAdminRefreshToken, 
+                getCoachRefreshToken,
+                isShinkichiOrAdminCoach,
+                getShinkichiCalendarId
+            } = await import('@/lib/google-calendar')
             const calSummary = `${params.studentName}様${params.hasSecondStudent ? ` & ${params.secondStudentName || '2人目'}様` : ''}　担当：${coachName}`
             const calDescription = `[体験レッスンスケジュール]\n案件ID: ${params.leadId}\n確定日時: ${params.confirmedDate}\n確定場所: ${params.confirmedLocation}\nご要望・備考: ${params.leadNotes || 'なし'}`
 
@@ -450,65 +456,96 @@ async function createTrialScheduleForLead(params: {
                 attendees.push({ email: coachEmail, displayName: coachName })
             }
 
+            const isShinkichi = params.coachId ? await isShinkichiOrAdminCoach(supabaseAdmin, params.coachId) : false
+            const shinkichiCalendarId = isShinkichi ? await getShinkichiCalendarId(supabaseAdmin) : null
+
             const calendarSyncTasks: Promise<string | null>[] = []
 
-            let coachRefreshToken: string | null = null
-            let adminRefreshToken: string | null = null
+            if (isShinkichi) {
+                // 【新吉コーチ（代表・管理者）アサイン時】
+                // 本部マスターカレンダーとの二重登録を抑止し、指定された任意カレンダー（未設定時はprimary）へ1件のみ登録
+                // attendeesに新吉様のメールを含めることで、個人アカウント・端末カレンダーにも即座に自動反映
+                calendarSyncTasks.push(
+                    (async () => {
+                        try {
+                            let token = await getCoachRefreshToken(supabaseAdmin, params.coachId)
+                            if (!token) token = await getAdminRefreshToken(supabaseAdmin)
+                            if (token) {
+                                return await createCalendarEvent(token, {
+                                    summary: calSummary,
+                                    description: calDescription,
+                                    location: params.confirmedLocation || '',
+                                    start: start,
+                                    end: end,
+                                    attendees: attendees.length > 0 ? attendees : undefined,
+                                    calendarId: shinkichiCalendarId || 'primary'
+                                })
+                            }
+                        } catch (sErr) {
+                            console.error('[Google Calendar] Shinkichi calendar sync error:', sErr)
+                        }
+                        return null
+                    })()
+                )
+            } else {
+                // 【通常コーチアサイン時】コーチ個人カレンダーと管理者マスターカレンダーの双方へ登録
+                let coachRefreshToken: string | null = null
+                let adminRefreshToken: string | null = null
 
-            if (params.coachId) {
-                try {
-                    coachRefreshToken = await getCoachRefreshToken(supabaseAdmin, params.coachId)
-                } catch (cErr) {
-                    console.error('Coach calendar token error:', cErr)
+                if (params.coachId) {
+                    try {
+                        coachRefreshToken = await getCoachRefreshToken(supabaseAdmin, params.coachId)
+                    } catch (cErr) {
+                        console.error('Coach calendar token error:', cErr)
+                    }
                 }
-            }
 
-            try {
-                adminRefreshToken = await getAdminRefreshToken(supabaseAdmin)
-            } catch (aErr) {
-                console.error('Admin calendar token error:', aErr)
-            }
+                try {
+                    adminRefreshToken = await getAdminRefreshToken(supabaseAdmin)
+                } catch (aErr) {
+                    console.error('Admin calendar token error:', aErr)
+                }
 
-            // a) 管理者カレンダー同期（attendees付きで登録することでコーチのカレンダーにも自動反映）
-            if (adminRefreshToken) {
-                calendarSyncTasks.push(
-                    (async () => {
-                        try {
-                            return await createCalendarEvent(adminRefreshToken, {
-                                summary: calSummary,
-                                description: calDescription,
-                                location: params.confirmedLocation || '',
-                                start: start,
-                                end: end,
-                                attendees: attendees.length > 0 ? attendees : undefined
-                            })
-                        } catch (aErr) {
-                            console.error('Admin calendar sync error:', aErr)
-                        }
-                        return null
-                    })()
-                )
-            }
+                // a) 管理者カレンダー同期（attendees付きで登録することでコーチのカレンダーにも自動反映）
+                if (adminRefreshToken) {
+                    calendarSyncTasks.push(
+                        (async () => {
+                            try {
+                                return await createCalendarEvent(adminRefreshToken, {
+                                    summary: calSummary,
+                                    description: calDescription,
+                                    location: params.confirmedLocation || '',
+                                    start: start,
+                                    end: end,
+                                    attendees: attendees.length > 0 ? attendees : undefined
+                                })
+                            } catch (aErr) {
+                                console.error('Admin calendar sync error:', aErr)
+                            }
+                            return null
+                        })()
+                    )
+                }
 
-            // b) コーチのカレンダー同期タスク
-            // ※ コーチのリフレッシュトークンが管理者と同じ場合（管理者が自身をアサインした場合）は重複を防止するためスキップ
-            if (coachRefreshToken && coachRefreshToken !== adminRefreshToken) {
-                calendarSyncTasks.push(
-                    (async () => {
-                        try {
-                            return await createCalendarEvent(coachRefreshToken, {
-                                summary: calSummary,
-                                description: calDescription,
-                                location: params.confirmedLocation || '',
-                                start: start,
-                                end: end
-                            })
-                        } catch (cErr) {
-                            console.error('Coach calendar sync error:', cErr)
-                        }
-                        return null
-                    })()
-                )
+                // b) コーチのカレンダー同期タスク
+                if (coachRefreshToken && coachRefreshToken !== adminRefreshToken) {
+                    calendarSyncTasks.push(
+                        (async () => {
+                            try {
+                                return await createCalendarEvent(coachRefreshToken, {
+                                    summary: calSummary,
+                                    description: calDescription,
+                                    location: params.confirmedLocation || '',
+                                    start: start,
+                                    end: end
+                                })
+                            } catch (cErr) {
+                                console.error('Coach calendar sync error:', cErr)
+                            }
+                            return null
+                        })()
+                    )
+                }
             }
 
             // 並列実行で待ち時間を半減
