@@ -232,19 +232,15 @@ async function createTrialScheduleForLead(params: {
 
         // コーチ名の取得
         let coachName = '担当コーチ'
-        let coachEmail: string | null = null
-        let coachGoogleChatEmail: string | null = null
         if (params.coachId) {
             const { data: coachProfile } = await supabaseAdmin
                 .from('profiles')
-                .select('full_name, email, google_chat_email')
+                .select('full_name')
                 .eq('id', params.coachId)
                 .single()
             if (coachProfile?.full_name) {
                 coachName = coachProfile.full_name
             }
-            if (coachProfile?.email) coachEmail = coachProfile.email
-            if (coachProfile?.google_chat_email) coachGoogleChatEmail = coachProfile.google_chat_email
         }
 
         // 既存スケジュールの確認
@@ -434,51 +430,35 @@ async function createTrialScheduleForLead(params: {
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://manager.swim-partners.com'
         const paymentLink = `${appUrl}/pay/trial/${targetScheduleId}`
 
-        // 4. Googleカレンダーへの同期（新吉アサイン時は二重登録を抑止し任意カレンダーへ、他コーチは並列同期）
+        // 4. Googleカレンダーへの同期（info.swimpartners本部カレンダーへ登録、新吉アサイン時は二重登録を抑止）
         try {
             const { 
                 createCalendarEvent, 
                 getAdminRefreshToken, 
                 getCoachRefreshToken,
-                isShinkichiOrAdminCoach,
-                getShinkichiCalendarId
+                isShinkichiOrAdminCoach
             } = await import('@/lib/google-calendar')
             const calSummary = `${params.studentName}様${params.hasSecondStudent ? ` & ${params.secondStudentName || '2人目'}様` : ''}　担当：${coachName}`
             const calDescription = `[体験レッスンスケジュール]\n案件ID: ${params.leadId}\n確定日時: ${params.confirmedDate}\n確定場所: ${params.confirmedLocation}\nご要望・備考: ${params.leadNotes || 'なし'}`
 
-            // コーチのGoogleカレンダーに反映させるためのattendees設定
-            const attendees: { email: string; displayName?: string }[] = []
-            const targetCoachEmail = coachGoogleChatEmail || coachEmail
-            if (targetCoachEmail) {
-                attendees.push({ email: targetCoachEmail, displayName: coachName })
-            }
-            if (coachEmail && targetCoachEmail !== coachEmail) {
-                attendees.push({ email: coachEmail, displayName: coachName })
-            }
-
             const isShinkichi = params.coachId ? await isShinkichiOrAdminCoach(supabaseAdmin, params.coachId) : false
-            const shinkichiCalendarId = isShinkichi ? await getShinkichiCalendarId(supabaseAdmin) : null
 
             const calendarSyncTasks: Promise<string | null>[] = []
 
             if (isShinkichi) {
                 // 【新吉コーチ（代表・管理者）アサイン時】
-                // 本部マスターカレンダーとの二重登録を抑止し、指定された任意カレンダー（未設定時はprimary）へ1件のみ登録
-                // attendeesに新吉様のメールを含めることで、個人アカウント・端末カレンダーにも即座に自動反映
+                // 本部マスターカレンダー（info.swimpartners）への二重登録を抑止し、primaryへ1件のみ登録
                 calendarSyncTasks.push(
                     (async () => {
                         try {
-                            let token = await getCoachRefreshToken(supabaseAdmin, params.coachId)
-                            if (!token) token = await getAdminRefreshToken(supabaseAdmin)
-                            if (token) {
-                                return await createCalendarEvent(token, {
+                            const adminRefreshToken = await getAdminRefreshToken(supabaseAdmin)
+                            if (adminRefreshToken) {
+                                return await createCalendarEvent(adminRefreshToken, {
                                     summary: calSummary,
                                     description: calDescription,
                                     location: params.confirmedLocation || '',
                                     start: start,
-                                    end: end,
-                                    attendees: attendees.length > 0 ? attendees : undefined,
-                                    calendarId: shinkichiCalendarId || 'primary'
+                                    end: end
                                 })
                             }
                         } catch (sErr) {
@@ -506,7 +486,7 @@ async function createTrialScheduleForLead(params: {
                     console.error('Admin calendar token error:', aErr)
                 }
 
-                // a) 管理者カレンダー同期（attendees付きで登録することでコーチのカレンダーにも自動反映）
+                // a) 本部マスターカレンダー同期
                 if (adminRefreshToken) {
                     calendarSyncTasks.push(
                         (async () => {
@@ -516,8 +496,7 @@ async function createTrialScheduleForLead(params: {
                                     description: calDescription,
                                     location: params.confirmedLocation || '',
                                     start: start,
-                                    end: end,
-                                    attendees: attendees.length > 0 ? attendees : undefined
+                                    end: end
                                 })
                             } catch (aErr) {
                                 console.error('Admin calendar sync error:', aErr)
@@ -527,7 +506,7 @@ async function createTrialScheduleForLead(params: {
                     )
                 }
 
-                // b) コーチのカレンダー同期タスク
+                // b) コーチ個人カレンダー同期タスク
                 if (coachRefreshToken && coachRefreshToken !== adminRefreshToken) {
                     calendarSyncTasks.push(
                         (async () => {

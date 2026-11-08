@@ -115,60 +115,31 @@ export async function updateScheduleWithCalendar(params: UpdateScheduleParams) {
 
         if (updateError) throw updateError
 
-        // 3. Googleカレンダーへ同期
+        // 3. Googleカレンダーへ同期（info.swimpartners本部カレンダーへ登録）
         try {
             const { 
                 updateCalendarEvent, 
                 createCalendarEvent, 
-                getAdminRefreshToken,
-                getCoachRefreshToken,
-                isShinkichiOrAdminCoach,
-                getShinkichiCalendarId
+                getAdminRefreshToken
             } = await import('@/lib/google-calendar')
 
-            const targetCoachId = params.coachId || existing?.coach_id
-            const isShinkichi = targetCoachId ? await isShinkichiOrAdminCoach(supabaseAdmin, targetCoachId) : false
-            const shinkichiCalendarId = isShinkichi ? await getShinkichiCalendarId(supabaseAdmin) : null
-            const targetCalId = shinkichiCalendarId || 'primary'
+            const adminRefreshToken = await getAdminRefreshToken(supabaseAdmin)
 
-            let token = targetCoachId ? await getCoachRefreshToken(supabaseAdmin, targetCoachId) : null
-            if (!token) {
-                token = await getAdminRefreshToken(supabaseAdmin)
-            }
-
-            if (token) {
-                let attendees: { email: string; displayName?: string }[] | undefined = undefined
-                if (targetCoachId) {
-                    const { data: cProfile } = await supabaseAdmin
-                        .from('profiles')
-                        .select('full_name, email, google_chat_email')
-                        .eq('id', targetCoachId)
-                        .single()
-                    if (cProfile) {
-                        const atts: { email: string; displayName?: string }[] = []
-                        const cEmail = cProfile.google_chat_email || cProfile.email
-                        if (cEmail) atts.push({ email: cEmail, displayName: cProfile.full_name })
-                        if (cProfile.email && cEmail !== cProfile.email) atts.push({ email: cProfile.email, displayName: cProfile.full_name })
-                        if (atts.length > 0) attendees = atts
-                    }
-                }
-
+            if (adminRefreshToken) {
                 const calPayload = {
                     summary: params.title,
                     description: params.notes || '',
                     location: params.location || '',
                     start: params.startTime,
                     end: params.endTime,
-                    attendees,
-                    calendarId: targetCalId
                 }
 
                 if (existing?.google_event_id) {
                     // 既存イベントを更新
-                    await updateCalendarEvent(token, existing.google_event_id, calPayload, targetCalId)
+                    await updateCalendarEvent(adminRefreshToken, existing.google_event_id, calPayload)
                 } else {
                     // イベントが未作成の場合は新規作成してIDを保存
-                    const newEventId = await createCalendarEvent(token, calPayload, targetCalId)
+                    const newEventId = await createCalendarEvent(adminRefreshToken, calPayload)
                     if (newEventId) {
                         await supabaseAdmin
                             .from('lesson_schedules')
