@@ -9,6 +9,7 @@ import { emailService } from "@/lib/email";
 import { lineService } from "@/lib/line";
 import { dispatchNewLeadToMatchingCoaches } from "@/lib/coach-matching";
 import { autoDetectLocationForLead } from "@/lib/location-matcher";
+import { sendGA4ConversionEvent } from "@/lib/ga4-measurement-protocol";
 
 export async function POST(req: Request) {
   try {
@@ -674,6 +675,28 @@ SWIM PARTNERS/スイムパートナーズ事務局`;
       } catch (emailErr) {
         console.error('[Trial Booking] Failed to send reception email to customer:', emailErr);
       }
+    }
+
+    // 8. GA4 Measurement Protocol へのコンバージョン送信（非ブロッキング）
+    try {
+      const reservationId = savedLeadId ? String(savedLeadId) : `temp-${Date.now()}`;
+      await sendGA4ConversionEvent({
+        eventName: 'reserve_complete',
+        clientId: `crm-${reservationId}`,
+        userId: payload.userId || undefined,
+        params: {
+          engagement_time_msec: 100,
+          reservation_id: reservationId,
+          event_category: 'booking',
+          event_label: 'trial_lesson',
+          currency: 'JPY',
+          value: referrer ? 3500 : 5500,
+          source: payload.source || 'LINE/LIFF体験予約フォーム',
+          lesson_area: payload.station || '',
+        },
+      });
+    } catch (ga4Err) {
+      console.warn('[Trial Booking] GA4 Measurement Protocol failed (non-blocking):', ga4Err);
     }
 
     return NextResponse.json({ success: true });
