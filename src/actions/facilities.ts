@@ -26,6 +26,30 @@ export async function createFacilityAction(data: { name: string, isFacilityFeeAp
     }
 }
 
+export async function updateFacilityAction(id: string, data: { name: string, isFacilityFeeApplied: boolean }) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { success: false, error: 'Unauthorized' }
+
+    try {
+        const { error } = await supabase
+            .from('facilities')
+            .update({
+                name: data.name,
+                is_facility_fee_applied: data.isFacilityFeeApplied
+            })
+            .eq('id', id)
+
+        if (error) throw error
+
+        revalidatePath('/admin/masters/facilities')
+        return { success: true }
+    } catch (error: any) {
+        console.error('Update Facility Error:', error)
+        return { success: false, error: error.message || 'Failed to update facility' }
+    }
+}
+
 export async function deleteFacilityAction(id: string) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()

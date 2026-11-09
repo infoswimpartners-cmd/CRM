@@ -13,7 +13,7 @@ import {
 import { toast } from 'sonner'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Trash2 } from 'lucide-react'
+import { Trash2, Pencil } from 'lucide-react'
 import {
     AlertDialog,
     AlertDialogAction,
@@ -25,6 +25,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { deleteFacilityAction } from '@/actions/facilities'
+import { EditFacilityDialog } from './EditFacilityDialog'
 import { format } from 'date-fns'
 
 interface Facility {
@@ -37,6 +38,7 @@ interface Facility {
 export function FacilityTable({ facilities }: { facilities: Facility[] }) {
     const router = useRouter()
     const [deletingId, setDeletingId] = useState<string | null>(null)
+    const [editingFacility, setEditingFacility] = useState<Facility | null>(null)
 
     const handleDelete = async () => {
         if (!deletingId) return
@@ -84,14 +86,26 @@ export function FacilityTable({ facilities }: { facilities: Facility[] }) {
                                 {format(new Date(facility.created_at), 'yyyy/MM/dd HH:mm')}
                             </TableCell>
                             <TableCell className="text-right">
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="text-red-500 hover:text-red-600 hover:bg-red-50"
-                                    onClick={() => setDeletingId(facility.id)}
-                                >
-                                    <Trash2 className="h-4 w-4" />
-                                </Button>
+                                <div className="flex items-center justify-end gap-1">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="text-slate-600 hover:text-blue-600 hover:bg-blue-50"
+                                        onClick={() => setEditingFacility(facility)}
+                                        title="編集"
+                                    >
+                                        <Pencil className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                                        onClick={() => setDeletingId(facility.id)}
+                                        title="削除"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                </div>
                             </TableCell>
                         </TableRow>
                     ))}
@@ -104,6 +118,12 @@ export function FacilityTable({ facilities }: { facilities: Facility[] }) {
                     )}
                 </TableBody>
             </Table>
+
+            <EditFacilityDialog
+                facility={editingFacility}
+                open={!!editingFacility}
+                onOpenChange={(open) => !open && setEditingFacility(null)}
+            />
 
             <AlertDialog open={!!deletingId} onOpenChange={(open: boolean) => !open && setDeletingId(null)}>
                 <AlertDialogContent>
