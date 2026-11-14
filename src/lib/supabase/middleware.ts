@@ -12,6 +12,11 @@ export async function updateSession(request: NextRequest) {
         },
     })
 
+    // skip public redirect endpoints from session checks
+    if (request.nextUrl.pathname.startsWith('/go/')) {
+        return supabaseResponse
+    }
+
     const supabase = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
