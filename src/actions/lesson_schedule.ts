@@ -271,19 +271,25 @@ export async function createLessonSchedule(params: CreateLessonScheduleParams) {
                     apply_pair_pricing,
                     status,
                     membership:membership_types!students_membership_type_id_fkey (
+                        id,
                         monthly_lesson_limit,
                         max_rollover_limit,
                         fee,
                         name,
                         is_package,
+                        default_lesson_master_id,
+                        membership_type_lessons(lesson_master_id),
                         default_lesson:lesson_masters!default_lesson_master_id(unit_price, pair_unit_price)
                     ),
                     next_membership:membership_types!students_next_membership_type_id_fkey (
+                        id,
                         monthly_lesson_limit,
                         max_rollover_limit,
                         fee,
                         name,
                         is_package,
+                        default_lesson_master_id,
+                        membership_type_lessons(lesson_master_id),
                         default_lesson:lesson_masters!default_lesson_master_id(unit_price, pair_unit_price)
                     ),
                     current_tickets
@@ -348,17 +354,54 @@ export async function createLessonSchedule(params: CreateLessonScheduleParams) {
                     }
                 }
 
+                // 2.7 誤ったレッスンマスタ登録を防ぐ検証・自動補正ガード
+                let effectiveLessonMasterId: string | null = params.lesson_master_id || null
+                const isTrialStatus = ['trial_pending', 'trial_confirmed', 'trial_billed', 'applied'].includes(student.status) && !membership
+
+                if (!isTrialStatus) {
+                    if (membership) {
+                        const allowedIds = (membership as any).membership_type_lessons?.map((mtl: any) => mtl.lesson_master_id) || []
+                        const defaultMasterId = (membership as any).default_lesson_master_id || null
+
+                        let isValidForPlan = true
+                        if (effectiveLessonMasterId) {
+                            const { data: lmCheck } = await supabaseAdmin
+                                .from('lesson_masters')
+                                .select('id, active')
+                                .eq('id', effectiveLessonMasterId)
+                                .maybeSingle()
+                            if (!lmCheck || lmCheck.active === false) {
+                                isValidForPlan = false
+                            } else if (allowedIds.length > 0 && !allowedIds.includes(effectiveLessonMasterId) && effectiveLessonMasterId !== defaultMasterId) {
+                                isValidForPlan = false
+                            }
+                        } else {
+                            isValidForPlan = false
+                        }
+
+                        if (!isValidForPlan && defaultMasterId) {
+                            console.warn(`[CreateLesson] Invalid/mismatched lesson_master_id (${effectiveLessonMasterId}) for membership ${membership.name}. Auto-correcting to default: ${defaultMasterId}`)
+                            effectiveLessonMasterId = defaultMasterId
+                        } else if (!isValidForPlan && allowedIds.length > 0) {
+                            effectiveLessonMasterId = allowedIds[0]
+                        }
+                    } else if (!effectiveLessonMasterId) {
+                        // プラン未設定の非体験生徒は新料金「単発（60分）10,000円」をデフォルトにする
+                        effectiveLessonMasterId = 'd5c6f390-ad26-43b8-a4e3-72431df304a0'
+                    }
+                }
+
                 if (checkOverage) {
                     isOverage = true
 
                     // 3. Billing Logic (Immediate)
                     // Calculate Price
                     let pairUnitPrice: number | null = null
-                    if (params.lesson_master_id) {
+                    if (effectiveLessonMasterId) {
                         const { data: lm } = await supabaseAdmin
                             .from('lesson_masters')
                             .select('unit_price, pair_unit_price')
-                            .eq('id', params.lesson_master_id)
+                            .eq('id', effectiveLessonMasterId)
                             .single()
                         if (lm && lm.unit_price) {
                             overagePrice = lm.unit_price
@@ -383,7 +426,7 @@ export async function createLessonSchedule(params: CreateLessonScheduleParams) {
                             overagePrice = Math.floor(membership.fee / limit)
                         } else {
                             // Final safety fallback
-                            overagePrice = 8800
+                            overagePrice = 10000
                         }
                     }
 
@@ -405,7 +448,7 @@ export async function createLessonSchedule(params: CreateLessonScheduleParams) {
                     .insert({
                         coach_id: params.coach_id,
                         student_id: params.student_id ? params.student_id : null,
-                        lesson_master_id: params.lesson_master_id ? params.lesson_master_id : null,
+                        lesson_master_id: effectiveLessonMasterId,
                         start_time: params.start_time,
                         end_time: params.end_time,
                         title: params.title,

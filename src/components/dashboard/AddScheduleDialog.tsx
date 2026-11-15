@@ -314,18 +314,17 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
                         if (lessons.length > 0) {
                             let targetId = 'default'
 
-                            // 1. 基本的に60分のレッスンを最優先（単発プランの場合は単価10,000円の単発60分を最優先）
-                            const isSinglePlan = res.membershipName?.includes('単発') || !res.limit || res.limit === 0
-                            const singleTenThousand = isSinglePlan
-                                ? lessons.find((l: any) => l.name?.includes('60') && (l.unit_price === 10000 || l.id === 'd5c6f390-ad26-43b8-a4e3-72431df304a0'))
-                                : null
-                            const sixtyMin = singleTenThousand || lessons.find((l: any) => l.name?.includes('60'))
-                            if (sixtyMin) {
-                                targetId = sixtyMin.id
-                            } else if (res.defaultLessonId) {
-                                // 2. 60分がない場合はプランのデフォルトID
-                                const match = lessons.find((l: any) => l.id === res.defaultLessonId)
-                                if (match) targetId = res.defaultLessonId
+                            // 1. プランの標準レッスン（新単発は10,000円、旧単発は9,000円）を最優先で選択
+                            const defaultMatch = res.defaultLessonId ? lessons.find((l: any) => l.id === res.defaultLessonId) : null
+                            if (defaultMatch) {
+                                targetId = defaultMatch.id
+                            } else {
+                                // 2. 標準レッスンが未設定の場合は、単価10,000円の単発（60分）または60分レッスンを優先
+                                const singleTenThousand = lessons.find((l: any) => l.name?.includes('60') && (l.unit_price === 10000 || l.id === 'd5c6f390-ad26-43b8-a4e3-72431df304a0'))
+                                const sixtyMin = singleTenThousand || lessons.find((l: any) => l.name?.includes('60'))
+                                if (sixtyMin) {
+                                    targetId = sixtyMin.id
+                                }
                             }
 
                             // 3. Fallback to first item if still default

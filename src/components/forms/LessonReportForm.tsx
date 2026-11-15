@@ -302,14 +302,13 @@ export function LessonReportForm() {
                 setRestrictedLessonIds(ids)
 
                 const allowedMasters = lessonMasters.filter(m => ids.includes(m.id))
-                // 単発プランの場合は単価10,000円の単発（60分）を最優先で選択
-                const isSinglePlan = (membership as any)?.name?.includes('単発') || (membership as any)?.monthly_lesson_limit === 0
-                const singleTenThousandMaster = isSinglePlan
-                    ? allowedMasters.find(m => m.name?.includes('60') && (m.unit_price === 10000 || m.id === 'd5c6f390-ad26-43b8-a4e3-72431df304a0'))
+                // プランの標準レッスン（新単発は10,000円、旧単発は9,000円）を最優先で選択
+                const defaultMaster = membership.default_lesson_master_id && ids.includes(membership.default_lesson_master_id)
+                    ? allowedMasters.find(m => m.id === membership.default_lesson_master_id)
                     : null
-                const sixtyMinMaster = singleTenThousandMaster || allowedMasters.find(m => m.name?.includes('60'))
+                const sixtyMinMaster = defaultMaster || allowedMasters.find(m => m.name?.includes('60'))
 
-                // スケジュールに紐づくマスタが明示的に90分/120分等の場合を除き、基本的に60分レッスンを最優先
+                // スケジュールに紐づくマスタが明示的に90分/120分等の場合を除き、基本的にプラン標準（60分）を最優先
                 const linkedMaster = schedule.lesson_master_id ? lessonMasters.find(m => m.id === schedule.lesson_master_id) : null
                 const isExplicitLongLesson = linkedMaster && (linkedMaster.name?.includes('90') || linkedMaster.name?.includes('120'))
 
@@ -326,8 +325,9 @@ export function LessonReportForm() {
                 }
             } else {
                 setRestrictedLessonIds(null)
-                const sixtyMin = lessonMasters.find(m => !m.is_trial && m.name?.includes('60'))
-                if (schedule.lesson_master_id) {
+                const sixtyMin = lessonMasters.find(m => !m.is_trial && m.name?.includes('60') && (m.unit_price === 10000 || m.id === 'd5c6f390-ad26-43b8-a4e3-72431df304a0'))
+                    || lessonMasters.find(m => !m.is_trial && m.name?.includes('60'))
+                if (schedule.lesson_master_id && lessonMasters.some(m => m.id === schedule.lesson_master_id)) {
                     form.setValue('lesson_master_id', schedule.lesson_master_id)
                 } else if (sixtyMin) {
                     form.setValue('lesson_master_id', sixtyMin.id)
@@ -335,8 +335,9 @@ export function LessonReportForm() {
             }
         } else {
             setRestrictedLessonIds(null)
-            const sixtyMin = lessonMasters.find(m => !m.is_trial && m.name?.includes('60'))
-            if (schedule.lesson_master_id) {
+            const sixtyMin = lessonMasters.find(m => !m.is_trial && m.name?.includes('60') && (m.unit_price === 10000 || m.id === 'd5c6f390-ad26-43b8-a4e3-72431df304a0'))
+                || lessonMasters.find(m => !m.is_trial && m.name?.includes('60'))
+            if (schedule.lesson_master_id && lessonMasters.some(m => m.id === schedule.lesson_master_id)) {
                 form.setValue('lesson_master_id', schedule.lesson_master_id)
             } else if (sixtyMin) {
                 form.setValue('lesson_master_id', sixtyMin.id)
@@ -521,13 +522,12 @@ export function LessonReportForm() {
                 // IMPORTANT: Only reset if the current selection is NOT allowed for this student
                 const currentMasterId = form.getValues('lesson_master_id')
                 if (!currentMasterId || !ids.includes(currentMasterId)) {
-                    // 基本的に60分レッスンを最優先で自動選択（単発プランの場合は単価10,000円の単発60分を最優先）
+                    // プランの標準レッスン（新単発は10,000円、旧単発は9,000円）を最優先で自動選択
                     const allowedMasters = lessonMasters.filter(m => ids.includes(m.id))
-                    const isSinglePlan = (membership as any)?.name?.includes('単発') || (membership as any)?.monthly_lesson_limit === 0
-                    const singleTenThousandMaster = isSinglePlan
-                        ? allowedMasters.find(m => m.name?.includes('60') && (m.unit_price === 10000 || m.id === 'd5c6f390-ad26-43b8-a4e3-72431df304a0'))
+                    const defaultMaster = membership.default_lesson_master_id && ids.includes(membership.default_lesson_master_id)
+                        ? allowedMasters.find(m => m.id === membership.default_lesson_master_id)
                         : null
-                    const sixtyMinMaster = singleTenThousandMaster || allowedMasters.find(m => m.name?.includes('60'))
+                    const sixtyMinMaster = defaultMaster || allowedMasters.find(m => m.name?.includes('60'))
 
                     if (sixtyMinMaster) {
                         form.setValue('lesson_master_id', sixtyMinMaster.id)
