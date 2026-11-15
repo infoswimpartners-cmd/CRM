@@ -314,8 +314,12 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
                         if (lessons.length > 0) {
                             let targetId = 'default'
 
-                            // 1. 基本的に60分のレッスンを最優先
-                            const sixtyMin = lessons.find((l: any) => l.name?.includes('60'))
+                            // 1. 基本的に60分のレッスンを最優先（単発プランの場合は単価10,000円の単発60分を最優先）
+                            const isSinglePlan = res.membershipName?.includes('単発') || !res.limit || res.limit === 0
+                            const singleTenThousand = isSinglePlan
+                                ? lessons.find((l: any) => l.name?.includes('60') && (l.unit_price === 10000 || l.id === 'd5c6f390-ad26-43b8-a4e3-72431df304a0'))
+                                : null
+                            const sixtyMin = singleTenThousand || lessons.find((l: any) => l.name?.includes('60'))
                             if (sixtyMin) {
                                 targetId = sixtyMin.id
                             } else if (res.defaultLessonId) {
