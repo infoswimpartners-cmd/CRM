@@ -415,12 +415,22 @@ export async function createImmediatePaymentInvoice(scheduleId: string) {
             }
         })
 
+        // 顧客の領収書メモ（但書）設定を確認
+        let receiptMemo: string | undefined
+        try {
+            const cus = await stripe.customers.retrieve(customerId)
+            if (cus && !('deleted' in cus && cus.deleted) && cus.metadata?.receipt_memo) {
+                receiptMemo = cus.metadata.receipt_memo
+            }
+        } catch {}
+
         // 3. Create Invoice (Collection Method: send_invoice)
         const invoice = await stripe.invoices.create({
             customer: customerId,
             collection_method: 'send_invoice',
             days_until_due: 1, // Due tomorrow basically
             auto_advance: true, // Auto-finalize
+            ...(receiptMemo ? { description: receiptMemo } : {}),
             metadata: {
                 schedule_id: schedule.id,
                 type: 'immediate_overage'
@@ -748,6 +758,66 @@ export async function getStripeInvoices(options: GetStripeInvoicesOptions = {}) 
             data: [],
             hasMore: false,
         }
+    }
+}
+
+/**
+ * Stripe顧客の請求先宛名および領収書メモ（但書）を取得する
+ */
+export async function getStripeCustomerBillingSettings(stripeCustomerId: string) {
+    try {
+        if (!stripeCustomerId) {
+            return { success: false, error: 'Stripe顧客IDがありません' }
+        }
+        const customer = await stripe.customers.retrieve(stripeCustomerId)
+        if (!customer || ('deleted' in customer && customer.deleted)) {
+            return { success: false, error: 'Stripe上に顧客データが存在しません' }
+        }
+        return {
+            success: true,
+            billingName: customer.name || '',
+            receiptMemo: customer.metadata?.receipt_memo || '',
+        }
+    } catch (error: any) {
+        console.error('[getStripeCustomerBillingSettings] Error:', error)
+        return { success: false, error: error?.message || '取得に失敗しました' }
+    }
+}
+
+/**
+ * Stripe顧客の請求先宛名および領収書メモ（但書）を更新する（CRM上の生徒名は変更しない）
+ */
+export async function updateStripeCustomerBillingSettings(
+    studentId: string,
+    stripeCustomerId: string,
+    billingName: string,
+    receiptMemo: string
+) {
+    try {
+        if (!stripeCustomerId) {
+            return { success: false, error: 'Stripe顧客IDがありません' }
+        }
+        const customer = await stripe.customers.retrieve(stripeCustomerId)
+        if (!customer || ('deleted' in customer && customer.deleted)) {
+            return { success: false, error: 'Stripe上に顧客データが存在しません' }
+        }
+
+        const trimmedName = billingName.trim()
+        const trimmedMemo = receiptMemo.trim()
+
+        await stripe.customers.update(stripeCustomerId, {
+            ...(trimmedName ? { name: trimmedName } : {}),
+            metadata: {
+                ...(customer.metadata || {}),
+                receipt_memo: trimmedMemo,
+            },
+        })
+
+        revalidatePath(`/customers/${studentId}`)
+        return { success: true }
+    } catch (error: any) {
+        console.error('[updateStripeCustomerBillingSettings] Error:', error)
+        return { success: false, error: error?.message || '更新に失敗しました' }
     }
 }
 

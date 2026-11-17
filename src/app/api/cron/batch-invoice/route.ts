@@ -102,13 +102,22 @@ export async function GET(req: NextRequest) {
                     continue
                 }
 
+                // 顧客の領収書メモ（但書）設定を確認
+                let customMemo: string | undefined
+                try {
+                    const cus = await stripe.customers.retrieve(customerId)
+                    if (cus && !('deleted' in cus && cus.deleted) && cus.metadata?.receipt_memo) {
+                        customMemo = cus.metadata.receipt_memo.trim() || undefined
+                    }
+                } catch {}
+
                 // B. Create Invoice
                 // This automatically pulls all pending invoice items for this customer.
                 const invoice = await stripe.invoices.create({
                     customer: customerId,
                     auto_advance: true,
                     collection_method: 'charge_automatically', // Try to charge card
-                    description: `${new Date().getMonth() + 1}月分 レッスン料まとめ請求`
+                    description: customMemo || `${new Date().getMonth() + 1}月分 レッスン料まとめ請求`
                 })
 
                 log.push(`  - Created Invoice: ${invoice.id}`)

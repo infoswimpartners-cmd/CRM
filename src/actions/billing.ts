@@ -122,12 +122,22 @@ export async function processLessonBilling(scheduleId: string, forceManualEmail:
         })
         console.log('[Billing] Invoice Item created:', invoiceItem.id)
 
+        // 顧客の領収書メモ（但書）設定を確認
+        let receiptMemo: string | undefined
+        try {
+            const cus = await stripe.customers.retrieve(stripeCustomerId)
+            if (cus && !('deleted' in cus && cus.deleted) && cus.metadata?.receipt_memo) {
+                receiptMemo = cus.metadata.receipt_memo.trim() || undefined
+            }
+        } catch {}
+
         // B. Create Invoice
         const invoice = await stripe.invoices.create({
             customer: stripeCustomerId,
             collection_method: shouldChargeAutomatically ? 'charge_automatically' : 'send_invoice',
             days_until_due: shouldChargeAutomatically ? undefined : 1,
             auto_advance: true,
+            ...(receiptMemo ? { description: receiptMemo } : {}),
             metadata: {
                 schedule_id: data.id
             }

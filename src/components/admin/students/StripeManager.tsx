@@ -1,15 +1,22 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { CreditCard, ExternalLink, Loader2, Link as LinkIcon, AlertTriangle, Pencil, Copy, Check, Receipt } from 'lucide-react'
-import { createStripeCustomer, createPaymentSetupLink, updateStudentStripeId } from '@/actions/stripe'
+import { CreditCard, ExternalLink, Loader2, Link as LinkIcon, AlertTriangle, Pencil, Copy, Check, Receipt, FileText } from 'lucide-react'
+import {
+    createStripeCustomer,
+    createPaymentSetupLink,
+    updateStudentStripeId,
+    getStripeCustomerBillingSettings,
+    updateStripeCustomerBillingSettings,
+} from '@/actions/stripe'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 
 interface StripeManagerProps {
     studentId: string
@@ -30,6 +37,50 @@ export function StripeManager({ studentId, stripeCustomerId, paymentMethodStatus
     const [manualId, setManualId] = useState('')
     const [isUpdating, setIsUpdating] = useState(false)
     const [copied, setCopied] = useState(false)
+
+    // 請求書・領収書の宛名とメモ（但書）設定
+    const [billingName, setBillingName] = useState('')
+    const [receiptMemo, setReceiptMemo] = useState('')
+    const [isLoadingSettings, setIsLoadingSettings] = useState(false)
+    const [isSavingSettings, setIsSavingSettings] = useState(false)
+
+    useEffect(() => {
+        if (!stripeCustomerId) return
+        let cancelled = false
+        setIsLoadingSettings(true)
+        getStripeCustomerBillingSettings(stripeCustomerId)
+            .then((res) => {
+                if (cancelled) return
+                if (res.success) {
+                    setBillingName(res.billingName || '')
+                    setReceiptMemo(res.receiptMemo || '')
+                }
+            })
+            .finally(() => {
+                if (!cancelled) setIsLoadingSettings(false)
+            })
+        return () => { cancelled = true }
+    }, [stripeCustomerId])
+
+    async function handleSaveBillingSettings() {
+        if (!stripeCustomerId) return
+        setIsSavingSettings(true)
+        try {
+            const res = await updateStripeCustomerBillingSettings(
+                studentId,
+                stripeCustomerId,
+                billingName,
+                receiptMemo
+            )
+            if (res.success) {
+                toast.success('請求書・領収書の宛名とメモ欄をStripeに保存しました')
+            } else {
+                toast.error('保存に失敗しました: ' + res.error)
+            }
+        } finally {
+            setIsSavingSettings(false)
+        }
+    }
 
     async function handleCreateCustomer() {
         setIsCreating(true)
@@ -251,6 +302,61 @@ export function StripeManager({ studentId, stripeCustomerId, paymentMethodStatus
                                 >
                                     <ExternalLink className="w-3 h-3 mr-1" />
                                     管理画面
+                                </Button>
+                            </div>
+                        </div>
+
+                        {/* 請求書・領収書の宛名とメモ欄（但書）設定 */}
+                        <div className="space-y-3 p-3.5 bg-slate-50/80 border border-slate-200/70 rounded-xl">
+                            <div className="flex items-center justify-between">
+                                <Label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                                    <FileText className="w-3.5 h-3.5 text-indigo-600" />
+                                    請求書・領収書設定（Stripe宛名・メモ欄）
+                                </Label>
+                                {isLoadingSettings && <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />}
+                            </div>
+                            <div className="space-y-2">
+                                <div className="space-y-1">
+                                    <Label htmlFor="stripeBillingName" className="text-[11px] font-semibold text-slate-600">
+                                        領収書・請求書の宛名（Stripe顧客名）
+                                    </Label>
+                                    <Input
+                                        id="stripeBillingName"
+                                        value={billingName}
+                                        onChange={(e) => setBillingName(e.target.value)}
+                                        placeholder="保護者名や法人名など（未入力時は生徒名）"
+                                        className="h-8 text-xs bg-white border-slate-200"
+                                        disabled={isLoadingSettings || isSavingSettings}
+                                    />
+                                    <p className="text-[10px] text-slate-400">
+                                        ※ CRM上の生徒名は変更されず、Stripeの請求書・領収書上の宛名のみ変更されます。
+                                    </p>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="stripeReceiptMemo" className="text-[11px] font-semibold text-slate-600">
+                                        請求書・領収書のメモ欄（但書）
+                                    </Label>
+                                    <Textarea
+                                        id="stripeReceiptMemo"
+                                        value={receiptMemo}
+                                        onChange={(e) => setReceiptMemo(e.target.value)}
+                                        placeholder="例: 但し、水泳個人指導料として"
+                                        rows={2}
+                                        className="text-xs bg-white border-slate-200 resize-none"
+                                        disabled={isLoadingSettings || isSavingSettings}
+                                    />
+                                    <p className="text-[10px] text-slate-400">
+                                        ※ 入力すると、今後の請求書・体験事前決済のStripe領収書メモ欄に自動で反映されます。
+                                    </p>
+                                </div>
+                                <Button
+                                    size="sm"
+                                    onClick={handleSaveBillingSettings}
+                                    disabled={isLoadingSettings || isSavingSettings}
+                                    className="w-full h-8 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold"
+                                >
+                                    {isSavingSettings && <Loader2 className="w-3 h-3 animate-spin mr-1.5" />}
+                                    Stripe宛名・メモを保存
                                 </Button>
                             </div>
                         </div>

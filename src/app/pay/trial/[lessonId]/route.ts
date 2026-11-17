@@ -139,6 +139,17 @@ export async function GET(
             }
         })
 
+        // Stripe顧客のメタデータから領収書メモ（但書）を取得
+        let receiptMemo: string | undefined
+        try {
+            const cus = await stripe.customers.retrieve(stripeCustomerId)
+            if (cus && !('deleted' in cus && cus.deleted) && cus.metadata?.receipt_memo) {
+                receiptMemo = cus.metadata.receipt_memo.trim() || undefined
+            }
+        } catch (cusErr) {
+            console.warn('[Trial Payment] Failed to retrieve customer metadata:', cusErr)
+        }
+
         const session = await stripe.checkout.sessions.create({
             customer: stripeCustomerId,
             payment_method_types: ['card'],
@@ -146,6 +157,14 @@ export async function GET(
             line_items: line_items,
             success_url: `${process.env.NEXT_PUBLIC_APP_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
             cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/cancel`,
+            ...(receiptMemo ? {
+                invoice_creation: {
+                    enabled: true,
+                    invoice_data: {
+                        description: receiptMemo,
+                    },
+                },
+            } : {}),
             metadata: {
                 studentId: student.id,
                 scheduleId: schedule.id,
@@ -156,6 +175,7 @@ export async function GET(
             },
             payment_intent_data: {
                 setup_future_usage: 'off_session',
+                ...(receiptMemo ? { description: receiptMemo } : {}),
             }
         })
 
