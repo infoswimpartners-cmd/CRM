@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import crypto from 'crypto'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { sendGoogleChatMessage } from '@/lib/google-chat'
@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
 
         // 案B: LINE Webhook受信のついでに、前回チェックから3分以上経過していれば
         // Next.js after() で確認画面離脱30分後フォローをバックグラウンド消化（Webhookレスポンス速度を維持）
-        scheduleLazyConfirm30MinFollowup()
+        scheduleLazyConfirm30MinFollowup({}, after)
 
         const body = JSON.parse(rawBody)
         const events = body.events || []

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import { recordAccessLog, recordConfirmAbandon } from '@/lib/line-tracking-service';
 import { scheduleLazyConfirm30MinFollowup } from '@/lib/line-marketing-service';
 
@@ -10,10 +10,13 @@ export async function POST(req: Request) {
 
         // 案D: クライアント側の30分タイマー満了による確認画面離脱フォロー即時判定トリガー
         if (body.step === 'confirm_30m_check') {
-            scheduleLazyConfirm30MinFollowup({
-                targetLineUserId: resolvedLineUserId || undefined,
-                force: true,
-            });
+            scheduleLazyConfirm30MinFollowup(
+                {
+                    targetLineUserId: resolvedLineUserId || undefined,
+                    force: true,
+                },
+                after
+            );
             return NextResponse.json({
                 success: true,
                 step: 'confirm_30m_check',
@@ -23,7 +26,7 @@ export async function POST(req: Request) {
 
         // 案B: 既存のLIFFトラッキングリクエストのついでに、前回チェックから3分以上経過していれば
         // Next.js after() でバックグラウンド消化を実行（レスポンス速度には一切影響させない）
-        scheduleLazyConfirm30MinFollowup();
+        scheduleLazyConfirm30MinFollowup({}, after);
 
         // 離脱ビーコン送信時の処理
         if (body.step === 'abandon') {

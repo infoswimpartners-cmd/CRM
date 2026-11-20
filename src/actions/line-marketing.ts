@@ -1576,8 +1576,11 @@ export async function getLineChatSyncSignatureAction(): Promise<{ success: boole
         await assertAdminUser();
         // 案B: 管理画面のLINEトーク新着ポーリングのついでに、前回チェックから3分以上経過していれば
         // Next.js after() で確認画面離脱30分後フォローをバックグラウンド消化（ポーリング応答速度は落とさない）
-        const { scheduleLazyConfirm30MinFollowup } = await import('@/lib/line-marketing-service');
-        scheduleLazyConfirm30MinFollowup();
+        const [{ scheduleLazyConfirm30MinFollowup }, { after }] = await Promise.all([
+            import('@/lib/line-marketing-service'),
+            import('next/server'),
+        ]);
+        scheduleLazyConfirm30MinFollowup({}, after);
 
         const signature = await getLineChatSyncSignature();
         return { success: true, signature };

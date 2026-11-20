@@ -10,7 +10,6 @@
  *   6. 体験後ステップ配信判定＆本入会（status: active）自動スキップ制御
  */
 
-import { after } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { formatLineMessage } from '@/lib/line';
 import {
@@ -3581,10 +3580,11 @@ export async function triggerLazyConfirm30MinFollowup(
 /**
  * Next.js の after() を用いて、呼び出し元のレスポンス返却後に非同期バックグラウンドで
  * triggerLazyConfirm30MinFollowup() をスケジュールするヘルパー。
- * （リクエストスコープ外や単体テスト環境で after() が例外を投げた場合は非同期 Promise にフォールバック）
+ * （クライアントバンドルへの next/server 混入を防ぐため、呼び出し元の Route Handler / Server Action から after を注入可能）
  */
 export function scheduleLazyConfirm30MinFollowup(
-    options: TriggerLazyConfirm30MinOptions = {}
+    options: TriggerLazyConfirm30MinOptions = {},
+    afterFn?: (callback: () => any) => void
 ): void {
     const task = async () => {
         try {
@@ -3595,8 +3595,8 @@ export function scheduleLazyConfirm30MinFollowup(
     };
 
     try {
-        if (typeof after === 'function') {
-            after(task);
+        if (typeof afterFn === 'function') {
+            afterFn(task);
             return;
         }
     } catch {
@@ -3604,6 +3604,7 @@ export function scheduleLazyConfirm30MinFollowup(
     }
     void task();
 }
+
 
 
 
