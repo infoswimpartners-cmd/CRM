@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { sendGoogleChatMessage } from '@/lib/google-chat'
 import { emailService } from '@/lib/email'
 import { autoDetectLocationForLead } from '@/lib/location-matcher'
+import { buildStudentNotesFromApplication } from '@/lib/student-notes'
 
 // 年齢を計算するヘルパー関数
 function calculateAge(birthDateString: string | null | undefined): number | null {
@@ -981,7 +982,14 @@ export async function assignLeadAction(leadId: string, confirmedDate: string, co
                     second_student_kana: lead.second_student_kana || null,
                     second_student_gender: lead.second_student_gender || null,
                     second_student_birth_date: lead.second_student_birth_date || null,
-                    notes: lead.notes || null,
+                    notes: buildStudentNotesFromApplication(null, {
+                        skillLevel: lead.skill_level,
+                        concern: lead.concern,
+                        area: lead.area,
+                        frequency: lead.frequency,
+                        availableTimes: lead.available_times,
+                        notes: lead.notes,
+                    }),
                     status: 'trial_billed',
                     coach_id: profile.id
                 })
@@ -1000,7 +1008,7 @@ export async function assignLeadAction(leadId: string, confirmedDate: string, co
             // Stripe Customer ID の確認・自動作成
             const { data: currentStd } = await supabaseAdmin
                 .from('students')
-                .select('stripe_customer_id, full_name, contact_email')
+                .select('stripe_customer_id, full_name, contact_email, notes')
                 .eq('id', studentId)
                 .single()
 
@@ -1047,6 +1055,15 @@ export async function assignLeadAction(leadId: string, confirmedDate: string, co
             if (lead.second_student_kana) updatePayload.second_student_name_kana = lead.second_student_kana
             if (lead.second_student_birth_date) updatePayload.second_student_birth_date = lead.second_student_birth_date
             if (lead.second_student_gender) updatePayload.second_student_gender = lead.second_student_gender
+            // 「公式LINE友だち追加（未申込）」を削除し、目標などの申込情報をカルテに反映
+            updatePayload.notes = buildStudentNotesFromApplication(currentStd?.notes, {
+                skillLevel: lead.skill_level,
+                concern: lead.concern,
+                area: lead.area,
+                frequency: lead.frequency,
+                availableTimes: lead.available_times,
+                notes: lead.notes,
+            })
 
             const { error: studentUpdateError } = await supabaseAdmin
                 .from('students')
@@ -1456,7 +1473,14 @@ export async function adminAssignLeadAction(
                     second_student_kana: lead.second_student_kana || null,
                     second_student_gender: lead.second_student_gender || null,
                     second_student_birth_date: lead.second_student_birth_date || null,
-                    notes: lead.notes || null,
+                    notes: buildStudentNotesFromApplication(null, {
+                        skillLevel: lead.skill_level,
+                        concern: lead.concern,
+                        area: lead.area,
+                        frequency: lead.frequency,
+                        availableTimes: lead.available_times,
+                        notes: lead.notes,
+                    }),
                     status: 'trial_billed',
                     coach_id: targetCoach.id
                 })
@@ -1475,7 +1499,7 @@ export async function adminAssignLeadAction(
             // Stripe Customer ID の確認・自動作成
             const { data: currentStd } = await supabaseAdmin
                 .from('students')
-                .select('stripe_customer_id, full_name, contact_email')
+                .select('stripe_customer_id, full_name, contact_email, notes')
                 .eq('id', studentId)
                 .single()
 
@@ -1522,6 +1546,15 @@ export async function adminAssignLeadAction(
             if (lead.second_student_kana) updatePayload.second_student_name_kana = lead.second_student_kana
             if (lead.second_student_birth_date) updatePayload.second_student_birth_date = lead.second_student_birth_date
             if (lead.second_student_gender) updatePayload.second_student_gender = lead.second_student_gender
+            // 「公式LINE友だち追加（未申込）」を削除し、目標などの申込情報をカルテに反映
+            updatePayload.notes = buildStudentNotesFromApplication(currentStd?.notes, {
+                skillLevel: lead.skill_level,
+                concern: lead.concern,
+                area: lead.area,
+                frequency: lead.frequency,
+                availableTimes: lead.available_times,
+                notes: lead.notes,
+            })
 
             const { error: studentUpdateError } = await supabaseAdmin
                 .from('students')
@@ -2897,7 +2930,14 @@ export async function getOrCreateTrialPaymentUrlAction(leadId: string): Promise<
                     second_student_kana: lead.second_student_kana || null,
                     second_student_gender: lead.second_student_gender || null,
                     second_student_birth_date: lead.second_student_birth_date || null,
-                    notes: lead.notes || null,
+                    notes: buildStudentNotesFromApplication(null, {
+                        skillLevel: lead.skill_level,
+                        concern: lead.concern,
+                        area: lead.area,
+                        frequency: lead.frequency,
+                        availableTimes: lead.available_times,
+                        notes: lead.notes,
+                    }),
                     status: 'trial_billed',
                     coach_id: coachId
                 })

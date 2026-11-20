@@ -7,6 +7,7 @@ export type LessonData = {
     base_price?: number
     base_reward?: number
     final_reward_amount?: number
+    expense_reimbursement?: number
     coach_id: string
     attendance_type?: string
     student_id?: string
@@ -208,8 +209,9 @@ export function calculateMonthlyStats(
     const stats = {
         totalSales: 0,
         totalReward: 0,
+        expenseReimbursement: 0,
         lessonCount: 0,
-        details: [] as { date: string, title: string, studentName: string, price: number, reward: number }[]
+        details: [] as { date: string, title: string, studentName: string, price: number, reward: number, expenseReimbursement?: number }[]
     }
 
     const myLessons = monthLessons.filter(l => l.coach_id === coachId)
@@ -230,6 +232,7 @@ export function calculateMonthlyStats(
         const reward = (l.final_reward_amount !== null && l.final_reward_amount !== undefined)
             ? l.final_reward_amount
             : calculateLessonReward(l, rate, settings)
+        const expense = l.expense_reimbursement || 0
 
         let title = l.lesson_masters?.is_trial ? '体験レッスン' : '通常レッスン';
         if (l.lesson_masters && price > l.lesson_masters.unit_price) {
@@ -241,12 +244,14 @@ export function calculateMonthlyStats(
 
         stats.totalSales += price
         stats.totalReward += reward
+        stats.expenseReimbursement += expense
         stats.details.push({
             date: l.lesson_date,
             title: title,
             studentName: l.students?.full_name || '',
             price: price,
-            reward: reward
+            reward: reward,
+            expenseReimbursement: expense
         })
     })
 
@@ -290,6 +295,7 @@ export function calculateHistoricalMonthlyRewards(
             yearMonth: format(d, 'yyyy年M月'),
             totalSales: stats.totalSales,
             totalReward: stats.totalReward,
+            expenseReimbursement: stats.expenseReimbursement,
             rate: historicalRate,
             lessonCount: stats.lessonCount,
             details: stats.details

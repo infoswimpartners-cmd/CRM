@@ -8,6 +8,48 @@ import { stripe } from '@/lib/stripe'
 import { calculateCoachRate, LessonData } from '@/lib/reward-system'
 import { startOfMonth, endOfMonth, subMonths } from 'date-fns'
 
+// 施設名から施設利用料と精算方式（報酬込 vs 立替経費精算）を安全に解決するヘルパー
+async function getFacilityFeeInfo(supabaseClient: any, locationName: string): Promise<{
+    facilityId: string | null
+    facilityFee: number
+    feePaymentType: 'reward' | 'expense'
+}> {
+    if (!locationName || locationName === 'キャンセル') {
+        return { facilityId: null, facilityFee: 0, feePaymentType: 'reward' }
+    }
+
+    let { data: facility, error } = await supabaseClient
+        .from('facilities')
+        .select('id, is_facility_fee_applied, facility_fee, fee_payment_type')
+        .eq('name', locationName)
+        .maybeSingle()
+
+    // 新規カラム未適用環境へのフォールバック
+    if (error && (error.code === '42703' || error.code === 'PGRST204' || error.message?.includes('facility_fee'))) {
+        const fallback = await supabaseClient
+            .from('facilities')
+            .select('id, is_facility_fee_applied')
+            .eq('name', locationName)
+            .maybeSingle()
+        facility = fallback.data
+    }
+
+    if (!facility) {
+        return { facilityId: null, facilityFee: 0, feePaymentType: 'reward' }
+    }
+
+    const fee = typeof facility.facility_fee === 'number'
+        ? facility.facility_fee
+        : (facility.is_facility_fee_applied ? 1500 : 0)
+    const paymentType: 'reward' | 'expense' = facility.fee_payment_type === 'expense' ? 'expense' : 'reward'
+
+    return {
+        facilityId: facility.id || null,
+        facilityFee: fee,
+        feePaymentType: paymentType
+    }
+}
+
 export async function getCalculatedLessonAmounts(
     supabaseAdmin: any,
     coachId: string,
@@ -24,15 +66,8 @@ export async function getCalculatedLessonAmounts(
         .eq('id', coachId)
         .single()
 
-    // 2. 施設情報を取得
-    const { data: facility } = await supabaseAdmin
-        .from('facilities')
-        .select('id, is_facility_fee_applied')
-        .eq('name', location)
-        .maybeSingle()
-
-    const facilityId = facility?.id || null
-    const facilityFee = facility?.is_facility_fee_applied ? 1500 : 0
+    // 2. 施設情報を取得（可変利用料・精算方式対応）
+    const { facilityId, facilityFee, feePaymentType } = await getFacilityFeeInfo(supabaseAdmin, location)
 
     // 3. レッスンマスタの取得
     const { data: master } = await supabaseAdmin
@@ -148,8 +183,9 @@ export async function getCalculatedLessonAmounts(
         baseReward += 1000
     }
 
-    // 施設利用料（支払報酬には施設利用料を上乗せする）
-    if (facilityFee > 0) {
+    // 施設利用料（精算方式が 'expense' の場合は立替経費精算として別枠計上し、課税報酬には含めない）
+    const expenseReimbursement = (facilityFee > 0 && feePaymentType === 'expense') ? facilityFee : 0
+    if (facilityFee > 0 && feePaymentType !== 'expense') {
         baseReward += facilityFee
     }
 
@@ -160,6 +196,8 @@ export async function getCalculatedLessonAmounts(
         base_price: basePrice,
         base_reward: baseReward,
         facility_id: facilityId,
+        facility_fee: facilityFee,
+        expense_reimbursement: expenseReimbursement,
         is_actual_distant_option: isActualDistantOption
     }
 }
@@ -201,13 +239,7 @@ export async function submitLessonReport(values: FormValues) {
     const data = parsed.data
 
     // 2.2 Add Facility Fee based on location
-    const { data: facility } = await supabase
-        .from('facilities')
-        .select('is_facility_fee_applied')
-        .eq('name', data.location)
-        .single()
-
-    const facilityFee = facility?.is_facility_fee_applied ? 1500 : 0
+    const { facilityFee } = await getFacilityFeeInfo(supabase, data.location)
     data.price = data.price + facilityFee
 
     // 2.5 Determine Billing Price
@@ -236,7 +268,7 @@ export async function submitLessonReport(values: FormValues) {
         const supabaseAdmin = createAdminClient()
 
         // 報酬・請求金額の計算
-        const { base_price, base_reward, facility_id, is_actual_distant_option } = 
+        const { base_price, base_reward, facility_id, facility_fee, expense_reimbursement, is_actual_distant_option } = 
             await getCalculatedLessonAmounts(
                 supabaseAdmin,
                 user.id,
@@ -248,7 +280,7 @@ export async function submitLessonReport(values: FormValues) {
             )
 
         // 3. Insert into Supabase using Admin Client
-        const { data: insertedLesson, error: dbError } = await supabaseAdmin.from('lessons').insert({
+        const insertPayload: any = {
             coach_id: user.id,
             student_id: data.student_id || null,
             student_name: data.student_name,
@@ -263,8 +295,20 @@ export async function submitLessonReport(values: FormValues) {
             base_price,
             base_reward,
             facility_id,
+            facility_fee,
+            expense_reimbursement,
             is_actual_distant_option
-        }).select('id').single()
+        }
+
+        let { data: insertedLesson, error: dbError } = await supabaseAdmin.from('lessons').insert(insertPayload).select('id').single()
+
+        if (dbError && (dbError.code === '42703' || dbError.code === 'PGRST204' || dbError.message?.includes('expense_reimbursement'))) {
+            delete insertPayload.facility_fee
+            delete insertPayload.expense_reimbursement
+            const fallbackRes = await supabaseAdmin.from('lessons').insert(insertPayload).select('id').single()
+            insertedLesson = fallbackRes.data
+            dbError = fallbackRes.error
+        }
 
         if (dbError) {
             console.error('Database Insertion Error:', dbError)
@@ -576,13 +620,7 @@ export async function updateLessonReport(lessonId: string, values: FormValues) {
         .eq('id', data.lesson_master_id)
         .single()
 
-    const { data: facility } = await supabaseAdmin
-        .from('facilities')
-        .select('is_facility_fee_applied')
-        .eq('name', data.location)
-        .single()
-
-    const facilityFee = facility?.is_facility_fee_applied ? 1500 : 0
+    const { facilityFee } = await getFacilityFeeInfo(supabaseAdmin, data.location)
 
     // ペア価格を適用するか判定
     let basePrice = master?.unit_price ?? data.price
@@ -714,13 +752,7 @@ export async function submitPublicLessonReport(values: PublicFormValues) {
     }
     const data = parsed.data
 
-    const { data: facility } = await supabase
-        .from('facilities')
-        .select('is_facility_fee_applied')
-        .eq('name', data.location)
-        .single()
-
-    const facilityFee = facility?.is_facility_fee_applied ? 1500 : 0
+    const { facilityFee } = await getFacilityFeeInfo(supabase, data.location)
     data.price = data.price + facilityFee
 
     try {
@@ -728,7 +760,7 @@ export async function submitPublicLessonReport(values: PublicFormValues) {
         const supabaseAdmin = createAdminClient()
 
         // 報酬・請求金額の計算
-        const { base_price, base_reward, facility_id, is_actual_distant_option } = 
+        const { base_price, base_reward, facility_id, facility_fee, expense_reimbursement, is_actual_distant_option } = 
             await getCalculatedLessonAmounts(
                 supabaseAdmin,
                 data.coach_id,
@@ -773,6 +805,8 @@ export async function submitPublicLessonReport(values: PublicFormValues) {
             base_price,
             base_reward,
             facility_id,
+            facility_fee,
+            expense_reimbursement,
             is_actual_distant_option
         }).select('id').single()
 
@@ -1017,12 +1051,7 @@ export async function submitAdminProxyReport(values: AdminProxyValues) {
     const data = parsed.data
 
     // 4. 施設利用料チェック
-    const { data: facility } = await supabaseAdmin
-        .from('facilities')
-        .select('is_facility_fee_applied')
-        .eq('name', data.location)
-        .single()
-    const facilityFee = facility?.is_facility_fee_applied ? 1500 : 0
+    const { facilityFee } = await getFacilityFeeInfo(supabaseAdmin, data.location)
 
     // 5. レッスン単価を取得して最終金額を計算
     const { data: master } = await supabaseAdmin
@@ -1065,7 +1094,7 @@ export async function submitAdminProxyReport(values: AdminProxyValues) {
 
     try {
         // 報酬・請求金額の計算
-        const { base_price, base_reward, facility_id, is_actual_distant_option } = 
+        const { base_price, base_reward, facility_id, facility_fee, expense_reimbursement, is_actual_distant_option } = 
             await getCalculatedLessonAmounts(
                 supabaseAdmin,
                 data.coach_id,
@@ -1092,6 +1121,8 @@ export async function submitAdminProxyReport(values: AdminProxyValues) {
             base_price,
             base_reward,
             facility_id,
+            facility_fee,
+            expense_reimbursement,
             is_actual_distant_option
         }).select('id').maybeSingle()
 

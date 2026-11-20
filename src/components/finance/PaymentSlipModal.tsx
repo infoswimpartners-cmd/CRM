@@ -24,6 +24,7 @@ interface PaymentSlipModalProps {
     withholdingTax: number
     systemFee: number
     transferFee: number
+    expenseReimbursement?: number
     finalAmount: number
     companyInfo: any // Record<string, string>
     templateConfig?: {
@@ -44,6 +45,7 @@ export function PaymentSlipModal({
     withholdingTax,
     systemFee,
     transferFee,
+    expenseReimbursement = 0,
     finalAmount,
     companyInfo,
     templateConfig
@@ -129,6 +131,12 @@ export function PaymentSlipModal({
                                     <td colSpan={4} className="py-2 pl-2 text-slate-600">源泉徴収額</td>
                                     <td className="py-2 text-right font-medium text-red-600 whitespace-nowrap">▲¥{withholdingTax.toLocaleString()}</td>
                                 </tr>
+                                {expenseReimbursement > 0 && (
+                                    <tr className="border-b border-slate-200 bg-emerald-50/50">
+                                        <td colSpan={4} className="py-2 pl-2 text-emerald-700 font-medium">立替経費精算（非課税・源泉対象外）</td>
+                                        <td className="py-2 text-right font-medium text-emerald-700 whitespace-nowrap">+¥{expenseReimbursement.toLocaleString()}</td>
+                                    </tr>
+                                )}
                                 <tr className="border-t-2 border-slate-800">
                                     <td colSpan={4} className="py-4 pl-2 font-bold text-xl text-slate-900">支払金額合計</td>
                                     <td className="py-4 text-right font-bold text-xl text-slate-900 whitespace-nowrap">

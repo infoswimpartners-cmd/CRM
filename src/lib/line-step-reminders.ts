@@ -333,7 +333,7 @@ export async function handleOfficialLineFollow(lineUserId: string, displayName?:
         } else {
             console.log(`[Official LINE Step] Registered new student record as friend_only: ${displayName || lineUserId}`)
         }
-    } else {
+    } else if (existingStudent.status === 'friend_only') {
         await supabase
             .from('students')
             .update({ status: 'friend_only' })

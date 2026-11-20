@@ -10,6 +10,7 @@ import { lineService } from "@/lib/line";
 import { dispatchNewLeadToMatchingCoaches } from "@/lib/coach-matching";
 import { autoDetectLocationForLead } from "@/lib/location-matcher";
 import { sendGA4ConversionEvent } from "@/lib/ga4-measurement-protocol";
+import { buildStudentNotesFromApplication } from "@/lib/student-notes";
 
 export async function POST(req: Request) {
   try {
@@ -157,7 +158,7 @@ export async function POST(req: Request) {
       if (payload.userId) {
         const { data: studentsByLine } = await supabase
           .from('students')
-          .select('id, status, full_name, contact_email, contact_phone')
+          .select('id, status, full_name, contact_email, contact_phone, notes')
           .eq('line_user_id', payload.userId)
           .order('created_at', { ascending: false });
 
@@ -170,7 +171,7 @@ export async function POST(req: Request) {
       if (!targetStudent && payload.email) {
         const { data: studentsByEmail } = await supabase
           .from('students')
-          .select('id, status, full_name, contact_email, contact_phone')
+          .select('id, status, full_name, contact_email, contact_phone, notes')
           .ilike('contact_email', payload.email.trim())
           .order('created_at', { ascending: false });
 
@@ -184,7 +185,7 @@ export async function POST(req: Request) {
         const cleanPhone = payload.phone.replace(/[-]/g, '').trim();
         const { data: studentsByPhone } = await supabase
           .from('students')
-          .select('id, status, full_name, contact_phone')
+          .select('id, status, full_name, contact_phone, notes')
           .order('created_at', { ascending: false });
 
         if (studentsByPhone && studentsByPhone.length > 0) {
@@ -220,6 +221,14 @@ export async function POST(req: Request) {
         if (payload.dob2) updateData.second_student_birth_date = payload.dob2;
         if (payload.gender2) updateData.second_student_gender = payload.gender2;
         if (payload.userId) updateData.line_user_id = payload.userId;
+        // 「公式LINE友だち追加（未申込）」を削除し、目標などの申込情報を反映
+        updateData.notes = buildStudentNotesFromApplication(targetStudent.notes, {
+          skillLevel: payload.skillLevel,
+          area: payload.station || payload.area,
+          frequency: payload.frequency,
+          availableTimes: payload.availableTimes,
+          notes: combinedNotes,
+        });
 
         const { error: updateErr } = await supabase
           .from('students')
@@ -247,6 +256,13 @@ export async function POST(req: Request) {
             second_student_name_kana: payload.kana2 ? payload.kana2.trim() : null,
             second_student_birth_date: payload.dob2 || null,
             second_student_gender: payload.gender2 || null,
+            notes: buildStudentNotesFromApplication(null, {
+              skillLevel: payload.skillLevel,
+              area: payload.station || payload.area,
+              frequency: payload.frequency,
+              availableTimes: payload.availableTimes,
+              notes: combinedNotes,
+            }),
             status: 'applied',
             created_at: new Date().toISOString()
           })

@@ -38,6 +38,7 @@ type PayoutStatus = {
     withholdingTax: number
     systemFee: number
     transferFee: number
+    expenseReimbursement?: number
     finalAmount: number
 }
 
@@ -274,6 +275,7 @@ export function PayoutDashboard({ data, targetMonth, companyInfo }: PayoutDashbo
                                             withholdingTax={item.withholdingTax}
                                             systemFee={item.systemFee}
                                             transferFee={item.transferFee}
+                                            expenseReimbursement={item.expenseReimbursement}
                                             finalAmount={item.finalAmount}
                                             companyInfo={companyInfo}
                                         />

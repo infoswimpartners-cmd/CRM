@@ -13,6 +13,7 @@ export interface MonthlyRewardStats {
     withholdingTax: number // 源泉徴収
     systemFee: number // システム手数料
     transferFee: number // 振込手数料
+    expenseReimbursement?: number // 立替経費精算（源泉対象外）
     finalAmount: number // 手取り
     rate: number // 適用レート
     lessonCount: number
@@ -28,6 +29,7 @@ interface LessonRewardDetail {
     studentName: string
     price: number
     reward: number
+    expenseReimbursement?: number
 }
 
 // Constants
@@ -83,10 +85,10 @@ export async function calculateHistoricalPayments(
     // 2. Fetch Lessons with all necessary fields for correct reward calculation
     const startDate = startOfMonth(subMonths(new Date(), monthsToLookBack + 3))
 
-    const { data: allLessons, error } = await supabase
+    let { data: allLessons, error } = await supabase
         .from('lessons')
         .select(`
-            id, price, lesson_date, coach_id, attendance_type, base_reward, final_reward_amount,
+            id, price, lesson_date, coach_id, attendance_type, base_reward, final_reward_amount, expense_reimbursement,
             lesson_masters (id, name, unit_price, is_trial),
             profiles ( distant_reward_fee, role ),
             students (
@@ -103,6 +105,32 @@ export async function calculateHistoricalPayments(
         `)
         .gte('lesson_date', startDate.toISOString())
         .eq('coach_id', coachId)
+
+    // マイグレーション未適用時のフォールバック
+    if (error) {
+        const fallbackRes = await supabase
+            .from('lessons')
+            .select(`
+                id, price, lesson_date, coach_id, attendance_type, base_reward, final_reward_amount,
+                lesson_masters (id, name, unit_price, is_trial),
+                profiles ( distant_reward_fee, role ),
+                students (
+                    id,
+                    full_name,
+                    is_two_person_lesson,
+                    is_default_distant_option,
+                    student_coaches ( coach_id, option_reward_fee, option_reward_note ),
+                    membership_types!students_membership_type_id_fkey (
+                        id,
+                        membership_type_lessons (lesson_master_id, reward_price)
+                    )
+                )
+            `)
+            .gte('lesson_date', startDate.toISOString())
+            .eq('coach_id', coachId)
+        allLessons = fallbackRes.data as typeof allLessons
+        error = fallbackRes.error
+    }
 
     if (error) {
         console.error('Error fetching lessons:', error)
@@ -143,6 +171,7 @@ export async function calculateHistoricalPayments(
         // 3. Calculate Stats using correct lesson reward logic
         let totalSales = 0
         let totalReward = 0
+        let totalExpenseReimbursement = 0
         const details: LessonRewardDetail[] = []
 
         monthLessons.forEach((rawL: any) => {
@@ -163,6 +192,7 @@ export async function calculateHistoricalPayments(
             const reward = (l.final_reward_amount !== null && l.final_reward_amount !== undefined)
                 ? l.final_reward_amount
                 : calculateLessonReward(l, rate, rewardSettings)
+            const expense = l.expense_reimbursement || 0
 
             let title = l.lesson_masters?.is_trial ? '体験レッスン' : '通常レッスン'
             if (l.lesson_masters && price > l.lesson_masters.unit_price) {
@@ -174,12 +204,14 @@ export async function calculateHistoricalPayments(
 
             totalSales += price
             totalReward += reward
+            totalExpenseReimbursement += expense
             details.push({
                 date: l.lesson_date,
                 title: title,
                 studentName: l.students?.full_name || '',
                 price: price,
-                reward: reward
+                reward: reward,
+                expenseReimbursement: expense
             })
         })
 
@@ -196,7 +228,8 @@ export async function calculateHistoricalPayments(
         const systemFee = Math.floor(totalTaxIncluded * SYSTEM_FEE_RATE)
         const transferFee = totalTaxIncluded > 0 ? TRANSFER_FEE : 0
 
-        const finalAmount = totalTaxIncluded - withholdingTax - systemFee - transferFee
+        // 立替経費（源泉対象外）は源泉徴収控除後の手取り額に直接加算する
+        const finalAmount = totalTaxIncluded - withholdingTax - systemFee - transferFee + totalExpenseReimbursement
 
         // 5. Payment Date and Status
         const nextMonth = new Date(d.getFullYear(), d.getMonth() + 1, 25)
@@ -215,6 +248,7 @@ export async function calculateHistoricalPayments(
             withholdingTax,
             systemFee,
             transferFee,
+            expenseReimbursement: totalExpenseReimbursement,
             finalAmount,
             rate,
             lessonCount: monthLessons.length,

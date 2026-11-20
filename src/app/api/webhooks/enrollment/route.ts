@@ -111,13 +111,16 @@ export async function POST(req: NextRequest) {
             }
         })
 
-        // 4. Update Student
+        // 4. Update Student（「公式LINE友だち追加（未申込）」が残っている場合は除去）
+        const { stripLineFriendAddNote } = await import('@/lib/student-notes')
+        const cleanedNotes = stripLineFriendAddNote(student.notes)
         const { error: updateError } = await supabaseAdmin
             .from('students')
             .update({
                 status: 'active', // Use exact status string
                 membership_type_id: membershipType.id,
-                stripe_subscription_id: subscription.id
+                stripe_subscription_id: subscription.id,
+                notes: cleanedNotes || null
             })
             .eq('id', student.id)
 

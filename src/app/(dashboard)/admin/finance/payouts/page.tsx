@@ -27,6 +27,7 @@ type PayoutStatus = {
     withholdingTax: number
     systemFee: number
     transferFee: number
+    expenseReimbursement: number
     finalAmount: number
 }
 
@@ -49,15 +50,29 @@ export default async function PayoutsPage({ searchParams }: { searchParams: Prom
     // We'll calculate historical for say 12 months back, then filter for the selected month.
     // Optimization: fetching only relevant lessons would be better but reusing logic is safer.
     const twelveMonthsAgo = subMonths(today, 12)
-    const { data: allLessons } = await supabase
+    let { data: allLessons, error: lessonsError } = await supabase
         .from('lessons')
         .select(`
-            id, price, base_price, base_reward, final_reward_amount, lesson_date, coach_id, attendance_type,
+            id, price, base_price, base_reward, final_reward_amount, expense_reimbursement, lesson_date, coach_id, attendance_type,
             lesson_masters (id, name, unit_price, is_trial),
             profiles ( distant_reward_fee ),
             students (full_name, is_two_person_lesson, is_default_distant_option, student_coaches ( coach_id, option_reward_fee, option_reward_note ), membership_types!students_membership_type_id_fkey (id, membership_type_lessons (lesson_master_id, reward_price)))
         `)
         .gte('lesson_date', twelveMonthsAgo.toISOString())
+
+    // マイグレーション未適用時のフォールバック
+    if (lessonsError) {
+        const fallbackRes = await supabase
+            .from('lessons')
+            .select(`
+                id, price, base_price, base_reward, final_reward_amount, lesson_date, coach_id, attendance_type,
+                lesson_masters (id, name, unit_price, is_trial),
+                profiles ( distant_reward_fee ),
+                students (full_name, is_two_person_lesson, is_default_distant_option, student_coaches ( coach_id, option_reward_fee, option_reward_note ), membership_types!students_membership_type_id_fkey (id, membership_type_lessons (lesson_master_id, reward_price)))
+            `)
+            .gte('lesson_date', twelveMonthsAgo.toISOString())
+        allLessons = fallbackRes.data as typeof allLessons
+    }
 
     // 3. Fetch Payouts for this target month
     const { data: payouts } = await supabase
@@ -120,6 +135,7 @@ export default async function PayoutsPage({ searchParams }: { searchParams: Prom
             const targetData = history.find(h => h.month === targetMonthStr)
 
             const totalReward = targetData?.totalReward || 0
+            const expenseReimbursement = targetData?.expenseReimbursement || 0
             const totalSales = targetData?.totalSales || 0
             const rate = targetData?.rate || 0
             const details = targetData?.details || []
@@ -152,7 +168,8 @@ export default async function PayoutsPage({ searchParams }: { searchParams: Prom
             const systemFee = Math.floor(totalTaxIncluded * SYSTEM_FEE_RATE)
             const transferFee = totalTaxIncluded > 0 ? TRANSFER_FEE : 0
 
-            const finalAmount = totalTaxIncluded - withholdingTax - systemFee - transferFee
+            // 立替経費（源泉対象外）は源泉徴収控除後の手取り額に直接加算する
+            const finalAmount = totalTaxIncluded - withholdingTax - systemFee - transferFee + expenseReimbursement
 
             // Sum payouts
             const coachPayouts = payouts?.filter(p => p.coach_id === coach.id) || []
@@ -209,6 +226,7 @@ export default async function PayoutsPage({ searchParams }: { searchParams: Prom
                 withholdingTax,
                 systemFee,
                 transferFee,
+                expenseReimbursement,
                 finalAmount
             })
         }

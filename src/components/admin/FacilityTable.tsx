@@ -32,6 +32,8 @@ interface Facility {
     id: string
     name: string
     is_facility_fee_applied: boolean
+    facility_fee?: number | null
+    fee_payment_type?: 'reward' | 'expense' | string | null
     created_at: string
 }
 
@@ -76,11 +78,29 @@ export function FacilityTable({ facilities }: { facilities: Facility[] }) {
                                 {facility.name}
                             </TableCell>
                             <TableCell>
-                                {facility.is_facility_fee_applied ? (
-                                    <span className="text-blue-600 font-medium">+1,500円 適用</span>
-                                ) : (
-                                    <span className="text-gray-500">なし</span>
-                                )}
+                                {(() => {
+                                    const fee = typeof facility.facility_fee === 'number'
+                                        ? facility.facility_fee
+                                        : (facility.is_facility_fee_applied ? 1500 : 0)
+                                    if (fee <= 0) {
+                                        return <span className="text-gray-500">なし</span>
+                                    }
+                                    const isExpense = facility.fee_payment_type === 'expense'
+                                    return (
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-blue-600 font-bold">+{fee.toLocaleString()}円</span>
+                                            {isExpense ? (
+                                                <span className="text-[11px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-1.5 py-0.5 rounded font-medium">
+                                                    立替経費（源泉対象外）
+                                                </span>
+                                            ) : (
+                                                <span className="text-[11px] bg-slate-50 text-slate-600 border border-slate-200 px-1.5 py-0.5 rounded">
+                                                    報酬加算
+                                                </span>
+                                            )}
+                                        </div>
+                                    )
+                                })()}
                             </TableCell>
                             <TableCell>
                                 {format(new Date(facility.created_at), 'yyyy/MM/dd HH:mm')}

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { ChevronLeft, Send, MapPin, AlertCircle, Plus, Trash2, Eye, EyeOff, CheckCircle, Pencil, CreditCard, Copy, ExternalLink, Loader2, UserCheck } from 'lucide-react'
+import { ChevronLeft, Send, MapPin, AlertCircle, Plus, Trash2, Eye, EyeOff, CheckCircle, Pencil, CreditCard, Copy, ExternalLink, Loader2, UserCheck, ChevronsUpDown, Check } from 'lucide-react'
 import Link from 'next/link'
 import {
     Table,
@@ -306,6 +306,8 @@ export default function AdminLeadsPage() {
     const [assignConfirmedLocation, setAssignConfirmedLocation] = useState('')
     const [assignSplitIndividual, setAssignSplitIndividual] = useState(true)
     const [isAssigning, setIsAssigning] = useState(false)
+    const [assignCoachSearchOpen, setAssignCoachSearchOpen] = useState(false)
+    const [assignLocationSearchOpen, setAssignLocationSearchOpen] = useState(false)
 
     // 案件編集用のステート
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -2271,34 +2273,77 @@ export default function AdminLeadsPage() {
                                                         )}
                                                     </div>
 
-                                                    {/* 担当コーチ選択 */}
+                                                    {/* 担当コーチ選択（検索・自動フィルタリング対応） */}
                                                     <div className="space-y-1.5">
                                                         <Label htmlFor="assignCoachSelect" className="text-xs font-semibold text-gray-700">
                                                             {isCurrentAssigned ? '新しい担当コーチを選択' : '担当コーチ'} <span className="text-destructive">*</span>
                                                         </Label>
-                                                        <Select
-                                                            value={assignTargetCoachId}
-                                                            onValueChange={setAssignTargetCoachId}
-                                                        >
-                                                            <SelectTrigger id="assignCoachSelect" className="text-xs h-9 bg-white border-gray-200">
-                                                                <SelectValue placeholder="担当コーチを選択してください" />
-                                                            </SelectTrigger>
-                                                            <SelectContent className="max-h-60">
-                                                                {coaches.map((c) => (
-                                                                    <SelectItem key={c.id} value={c.id} className="text-xs">
-                                                                        <div className="flex items-center justify-between w-full gap-2">
-                                                                            <span className="font-medium">
-                                                                                {c.full_name}
-                                                                                {isCurrentAssigned && c.id === assigningLead.assigned_coach_id ? '（現在の担当）' : ''}
+                                                        <Popover open={assignCoachSearchOpen} onOpenChange={setAssignCoachSearchOpen} modal={false}>
+                                                            <PopoverTrigger asChild>
+                                                                <Button
+                                                                    id="assignCoachSelect"
+                                                                    type="button"
+                                                                    variant="outline"
+                                                                    role="combobox"
+                                                                    aria-expanded={assignCoachSearchOpen}
+                                                                    className="w-full justify-between text-xs h-9 bg-white border-gray-200 font-normal"
+                                                                >
+                                                                    {selectedCoach ? (
+                                                                        <span className="truncate font-medium">
+                                                                            {selectedCoach.full_name}
+                                                                            {isCurrentAssigned && selectedCoach.id === assigningLead.assigned_coach_id ? '（現在の担当）' : ''}
+                                                                            {' '}
+                                                                            <span className="text-[10px] text-gray-400 font-normal">
+                                                                                ({selectedCoach.role === 'admin' ? '管理者' : selectedCoach.role === 'owner' ? 'オーナー' : 'コーチ'})
                                                                             </span>
-                                                                            <span className="text-[10px] text-gray-400">
-                                                                                {c.role === 'admin' ? '管理者' : c.role === 'owner' ? 'オーナー' : 'コーチ'}
-                                                                            </span>
-                                                                        </div>
-                                                                    </SelectItem>
-                                                                ))}
-                                                            </SelectContent>
-                                                        </Select>
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="text-muted-foreground">担当コーチを選択してください</span>
+                                                                    )}
+                                                                    <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
+                                                                </Button>
+                                                            </PopoverTrigger>
+                                                            <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                                                                <Command>
+                                                                    <CommandInput placeholder="コーチ名で検索..." className="h-8 text-xs" autoFocus />
+                                                                    <CommandList className="max-h-60 overflow-y-auto">
+                                                                        <CommandEmpty className="py-3 text-center text-xs text-gray-500">
+                                                                            該当するコーチが見つかりません
+                                                                        </CommandEmpty>
+                                                                        <CommandGroup>
+                                                                            {coaches.map((c) => {
+                                                                                const roleLabel = c.role === 'admin' ? '管理者' : c.role === 'owner' ? 'オーナー' : 'コーチ'
+                                                                                const isSelected = assignTargetCoachId === c.id
+                                                                                return (
+                                                                                    <CommandItem
+                                                                                        key={c.id}
+                                                                                        value={`${c.full_name || ''} ${c.full_name_kana || ''} ${roleLabel}`}
+                                                                                        onSelect={() => {
+                                                                                            setAssignTargetCoachId(c.id)
+                                                                                            setAssignCoachSearchOpen(false)
+                                                                                        }}
+                                                                                        className="text-xs flex items-center justify-between cursor-pointer py-2 px-2"
+                                                                                    >
+                                                                                        <div className="flex items-center gap-1.5 min-w-0">
+                                                                                            <Check
+                                                                                                className={`h-3.5 w-3.5 shrink-0 ${isSelected ? 'opacity-100 text-primary' : 'opacity-0'}`}
+                                                                                            />
+                                                                                            <span className="font-medium truncate">
+                                                                                                {c.full_name}
+                                                                                                {isCurrentAssigned && c.id === assigningLead.assigned_coach_id ? '（現在の担当）' : ''}
+                                                                                            </span>
+                                                                                        </div>
+                                                                                        <span className="text-[10px] text-gray-400 shrink-0 ml-2">
+                                                                                            {roleLabel}
+                                                                                        </span>
+                                                                                    </CommandItem>
+                                                                                )
+                                                                            })}
+                                                                        </CommandGroup>
+                                                                    </CommandList>
+                                                                </Command>
+                                                            </PopoverContent>
+                                                        </Popover>
                                                     </div>
 
                                                     {/* 2名申込時の受講形式選択 */}
@@ -2407,7 +2452,7 @@ export default function AdminLeadsPage() {
                                                         />
                                                     </div>
 
-                                                    {/* 確定体験場所 */}
+                                                    {/* 確定体験場所（施設マスタから検索・自動フィルタリング選択） */}
                                                     <div className="space-y-1.5">
                                                         <div className="flex items-center justify-between">
                                                             <Label htmlFor="assignLocation" className="text-xs font-semibold text-gray-700">
@@ -2423,13 +2468,62 @@ export default function AdminLeadsPage() {
                                                                 </button>
                                                             )}
                                                         </div>
-                                                        <Input
-                                                            id="assignLocation"
-                                                            placeholder="例: ○○プール"
-                                                            className="text-xs h-9 bg-white border-gray-200"
-                                                            value={assignConfirmedLocation}
-                                                            onChange={(e) => setAssignConfirmedLocation(e.target.value)}
-                                                        />
+                                                        <Popover open={assignLocationSearchOpen} onOpenChange={setAssignLocationSearchOpen} modal={false}>
+                                                            <PopoverTrigger asChild>
+                                                                <Button
+                                                                    id="assignLocation"
+                                                                    type="button"
+                                                                    variant="outline"
+                                                                    role="combobox"
+                                                                    aria-expanded={assignLocationSearchOpen}
+                                                                    className="w-full justify-between text-xs h-9 bg-white border-gray-200 font-normal"
+                                                                >
+                                                                    {assignConfirmedLocation ? (
+                                                                        <span className="truncate font-medium">
+                                                                            {assignConfirmedLocation}
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="text-muted-foreground">施設マスタから選択してください</span>
+                                                                    )}
+                                                                    <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
+                                                                </Button>
+                                                            </PopoverTrigger>
+                                                            <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                                                                <Command>
+                                                                    <CommandInput placeholder="施設名で検索..." className="h-8 text-xs" autoFocus />
+                                                                    <CommandList className="max-h-60 overflow-y-auto">
+                                                                        <CommandEmpty className="py-3 text-center text-xs text-gray-500">
+                                                                            該当する施設が見つかりません
+                                                                        </CommandEmpty>
+                                                                        <CommandGroup>
+                                                                            {facilities.map((facility) => {
+                                                                                const isSelected = assignConfirmedLocation === facility.name
+                                                                                return (
+                                                                                    <CommandItem
+                                                                                        key={facility.id}
+                                                                                        value={facility.name}
+                                                                                        onSelect={() => {
+                                                                                            setAssignConfirmedLocation(facility.name)
+                                                                                            setAssignLocationSearchOpen(false)
+                                                                                        }}
+                                                                                        className="text-xs flex items-center justify-between cursor-pointer py-2 px-2"
+                                                                                    >
+                                                                                        <div className="flex items-center gap-1.5 min-w-0">
+                                                                                            <Check
+                                                                                                className={`h-3.5 w-3.5 shrink-0 ${isSelected ? 'opacity-100 text-primary' : 'opacity-0'}`}
+                                                                                            />
+                                                                                            <span className="font-medium truncate">
+                                                                                                {facility.name}
+                                                                                            </span>
+                                                                                        </div>
+                                                                                    </CommandItem>
+                                                                                )
+                                                                            })}
+                                                                        </CommandGroup>
+                                                                    </CommandList>
+                                                                </Command>
+                                                            </PopoverContent>
+                                                        </Popover>
                                                     </div>
                                                 </div>
                                             )}
