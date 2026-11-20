@@ -139,12 +139,13 @@ export async function GET(
             }
         })
 
-        // Stripe顧客のメタデータから領収書メモ（但書）を取得
+        // Stripe顧客のメタデータから体験用の領収書メモ（但書）を取得
         let receiptMemo: string | undefined
         try {
+            const { resolveInvoiceMemo } = await import('@/lib/billing-memo')
             const cus = await stripe.customers.retrieve(stripeCustomerId)
-            if (cus && !('deleted' in cus && cus.deleted) && cus.metadata?.receipt_memo) {
-                receiptMemo = cus.metadata.receipt_memo.trim() || undefined
+            if (cus && !('deleted' in cus && cus.deleted)) {
+                receiptMemo = resolveInvoiceMemo(cus.metadata, { isTrial: true })
             }
         } catch (cusErr) {
             console.warn('[Trial Payment] Failed to retrieve customer metadata:', cusErr)

@@ -102,12 +102,13 @@ export async function GET(req: NextRequest) {
                     continue
                 }
 
-                // 顧客の領収書メモ（但書）設定を確認
+                // 顧客の領収書メモ（但書）設定を確認（体験以降ベース「◯月分水泳レッスン費として」を自動適用）
                 let customMemo: string | undefined
                 try {
+                    const { resolveInvoiceMemo } = await import('@/lib/billing-memo')
                     const cus = await stripe.customers.retrieve(customerId)
-                    if (cus && !('deleted' in cus && cus.deleted) && cus.metadata?.receipt_memo) {
-                        customMemo = cus.metadata.receipt_memo.trim() || undefined
+                    if (cus && !('deleted' in cus && cus.deleted)) {
+                        customMemo = resolveInvoiceMemo(cus.metadata, { isTrial: false })
                     }
                 } catch {}
 

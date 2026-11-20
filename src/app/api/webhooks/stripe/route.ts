@@ -616,6 +616,27 @@ ${slotsListText}
                 }
                 break
             }
+            case 'invoice.created': {
+                // サブスクリプション等の自動生成請求書（draft状態）のメモ欄に「◯月分水泳レッスン費として」等を設定
+                const invoice = event.data.object as Stripe.Invoice
+                if (invoice.status === 'draft' && !invoice.description && invoice.customer) {
+                    try {
+                        const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer.id
+                        const cus = await stripe.customers.retrieve(customerId)
+                        if (cus && !('deleted' in cus && cus.deleted)) {
+                            const { resolveInvoiceMemo } = await import('@/lib/billing-memo')
+                            const memo = resolveInvoiceMemo(cus.metadata, { isTrial: false })
+                            if (memo) {
+                                await stripe.invoices.update(invoice.id, { description: memo })
+                                console.log(`[Stripe Webhook] Auto-applied receipt memo to draft invoice ${invoice.id}: ${memo}`)
+                            }
+                        }
+                    } catch (invMemoErr) {
+                        console.warn('[Stripe Webhook] Failed to auto-apply memo on invoice.created:', invMemoErr)
+                    }
+                }
+                break
+            }
             case 'invoice.paid': {
                 const invoice = event.data.object as Stripe.Invoice
                 const mainScheduleId = invoice.metadata?.schedule_id

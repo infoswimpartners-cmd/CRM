@@ -42,9 +42,10 @@ export function StripeManager({ studentId, stripeCustomerId, paymentMethodStatus
     const [isUpdating, setIsUpdating] = useState(false)
     const [copied, setCopied] = useState(false)
 
-    // 請求書・領収書の宛名とメモ（但書）設定
+    // 請求書・領収書の宛名とメモ（体験用・通常用但書）設定
     const [billingName, setBillingName] = useState('')
-    const [receiptMemo, setReceiptMemo] = useState('')
+    const [trialMemo, setTrialMemo] = useState('')
+    const [regularMemo, setRegularMemo] = useState('')
     const [isLoadingSettings, setIsLoadingSettings] = useState(false)
     const [isSavingSettings, setIsSavingSettings] = useState(false)
 
@@ -63,7 +64,8 @@ export function StripeManager({ studentId, stripeCustomerId, paymentMethodStatus
                 if (cancelled) return
                 if (res.success) {
                     setBillingName(res.billingName || '')
-                    setReceiptMemo(res.receiptMemo || '')
+                    setTrialMemo(res.trialMemo || '')
+                    setRegularMemo(res.regularMemo || '')
                 }
             })
             .finally(() => {
@@ -92,7 +94,8 @@ export function StripeManager({ studentId, stripeCustomerId, paymentMethodStatus
                 studentId,
                 stripeCustomerId,
                 billingName,
-                receiptMemo
+                trialMemo,
+                regularMemo
             )
             if (res.success) {
                 toast.success('請求書・領収書の宛名とメモ欄をStripeに保存しました')
@@ -363,20 +366,34 @@ export function StripeManager({ studentId, stripeCustomerId, paymentMethodStatus
                                     </p>
                                 </div>
                                 <div className="space-y-1">
-                                    <Label htmlFor="stripeReceiptMemo" className="text-[11px] font-semibold text-slate-600">
-                                        請求書・領収書のメモ欄（但書）
+                                    <Label htmlFor="stripeTrialMemo" className="text-[11px] font-semibold text-slate-600">
+                                        体験レッスンのメモ欄（初回体験時のみ使用）
                                     </Label>
                                     <Textarea
-                                        id="stripeReceiptMemo"
-                                        value={receiptMemo}
-                                        onChange={(e) => setReceiptMemo(e.target.value)}
-                                        placeholder="例: 但し、水泳個人指導料として"
+                                        id="stripeTrialMemo"
+                                        value={trialMemo}
+                                        onChange={(e) => setTrialMemo(e.target.value)}
+                                        placeholder="例: 水泳(初回体験) 2026年11月分として"
                                         rows={2}
                                         className="text-xs bg-white border-slate-200 resize-none"
                                         disabled={isLoadingSettings || isSavingSettings}
                                     />
-                                    <p className="text-[10px] text-slate-400">
-                                        ※ 入力すると、今後の請求書・体験事前決済のStripe領収書メモ欄に自動で反映されます。
+                                </div>
+                                <div className="space-y-1">
+                                    <Label htmlFor="stripeRegularMemo" className="text-[11px] font-semibold text-slate-600">
+                                        体験以降のメモ欄（本入会・月次請求時）
+                                    </Label>
+                                    <Textarea
+                                        id="stripeRegularMemo"
+                                        value={regularMemo}
+                                        onChange={(e) => setRegularMemo(e.target.value)}
+                                        placeholder="未入力時は自動で「◯月分水泳レッスン費として」が適用されます"
+                                        rows={2}
+                                        className="text-xs bg-white border-slate-200 resize-none"
+                                        disabled={isLoadingSettings || isSavingSettings}
+                                    />
+                                    <p className="text-[10px] text-slate-400 leading-snug">
+                                        ※ 空欄のまま、または <code className="bg-slate-100 px-1 rounded">{"{{month}}"}月分水泳レッスン費として</code> と入力すると、請求月の数字（例: 12月分水泳レッスン費として）が自動反映されます。
                                     </p>
                                 </div>
                                 <Button

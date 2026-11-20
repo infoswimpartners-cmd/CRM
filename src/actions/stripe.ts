@@ -415,12 +415,13 @@ export async function createImmediatePaymentInvoice(scheduleId: string) {
             }
         })
 
-        // 顧客の領収書メモ（但書）設定を確認
+        // 顧客の領収書メモ（但書）設定を確認（体験以降ベース「◯月分水泳レッスン費として」を自動適用）
         let receiptMemo: string | undefined
         try {
+            const { resolveInvoiceMemo } = await import('@/lib/billing-memo')
             const cus = await stripe.customers.retrieve(customerId)
-            if (cus && !('deleted' in cus && cus.deleted) && cus.metadata?.receipt_memo) {
-                receiptMemo = cus.metadata.receipt_memo
+            if (cus && !('deleted' in cus && cus.deleted)) {
+                receiptMemo = resolveInvoiceMemo(cus.metadata, { isTrial: false })
             }
         } catch {}
 
@@ -762,7 +763,7 @@ export async function getStripeInvoices(options: GetStripeInvoicesOptions = {}) 
 }
 
 /**
- * Stripe顧客の請求先宛名および領収書メモ（但書）を取得する
+ * Stripe顧客の請求先宛名および領収書メモ（体験用・通常用但書）を取得する
  */
 export async function getStripeCustomerBillingSettings(stripeCustomerId: string) {
     try {
@@ -773,10 +774,14 @@ export async function getStripeCustomerBillingSettings(stripeCustomerId: string)
         if (!customer || ('deleted' in customer && customer.deleted)) {
             return { success: false, error: 'Stripe上に顧客データが存在しません' }
         }
+        const { extractCustomerMemoSettings } = await import('@/lib/billing-memo')
+        const { trialMemo, regularMemo } = extractCustomerMemoSettings(customer.metadata)
         return {
             success: true,
             billingName: customer.name || '',
-            receiptMemo: customer.metadata?.receipt_memo || '',
+            trialMemo,
+            regularMemo,
+            receiptMemo: regularMemo || trialMemo,
         }
     } catch (error: any) {
         console.error('[getStripeCustomerBillingSettings] Error:', error)
@@ -785,13 +790,14 @@ export async function getStripeCustomerBillingSettings(stripeCustomerId: string)
 }
 
 /**
- * Stripe顧客の請求先宛名および領収書メモ（但書）を更新する（CRM上の生徒名は変更しない）
+ * Stripe顧客の請求先宛名および領収書メモ（体験用・通常用但書）を更新する（CRM上の生徒名は変更しない）
  */
 export async function updateStripeCustomerBillingSettings(
     studentId: string,
     stripeCustomerId: string,
     billingName: string,
-    receiptMemo: string
+    trialMemo: string,
+    regularMemo: string = ''
 ) {
     try {
         if (!stripeCustomerId) {
@@ -803,13 +809,16 @@ export async function updateStripeCustomerBillingSettings(
         }
 
         const trimmedName = billingName.trim()
-        const trimmedMemo = receiptMemo.trim()
+        const trimmedTrial = trialMemo.trim()
+        const trimmedRegular = regularMemo.trim()
 
         await stripe.customers.update(stripeCustomerId, {
             ...(trimmedName ? { name: trimmedName } : {}),
             metadata: {
                 ...(customer.metadata || {}),
-                receipt_memo: trimmedMemo,
+                trial_receipt_memo: trimmedTrial,
+                regular_receipt_memo: trimmedRegular,
+                receipt_memo: trimmedRegular || trimmedTrial,
             },
         })
 

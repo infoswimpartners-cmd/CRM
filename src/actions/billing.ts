@@ -122,12 +122,13 @@ export async function processLessonBilling(scheduleId: string, forceManualEmail:
         })
         console.log('[Billing] Invoice Item created:', invoiceItem.id)
 
-        // 顧客の領収書メモ（但書）設定を確認
+        // 顧客の領収書メモ（但書）設定を確認（体験以降ベース「◯月分水泳レッスン費として」を自動適用）
         let receiptMemo: string | undefined
         try {
+            const { resolveInvoiceMemo } = await import('@/lib/billing-memo')
             const cus = await stripe.customers.retrieve(stripeCustomerId)
-            if (cus && !('deleted' in cus && cus.deleted) && cus.metadata?.receipt_memo) {
-                receiptMemo = cus.metadata.receipt_memo.trim() || undefined
+            if (cus && !('deleted' in cus && cus.deleted)) {
+                receiptMemo = resolveInvoiceMemo(cus.metadata, { isTrial: false })
             }
         } catch {}
 
