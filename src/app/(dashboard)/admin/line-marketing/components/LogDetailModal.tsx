@@ -85,15 +85,17 @@ export function LogDetailModal({ log, open, onClose }: LogDetailModalProps) {
                             <span className="font-semibold text-slate-800">
                                 {(log.delivery_type === 'direct_chat' || log.step_name === '個別トーク（1対1チャット）')
                                     ? '個別トーク（1対1チャット）'
-                                    : log.delivery_type === 'broadcast'
-                                        ? '一括配信'
-                                        : log.delivery_type === 'step_message'
-                                            ? `ステップ配信 (${log.step_name || '名称未設定'})`
-                                            : log.delivery_type === 'cart_recovery'
-                                                ? 'カゴ落ち自動フォロー'
-                                                : log.delivery_type === 'test_preview'
-                                                    ? 'テストプレビュー送信'
-                                                    : log.delivery_type}
+                                    : (log.delivery_type === 'confirm_30m_followup' || log.step_name === '確認画面離脱30分後フォロー')
+                                        ? '確認画面離脱30分後フォロー'
+                                        : (log.delivery_type === 'cart_recovery' || log.step_name === 'カゴ落ち自動フォロー')
+                                            ? 'カゴ落ち自動フォロー'
+                                            : log.delivery_type === 'broadcast'
+                                                ? '一括配信'
+                                                : log.delivery_type === 'step_message'
+                                                    ? `ステップ配信 (${log.step_name || '名称未設定'})`
+                                                    : log.delivery_type === 'test_preview'
+                                                        ? 'テストプレビュー送信'
+                                                        : log.delivery_type}
                             </span>
                         </div>
                         <div>

@@ -385,6 +385,54 @@ export default function BookingForm() {
     };
   }, [isConfirming, isSubmitted, userId, formData.name]);
 
+  // 案D: 確認画面到達から30分経過しても未完了の場合、クライアント側から即時判定をトリガー
+  // （LIFFを閉じた場合は案BのWebhook／リクエスト便乗で回収されるハイブリッド構成）
+  useEffect(() => {
+    if (!isConfirming || isSubmitted) return;
+
+    // 確認到達ログのサーバー記録ラグを考慮し、30分＋5秒で着火させる
+    const CONFIRM_30M_DELAY_MS = 30 * 60 * 1000 + 5000;
+    const confirmedEnteredAt = Date.now();
+    let hasTriggered = false;
+
+    const triggerConfirm30mCheck = () => {
+      if (hasTriggered || isSubmitted || isSubmittingRef.current) return;
+      hasTriggered = true;
+
+      fetch("/api/liff-tracking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: userId || undefined,
+          step: "confirm_30m_check",
+          formType: "trial_confirm",
+          displayName: formData.name.trim() || undefined,
+          pageUrl: window.location.href,
+        }),
+      }).catch(() => {});
+    };
+
+    const timerId = window.setTimeout(() => {
+      triggerConfirm30mCheck();
+    }, CONFIRM_30M_DELAY_MS);
+
+    // モバイル等でバックグラウンド中にsetTimeoutがスリープし、30分経過後に画面へ戻った場合にも着火
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        if (Date.now() - confirmedEnteredAt >= CONFIRM_30M_DELAY_MS) {
+          triggerConfirm30mCheck();
+        }
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.clearTimeout(timerId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [isConfirming, isSubmitted, userId, formData.name]);
+
   // 入力変更ハンドラ
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target as HTMLInputElement;

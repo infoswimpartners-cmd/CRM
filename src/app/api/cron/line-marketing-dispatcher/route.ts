@@ -16,6 +16,7 @@
  *   5. カゴ落ち自動フォロー（フォーム閲覧後離脱者）の実行
  *   6. フォーム確認後未申込（ホット離脱者）即時自動フォローの実行
  *   7. 友だち追加後1時間未アクション自動フォローの実行
+ *   8. フォーム確認画面離脱30分後リマインド配信の実行
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -25,6 +26,7 @@ import {
     syncTrialDoneStudentsToProgress,
     processCartAbandonmentReminders,
     processConfirmAbandonmentReminders,
+    processConfirm30MinFollowupReminders,
     processInactiveFollowRecovery,
 } from '@/lib/line-marketing-service';
 
@@ -76,6 +78,14 @@ async function runMarketingDispatcher(options: { dryRun?: boolean } = {}) {
         console.error('[Dispatcher] Error in processInactiveFollowRecovery:', inactiveFollowErr);
     }
 
+    // 8. 体験申込フォーム確認画面離脱30分後リマインド配信の判定・実行
+    let confirm30mFollowupResult: any = null;
+    try {
+        confirm30mFollowupResult = await processConfirm30MinFollowupReminders({ dryRun });
+    } catch (confirm30mErr) {
+        console.error('[Dispatcher] Error in processConfirm30MinFollowupReminders:', confirm30mErr);
+    }
+
     return {
         dryRun,
         timestamp: nowIso,
@@ -85,6 +95,7 @@ async function runMarketingDispatcher(options: { dryRun?: boolean } = {}) {
         leadStepReminders: leadStepResult,
         cartRecovery: cartRecoveryResult,
         confirmRecovery: confirmRecoveryResult,
+        confirm30mFollowup: confirm30mFollowupResult,
         inactiveFollowRecovery: inactiveFollowResult,
     };
 }

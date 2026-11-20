@@ -854,19 +854,27 @@ export async function getLineChatHistory(lineUserId: string): Promise<LineChatMe
         if (isDuplicateMessage('outbound', text, sentAt)) continue;
 
         const isDirectChat = dlog.delivery_type === 'direct_chat' || dlog.step_name === '個別トーク（1対1チャット）' || dlog.step_name === '個別トーク返信';
+        const isConfirm30mFollowup = dlog.delivery_type === 'confirm_30m_followup' || dlog.step_name === '確認画面離脱30分後フォロー';
+        const isCartRecovery = dlog.delivery_type === 'cart_recovery' || dlog.step_name === 'カゴ落ち自動フォロー';
         const msgType: LineChatMessage['message_type'] = isDirectChat
             ? 'direct_chat'
-            : (dlog.delivery_type || 'broadcast');
+            : isConfirm30mFollowup
+                ? 'confirm_30m_followup'
+                : isCartRecovery
+                    ? 'cart_recovery'
+                    : (dlog.delivery_type || 'broadcast');
 
         const senderLabel = isDirectChat
             ? '事務局（個別返信）'
-            : dlog.delivery_type === 'step_message'
-                ? `ステップ配信${dlog.step_name ? ` (${dlog.step_name})` : ''}`
-                : dlog.delivery_type === 'cart_recovery'
+            : isConfirm30mFollowup
+                ? '確認画面離脱30分後フォロー'
+                : isCartRecovery
                     ? 'カゴ落ち自動フォロー'
-                    : dlog.delivery_type === 'test_preview'
-                        ? 'テストプレビュー送信'
-                        : '一括配信';
+                    : dlog.delivery_type === 'step_message'
+                        ? `ステップ配信${dlog.step_name ? ` (${dlog.step_name})` : ''}`
+                        : dlog.delivery_type === 'test_preview'
+                            ? 'テストプレビュー送信'
+                            : '一括配信';
 
         const syntheticMsg: LineChatMessage = {
             id: `dlog-${dlog.id}`,

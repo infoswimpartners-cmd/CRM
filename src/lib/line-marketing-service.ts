@@ -10,6 +10,7 @@
  *   6. 体験後ステップ配信判定＆本入会（status: active）自動スキップ制御
  */
 
+import { after } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { formatLineMessage } from '@/lib/line';
 import {
@@ -55,6 +56,7 @@ export const DEFAULT_VARIABLE_FALLBACKS: Record<string, string> = {
     area: 'ご希望エリア',
     student_number: '',
     trial_url: process.env.NEXT_PUBLIC_SITE_URL ? `${process.env.NEXT_PUBLIC_SITE_URL}/trial` : 'https://manager.swim-partners.com/trial',
+    form_url: process.env.NEXT_PUBLIC_SITE_URL ? `${process.env.NEXT_PUBLIC_SITE_URL}/trial` : 'https://manager.swim-partners.com/trial',
 };
 
 // ==============================================================================
@@ -271,7 +273,7 @@ export async function writeDeliveryLog(params: {
     studentNumber?: string | null;
     studentName?: string | null;
     lineUserId: string;
-    deliveryType: 'broadcast' | 'step_message' | 'test_preview' | 'cart_recovery' | 'confirm_abandon_recovery' | 'inactive_follow_recovery' | 'direct_chat';
+    deliveryType: 'broadcast' | 'step_message' | 'test_preview' | 'cart_recovery' | 'confirm_abandon_recovery' | 'confirm_30m_followup' | 'inactive_follow_recovery' | 'direct_chat';
     campaignId?: string | null;
     stepId?: string | null;
     stepName?: string | null;
@@ -304,8 +306,17 @@ export async function writeDeliveryLog(params: {
             sent_at: nowIso,
         });
 
-        // DBのCHECK制約が未マイグレーションで direct_chat / cart_recovery が弾かれた場合、互換種別で再試行
-        if (error && (params.deliveryType === 'direct_chat' || params.deliveryType === 'cart_recovery')) {
+        // DBのCHECK制約が未マイグレーションで direct_chat / cart_recovery / confirm_30m_followup 等が弾かれた場合、互換種別で再試行
+        if (error && (params.deliveryType === 'direct_chat' || params.deliveryType === 'cart_recovery' || params.deliveryType === 'confirm_30m_followup' || params.deliveryType === 'confirm_abandon_recovery' || params.deliveryType === 'inactive_follow_recovery')) {
+            const fallbackStepName =
+                params.stepName ||
+                (params.deliveryType === 'direct_chat'
+                    ? '個別トーク（1対1チャット）'
+                    : params.deliveryType === 'confirm_30m_followup'
+                        ? '確認画面離脱30分後フォロー'
+                        : params.deliveryType === 'confirm_abandon_recovery'
+                            ? 'フォーム確認後未申込 即時フォロー'
+                            : 'カゴ落ち自動フォロー');
             const retryRes = await supabase.from('line_delivery_logs').insert({
                 student_id: params.studentId || null,
                 student_number: params.studentNumber || null,
@@ -314,7 +325,7 @@ export async function writeDeliveryLog(params: {
                 delivery_type: 'broadcast',
                 campaign_id: params.campaignId || null,
                 step_id: params.stepId || null,
-                step_name: params.stepName || (params.deliveryType === 'direct_chat' ? '個別トーク（1対1チャット）' : 'カゴ落ち自動フォロー'),
+                step_name: fallbackStepName,
                 message_body: params.renderedMessage,
                 rendered_message: params.renderedMessage,
                 status: params.status,
@@ -2600,3 +2611,999 @@ export async function processConfirmAbandonmentReminders(
         details,
     };
 }
+
+// ==============================================================================
+// 16. 体験申込の確認画面離脱 30分後リマインド配信処理 (task-20261115-001)
+// ==============================================================================
+
+export const CONFIRM_30M_FOLLOWUP_ENABLED_KEY = 'line_confirm_30m_followup_enabled';
+export const CONFIRM_30M_FOLLOWUP_MODE_KEY = 'line_confirm_30m_followup_mode';
+export const CONFIRM_30M_FOLLOWUP_TEMPLATE_KEY = 'line_confirm_30m_followup_template';
+
+export const DEFAULT_CONFIRM_30M_FOLLOWUP_TEMPLATE =
+`{{name}}様
+体験レッスンのお申し込み、ありがとうございます。
+「やってみたい」と思って入力を進めてくださったこと、とても嬉しく思います。
+あと少しで完了のところでした。入力いただいた内容はそのまま残っていますので、こちらから続きをご入力いただけます。
+▼続きから申し込む
+{{form_url}}
+「うちの子に合うかな」「泳げなくても大丈夫かな」など、気になることがあれば、このトークにそのまま返信ください。一つずつ一緒に確認しながら進めましょう。`;
+
+export interface ProcessConfirm30MinFollowupOptions {
+    dryRun?: boolean;
+    nowDate?: Date;
+    targetLineUserId?: string;
+    forceSend?: boolean;
+    allowTestUsersInTestOnly?: boolean;
+}
+
+export interface ProcessConfirm30MinFollowupResult {
+    processedCount: number;
+    successCount: number;
+    skippedCount: number;
+    failedCount: number;
+    enabled: boolean;
+    mode: 'active' | 'test_only' | 'paused';
+    details: Array<{
+        lineUserId: string;
+        studentName?: string;
+        action: 'sent' | 'skipped' | 'dry_run' | 'failed';
+        reason?: string;
+        elapsedMinutes?: number;
+        confirmedAt?: string;
+    }>;
+}
+
+/**
+ * 体験申込フォームで確認画面まで入力して申込を完了しなかったユーザーへ、
+ * 離脱（確認画面到達）の30分後に再開を促すLINEメッセージを1回だけ自動送信する。
+ *
+ * 要件:
+ *   3.1 トリガーとタイミング:
+ *       - 対象イベント: 確認画面到達（trial_confirm 到達記録 / trial_form_confirmed「フォーム確認済未申込」タグ付与）
+ *       - 到達から30分後に送信（30分以上経過）
+ *       - 1ユーザーにつき同一離脱には1回まで（再度フォームを開いて再度確認画面で離脱した場合は新しい起点としてよい）
+ *   3.2 送信直前の除外判定（必須）:
+ *       送信直前に最新状態を再確認し、以下のいずれかなら送信しない:
+ *       (a) 申込完了している（trial_applied タグ、students.status が申込・体験以降、leads 登録済、または line_access_logs.is_converted）
+ *       (b) 本入会済み（active）または退会済み（withdrawn）
+ *       (c) 本30分フォローを当該離脱に対して送信済み（confirm_30m_followup_sent タグの sent_for_confirmed_at / sent_at により冪等管理）
+ *   3.3 文面:
+ *       登録済み文面と同一を使用（{{name}} と {{form_url}} / {{trial_url}} 両対応）
+ */
+export const CONFIRM_STEP1_AUTO_PAUSED_KEY = 'line_confirm_step1_auto_paused_20261120';
+let hasCheckedConfirmStep1PauseInMemory = false;
+
+/**
+ * 30分後リマインド有効化に伴い、同文面で重複するステップ配信シナリオ「フォーム確認済未申込 (trial_form_confirmed)」の
+ * Step 1（確認当日18:00 / step_order = 1）を1回限り自動で停止（is_active = false）する。
+ * Step 2（翌日18:00 / step_order = 2）は有効のまま維持する。
+ */
+export async function ensureConfirmStep1PausedOnce(): Promise<void> {
+    if (hasCheckedConfirmStep1PauseInMemory) return;
+    const supabase = createAdminClient();
+    const nowIso = new Date().toISOString();
+
+    try {
+        const { data: flagRow } = await supabase
+            .from('app_configs')
+            .select('value')
+            .eq('key', CONFIRM_STEP1_AUTO_PAUSED_KEY)
+            .maybeSingle();
+
+        if (flagRow?.value) {
+            hasCheckedConfirmStep1PauseInMemory = true;
+            return;
+        }
+
+        // 1. DBテーブル line_step_rules の trial_form_confirmed Step 1 のみを停止（Step 2 以降は触らない）
+        try {
+            await supabase
+                .from('line_step_rules')
+                .update({ is_active: false, updated_at: nowIso })
+                .eq('target_tag', 'trial_form_confirmed')
+                .eq('step_order', 1);
+        } catch {}
+
+        // 2. app_configs フォールバック (line_step_rules_data_v1) 側も同様に Step 1 のみ停止
+        try {
+            const { data: fbCfg } = await supabase
+                .from('app_configs')
+                .select('value')
+                .eq('key', 'line_step_rules_data_v1')
+                .maybeSingle();
+
+            if (fbCfg?.value) {
+                const rules = JSON.parse(fbCfg.value);
+                if (Array.isArray(rules)) {
+                    let changed = false;
+                    const updatedRules = rules.map((r: any) => {
+                        if (r && r.targetTag === 'trial_form_confirmed' && Number(r.stepOrder) === 1 && r.isActive !== false) {
+                            changed = true;
+                            return { ...r, isActive: false, updatedAt: nowIso };
+                        }
+                        return r;
+                    });
+                    if (changed) {
+                        await supabase
+                            .from('app_configs')
+                            .upsert(
+                                {
+                                    key: 'line_step_rules_data_v1',
+                                    value: JSON.stringify(updatedRules),
+                                    updated_at: nowIso,
+                                },
+                                { onConflict: 'key' }
+                            );
+                    }
+                }
+            }
+        } catch {}
+
+        await supabase
+            .from('app_configs')
+            .upsert(
+                {
+                    key: CONFIRM_STEP1_AUTO_PAUSED_KEY,
+                    value: nowIso,
+                    updated_at: nowIso,
+                },
+                { onConflict: 'key' }
+            );
+
+        hasCheckedConfirmStep1PauseInMemory = true;
+    } catch (err) {
+        console.warn('[ensureConfirmStep1PausedOnce] Warning:', err);
+    }
+}
+
+export async function processConfirm30MinFollowupReminders(
+    options: ProcessConfirm30MinFollowupOptions = {}
+): Promise<ProcessConfirm30MinFollowupResult> {
+    const {
+        dryRun = false,
+        nowDate = new Date(),
+        targetLineUserId,
+        forceSend = false,
+        allowTestUsersInTestOnly = false,
+    } = options;
+    const supabase = createAdminClient();
+
+    // 既存ステップ配信「フォーム確認済未申込」Step 1（当日18:00）の自動停止（初回1回のみ・Step 2は有効維持）
+    await ensureConfirmStep1PausedOnce();
+
+    // 1. 有効/無効および稼働モード設定の取得
+    const { data: configRows } = await supabase
+        .from('app_configs')
+        .select('key, value')
+        .in('key', [
+            CONFIRM_30M_FOLLOWUP_ENABLED_KEY,
+            CONFIRM_30M_FOLLOWUP_MODE_KEY,
+            CONFIRM_30M_FOLLOWUP_TEMPLATE_KEY,
+        ]);
+
+    const cfgMap = new Map<string, string>();
+    for (const r of configRows || []) {
+        if (r.key && r.value !== null && r.value !== undefined) {
+            cfgMap.set(r.key, String(r.value));
+        }
+    }
+
+    const enabledVal = cfgMap.get(CONFIRM_30M_FOLLOWUP_ENABLED_KEY)?.trim().toLowerCase();
+    // デフォルトは有効（管理画面から false / paused に切り替え可能）
+    const isEnabled = enabledVal !== 'false' && enabledVal !== '0' && enabledVal !== 'paused';
+
+    if (!isEnabled && !forceSend) {
+        return {
+            processedCount: 0,
+            successCount: 0,
+            skippedCount: 0,
+            failedCount: 0,
+            enabled: false,
+            mode: 'paused',
+            details: [],
+        };
+    }
+
+    const rawMode = cfgMap.get(CONFIRM_30M_FOLLOWUP_MODE_KEY)?.trim().toLowerCase();
+    const recoveryMode: 'active' | 'test_only' = rawMode === 'test_only' ? 'test_only' : 'active';
+    const isTestOnly = recoveryMode === 'test_only';
+
+    const templateText = cfgMap.get(CONFIRM_30M_FOLLOWUP_TEMPLATE_KEY)?.trim() || DEFAULT_CONFIRM_30M_FOLLOWUP_TEMPLATE;
+
+    // 2. 全ユーザータグおよび直近アクセスログから候補者を収集
+    const allUserTags = await getAllUserTags();
+
+    const userCandidateMap = new Map<string, {
+        lineUserId: string;
+        tags: Set<string>;
+        confirmedAt: Date | null;
+        appliedAt: Date | null;
+        followupSentAt: Date | null;
+        followupSentForConfirmedAt: Date | null;
+        displayName?: string;
+    }>();
+
+    for (const tag of allUserTags) {
+        if (!tag.line_user_id) continue;
+        let entry = userCandidateMap.get(tag.line_user_id);
+        if (!entry) {
+            entry = {
+                lineUserId: tag.line_user_id,
+                tags: new Set<string>(),
+                confirmedAt: null,
+                appliedAt: null,
+                followupSentAt: null,
+                followupSentForConfirmedAt: null,
+                displayName: tag.display_name || undefined,
+            };
+            userCandidateMap.set(tag.line_user_id, entry);
+        }
+
+        entry.tags.add(tag.tag_name);
+        if (tag.display_name && !entry.displayName) {
+            entry.displayName = tag.display_name;
+        }
+
+        // 確認画面到達日時（trial_form_confirmed）の取得
+        // 再度フォームを開いて再度確認画面に到達した場合は metadata (last_confirmed_at / confirmed_at / abandoned_at / first_confirmed_at) の最新日時を優先し、未設定時のみ created_at をフォールバック使用する
+        if (tag.tag_name === STANDARD_TAGS.FORM_CONFIRMED) {
+            const metaDates = [
+                tag.metadata?.last_confirmed_at,
+                tag.metadata?.confirmed_at,
+                tag.metadata?.abandoned_at,
+                tag.metadata?.first_confirmed_at,
+            ].filter(Boolean);
+            const candidateDates = metaDates.length > 0 ? metaDates : [tag.created_at].filter(Boolean);
+
+            for (const dStr of candidateDates) {
+                const parsed = new Date(dStr);
+                if (!isNaN(parsed.getTime())) {
+                    if (!entry.confirmedAt || parsed.getTime() > entry.confirmedAt.getTime()) {
+                        entry.confirmedAt = parsed;
+                    }
+                }
+            }
+        }
+
+        // 申込完了タグ（trial_applied）の日時取得
+        if (tag.tag_name === STANDARD_TAGS.FORM_APPLIED) {
+            const appDateStr = tag.metadata?.applied_at || tag.created_at;
+            if (appDateStr) {
+                const parsed = new Date(appDateStr);
+                if (!isNaN(parsed.getTime())) {
+                    if (!entry.appliedAt || parsed.getTime() > entry.appliedAt.getTime()) {
+                        entry.appliedAt = parsed;
+                    }
+                }
+            }
+        }
+
+        // 30分フォロー送信済タグ（confirm_30m_followup_sent）の日時取得
+        if (tag.tag_name === STANDARD_TAGS.CONFIRM_30M_FOLLOWUP_SENT) {
+            const sentDateStr = tag.metadata?.sent_at || tag.created_at;
+            if (sentDateStr) {
+                const parsed = new Date(sentDateStr);
+                if (!isNaN(parsed.getTime())) {
+                    if (!entry.followupSentAt || parsed.getTime() > entry.followupSentAt.getTime()) {
+                        entry.followupSentAt = parsed;
+                    }
+                }
+            }
+            const sentForConfStr = tag.metadata?.sent_for_confirmed_at;
+            if (sentForConfStr) {
+                const parsed = new Date(sentForConfStr);
+                if (!isNaN(parsed.getTime())) {
+                    if (!entry.followupSentForConfirmedAt || parsed.getTime() > entry.followupSentForConfirmedAt.getTime()) {
+                        entry.followupSentForConfirmedAt = parsed;
+                    }
+                }
+            }
+        }
+    }
+
+    // line_access_logs（および app_configs フォールバック）の trial_confirm 記録からも確認画面到達日時を補完
+    try {
+        const { data: confirmLogs, error: logErr } = await supabase
+            .from('line_access_logs')
+            .select('line_user_id, created_at, display_name, form_type, is_converted, metadata')
+            .eq('form_type', 'trial_confirm')
+            .order('created_at', { ascending: false })
+            .limit(300);
+
+        let logsToProcess: any[] = [];
+        if (!logErr && confirmLogs) {
+            logsToProcess = confirmLogs;
+        } else {
+            const { data: fbLogs } = await supabase
+                .from('app_configs')
+                .select('value')
+                .eq('key', 'line_tracking_logs_v1')
+                .maybeSingle();
+            if (fbLogs?.value) {
+                try {
+                    const parsedLogs: any[] = JSON.parse(fbLogs.value);
+                    logsToProcess = parsedLogs.filter(l => l.form_type === 'trial_confirm');
+                } catch {}
+            }
+        }
+
+        for (const log of logsToProcess) {
+            if (!log.line_user_id) continue;
+            let entry = userCandidateMap.get(log.line_user_id);
+            if (!entry) {
+                entry = {
+                    lineUserId: log.line_user_id,
+                    tags: new Set<string>([STANDARD_TAGS.FORM_CONFIRMED]),
+                    confirmedAt: null,
+                    appliedAt: null,
+                    followupSentAt: null,
+                    followupSentForConfirmedAt: null,
+                    displayName: log.display_name || undefined,
+                };
+                userCandidateMap.set(log.line_user_id, entry);
+            } else {
+                entry.tags.add(STANDARD_TAGS.FORM_CONFIRMED);
+            }
+
+            const logDateStr = log.metadata?.confirmed_at || log.created_at;
+            if (logDateStr) {
+                const logDate = new Date(logDateStr);
+                if (!isNaN(logDate.getTime())) {
+                    if (!entry.confirmedAt || logDate.getTime() > entry.confirmedAt.getTime()) {
+                        entry.confirmedAt = logDate;
+                    }
+                }
+            }
+            if (log.is_converted) {
+                entry.tags.add(STANDARD_TAGS.FORM_APPLIED);
+            }
+            if (log.display_name && !entry.displayName) {
+                entry.displayName = log.display_name;
+            }
+        }
+    } catch {
+        // アクセスログ参照失敗時はタグ情報のみで継続
+    }
+
+    let candidates = Array.from(userCandidateMap.values());
+    if (targetLineUserId) {
+        candidates = candidates.filter(c => c.lineUserId === targetLineUserId);
+    }
+
+    let successCount = 0;
+    let skippedCount = 0;
+    let failedCount = 0;
+    const details: ProcessConfirm30MinFollowupResult['details'] = [];
+
+    for (const candidate of candidates) {
+        const { lineUserId, tags, confirmedAt } = candidate;
+
+        // トリガー条件: 確認画面到達（trial_form_confirmed）していること
+        if (!tags.has(STANDARD_TAGS.FORM_CONFIRMED)) {
+            continue;
+        }
+
+        if (!confirmedAt) {
+            skippedCount++;
+            details.push({
+                lineUserId,
+                action: 'skipped',
+                reason: 'confirmed_at_missing',
+            });
+            continue;
+        }
+
+        const confirmedAtIso = confirmedAt.toISOString();
+        const elapsedMs = nowDate.getTime() - confirmedAt.getTime();
+        const elapsedMinutes = elapsedMs / (1000 * 60);
+
+        // 要件3.1 タイミング判定: 到達から30分後に送信（30分未満は未到来のためスキップ、上限は48時間＝2880分）
+        if (!forceSend && (elapsedMinutes < 30 || elapsedMinutes > 2880)) {
+            skippedCount++;
+            details.push({
+                lineUserId,
+                action: 'skipped',
+                reason: elapsedMinutes < 30
+                    ? `not_yet_30m (${elapsedMinutes.toFixed(1)}m < 30m)`
+                    : `expired_over_48h (${elapsedMinutes.toFixed(1)}m)`,
+                elapsedMinutes,
+                confirmedAt: confirmedAtIso,
+            });
+            continue;
+        }
+
+        // =========================================================================
+        // 要件3.2: 送信直前の最新状態再確認による除外判定（必須）
+        // =========================================================================
+
+        // 最新タグ一覧をDB/フォールバックから直前再取得して検証
+        const freshAllTags = await getAllUserTags();
+        const freshUserTags = freshAllTags.filter(t => t.line_user_id === lineUserId);
+        const freshTagNames = new Set(freshUserTags.map(t => t.tag_name));
+
+        // 最新の confirmedAt を再算出（別プロセスで更新された場合の整合性担保）
+        let latestConfirmedAt = confirmedAt;
+        const freshConfirmTag = freshUserTags.find(t => t.tag_name === STANDARD_TAGS.FORM_CONFIRMED);
+        if (freshConfirmTag) {
+            const freshMetaDates = [
+                freshConfirmTag.metadata?.last_confirmed_at,
+                freshConfirmTag.metadata?.confirmed_at,
+                freshConfirmTag.metadata?.abandoned_at,
+                freshConfirmTag.metadata?.first_confirmed_at,
+            ].filter(Boolean);
+            const freshCandidateDates = freshMetaDates.length > 0 ? freshMetaDates : [freshConfirmTag.created_at].filter(Boolean);
+            for (const dStr of freshCandidateDates) {
+                const p = new Date(dStr);
+                if (!isNaN(p.getTime()) && p.getTime() > latestConfirmedAt.getTime()) {
+                    latestConfirmedAt = p;
+                }
+            }
+        }
+
+        // (c) 本30分フォローを送信済みか判定（同一離脱には1回まで。再度フォームを開いて再度離脱した場合は新しい起点としてよい）
+        const freshSentTag = freshUserTags.find(t => t.tag_name === STANDARD_TAGS.CONFIRM_30M_FOLLOWUP_SENT);
+        if (freshSentTag) {
+            const sentAtStr = freshSentTag.metadata?.sent_at || freshSentTag.created_at;
+            const sentForConfStr = freshSentTag.metadata?.sent_for_confirmed_at;
+            const sentAtDate = sentAtStr ? new Date(sentAtStr) : null;
+            const sentForConfDate = sentForConfStr ? new Date(sentForConfStr) : null;
+
+            const isAlreadySentForThisAbandon =
+                (sentForConfDate && !isNaN(sentForConfDate.getTime()) && sentForConfDate.getTime() >= latestConfirmedAt.getTime()) ||
+                (sentAtDate && !isNaN(sentAtDate.getTime()) && sentAtDate.getTime() >= latestConfirmedAt.getTime());
+
+            if (isAlreadySentForThisAbandon) {
+                skippedCount++;
+                details.push({
+                    lineUserId,
+                    action: 'skipped',
+                    reason: 'already_confirm_30m_followup_sent',
+                    elapsedMinutes,
+                    confirmedAt: latestConfirmedAt.toISOString(),
+                });
+                continue;
+            }
+        }
+
+        // 配信ログ（line_delivery_logs / フォールバック）でも当該離脱以降に confirm_30m_followup が送信済みでないか二重チェック
+        try {
+            const { data: recentSentLogs, error: sentLogErr } = await supabase
+                .from('line_delivery_logs')
+                .select('id, sent_at, status, delivery_type, step_name')
+                .eq('line_user_id', lineUserId)
+                .in('status', ['sent', 'success'])
+                .gte('sent_at', latestConfirmedAt.toISOString())
+                .limit(20);
+
+            let matchingLogFound = false;
+            if (!sentLogErr && recentSentLogs) {
+                matchingLogFound = recentSentLogs.some(
+                    l => l.delivery_type === 'confirm_30m_followup' || l.step_name === '確認画面離脱30分後フォロー'
+                );
+            } else {
+                const { data: fbLogCfg } = await supabase
+                    .from('app_configs')
+                    .select('value')
+                    .eq('key', 'line_delivery_logs_data_v1')
+                    .maybeSingle();
+                if (fbLogCfg?.value) {
+                    try {
+                        const fbLogs: any[] = JSON.parse(fbLogCfg.value);
+                        matchingLogFound = fbLogs.some(
+                            l =>
+                                l.line_user_id === lineUserId &&
+                                (l.status === 'sent' || l.status === 'success') &&
+                                (l.delivery_type === 'confirm_30m_followup' || l.step_name === '確認画面離脱30分後フォロー') &&
+                                l.sent_at &&
+                                new Date(l.sent_at).getTime() >= latestConfirmedAt.getTime()
+                        );
+                    } catch {}
+                }
+            }
+
+            if (matchingLogFound) {
+                skippedCount++;
+                details.push({
+                    lineUserId,
+                    action: 'skipped',
+                    reason: 'already_confirm_30m_followup_sent_in_logs',
+                    elapsedMinutes,
+                    confirmedAt: latestConfirmedAt.toISOString(),
+                });
+                continue;
+            }
+        } catch {}
+
+        // (a)-1 タグによる申込完了判定（trial_applied タグが存在し、確認到達以降または既に付与されている場合）
+        if (freshTagNames.has(STANDARD_TAGS.FORM_APPLIED)) {
+            const freshAppliedTag = freshUserTags.find(t => t.tag_name === STANDARD_TAGS.FORM_APPLIED);
+            const appliedAtStr = freshAppliedTag?.metadata?.applied_at || freshAppliedTag?.created_at;
+            const appliedAtDate = appliedAtStr ? new Date(appliedAtStr) : null;
+            // trial_applied タグを保有していれば申込完了とみなす（再度確認到達した場合でも applied_at >= confirmed_at またはタグ保持中は除外）
+            if (!appliedAtDate || isNaN(appliedAtDate.getTime()) || appliedAtDate.getTime() >= latestConfirmedAt.getTime() || freshTagNames.has(STANDARD_TAGS.FORM_APPLIED)) {
+                skippedCount++;
+                details.push({
+                    lineUserId,
+                    action: 'skipped',
+                    reason: 'already_applied_tag',
+                    elapsedMinutes,
+                    confirmedAt: latestConfirmedAt.toISOString(),
+                });
+                continue;
+            }
+        }
+
+        // 生徒情報の直前照会（students テーブル）
+        let student: any = null;
+        try {
+            const { data } = await supabase
+                .from('students')
+                .select(`
+                    id,
+                    student_number,
+                    full_name,
+                    status,
+                    coach:coach_id(full_name),
+                    membership_type:membership_type_id(name)
+                `)
+                .eq('line_user_id', lineUserId)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+            student = data;
+        } catch {}
+
+        // (b) 本入会済み（active）または退会済み（withdrawn）の除外判定（テスト太郎を含む全ユーザーで厳格適用）
+        if (student && (student.status === 'active' || student.status === 'withdrawn')) {
+            skippedCount++;
+            details.push({
+                lineUserId,
+                studentName: student.full_name,
+                action: 'skipped',
+                reason: `student_status_${student.status}`,
+                elapsedMinutes,
+                confirmedAt: latestConfirmedAt.toISOString(),
+            });
+            continue;
+        }
+
+        // (a)-2 生徒ステータスによる申込完了判定（applied, trial_pending, trial_confirmed, trial_billed, trial_done）
+        const appliedStatuses = ['applied', 'trial_pending', 'trial_confirmed', 'trial_billed', 'trial_done'];
+        if (student && appliedStatuses.includes(student.status)) {
+            skippedCount++;
+            details.push({
+                lineUserId,
+                studentName: student.full_name,
+                action: 'skipped',
+                reason: `student_already_${student.status}`,
+                elapsedMinutes,
+                confirmedAt: latestConfirmedAt.toISOString(),
+            });
+            continue;
+        }
+
+        // (a)-3 leads テーブルで確認画面到達以降に申込レコードが作成・更新されていないか直前確認
+        try {
+            const { data: recentLead } = await supabase
+                .from('leads')
+                .select('id, status, created_at, updated_at')
+                .eq('line_user_id', lineUserId)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+            if (recentLead) {
+                const leadTime = Math.max(
+                    recentLead.created_at ? new Date(recentLead.created_at).getTime() : 0,
+                    recentLead.updated_at ? new Date(recentLead.updated_at).getTime() : 0
+                );
+                if (leadTime >= latestConfirmedAt.getTime()) {
+                    skippedCount++;
+                    details.push({
+                        lineUserId,
+                        studentName: student?.full_name || candidate.displayName,
+                        action: 'skipped',
+                        reason: 'already_applied_in_leads',
+                        elapsedMinutes,
+                        confirmedAt: latestConfirmedAt.toISOString(),
+                    });
+                    continue;
+                }
+            }
+        } catch {}
+
+        // (a)-4 line_access_logs で is_converted = true になっていないか直前確認
+        try {
+            const { data: convLogs, error: convErr } = await supabase
+                .from('line_access_logs')
+                .select('id, is_converted, converted_at, created_at')
+                .eq('line_user_id', lineUserId)
+                .eq('is_converted', true)
+                .order('created_at', { ascending: false })
+                .limit(1);
+
+            let isConverted = false;
+            if (!convErr && convLogs && convLogs.length > 0) {
+                const convTime = new Date(convLogs[0].converted_at || convLogs[0].created_at).getTime();
+                if (convTime >= latestConfirmedAt.getTime()) {
+                    isConverted = true;
+                }
+            } else {
+                const { data: fbLogs } = await supabase
+                    .from('app_configs')
+                    .select('value')
+                    .eq('key', 'line_tracking_logs_v1')
+                    .maybeSingle();
+                if (fbLogs?.value) {
+                    try {
+                        const parsedLogs: any[] = JSON.parse(fbLogs.value);
+                        isConverted = parsedLogs.some(
+                            l =>
+                                l.line_user_id === lineUserId &&
+                                l.is_converted === true &&
+                                new Date(l.converted_at || l.created_at).getTime() >= latestConfirmedAt.getTime()
+                        );
+                    } catch {}
+                }
+            }
+
+            if (isConverted) {
+                skippedCount++;
+                details.push({
+                    lineUserId,
+                    studentName: student?.full_name || candidate.displayName,
+                    action: 'skipped',
+                    reason: 'already_converted_in_access_logs',
+                    elapsedMinutes,
+                    confirmedAt: latestConfirmedAt.toISOString(),
+                });
+                continue;
+            }
+        } catch {}
+
+        // 【安全ガード】: test_only モード時はテスト太郎（0035）または明示的テスト対象以外をスキップ
+        if (isTestOnly && !forceSend && !allowTestUsersInTestOnly) {
+            const isTestUserId = lineUserId === TEST_TARO_LINE_USER_ID;
+            const isTestStudentNumber = student?.student_number === TEST_TARO_STUDENT_NUMBER;
+
+            if (!isTestUserId && !isTestStudentNumber) {
+                skippedCount++;
+                details.push({
+                    lineUserId,
+                    studentName: student?.full_name || candidate.displayName,
+                    action: 'skipped',
+                    reason: 'test_only_mode_guard',
+                    elapsedMinutes,
+                    confirmedAt: latestConfirmedAt.toISOString(),
+                });
+                console.log(`[Confirm30mFollowup] 安全ガード作動 (test_onlyモード): 実ユーザーへの配信をスキップしました (LINE ID: ${lineUserId})`);
+                continue;
+            }
+        }
+
+        const studentName = (student?.full_name || candidate.displayName || 'お客様').trim();
+
+        // 変数の準備（{{form_url}} と {{trial_url}} の両方に対応）
+        const trialLiffId = process.env.NEXT_PUBLIC_TRIAL_LIFF_ID || process.env.NEXT_PUBLIC_LIFF_ID;
+        const personalizedFormUrl = trialLiffId
+            ? `https://liff.line.me/${trialLiffId}`
+            : `${process.env.NEXT_PUBLIC_SITE_URL || 'https://manager.swim-partners.com'}/trial?userId=${encodeURIComponent(lineUserId)}`;
+
+        const variables: Record<string, string> = {
+            name: studentName,
+            student_number: student?.student_number || '',
+            coach_name: student?.coach?.full_name || '',
+            plan_name: student?.membership_type?.name || '',
+            form_url: personalizedFormUrl,
+            trial_url: personalizedFormUrl,
+        };
+
+        // dryRunモードの場合
+        if (dryRun) {
+            successCount++;
+            details.push({
+                lineUserId,
+                studentName,
+                action: 'dry_run',
+                reason: 'simulated_send_success',
+                elapsedMinutes,
+                confirmedAt: latestConfirmedAt.toISOString(),
+            });
+            continue;
+        }
+
+        // 要件3.3: 登録済み文面と同一の固定テンプレートをそのまま変数置換して送信（Gemini改変なし）
+        const sendResult = await sendSingleLineMessage({
+            studentId: student?.id,
+            studentNumber: student?.student_number,
+            studentName,
+            lineUserId,
+            rawMessage: templateText,
+            variables,
+            deliveryType: 'confirm_30m_followup',
+            stepName: '確認画面離脱30分後フォロー',
+        });
+
+        if (sendResult.success) {
+            successCount++;
+
+            // 1. 送信済みタグ（confirm_30m_followup_sent「確認後30分フォロー送信済」）を冪等に付与
+            try {
+                await addTagToUser(lineUserId, STANDARD_TAGS.CONFIRM_30M_FOLLOWUP_SENT, {
+                    category: 'automation',
+                    displayName: studentName,
+                    studentId: student?.id,
+                    metadata: {
+                        sent_at: nowDate.toISOString(),
+                        sent_for_confirmed_at: latestConfirmedAt.toISOString(),
+                        elapsed_minutes: Math.round(elapsedMinutes * 10) / 10,
+                    },
+                });
+            } catch (tagErr) {
+                console.error(`[Confirm30mFollowup] confirm_30m_followup_sent タグ付与失敗 (${lineUserId}):`, tagErr);
+            }
+
+            // 2. スパム防止調停: 後続の友だち追加ステップ配信予定があれば24時間後ろ倒し
+            try {
+                const stepLeadState = await getStepLeadState(lineUserId);
+                if (stepLeadState && stepLeadState.next_send_at && stepLeadState.step_stage !== -1 && !stepLeadState.is_blocked) {
+                    const currentNextDate = new Date(stepLeadState.next_send_at);
+                    const baseTime = currentNextDate.getTime() > nowDate.getTime()
+                        ? currentNextDate.getTime()
+                        : nowDate.getTime();
+                    const delayedNextDate = new Date(baseTime + 24 * 60 * 60 * 1000);
+
+                    await saveStepLeadState({
+                        ...stepLeadState,
+                        next_send_at: delayedNextDate.toISOString(),
+                        notes: `${stepLeadState.notes ? stepLeadState.notes + ' | ' : ''}確認画面離脱30分後フォロー送信のため次回ステップ配信を24時間後ろ倒し`,
+                    });
+                }
+            } catch (stepErr) {
+                console.error(`[Confirm30mFollowup] スパム防止調停エラー (${lineUserId}):`, stepErr);
+            }
+
+            // 3. 1対1個別チャット履歴へアウトバウンドメッセージを記録
+            try {
+                const renderedMsg = renderLineMessage(templateText, variables);
+                const { recordLineChatMessage } = await import('@/lib/line-chat-service');
+                await recordLineChatMessage({
+                    lineUserId,
+                    displayName: studentName,
+                    direction: 'outbound',
+                    senderType: 'system_auto',
+                    messageType: 'step_message',
+                    messageText: renderedMsg,
+                    senderLabel: '確認画面離脱30分後フォロー自動配信',
+                    isRead: true,
+                    status: 'sent',
+                    metadata: {
+                        deliveryType: 'confirm_30m_followup',
+                        confirmedAt: latestConfirmedAt.toISOString(),
+                        elapsedMinutes: Math.round(elapsedMinutes * 10) / 10,
+                    },
+                });
+            } catch (chatErr) {
+                console.warn('[Confirm30mFollowup] Failed to record chat message:', chatErr);
+            }
+
+            details.push({
+                lineUserId,
+                studentName,
+                action: 'sent',
+                elapsedMinutes,
+                confirmedAt: latestConfirmedAt.toISOString(),
+            });
+        } else {
+            failedCount++;
+            details.push({
+                lineUserId,
+                studentName,
+                action: 'failed',
+                reason: sendResult.error,
+                elapsedMinutes,
+                confirmedAt: latestConfirmedAt.toISOString(),
+            });
+        }
+
+        await new Promise(r => setTimeout(r, 50));
+    }
+
+    return {
+        processedCount: candidates.length,
+        successCount,
+        skippedCount,
+        failedCount,
+        enabled: isEnabled,
+        mode: recoveryMode,
+        details,
+    };
+}
+
+// ==============================================================================
+// 17. Webhook / リクエスト便乗方式（案B）＋クライアントタイマー着火（案D）用スロットリング制御
+// ==============================================================================
+
+export const CONFIRM_30M_LAST_CHECKED_AT_KEY = 'line_confirm_30m_last_checked_at';
+export const CONFIRM_30M_THROTTLE_MS = 3 * 60 * 1000; // 3分間隔スロットリング
+
+let lastLazyConfirm30mCheckTimeMs = 0;
+let isLazyConfirm30mRunning = false;
+
+export interface TriggerLazyConfirm30MinOptions {
+    nowDate?: Date;
+    force?: boolean;
+    targetLineUserId?: string;
+    dryRun?: boolean;
+}
+
+export interface TriggerLazyConfirm30MinResult {
+    triggered: boolean;
+    reason?: 'already_running_in_memory' | 'throttled_in_memory' | 'throttled_in_db' | 'executed' | 'error';
+    lastCheckedAt?: string;
+    result?: ProcessConfirm30MinFollowupResult;
+    error?: string;
+}
+
+/**
+ * テスト用：メモリ上のスロットリング状態をリセットする
+ */
+export function resetLazyConfirm30MinThrottleForTest(): void {
+    lastLazyConfirm30mCheckTimeMs = 0;
+    isLazyConfirm30mRunning = false;
+}
+
+/**
+ * 前回チェックから3分以上経過している場合のみ（または force / targetLineUserId 指定時）、
+ * processConfirm30MinFollowupReminders() を実行するスロットリング付きラッパー。
+ *
+ * - 同一プロセス内のメモリキャッシュと app_configs (line_confirm_30m_last_checked_at) の2段構えで
+ *   3分以内の連続リクエストによる重複チェック・DB負荷を防止します。
+ * - targetLineUserId が指定された場合（案D：クライアントの30分タイマー満了によるピンポイント着火）は、
+ *   全体スロットリングに阻害されず当該ユーザーの30分経過＆直前除外判定を即時実行します。
+ */
+export async function triggerLazyConfirm30MinFollowup(
+    options: TriggerLazyConfirm30MinOptions = {}
+): Promise<TriggerLazyConfirm30MinResult> {
+    const {
+        nowDate = new Date(),
+        force = false,
+        targetLineUserId,
+        dryRun = false,
+    } = options;
+
+    const nowMs = nowDate.getTime();
+    const isTargetedCheck = Boolean(targetLineUserId && targetLineUserId.trim());
+
+    if (!force && !isTargetedCheck) {
+        if (isLazyConfirm30mRunning) {
+            return {
+                triggered: false,
+                reason: 'already_running_in_memory',
+                lastCheckedAt: lastLazyConfirm30mCheckTimeMs
+                    ? new Date(lastLazyConfirm30mCheckTimeMs).toISOString()
+                    : undefined,
+            };
+        }
+
+        // 1. インメモリ高速スロットリング判定（3分未満ならDBアクセスすら行わず即時スキップ）
+        if (
+            lastLazyConfirm30mCheckTimeMs > 0 &&
+            nowMs >= lastLazyConfirm30mCheckTimeMs &&
+            nowMs - lastLazyConfirm30mCheckTimeMs < CONFIRM_30M_THROTTLE_MS
+        ) {
+            return {
+                triggered: false,
+                reason: 'throttled_in_memory',
+                lastCheckedAt: new Date(lastLazyConfirm30mCheckTimeMs).toISOString(),
+            };
+        }
+    }
+
+    const supabase = createAdminClient();
+
+    if (!force && !isTargetedCheck) {
+        // 2. サーバーレス複数インスタンス間のDBスロットリング判定（app_configs）
+        try {
+            const { data: cfg } = await supabase
+                .from('app_configs')
+                .select('value')
+                .eq('key', CONFIRM_30M_LAST_CHECKED_AT_KEY)
+                .maybeSingle();
+
+            if (cfg?.value) {
+                const dbLastMs = new Date(cfg.value).getTime();
+                if (!isNaN(dbLastMs)) {
+                    if (dbLastMs > lastLazyConfirm30mCheckTimeMs) {
+                        lastLazyConfirm30mCheckTimeMs = dbLastMs;
+                    }
+                    if (nowMs >= dbLastMs && nowMs - dbLastMs < CONFIRM_30M_THROTTLE_MS) {
+                        return {
+                            triggered: false,
+                            reason: 'throttled_in_db',
+                            lastCheckedAt: cfg.value,
+                        };
+                    }
+                }
+            }
+        } catch {
+            // app_configs 参照失敗時はメモリ判定のみで続行
+        }
+    }
+
+    if (!isTargetedCheck) {
+        isLazyConfirm30mRunning = true;
+        lastLazyConfirm30mCheckTimeMs = nowMs;
+
+        // 後続リクエストの多重起動を防ぐため、実行開始時点で最終チェック時刻を先行記録
+        try {
+            await supabase
+                .from('app_configs')
+                .upsert(
+                    {
+                        key: CONFIRM_30M_LAST_CHECKED_AT_KEY,
+                        value: nowDate.toISOString(),
+                        updated_at: nowDate.toISOString(),
+                    },
+                    { onConflict: 'key' }
+                );
+        } catch {}
+    }
+
+    try {
+        const result = await processConfirm30MinFollowupReminders({
+            nowDate,
+            targetLineUserId: isTargetedCheck ? targetLineUserId!.trim() : undefined,
+            dryRun,
+        });
+
+        return {
+            triggered: true,
+            reason: 'executed',
+            lastCheckedAt: nowDate.toISOString(),
+            result,
+        };
+    } catch (err: any) {
+        console.error('[LazyConfirm30mFollowup] Background execution error:', err);
+        return {
+            triggered: false,
+            reason: 'error',
+            error: err?.message || String(err),
+        };
+    } finally {
+        if (!isTargetedCheck) {
+            isLazyConfirm30mRunning = false;
+        }
+    }
+}
+
+/**
+ * Next.js の after() を用いて、呼び出し元のレスポンス返却後に非同期バックグラウンドで
+ * triggerLazyConfirm30MinFollowup() をスケジュールするヘルパー。
+ * （リクエストスコープ外や単体テスト環境で after() が例外を投げた場合は非同期 Promise にフォールバック）
+ */
+export function scheduleLazyConfirm30MinFollowup(
+    options: TriggerLazyConfirm30MinOptions = {}
+): void {
+    const task = async () => {
+        try {
+            await triggerLazyConfirm30MinFollowup(options);
+        } catch (err) {
+            console.error('[scheduleLazyConfirm30MinFollowup] Error:', err);
+        }
+    };
+
+    try {
+        if (typeof after === 'function') {
+            after(task);
+            return;
+        }
+    } catch {
+        // リクエストコンテキスト外（テスト実行時など）は非同期実行へフォールバック
+    }
+    void task();
+}
+
+
+

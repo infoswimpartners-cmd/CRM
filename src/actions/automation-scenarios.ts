@@ -22,6 +22,12 @@ import {
     TRIAL_FOLLOWUP_GCHAT_WEBHOOK_KEY,
     TEST_TARO_STUDENT_NUMBER,
 } from '@/lib/line-trial-followup';
+import {
+    CONFIRM_30M_FOLLOWUP_ENABLED_KEY,
+    CONFIRM_30M_FOLLOWUP_MODE_KEY,
+    CONFIRM_30M_FOLLOWUP_TEMPLATE_KEY,
+    DEFAULT_CONFIRM_30M_FOLLOWUP_TEMPLATE,
+} from '@/lib/line-marketing-service';
 
 // レッスン報告フィードバックのデフォルトテンプレート（コーチ入力本文のみ）
 const DEFAULT_LESSON_REPORT_FEEDBACK_TEMPLATE = `{{feedback_comment}}`;
@@ -141,6 +147,10 @@ export async function getAutomationScenariosAction(): Promise<{
             }
         } catch {}
 
+        // 3.5. 体験申込の確認画面離脱 30分後リマインド配信
+        const confirm30mEnabled = configMap.get(CONFIRM_30M_FOLLOWUP_ENABLED_KEY)?.value !== 'false';
+        const confirm30mTemplate = configMap.get(CONFIRM_30M_FOLLOWUP_TEMPLATE_KEY)?.value?.trim() || DEFAULT_CONFIRM_30M_FOLLOWUP_TEMPLATE;
+
         // 4. ユーザーアクティビティ・1時間未返信フォロー
         const activityFollowEnabled = configMap.get('line_user_activity_follow_enabled')?.value === 'true';
         const activityTemplate = configMap.get('line_user_activity_follow_template')?.value?.trim() || DEFAULT_ACTIVITY_RECOVERY_TEMPLATE;
@@ -227,6 +237,27 @@ export async function getAutomationScenariosAction(): Promise<{
                     enableAiNaturalize: true,
                 },
                 updatedAt: configMap.get('step_reminders_templates')?.updatedAt,
+            },
+            {
+                id: 'confirm_30m_followup',
+                name: '確認画面離脱 30分後リマインド配信',
+                category: 'cart_recovery',
+                categoryLabel: '離脱復帰',
+                description: '体験申込フォームで確認画面まで入力して申込を完了しなかったユーザーへ、到達の30分後に再開を促すLINEメッセージを1回だけ自動送信します。送信直前に申込完了・本入会・退会・送信済を再確認して除外判定を行います。',
+                trigger: '確認画面到達（trial_confirm / フォーム確認済未申込タグ付与）',
+                timing: '確認画面到達から30分後（1離脱につき1回のみ）',
+                target: 'フォーム確認済・未申込の離脱見込み客',
+                status: confirm30mEnabled ? 'active' : 'paused',
+                statusLabel: confirm30mEnabled ? '稼働中' : '一時停止',
+                channels: ['line'],
+                template: confirm30mTemplate,
+                defaultTemplate: DEFAULT_CONFIRM_30M_FOLLOWUP_TEMPLATE,
+                variables: [
+                    { key: 'name', label: '顧客氏名', example: 'テスト太郎' },
+                    { key: 'form_url', label: 'フォーム再開URL', example: 'https://manager.swim-partners.com/trial?userId=...' },
+                    { key: 'trial_url', label: 'フォーム再開URL(互換)', example: 'https://manager.swim-partners.com/trial?userId=...' },
+                ],
+                updatedAt: configMap.get(CONFIRM_30M_FOLLOWUP_TEMPLATE_KEY)?.updatedAt,
             },
             {
                 id: 'user_activity_recovery',
@@ -354,6 +385,12 @@ export async function saveScenarioConfigAction(
                 key: 'step_reminders_templates',
                 value: JSON.stringify(tplObj),
             });
+        } else if (scenarioId === 'confirm_30m_followup') {
+            upsertRows.push(
+                { key: CONFIRM_30M_FOLLOWUP_ENABLED_KEY, value: status === 'active' ? 'true' : 'false' },
+                { key: CONFIRM_30M_FOLLOWUP_MODE_KEY, value: status === 'active' ? 'active' : 'paused' },
+                { key: CONFIRM_30M_FOLLOWUP_TEMPLATE_KEY, value: template }
+            );
         } else if (scenarioId === 'user_activity_recovery') {
             upsertRows.push(
                 { key: 'line_user_activity_follow_enabled', value: status === 'active' ? 'true' : 'false' },
@@ -453,6 +490,7 @@ export async function testSendScenarioAction(params: {
             feedback_comment: 'クロールの息継ぎが非常にスムーズになりました！次回もこの調子でいきましょう。',
             report_url: `https://manager.swim-partners.com/member/reports/test-preview`,
             form_url: `https://manager.swim-partners.com/trial?leadId=test-lead`,
+            trial_url: `https://manager.swim-partners.com/trial?leadId=test-lead`,
             enroll_url: 'https://liff.line.me/2009159689-Ugq1NLXe',
             survey_url: 'https://forms.gle/nNJMpU9TwQ4hkmPR7',
         };
@@ -462,6 +500,7 @@ export async function testSendScenarioAction(params: {
             if (params.scenarioId === 'trial_followup') rawTemplate = DEFAULT_TRIAL_FOLLOWUP_TEMPLATE;
             else if (params.scenarioId === 'lesson_report_feedback') rawTemplate = DEFAULT_LESSON_REPORT_FEEDBACK_TEMPLATE;
             else if (params.scenarioId === 'cart_recovery') rawTemplate = DEFAULT_CART_RECOVERY_TEMPLATE;
+            else if (params.scenarioId === 'confirm_30m_followup') rawTemplate = DEFAULT_CONFIRM_30M_FOLLOWUP_TEMPLATE;
             else if (params.scenarioId === 'user_activity_recovery') rawTemplate = DEFAULT_ACTIVITY_RECOVERY_TEMPLATE;
             else if (params.scenarioId === 'lesson_reminder') rawTemplate = DEFAULT_LESSON_REMINDER_TEMPLATE;
             else rawTemplate = `{{name}} 様\n\nテスト送信メッセージです。`;

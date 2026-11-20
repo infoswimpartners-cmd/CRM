@@ -72,7 +72,7 @@ export interface SyncTrialDoneResult {
 export interface LineDeliveryLog {
     id: string;
     created_at: string;
-    delivery_type: 'broadcast' | 'step_message' | 'test_preview' | 'cart_recovery' | 'confirm_abandon_recovery' | 'direct_chat';
+    delivery_type: 'broadcast' | 'step_message' | 'test_preview' | 'cart_recovery' | 'confirm_abandon_recovery' | 'confirm_30m_followup' | 'direct_chat';
     campaign_id: string | null;
     step_id: string | null;
     step_name: string | null;
@@ -101,7 +101,7 @@ export interface SendMessageOptions {
     lineUserId: string;
     rawMessage: string;
     variables?: Record<string, string | null | undefined>;
-    deliveryType: 'broadcast' | 'step_message' | 'test_preview' | 'cart_recovery' | 'confirm_abandon_recovery' | 'inactive_follow_recovery' | 'direct_chat';
+    deliveryType: 'broadcast' | 'step_message' | 'test_preview' | 'cart_recovery' | 'confirm_abandon_recovery' | 'confirm_30m_followup' | 'inactive_follow_recovery' | 'direct_chat';
     campaignId?: string;
     stepId?: string;
     stepName?: string;
@@ -193,7 +193,7 @@ export interface CreateBroadcastParams {
 export interface GetDeliveryLogsParams {
     page?: number;
     pageSize?: number;
-    deliveryType?: 'broadcast' | 'step_message' | 'test_preview' | 'cart_recovery' | 'confirm_abandon_recovery' | 'direct_chat' | 'all';
+    deliveryType?: 'broadcast' | 'step_message' | 'test_preview' | 'cart_recovery' | 'confirm_abandon_recovery' | 'confirm_30m_followup' | 'direct_chat' | 'all';
     status?: 'success' | 'sent' | 'failed' | 'skipped' | 'all';
     searchQuery?: string;
     startDate?: string;
@@ -259,7 +259,7 @@ export interface LineChatMessage {
     display_name?: string | null;
     direction: 'inbound' | 'outbound';
     sender_type: 'user' | 'admin' | 'system_auto' | 'coach';
-    message_type: 'text' | 'broadcast' | 'step_message' | 'cart_recovery' | 'direct_chat' | 'test_preview' | 'sticker' | 'image';
+    message_type: 'text' | 'broadcast' | 'step_message' | 'cart_recovery' | 'confirm_30m_followup' | 'direct_chat' | 'test_preview' | 'sticker' | 'image';
     message_text: string;
     sender_label?: string | null;
     is_read: boolean;

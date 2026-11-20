@@ -167,6 +167,7 @@ const TAG_DISPLAY_MAP: Record<string, string> = {
     referral_lead: '紹介経由',
     cart_recovery_sent: 'カゴ落ち送信済',
     confirm_abandon_recovery_sent: '確認後即時送信済',
+    confirm_30m_followup_sent: '確認後30分フォロー送信済',
     'audience:kids': 'キッズ',
     'audience:adult': '大人',
 };
@@ -1501,6 +1502,9 @@ export function IndividualChatTab({
                                                             )}
                                                             {msg.message_type === 'cart_recovery' && (
                                                                 <ShoppingBag className="w-3 h-3 text-amber-600" />
+                                                            )}
+                                                            {msg.message_type === 'confirm_30m_followup' && (
+                                                                <Clock className="w-3 h-3 text-rose-600" />
                                                             )}
                                                             {msg.message_type === 'test_preview' && (
                                                                 <FlaskConical className="w-3 h-3 text-emerald-600" />

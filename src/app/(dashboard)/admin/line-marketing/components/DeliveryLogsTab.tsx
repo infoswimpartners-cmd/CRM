@@ -216,6 +216,7 @@ export function DeliveryLogsTab() {
                                 <SelectItem value="broadcast">一括配信</SelectItem>
                                 <SelectItem value="step_message">ステップ配信</SelectItem>
                                 <SelectItem value="cart_recovery">カゴ落ちフォロー</SelectItem>
+                                <SelectItem value="confirm_30m_followup">確認30分後フォロー</SelectItem>
                                 <SelectItem value="test_preview">テスト送信</SelectItem>
                             </SelectContent>
                         </Select>
@@ -323,6 +324,14 @@ export function DeliveryLogsTab() {
                                                 <Badge variant="outline" className="text-[11px] bg-emerald-50 text-emerald-700 border-emerald-200">
                                                     個別トーク
                                                 </Badge>
+                                            ) : (log.delivery_type === 'confirm_30m_followup' || log.step_name === '確認画面離脱30分後フォロー') ? (
+                                                <Badge variant="outline" className="text-[11px] bg-rose-50 text-rose-700 border-rose-200">
+                                                    確認30分後
+                                                </Badge>
+                                            ) : (log.delivery_type === 'cart_recovery' || log.step_name === 'カゴ落ち自動フォロー') ? (
+                                                <Badge variant="outline" className="text-[11px] bg-indigo-50 text-indigo-700 border-indigo-200">
+                                                    カゴ落ち
+                                                </Badge>
                                             ) : log.delivery_type === 'broadcast' ? (
                                                 <Badge variant="outline" className="text-[11px] bg-blue-50 text-blue-700 border-blue-200">
                                                     一括配信
@@ -330,10 +339,6 @@ export function DeliveryLogsTab() {
                                             ) : log.delivery_type === 'step_message' ? (
                                                 <Badge variant="outline" className="text-[11px] bg-purple-50 text-purple-700 border-purple-200">
                                                     ステップ
-                                                </Badge>
-                                            ) : log.delivery_type === 'cart_recovery' ? (
-                                                <Badge variant="outline" className="text-[11px] bg-indigo-50 text-indigo-700 border-indigo-200">
-                                                    カゴ落ち
                                                 </Badge>
                                             ) : log.delivery_type === 'test_preview' ? (
                                                 <Badge variant="outline" className="text-[11px] bg-amber-50 text-amber-700 border-amber-200">

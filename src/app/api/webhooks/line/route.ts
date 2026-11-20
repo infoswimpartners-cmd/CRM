@@ -8,6 +8,7 @@ import {
     handleOfficialLineUnfollow, 
     handleOfficialLineMessage 
 } from '@/lib/line-step-reminders'
+import { scheduleLazyConfirm30MinFollowup } from '@/lib/line-marketing-service'
 
 const CHANNEL_SECRET = process.env.LINE_CHANNEL_SECRET || process.env.LINE_CLIENT_SECRET || ''
 const CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN || ''
@@ -83,6 +84,10 @@ export async function POST(req: NextRequest) {
         } else {
             console.warn('[LINE Webhook] LINE_CHANNEL_SECRET is not configured. Signature verification skipped.')
         }
+
+        // 案B: LINE Webhook受信のついでに、前回チェックから3分以上経過していれば
+        // Next.js after() で確認画面離脱30分後フォローをバックグラウンド消化（Webhookレスポンス速度を維持）
+        scheduleLazyConfirm30MinFollowup()
 
         const body = JSON.parse(rawBody)
         const events = body.events || []

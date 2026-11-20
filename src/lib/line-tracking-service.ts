@@ -30,6 +30,7 @@ export const STANDARD_TAGS = {
     REFERRAL: 'referral_lead',             // お友達紹介キャンペーン経由
     CART_RECOVERY_SENT: 'cart_recovery_sent', // カゴ落ちフォロー送信済
     CONFIRM_ABANDON_RECOVERY_SENT: 'confirm_abandon_recovery_sent', // フォーム確認後未申込の即時フォロー送信済
+    CONFIRM_30M_FOLLOWUP_SENT: 'confirm_30m_followup_sent', // フォーム確認後30分フォロー送信済
     INACTIVE_FOLLOW_RECOVERY_SENT: 'inactive_follow_recovery_sent', // 友だち追加1時間後未アクションフォロー送信済
     TRIAL_FOLLOWUP_SENT: 'trial_followup_sent', // 体験レッスン終了後フォロー送信済
     AUDIENCE_KIDS: 'audience:kids',        // 対象: キッズ/ジュニア
@@ -76,6 +77,11 @@ export const TAG_LABELS: Record<string, { label: string; category: string; descr
         label: '確認後即時フォロー送信済',
         category: 'automation',
         description: 'フォーム確認後未申込の離脱者へ即時フォローメッセージを送信完了したユーザー'
+    },
+    [STANDARD_TAGS.CONFIRM_30M_FOLLOWUP_SENT]: {
+        label: '確認後30分フォロー送信済',
+        category: 'automation',
+        description: 'フォーム確認画面到達から30分経過した未申込の離脱者へ再開リマインドを送信完了したユーザー'
     },
     [STANDARD_TAGS.INACTIVE_FOLLOW_RECOVERY_SENT]: {
         label: '追加1時間フォロー送信済',

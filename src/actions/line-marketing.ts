@@ -714,6 +714,12 @@ export async function getStepRules(targetTag?: string): Promise<{ success: boole
         await assertAdminUser();
         const supabaseAdmin = createAdminClient();
 
+        // 初回1回のみ「フォーム確認済未申込 (trial_form_confirmed)」の Step 1（当日18:00）を自動停止（Step 2は有効維持）
+        try {
+            const { ensureConfirmStep1PausedOnce } = await import('@/lib/line-marketing-service');
+            await ensureConfirmStep1PausedOnce();
+        } catch {}
+
         // 1. DBテーブルからの取得試行
         try {
             let query = supabaseAdmin
@@ -1070,6 +1076,8 @@ export async function getDeliveryLogs(
                 query = query.or('delivery_type.eq.direct_chat,step_name.eq.個別トーク（1対1チャット）');
             } else if (params.deliveryType === 'cart_recovery') {
                 query = query.or('delivery_type.eq.cart_recovery,step_name.eq.カゴ落ち自動フォロー');
+            } else if (params.deliveryType === 'confirm_30m_followup') {
+                query = query.or('delivery_type.eq.confirm_30m_followup,step_name.eq.確認画面離脱30分後フォロー');
             } else {
                 query = query.eq('delivery_type', params.deliveryType);
             }
@@ -1124,16 +1132,18 @@ export async function getDeliveryLogs(
                 try { fallbackLogs = JSON.parse(config.value); } catch {}
             }
 
-            // 簡易フィルタリング（direct_chat / cart_recovery の step_name 互換判定を含む）
+            // 簡易フィルタリング（direct_chat / cart_recovery / confirm_30m_followup の step_name 互換判定を含む）
             let filtered = fallbackLogs;
             if (params.deliveryType && params.deliveryType !== 'all') {
                 filtered = filtered.filter((l: any) => {
                     const isDirectChat = l.delivery_type === 'direct_chat' || l.step_name === '個別トーク（1対1チャット）';
                     const isCartRecovery = l.delivery_type === 'cart_recovery' || l.step_name === 'カゴ落ち自動フォロー';
+                    const isConfirm30mFollowup = l.delivery_type === 'confirm_30m_followup' || l.step_name === '確認画面離脱30分後フォロー';
                     if (params.deliveryType === 'direct_chat') return isDirectChat;
                     if (params.deliveryType === 'cart_recovery') return isCartRecovery;
+                    if (params.deliveryType === 'confirm_30m_followup') return isConfirm30mFollowup;
                     if (params.deliveryType === 'broadcast') {
-                        return l.delivery_type === 'broadcast' && !isDirectChat && !isCartRecovery;
+                        return l.delivery_type === 'broadcast' && !isDirectChat && !isCartRecovery && !isConfirm30mFollowup;
                     }
                     return l.delivery_type === params.deliveryType;
                 });
@@ -1564,6 +1574,11 @@ import {
 export async function getLineChatSyncSignatureAction(): Promise<{ success: boolean; signature: string }> {
     try {
         await assertAdminUser();
+        // 案B: 管理画面のLINEトーク新着ポーリングのついでに、前回チェックから3分以上経過していれば
+        // Next.js after() で確認画面離脱30分後フォローをバックグラウンド消化（ポーリング応答速度は落とさない）
+        const { scheduleLazyConfirm30MinFollowup } = await import('@/lib/line-marketing-service');
+        scheduleLazyConfirm30MinFollowup();
+
         const signature = await getLineChatSyncSignature();
         return { success: true, signature };
     } catch {
