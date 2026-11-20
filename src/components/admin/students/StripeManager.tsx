@@ -2,15 +2,18 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { CreditCard, ExternalLink, Loader2, Link as LinkIcon, AlertTriangle, Pencil, Copy, Check, Receipt, FileText } from 'lucide-react'
+import { CreditCard, ExternalLink, Loader2, Link as LinkIcon, AlertTriangle, Pencil, Copy, Check, Receipt, FileText, Download } from 'lucide-react'
 import {
     createStripeCustomer,
     createPaymentSetupLink,
     updateStudentStripeId,
     getStripeCustomerBillingSettings,
     updateStripeCustomerBillingSettings,
+    getCustomerReceiptsAndInvoices,
+    type CustomerReceiptItem,
 } from '@/actions/stripe'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
@@ -31,6 +34,7 @@ interface StripeManagerProps {
 }
 
 export function StripeManager({ studentId, stripeCustomerId, paymentMethodStatus }: StripeManagerProps) {
+    const router = useRouter()
     const [isCreating, setIsCreating] = useState(false)
     const [isLinking, setIsLinking] = useState(false)
     const [isManualMode, setIsManualMode] = useState(false)
@@ -44,10 +48,16 @@ export function StripeManager({ studentId, stripeCustomerId, paymentMethodStatus
     const [isLoadingSettings, setIsLoadingSettings] = useState(false)
     const [isSavingSettings, setIsSavingSettings] = useState(false)
 
+    // 発行済み領収書・請求書一覧
+    const [receipts, setReceipts] = useState<CustomerReceiptItem[]>([])
+    const [isLoadingReceipts, setIsLoadingReceipts] = useState(false)
+
     useEffect(() => {
         if (!stripeCustomerId) return
         let cancelled = false
         setIsLoadingSettings(true)
+        setIsLoadingReceipts(true)
+
         getStripeCustomerBillingSettings(stripeCustomerId)
             .then((res) => {
                 if (cancelled) return
@@ -59,6 +69,18 @@ export function StripeManager({ studentId, stripeCustomerId, paymentMethodStatus
             .finally(() => {
                 if (!cancelled) setIsLoadingSettings(false)
             })
+
+        getCustomerReceiptsAndInvoices(stripeCustomerId)
+            .then((res) => {
+                if (cancelled) return
+                if (res.success) {
+                    setReceipts(res.items || [])
+                }
+            })
+            .finally(() => {
+                if (!cancelled) setIsLoadingReceipts(false)
+            })
+
         return () => { cancelled = true }
     }, [stripeCustomerId])
 
@@ -74,6 +96,7 @@ export function StripeManager({ studentId, stripeCustomerId, paymentMethodStatus
             )
             if (res.success) {
                 toast.success('請求書・領収書の宛名とメモ欄をStripeに保存しました')
+                router.refresh()
             } else {
                 toast.error('保存に失敗しました: ' + res.error)
             }
@@ -88,6 +111,7 @@ export function StripeManager({ studentId, stripeCustomerId, paymentMethodStatus
             const result = await createStripeCustomer(studentId)
             if (result.success) {
                 toast.success('Stripe顧客を作成しました')
+                router.refresh()
             } else {
                 toast.error('作成失敗: ' + result.error)
             }
@@ -123,6 +147,7 @@ export function StripeManager({ studentId, stripeCustomerId, paymentMethodStatus
                 toast.success('Stripe IDを手動更新しました')
                 setIsManualMode(false)
                 setManualId('')
+                router.refresh()
             } else {
                 toast.error('更新失敗: ' + result.error)
             }
@@ -193,9 +218,14 @@ export function StripeManager({ studentId, stripeCustomerId, paymentMethodStatus
                 ) : !stripeCustomerId ? (
                     /* Customer not created yet */
                     <div className="flex flex-col gap-3">
-                        <div className="flex items-center gap-2 text-sm text-yellow-600 bg-yellow-50 p-3 rounded-md">
-                            <AlertTriangle className="w-4 h-4" />
-                            <span>Stripe顧客データが未作成です</span>
+                        <div className="flex flex-col gap-1 text-sm text-yellow-700 bg-yellow-50 p-3 rounded-md border border-yellow-200/70">
+                            <div className="flex items-center gap-2 font-medium">
+                                <AlertTriangle className="w-4 h-4 shrink-0" />
+                                <span>Stripe顧客データが未作成です</span>
+                            </div>
+                            <p className="text-[11px] text-yellow-600 leading-relaxed pl-6">
+                                ※ 宛名・メモ欄（但書）の設定や領収書の確認は、下の「顧客データを作成する」をクリックするか、コーチアサイン完了後に表示されます。
+                            </p>
                         </div>
                         <Button
                             onClick={handleCreateCustomer}
@@ -359,6 +389,112 @@ export function StripeManager({ studentId, stripeCustomerId, paymentMethodStatus
                                     Stripe宛名・メモを保存
                                 </Button>
                             </div>
+                        </div>
+
+                        {/* 領収書・請求書の確認セクション */}
+                        <div className="space-y-2.5 p-3.5 bg-white border border-slate-200/80 rounded-xl">
+                            <div className="flex items-center justify-between">
+                                <Label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                                    <Receipt className="w-3.5 h-3.5 text-emerald-600" />
+                                    領収書・請求書の確認
+                                </Label>
+                                {isLoadingReceipts && <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />}
+                            </div>
+
+                            {!isLoadingReceipts && receipts.length === 0 ? (
+                                <p className="text-[11px] text-slate-400 py-2 text-center bg-slate-50/70 rounded-lg">
+                                    発行済みの領収書・請求書はまだありません
+                                </p>
+                            ) : (
+                                <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                                    {receipts.map((item) => {
+                                        const dateStr = new Date(item.created * 1000).toLocaleDateString('ja-JP')
+                                        const isPaid = item.status === 'paid'
+                                        return (
+                                            <div
+                                                key={item.id}
+                                                className="p-2.5 rounded-lg border border-slate-100 bg-slate-50/60 flex flex-col gap-1.5 text-xs"
+                                            >
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="font-mono text-[11px] text-slate-500">{dateStr}</span>
+                                                        <Badge
+                                                            variant="outline"
+                                                            className={
+                                                                isPaid
+                                                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] px-1.5 py-0'
+                                                                    : 'bg-amber-50 text-amber-700 border-amber-200 text-[10px] px-1.5 py-0'
+                                                            }
+                                                        >
+                                                            {isPaid ? '支払済' : item.status === 'open' ? '請求中' : item.status}
+                                                        </Badge>
+                                                    </div>
+                                                    <span className="font-bold text-slate-800">
+                                                        ¥{item.amount.toLocaleString()}
+                                                    </span>
+                                                </div>
+
+                                                {(item.customerName || item.description) && (
+                                                    <div className="text-[11px] text-slate-600 space-y-0.5 leading-snug">
+                                                        {item.customerName && (
+                                                            <div className="truncate">
+                                                                <span className="text-slate-400">宛名:</span> {item.customerName}
+                                                            </div>
+                                                        )}
+                                                        {item.description && (
+                                                            <div className="truncate">
+                                                                <span className="text-slate-400">メモ:</span> {item.description}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                <div className="flex flex-wrap gap-1.5 pt-1">
+                                                    {item.invoicePdfUrl && (
+                                                        <Button
+                                                            asChild
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="h-7 px-2 text-[11px] bg-white hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200"
+                                                        >
+                                                            <a href={item.invoicePdfUrl} target="_blank" rel="noopener noreferrer">
+                                                                <Download className="w-3 h-3 mr-1" />
+                                                                領収書/請求書PDF
+                                                            </a>
+                                                        </Button>
+                                                    )}
+                                                    {item.hostedUrl && (
+                                                        <Button
+                                                            asChild
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="h-7 px-2 text-[11px] bg-white hover:bg-indigo-50 hover:text-indigo-700 hover:border-indigo-200"
+                                                        >
+                                                            <a href={item.hostedUrl} target="_blank" rel="noopener noreferrer">
+                                                                <ExternalLink className="w-3 h-3 mr-1" />
+                                                                Web明細・領収書
+                                                            </a>
+                                                        </Button>
+                                                    )}
+                                                    {item.receiptUrl && (
+                                                        <Button
+                                                            asChild
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="h-7 px-2 text-[11px] bg-white hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200"
+                                                        >
+                                                            <a href={item.receiptUrl} target="_blank" rel="noopener noreferrer">
+                                                                <Receipt className="w-3 h-3 mr-1" />
+                                                                Stripeレシート
+                                                            </a>
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}

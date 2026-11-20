@@ -821,3 +821,95 @@ export async function updateStripeCustomerBillingSettings(
     }
 }
 
+export interface CustomerReceiptItem {
+    id: string
+    kind: 'invoice' | 'charge'
+    number: string | null
+    amount: number
+    status: string
+    created: number
+    description: string | null
+    customerName: string | null
+    invoicePdfUrl: string | null
+    hostedUrl: string | null
+    receiptUrl: string | null
+}
+
+/**
+ * Stripe顧客の請求書・領収書・レシート一覧を取得する
+ */
+export async function getCustomerReceiptsAndInvoices(stripeCustomerId: string) {
+    try {
+        if (!stripeCustomerId) {
+            return { success: false, error: 'Stripe顧客IDがありません', items: [] as CustomerReceiptItem[] }
+        }
+
+        const [invoicesRes, chargesRes] = await Promise.all([
+            stripe.invoices.list({ customer: stripeCustomerId, limit: 15 }),
+            stripe.charges.list({ customer: stripeCustomerId, limit: 15 }),
+        ])
+
+        const invoicePaymentIntentIds = new Set<string>()
+        const items: CustomerReceiptItem[] = []
+
+        for (const inv of invoicesRes.data) {
+            const piId = typeof (inv as any).payment_intent === 'string'
+                ? (inv as any).payment_intent
+                : (inv as any).payment_intent?.id
+            if (piId) invoicePaymentIntentIds.add(piId)
+
+            items.push({
+                id: inv.id,
+                kind: 'invoice',
+                number: inv.number || null,
+                amount: inv.amount_paid || inv.amount_due || 0,
+                status: inv.status || 'unknown',
+                created: inv.created,
+                description: inv.description || inv.lines?.data?.[0]?.description || null,
+                customerName: inv.customer_name || null,
+                invoicePdfUrl: inv.invoice_pdf || null,
+                hostedUrl: inv.hosted_invoice_url || null,
+                receiptUrl: null,
+            })
+        }
+
+        // Invoiceに紐づかない単発決済（体験事前決済の通常Checkoutなど）のレシートも追加
+        for (const ch of chargesRes.data) {
+            const piId = typeof ch.payment_intent === 'string' ? ch.payment_intent : ch.payment_intent?.id
+            const invId = (ch as any).invoice
+            if (invId || (piId && invoicePaymentIntentIds.has(piId))) {
+                continue
+            }
+            if (!ch.paid) continue
+
+            items.push({
+                id: ch.id,
+                kind: 'charge',
+                number: null,
+                amount: ch.amount,
+                status: ch.refunded ? 'refunded' : 'paid',
+                created: ch.created,
+                description: ch.description || null,
+                customerName: ch.billing_details?.name || null,
+                invoicePdfUrl: null,
+                hostedUrl: null,
+                receiptUrl: ch.receipt_url || null,
+            })
+        }
+
+        items.sort((a, b) => b.created - a.created)
+
+        return {
+            success: true,
+            items: JSON.parse(JSON.stringify(items)) as CustomerReceiptItem[],
+        }
+    } catch (error: any) {
+        console.error('[getCustomerReceiptsAndInvoices] Error:', error)
+        return {
+            success: false,
+            error: error?.message || '領収書履歴の取得に失敗しました',
+            items: [] as CustomerReceiptItem[],
+        }
+    }
+}
+
