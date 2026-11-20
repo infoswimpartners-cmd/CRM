@@ -118,15 +118,10 @@ export async function GET(
             }
         }
 
-        const line_items = targetSchedules.map((s) => {
+        const line_items = targetSchedules.map((s, idx) => {
             const m = Array.isArray(s.lesson_masters) ? s.lesson_masters[0] : s.lesson_masters
-            let itemName = m?.name || '体験レッスン'
-            if (s.title) {
-                const namePart = s.title.split('様')[0]
-                if (namePart) {
-                    itemName = `体験レッスン（${namePart.trim()} 様）`
-                }
-            }
+            const baseName = m?.name || '初回体験レッスン'
+            const itemName = targetSchedules.length > 1 ? `${baseName}（${idx + 1}枠目）` : baseName
             return {
                 price_data: {
                     currency: 'jpy',
