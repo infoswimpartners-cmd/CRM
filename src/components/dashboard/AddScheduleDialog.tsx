@@ -124,6 +124,7 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
     const [packageRemainingCount, setPackageRemainingCount] = useState(0)
     const [isGoogleLinked, setIsGoogleLinked] = useState(false)
     const [checkingStatus, setCheckingStatus] = useState(false)
+    const [statusError, setStatusError] = useState<string | null>(null)
     const lastCheckedRef = useRef<{ studentId: string; date: string; attendanceType: string } | null>(null)
 
     // ダイアログを閉じた時にキャッシュをリセット
@@ -292,54 +293,66 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
 
                 const check = async () => {
                     setCheckingStatus(true)
-                    const { checkStudentLessonStatus } = await import('@/actions/lesson_schedule')
-                    const res = await checkStudentLessonStatus(studentId, dateStr, attendanceType)
+                    setStatusError(null)
+                    try {
+                        const { checkStudentLessonStatus } = await import('@/actions/lesson_schedule')
+                        const res = await checkStudentLessonStatus(studentId, dateStr, attendanceType)
 
-                    if (res.success) {
-                        setIsOverage(!!res.isOverage)
-                        setMembershipName(res.membershipName)
-                        setMonthlyLimit(res.limit || 0)
-                        setCurrentCount(res.count || 0)
-                        setRolloverCount(res.rollover || 0)
-                        setCurrentTickets(res.currentTickets || 0)
-                        setIsPackage(!!res.isPackage)
-                        setPackageTotalCount(res.packageTotalCount || 0)
-                        setPackageUsedCount(res.packageUsedCount || 0)
-                        setPackageRemainingCount(res.packageRemainingCount || 0)
-                        setAvailableLessons(res.availableLessons || [])
+                        if (res.success) {
+                            setIsOverage(!!res.isOverage)
+                            setMembershipName(res.membershipName)
+                            setMonthlyLimit(res.limit || 0)
+                            setCurrentCount(res.count || 0)
+                            setRolloverCount(res.rollover || 0)
+                            setCurrentTickets(res.currentTickets || 0)
+                            setIsPackage(!!res.isPackage)
+                            setPackageTotalCount(res.packageTotalCount || 0)
+                            setPackageUsedCount(res.packageUsedCount || 0)
+                            setPackageRemainingCount(res.packageRemainingCount || 0)
+                            setAvailableLessons(res.availableLessons || [])
 
-                        const lessons = res.availableLessons || []
+                            const lessons = res.availableLessons || []
 
-                        // Auto-select logic: 基本的に60分レッスンを最優先で自動選択
-                        if (lessons.length > 0) {
-                            let targetId = 'default'
+                            // Auto-select logic: 基本的に60分レッスンを最優先で自動選択
+                            if (lessons.length > 0) {
+                                let targetId = 'default'
 
-                            // 1. プランの標準レッスン（新単発は10,000円、旧単発は9,000円）を最優先で選択
-                            const defaultMatch = res.defaultLessonId ? lessons.find((l: any) => l.id === res.defaultLessonId) : null
-                            if (defaultMatch) {
-                                targetId = defaultMatch.id
-                            } else {
-                                // 2. 標準レッスンが未設定の場合は、単価10,000円の単発（60分）または60分レッスンを優先
-                                const singleTenThousand = lessons.find((l: any) => l.name?.includes('60') && (l.unit_price === 10000 || l.id === 'd5c6f390-ad26-43b8-a4e3-72431df304a0'))
-                                const sixtyMin = singleTenThousand || lessons.find((l: any) => l.name?.includes('60'))
-                                if (sixtyMin) {
-                                    targetId = sixtyMin.id
+                                // 1. プランの標準レッスン（新単発は10,000円、旧単発は9,000円）を最優先で選択
+                                const defaultMatch = res.defaultLessonId ? lessons.find((l: any) => l.id === res.defaultLessonId) : null
+                                if (defaultMatch) {
+                                    targetId = defaultMatch.id
+                                } else {
+                                    // 2. 標準レッスンが未設定の場合は、単価10,000円の単発（60分）または60分レッスンを優先
+                                    const singleTenThousand = lessons.find((l: any) => l.name?.includes('60') && (l.unit_price === 10000 || l.id === 'd5c6f390-ad26-43b8-a4e3-72431df304a0'))
+                                    const sixtyMin = singleTenThousand || lessons.find((l: any) => l.name?.includes('60'))
+                                    if (sixtyMin) {
+                                        targetId = sixtyMin.id
+                                    }
                                 }
-                            }
 
-                            // 3. Fallback to first item if still default
-                            if (targetId === 'default') {
-                                targetId = lessons[0].id
-                            }
+                                // 3. Fallback to first item if still default
+                                if (targetId === 'default') {
+                                    targetId = lessons[0].id
+                                }
 
-                            console.log('[AutoSelect] Selected:', targetId)
-                            // Use setTimeout to ensure availableLessons state update is processed by Select component
-                            setTimeout(() => setSelectedMasterId(targetId), 0)
+                                console.log('[AutoSelect] Selected:', targetId)
+                                // Use setTimeout to ensure availableLessons state update is processed by Select component
+                                setTimeout(() => setSelectedMasterId(targetId), 0)
+                            } else {
+                                setSelectedMasterId('default')
+                            }
                         } else {
-                            setSelectedMasterId('default')
+                            console.error('[CheckStatus Failed]:', res.error)
+                            setStatusError(res.error || '生徒情報の取得に失敗しました')
+                            setAvailableLessons([])
                         }
+                    } catch (err: any) {
+                        console.error('[CheckStatus Error]:', err)
+                        setStatusError(err?.message || '通信エラーが発生しました')
+                        setAvailableLessons([])
+                    } finally {
+                        setCheckingStatus(false)
                     }
-                    setCheckingStatus(false)
                 }
                 check()
             }
@@ -565,6 +578,9 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
         setIsTrialMode(false)
         setIsOverage(false)
         setMembershipName(null)
+        setAvailableLessons([])
+        setSelectedMasterId('default')
+        setStatusError(null)
         if (currentUser) setSelectedCoachId(currentUser.id)
     }
 
@@ -752,12 +768,36 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
                             {/* Lesson Selector (Always visible, defaulting to Membership Default) */}
                             <div className="grid gap-2 mt-4 bg-slate-50 p-3 rounded-md border border-slate-200">
                                 <Label className="text-slate-800 font-bold">レッスン種別</Label>
-                                <Select value={selectedMasterId} onValueChange={setSelectedMasterId}>
+                                <Select
+                                    value={selectedMasterId}
+                                    onValueChange={setSelectedMasterId}
+                                    disabled={studentId === 'none' || checkingStatus}
+                                >
                                     <SelectTrigger>
-                                        <SelectValue placeholder="レッスンを選択" />
+                                        <SelectValue
+                                            placeholder={
+                                                studentId === 'none'
+                                                    ? "先に生徒を選択してください"
+                                                    : checkingStatus
+                                                        ? "読み込み中..."
+                                                        : "レッスンを選択"
+                                            }
+                                        />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {availableLessons.length > 0 ? (
+                                        {studentId === 'none' ? (
+                                            <div className="p-2 text-xs text-gray-500 text-center">
+                                                先に生徒を選択してください
+                                            </div>
+                                        ) : checkingStatus ? (
+                                            <div className="p-2 text-xs text-gray-500 text-center flex items-center justify-center gap-1.5">
+                                                <Loader2 className="w-3 h-3 animate-spin" /> 読み込み中...
+                                            </div>
+                                        ) : statusError ? (
+                                            <div className="p-2 text-xs text-red-500 text-center">
+                                                取得エラー: {statusError}
+                                            </div>
+                                        ) : availableLessons.length > 0 ? (
                                             availableLessons.map((l: any) => (
                                                 <SelectItem key={l.id} value={l.id}>
                                                     {l.name}
@@ -768,12 +808,6 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
                                                     )}
                                                 </SelectItem>
                                             ))
-                                        ) : lessonMasters.length > 0 ? (
-                                            lessonMasters.map((l: any) => (
-                                                <SelectItem key={l.id} value={l.id}>
-                                                    {l.name}
-                                                </SelectItem>
-                                            ))
                                         ) : (
                                             <div className="p-2 text-xs text-gray-500 text-center">
                                                 選択可能なレッスンがありません
@@ -781,6 +815,11 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
                                         )}
                                     </SelectContent>
                                 </Select>
+                                {statusError && (
+                                    <p className="text-xs text-red-600 mt-1">
+                                        ※レッスン種別の取得に失敗しました。生徒を再選択するかページを再読み込みしてください。
+                                    </p>
+                                )}
                             </div>
                         </div>
 
