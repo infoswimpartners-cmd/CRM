@@ -66,19 +66,26 @@ export async function updateSession(request: NextRequest) {
         }
     }
 
-    // skip API webhooks from session checks
-    if (request.nextUrl.pathname.startsWith('/api/webhooks/')) {
+    // APIルートは各ルートハンドラ自身で認証・署名検証を行うため、Middlewareでのセッション通信をスキップ
+    if (request.nextUrl.pathname.startsWith('/api/')) {
         return supabaseResponse
     }
 
-    // Check session first to avoid AuthSessionMissingError logs if possible
+    // セッション確認（Cookieから高速読み取り）
     const { data: sessionData } = await supabase.auth.getSession()
     const session = sessionData?.session
-    let user = null
+    let user = session?.user ?? null
 
+    // アクセストークンの期限切れが近い（残り5分未満）場合のみ Middleware 側で getUser() によるリフレッシュを実行
+    // ※ 保護ページ側の Server Component (DashboardLayout / MemberLayout / Page) では必ず getUser() による厳格な検証を行う
     if (session) {
-        const { data: userData } = await supabase.auth.getUser()
-        user = userData?.user
+        const nowSec = Math.floor(Date.now() / 1000)
+        const expiresAt = session.expires_at ?? 0
+        const needsRefresh = expiresAt - nowSec < 300
+        if (needsRefresh) {
+            const { data: userData } = await supabase.auth.getUser()
+            user = userData?.user ?? null
+        }
     }
 
     // Member routes protection (Supabase Auth Only)

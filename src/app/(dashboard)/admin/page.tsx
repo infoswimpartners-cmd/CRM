@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getCachedAuthUser } from '@/lib/auth-cache'
 import { LessonTable } from '@/components/admin/LessonTable'
 import { SalesSummary } from '@/components/admin/SalesSummary'
 import { CoachRewardTable } from '@/components/admin/CoachRewardTable'
@@ -119,7 +120,7 @@ async function AdminDashboardContent({ monthParam }: { monthParam: string }) {
         const targetDate = new Date(monthParam + '-01')
 
         const supabase = await createClient()
-        const { data: { user } } = await supabase.auth.getUser()
+        const { user } = await getCachedAuthUser()
 
         if (!user) {
             return <div>Access Denied</div>

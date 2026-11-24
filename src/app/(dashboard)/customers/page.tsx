@@ -85,7 +85,8 @@ type SortConfig = {
 export default function StudentListPage() {
     const [students, setStudents] = useState<Student[]>([])
     const [search, setSearch] = useState('')
-    const [statusFilter, setStatusFilter] = useState<string>('all')
+    // デフォルトは「会員（入会済み: active）」でフィルタリング
+    const [statusFilter, setStatusFilter] = useState<string>('active')
     const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'created_at', direction: 'desc' })
     const [loading, setLoading] = useState(true)
     const [isAdmin, setIsAdmin] = useState(false)
@@ -230,27 +231,75 @@ export default function StudentListPage() {
                 )}
             </div>
 
-            <div className="flex items-center gap-4 py-4">
-                <div className="relative w-full max-w-sm">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
-                    <Input
-                        placeholder="名前で検索..."
-                        className="pl-8"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                    />
+            <div className="flex flex-col gap-3 py-4">
+                <div className="flex items-center gap-4">
+                    <div className="relative w-full max-w-sm">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+                        <Input
+                            placeholder="名前で検索..."
+                            className="pl-8"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                        />
+                    </div>
                 </div>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-[180px]">
-                        <SelectValue placeholder="ステータス" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">全て表示</SelectItem>
-                        {Object.entries(statusLabels).map(([key, label]) => (
-                            <SelectItem key={key} value={key}>{label}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
+                {/* ステータスごとのフィルタリングボタン */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                    {statuses
+                        .filter((s) => s.id !== 'withdrawn')
+                        .map((s) => {
+                            const count = students.filter((st) => st.status === s.id).length
+                            const isSelected = statusFilter === s.id
+                            const displayLabel = s.id === 'active' ? '会員（入会済み）' : s.name
+                            return (
+                                <Button
+                                    key={s.id}
+                                    type="button"
+                                    size="sm"
+                                    variant={isSelected ? 'default' : 'outline'}
+                                    onClick={() => setStatusFilter(s.id)}
+                                    className={cn(
+                                        'h-8 px-3 text-xs rounded-full transition-all',
+                                        isSelected
+                                            ? 'bg-slate-900 text-white hover:bg-slate-800 shadow-xs'
+                                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-slate-900'
+                                    )}
+                                >
+                                    <span>{displayLabel}</span>
+                                    <span
+                                        className={cn(
+                                            'ml-1.5 px-1.5 py-0.2 rounded-full text-[10px] font-semibold',
+                                            isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+                                        )}
+                                    >
+                                        {count}
+                                    </span>
+                                </Button>
+                            )
+                        })}
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant={statusFilter === 'all' ? 'default' : 'outline'}
+                        onClick={() => setStatusFilter('all')}
+                        className={cn(
+                            'h-8 px-3 text-xs rounded-full transition-all',
+                            statusFilter === 'all'
+                                ? 'bg-slate-900 text-white hover:bg-slate-800 shadow-xs'
+                                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-slate-900'
+                        )}
+                    >
+                        <span>全て表示</span>
+                        <span
+                            className={cn(
+                                'ml-1.5 px-1.5 py-0.2 rounded-full text-[10px] font-semibold',
+                                statusFilter === 'all' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+                            )}
+                        >
+                            {students.length}
+                        </span>
+                    </Button>
+                </div>
             </div>
 
             {/* PC向けテーブルビュー (md以上で表示) */}

@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { PlusCircle, History, User, Calendar as CalendarIcon, DollarSign, Users, Waves, FileText } from 'lucide-react'
 
 import { createClient } from '@/lib/supabase/server'
+import { getCachedProfile } from '@/lib/auth-cache'
 import { redirect } from 'next/navigation'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -22,18 +23,11 @@ export const dynamic = 'force-dynamic'
 import { Suspense } from 'react'
 
 export default async function CoachDashboard() {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const { user, profile } = await getCachedProfile()
 
     if (!user) {
         redirect('/login')
     }
-
-    const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single()
 
     return (
         <div className="space-y-5 md:space-y-8 animate-fade-in-up pb-10 min-w-0">
@@ -108,8 +102,6 @@ async function CoachDashboardContent({ userId, profile }: { userId: string, prof
             students ( full_name )
         `)
         .eq('coach_id', userId)
-        .gte('start_time', now)
-        .order('start_time', { ascending: true })
         .gte('start_time', now)
         .order('start_time', { ascending: true })
         .limit(5)

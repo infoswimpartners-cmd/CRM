@@ -36,7 +36,7 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 interface GlobalSearchProps {
-    students: {
+    students?: {
         id: string
         full_name: string
         full_name_kana?: string | null
@@ -67,9 +67,47 @@ interface GlobalSearchProps {
     isAdmin: boolean
 }
 
-export function GlobalSearch({ students, coaches = [], leads = [], announcements = [], isAdmin }: GlobalSearchProps) {
+export function GlobalSearch({
+    students: initialStudents,
+    coaches: initialCoaches,
+    leads: initialLeads,
+    announcements: initialAnnouncements,
+    isAdmin,
+}: GlobalSearchProps) {
     const [open, setOpen] = React.useState(false)
+    const [students, setStudents] = React.useState(initialStudents || [])
+    const [coaches, setCoaches] = React.useState(initialCoaches || [])
+    const [leads, setLeads] = React.useState(initialLeads || [])
+    const [announcements, setAnnouncements] = React.useState(initialAnnouncements || [])
+    const [hasFetched, setHasFetched] = React.useState(Boolean(initialStudents))
+    const [isLoadingIndex, setIsLoadingIndex] = React.useState(false)
     const router = useRouter()
+
+    // 検索モーダルを初めて開いた時のみ認証済みAPIから検索インデックスを取得する
+    React.useEffect(() => {
+        if (!open || hasFetched || isLoadingIndex) return
+        let cancelled = false
+        setIsLoadingIndex(true)
+        fetch('/api/search-index', { cache: 'no-store' })
+            .then((res) => (res.ok ? res.json() : null))
+            .then((data) => {
+                if (cancelled || !data) return
+                setStudents(data.students || [])
+                setCoaches(data.coaches || [])
+                setLeads(data.leads || [])
+                setAnnouncements(data.announcements || [])
+                setHasFetched(true)
+            })
+            .catch((err) => {
+                console.error('[GlobalSearch] Failed to load search index:', err)
+            })
+            .finally(() => {
+                if (!cancelled) setIsLoadingIndex(false)
+            })
+        return () => {
+            cancelled = true
+        }
+    }, [open, hasFetched, isLoadingIndex])
 
     const pages = React.useMemo(() => {
         if (isAdmin) {
@@ -141,7 +179,9 @@ export function GlobalSearch({ students, coaches = [], leads = [], announcements
             <CommandDialog open={open} onOpenChange={setOpen}>
                 <CommandInput placeholder="名前、ID、ページ名、お知らせで検索..." />
                 <CommandList className="max-h-[450px]">
-                    <CommandEmpty>結果が見つかりませんでした。</CommandEmpty>
+                    <CommandEmpty>
+                        {isLoadingIndex ? '検索データを読み込み中...' : '結果が見つかりませんでした。'}
+                    </CommandEmpty>
 
                     <CommandGroup heading="ページ・機能">
                         {pages.map((page) => (

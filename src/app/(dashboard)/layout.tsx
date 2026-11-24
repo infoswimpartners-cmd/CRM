@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getCachedProfile } from '@/lib/auth-cache'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { Suspense } from 'react'
@@ -17,24 +18,15 @@ export default async function DashboardLayout({
 }: {
     children: React.ReactNode
 }) {
-    const supabase = await createClient()
-
     const headersList = await headers()
     const pathname = headersList.get('x-pathname') || ''
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    const { user, userError, profile } = await getCachedProfile()
 
     if (!user || userError) {
         const redirectUrl = pathname ? `/login?redirectTo=${encodeURIComponent(pathname)}` : '/login'
         redirect(redirectUrl)
     }
-
-    const { data: profile } = await supabase
-        .from('profiles')
-        .select('*, coach_number') // Explicitly select coach_number just in case * doesn't get it due to types? No, * gets all. But let's be safe or just rely on *
-        // * is fine.
-        .eq('id', user.id)
-        .single()
 
     if (!profile) {
         redirect('/')
