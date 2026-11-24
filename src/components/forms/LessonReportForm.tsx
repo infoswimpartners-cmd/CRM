@@ -874,12 +874,29 @@ export function LessonReportForm() {
                     name="lesson_master_id"
                     render={({ field }) => (
                         <FormItem>
-                            <FormLabel>レッスンの種類</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value}>
+                            <FormLabel className="flex items-center justify-between">
+                                <span>レッスンの種類</span>
+                                {displayMasters.length === 1 && selectedStudentId && (
+                                    <span className="text-[10px] font-normal text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                                        プランに合わせて自動選択済み
+                                    </span>
+                                )}
+                            </FormLabel>
+                            <Select
+                                onValueChange={field.onChange}
+                                value={field.value}
+                                disabled={!selectedStudentId && !form.watch('student_name')}
+                            >
                                 <FormControl>
                                     <SelectTrigger className="w-full overflow-hidden">
                                         <div className="truncate w-full text-left">
-                                            <SelectValue placeholder="レッスンを選択" />
+                                            <SelectValue
+                                                placeholder={
+                                                    !selectedStudentId && !form.watch('student_name')
+                                                        ? "先に生徒を選択してください"
+                                                        : "レッスンを選択"
+                                                }
+                                            />
                                         </div>
                                     </SelectTrigger>
                                 </FormControl>

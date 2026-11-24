@@ -767,7 +767,14 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
                             )}
                             {/* Lesson Selector (Always visible, defaulting to Membership Default) */}
                             <div className="grid gap-2 mt-4 bg-slate-50 p-3 rounded-md border border-slate-200">
-                                <Label className="text-slate-800 font-bold">レッスン種別</Label>
+                                <Label className="text-slate-800 font-bold flex items-center justify-between">
+                                    <span>レッスン種別</span>
+                                    {studentId !== 'none' && !checkingStatus && availableLessons.length === 1 && (
+                                        <span className="text-[10px] font-normal text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                                            プランに合わせて自動選択済み
+                                        </span>
+                                    )}
+                                </Label>
                                 <Select
                                     value={selectedMasterId}
                                     onValueChange={setSelectedMasterId}
