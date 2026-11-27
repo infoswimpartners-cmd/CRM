@@ -210,10 +210,19 @@ export async function assignMembership(studentId: string, membershipTypeId: stri
             await supabase.from('students').update({
                 membership_type_id: null,
                 stripe_subscription_id: null,
-                next_membership_type_id: null
+                next_membership_type_id: null,
+                next_next_membership_type_id: null
             }).eq('id', studentId)
 
             revalidatePath(`/customers/${studentId}`)
+            revalidatePath('/customers')
+            revalidatePath('/students')
+            revalidatePath('/admin')
+            revalidatePath('/admin/approvals')
+            revalidatePath('/admin/analytics')
+            revalidatePath('/member/billing')
+            revalidatePath('/member/dashboard')
+            revalidatePath('/coach')
             return { success: true }
         }
 
@@ -365,6 +374,14 @@ export async function assignMembership(studentId: string, membershipTypeId: stri
         if (dbError) throw dbError
 
         revalidatePath(`/customers/${studentId}`)
+        revalidatePath('/customers')
+        revalidatePath('/students')
+        revalidatePath('/admin')
+        revalidatePath('/admin/approvals')
+        revalidatePath('/admin/analytics')
+        revalidatePath('/member/billing')
+        revalidatePath('/member/dashboard')
+        revalidatePath('/coach')
         return { success: true }
 
     } catch (error: any) {

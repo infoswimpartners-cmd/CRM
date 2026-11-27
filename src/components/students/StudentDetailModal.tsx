@@ -155,7 +155,10 @@ export function StudentDetailModal({ student, isOpen, onOpenChange }: StudentDet
                                         {statusLabels[student.status] || student.status || '不明'}
                                     </Badge>
                                     {(() => {
-                                        const isPkg = student.membership_types?.is_package || getMembershipName().includes('パッケージ');
+                                        const membershipObj = Array.isArray(student.membership_types)
+                                            ? student.membership_types[0]
+                                            : student.membership_types
+                                        const isPkg = !!membershipObj?.is_package || getMembershipName().includes('パッケージ');
                                         if (isPkg) {
                                             return (
                                                 <Badge variant="outline" className="text-[9px] md:text-[10px] font-bold text-indigo-700 bg-indigo-50 border-indigo-200 shadow-2xs h-fit leading-none py-0.5">

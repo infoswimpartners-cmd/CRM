@@ -147,7 +147,17 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
     const studentStatusMasters = studentStatusMastersRes.data
     const assignedCoaches = assignedCoachesRes.data
     const schedules = schedulesRes.data
-    const changeRequest = changeRequestRes.data && changeRequestRes.data.length > 0 ? changeRequestRes.data[0] : null
+    const rawChangeRequest = changeRequestRes.data && changeRequestRes.data.length > 0 ? changeRequestRes.data[0] : null
+    // すでに新プランへ変更済みの変更申請バナーは表示しない（履歴レコード自体はDBに保持）
+    const changeRequest = rawChangeRequest &&
+        rawChangeRequest.request_type === 'change_plan' &&
+        rawChangeRequest.requested_membership_type_id &&
+        rawChangeRequest.requested_membership_type_id === student.membership_type_id
+        ? null
+        : rawChangeRequest
+    const currentMembershipName = Array.isArray(student.membership_types)
+        ? student.membership_types[0]?.name
+        : (student.membership_types as { name?: string } | null)?.name
     const leaveSetting = leaveSettingRes
     const withdrawalSetting = withdrawalSettingRes
 
@@ -238,8 +248,7 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
                             )}
                             {/* Membership Type Badge */}
                             <Badge variant="outline" className="border-indigo-200 text-indigo-700 bg-indigo-50/50">
-                                {/* @ts-ignore relationship */}
-                                {student.membership_types?.name || '会員種別: 未選択'}
+                                {currentMembershipName || '会員種別: 未選択'}
                             </Badge>
                             {student.status === 'trial_billed' && (
                                 <span className="text-xs font-semibold text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md">
@@ -453,14 +462,14 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
                                 {isAdmin ? (
                                     <div className="mt-1">
                                         <StudentMembershipAssigner
+                                            key={`assigner-${student.id}-${student.membership_type_id || 'unassigned'}`}
                                             studentId={student.id}
                                             currentMembershipTypeId={student.membership_type_id}
                                         />
                                     </div>
                                 ) : (
                                     <div className="font-bold text-lg text-slate-800">
-                                        {/* @ts-ignore relationship */}
-                                        {student.membership_types?.name || '未選択'}
+                                        {currentMembershipName || '未選択'}
                                     </div>
                                 )}
                             </div>
@@ -490,6 +499,7 @@ export default async function StudentDetailPage({ params }: { params: Promise<{ 
 
                                 {/* 利用状況・チケット (Client Component for monthly switching) */}
                                 <UsageStatusCard 
+                                    key={`usage-${student.id}-${student.membership_type_id || 'unassigned'}`}
                                     studentId={student.id} 
                                     initialUsageData={usageData} 
                                     currentTickets={student.current_tickets || 0} 

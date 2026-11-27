@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Calendar, Ticket, ChevronLeft, ChevronRight, RefreshCcw, Package } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -19,6 +19,20 @@ export function UsageStatusCard({ studentId, initialUsageData, currentTickets }:
     const [currentDate, setCurrentDate] = useState(new Date())
     const [usageData, setUsageData] = useState(initialUsageData)
     const [loading, setLoading] = useState(false)
+    const isInitialMountRef = useRef(true)
+
+    // プラン変更後の router.refresh() 等で親から最新の initialUsageData が渡された際に表示を同期する
+    useEffect(() => {
+        if (isInitialMountRef.current) {
+            isInitialMountRef.current = false
+            return
+        }
+        if (isSameMonth(currentDate, new Date())) {
+            setUsageData(initialUsageData)
+        } else {
+            fetchStatus(currentDate)
+        }
+    }, [initialUsageData])
 
     const fetchStatus = async (date: Date) => {
         setLoading(true)

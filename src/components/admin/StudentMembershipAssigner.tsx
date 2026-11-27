@@ -24,7 +24,7 @@ interface StudentMembershipAssignerProps {
 }
 
 export function StudentMembershipAssigner({ studentId, currentMembershipTypeId }: StudentMembershipAssignerProps) {
-    const [membershipTypeId, setMembershipTypeId] = useState(currentMembershipTypeId || '')
+    const [membershipTypeId, setMembershipTypeId] = useState(currentMembershipTypeId || 'unassigned')
     const [membershipTypes, setMembershipTypes] = useState<{ id: string, name: string }[]>([])
     const [loading, setLoading] = useState(false)
 
@@ -34,6 +34,11 @@ export function StudentMembershipAssigner({ studentId, currentMembershipTypeId }
 
     const router = useRouter()
     const supabase = createClient()
+
+    // 親コンポーネントからの最新プランID変更に追従する
+    useEffect(() => {
+        setMembershipTypeId(currentMembershipTypeId || 'unassigned')
+    }, [currentMembershipTypeId])
 
     useEffect(() => {
         const fetchData = async () => {
@@ -49,6 +54,7 @@ export function StudentMembershipAssigner({ studentId, currentMembershipTypeId }
     }, [studentId, supabase])
 
     const handleSelectChange = (val: string) => {
+        if (val === membershipTypeId) return
         setPendingTypeId(val)
         setIsDialogOpen(true)
     }

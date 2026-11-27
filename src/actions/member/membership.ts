@@ -160,6 +160,12 @@ export async function approveMembershipChangeRequest(requestId: string) {
         if (requestUpdateError) throw requestUpdateError
 
         revalidatePath(`/customers/${request.student_id}`)
+        revalidatePath('/customers')
+        revalidatePath('/students')
+        revalidatePath('/admin')
+        revalidatePath('/admin/approvals')
+        revalidatePath('/member/billing')
+        revalidatePath('/member/dashboard')
         return { success: true }
 
     } catch (error: any) {
@@ -196,6 +202,9 @@ export async function rejectMembershipChangeRequest(requestId: string, note?: st
         if (updateError) throw updateError
 
         revalidatePath(`/customers/${request.student_id}`)
+        revalidatePath('/admin')
+        revalidatePath('/admin/approvals')
+        revalidatePath('/member/billing')
         return { success: true }
 
     } catch (error: any) {

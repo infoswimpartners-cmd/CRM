@@ -132,7 +132,7 @@ export default function StudentsPage() {
                 .from('students')
                 .select(`
                     *,
-                    membership_types:membership_type_id (
+                    membership_types:membership_types!students_membership_type_id_fkey (
                         name,
                         is_package,
                         ticket_count

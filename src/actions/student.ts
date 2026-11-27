@@ -242,6 +242,12 @@ export async function updateStudent(id: string, formData: any) {
             }
         }
 
+        // プラン変更時は予約済みの旧スケジュールをクリアして最新プランのみ有効とする
+        if (isMembershipChange) {
+            updates.next_membership_type_id = null
+            updates.next_next_membership_type_id = null
+        }
+
         // 3. Update DB
         const { error: updateError } = await supabase
             .from('students')
@@ -282,6 +288,14 @@ export async function updateStudent(id: string, formData: any) {
         }
 
         revalidatePath(`/customers/${id}`)
+        revalidatePath('/customers')
+        revalidatePath('/students')
+        revalidatePath('/admin')
+        revalidatePath('/admin/approvals')
+        revalidatePath('/admin/analytics')
+        revalidatePath('/member/billing')
+        revalidatePath('/member/dashboard')
+        revalidatePath('/coach')
         return { success: true, emailSent }
 
     } catch (error: any) {

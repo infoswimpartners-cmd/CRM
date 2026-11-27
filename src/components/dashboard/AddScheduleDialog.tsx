@@ -127,10 +127,20 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
     const [statusError, setStatusError] = useState<string | null>(null)
     const lastCheckedRef = useRef<{ studentId: string; date: string; attendanceType: string } | null>(null)
 
-    // ダイアログを閉じた時にキャッシュをリセット
+    // ダイアログを閉じた時にキャッシュとプラン表示状態をリセット（プラン変更後に旧プランが一瞬表示されるのを防止）
     useEffect(() => {
         if (!open) {
             lastCheckedRef.current = null
+            setMembershipName(null)
+            setIsPackage(false)
+            setPackageTotalCount(0)
+            setPackageUsedCount(0)
+            setPackageRemainingCount(0)
+            setMonthlyLimit(null)
+            setCurrentCount(0)
+            setRolloverCount(0)
+            setCurrentTickets(0)
+            setIsOverage(false)
         }
     }, [open])
 
@@ -278,6 +288,7 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
 
     // Check Student Status when Student & Date selected (Preview for first slot)
     useEffect(() => {
+        if (!open) return
         const firstSlotDate = slots[0]?.date
         if (studentId && studentId !== 'none' && firstSlotDate) {
             const dateStr = firstSlotDate.toISOString()
@@ -388,7 +399,7 @@ export function AddScheduleDialog({ onSuccess, open, onOpenChange, initialDate, 
                 setIsTrialMode(false)
             }
         }
-    }, [studentId, slots[0]?.date, students, lessonMasters, attendanceType, selectedCoachId])
+    }, [open, studentId, slots[0]?.date, students, lessonMasters, attendanceType, selectedCoachId])
 
     const generateGoogleCalendarUrl = (
         eventTitle: string,

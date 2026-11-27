@@ -469,6 +469,8 @@ ${slotsListText}
                         const updateData: any = {
                             status: 'active',
                             membership_type_id: planId,  // 月次・パッケージ共通でDBのIDを設定
+                            next_membership_type_id: null,
+                            next_next_membership_type_id: null,
                             stripe_customer_id: session.customer as string || null,
                             stripe_subscription_id: session.subscription as string || null,
                             membership_started_at: nowStr,

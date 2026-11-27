@@ -241,7 +241,7 @@ export default function MembershipBillingCard({
                                 <span className="text-xl font-black text-slate-800">
                                     {currentPrivatePlan?.name || '未加入 (単発受講のみ)'}
                                 </span>
-                                {currentPrivatePlan && currentPrivatePlan.fee > 0 && (
+                                {currentPrivatePlan && currentPrivatePlan.fee > 0 && !currentPrivatePlan.is_package && (
                                     <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-50 text-sky-600 border border-sky-100">
                                         <Sparkles className="w-2.5 h-2.5 text-sky-500" />
                                         月謝会員

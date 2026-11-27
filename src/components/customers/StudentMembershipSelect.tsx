@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import {
     Select,
@@ -27,7 +28,12 @@ export function StudentMembershipSelect({ studentId, initialMembershipTypeId, co
     const [membershipTypeId, setMembershipTypeId] = useState<string>(initialMembershipTypeId || 'none')
     const [membershipTypes, setMembershipTypes] = useState<MembershipType[]>([])
     const [loading, setLoading] = useState(false)
+    const router = useRouter()
     const supabase = createClient()
+
+    useEffect(() => {
+        setMembershipTypeId(initialMembershipTypeId || 'none')
+    }, [initialMembershipTypeId])
 
     useEffect(() => {
         const fetchMembershipTypes = async () => {
@@ -55,13 +61,18 @@ export function StudentMembershipSelect({ studentId, initialMembershipTypeId, co
         try {
             const { error } = await supabase
                 .from('students')
-                .update({ membership_type_id: updateValue })
+                .update({
+                    membership_type_id: updateValue,
+                    next_membership_type_id: null,
+                    next_next_membership_type_id: null,
+                })
                 .eq('id', studentId)
 
             if (error) {
                 throw error
             }
             toast.success('会員区分を更新しました')
+            router.refresh()
         } catch (error) {
             // Revert on error
             setMembershipTypeId(oldId)
